@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: sentinel
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 10000
+      keepalive-time: 300000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate.default_schema: sentinel
+      hibernate.format_sql: true
