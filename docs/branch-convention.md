@@ -88,7 +88,11 @@ docs: add branch convention
 ## 4. 운영 원칙
 
 - 기능 1개당 브랜치 1개. 수명은 짧게 유지
-- 머지는 Squash merge. `main` 이력을 기능 단위 한 줄로 유지하여 KPI 성과 정리 시 활용
+- 머지는 Merge commit (GitHub **Create a merge commit**). Squash merge·Rebase merge 미사용
+  - 작업 브랜치의 개별 커밋 이력 보존. 변경 경위 추적 및 `git bisect` 활용 가능
+  - 머지 커밋에 PR 번호가 남아 기능 단위 묶음 식별 가능
+  - 기능 단위 이력 조회는 `git log --first-parent main`. KPI 성과 정리 시 활용
+  - 개별 커밋이 그대로 `main`에 남으므로 작업 브랜치 커밋도 메시지 규칙 준수
 - 머지 후 작업 브랜치 삭제
 - `main` 직접 커밋은 초기 세팅(첫 커밋)에 한정
 
@@ -137,6 +141,6 @@ docs: add branch convention
    git switch main && git pull && git branch -d <브랜치명>
    ```
 
-   Squash merge 시 `-d`가 머지되지 않은 브랜치로 판단하여 거부하는 경우 존재. PR 머지 확인 후 `-D` 사용
+   Merge commit 방식이므로 `git pull` 후 `-d`로 삭제 가능. 거부 시 PR 머지 여부 재확인
 
 3. api 변경 시 노트북 상시 실행 컨테이너 새 버전으로 교체
