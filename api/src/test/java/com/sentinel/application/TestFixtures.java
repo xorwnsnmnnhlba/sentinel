@@ -56,10 +56,18 @@ public class TestFixtures {
 		return environments.save(environment);
 	}
 
+	public TestSuite suite(Project project) {
+		return suites.save(new TestSuite(project, "suite-" + UUID.randomUUID(), null));
+	}
+
 	public TestCase testCase(Project project, HttpMethod method, String path, Map<String, List<String>> headers,
 			String body) {
-		TestSuite suite = suites.save(new TestSuite(project, "suite-" + UUID.randomUUID(), null));
-		return testCases.save(new TestCase(suite, "case", new RequestSpec(method, path, headers, body)));
+		return testCase(suite(project), method, path, headers, body);
+	}
+
+	public TestCase testCase(TestSuite suite, HttpMethod method, String path, Map<String, List<String>> headers,
+			String body) {
+		return testCases.save(new TestCase(suite, "case-" + UUID.randomUUID(), new RequestSpec(method, path, headers, body)));
 	}
 
 	public void deleteAll() {

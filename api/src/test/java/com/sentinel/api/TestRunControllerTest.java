@@ -9,6 +9,7 @@ import com.sentinel.application.TestFixtures;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestCase;
+import com.sentinel.domain.TestSuite;
 import com.sentinel.runner.HttpMethod;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,26 @@ class TestRunControllerTest {
 		String location = result.getResponse().getHeader("Location");
 		assertThat(location).startsWith("/api/test-runs/");
 		assertThat(mvc.get().uri(location)).hasStatusOk().bodyJson().extractingPath("$.status").isEqualTo("COMPLETED");
+	}
+
+	@Test
+	void runsSuiteAndReturnsSummary() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/a", null, null);
+		fixtures.testCase(suite, HttpMethod.GET, "/b", null, null);
+
+		MvcTestResult result = mvc.post()
+			.uri("/api/test-suites/{id}/runs", suite.getId())
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"environmentId\": " + environment.getId() + "}")
+			.exchange();
+
+		assertThat(result).hasStatus(HttpStatus.CREATED);
+		assertThat(result).bodyJson().extractingPath("$.summary.total").isEqualTo(2);
+		assertThat(result).bodyJson().extractingPath("$.summary.responded").isEqualTo(2);
+		assertThat(result).bodyJson().extractingPath("$.trigger").isEqualTo("MANUAL");
 	}
 
 	@Test

@@ -114,7 +114,8 @@ curl -i -X POST localhost:8080/api/test-cases/1/runs \
 | API | 설명 |
 |-----|------|
 | `POST /api/test-cases/{id}/runs` | 케이스 1건 실행. 본문 `{"environmentId": 1}`. 201 + `Location: /api/test-runs/{runId}` |
-| `GET /api/test-runs/{runId}` | 실행 결과 조회 |
+| `POST /api/test-suites/{id}/runs` | 스위트 전체 실행. 케이스 ID 순 순차 실행, 실패 케이스가 있어도 나머지 계속 실행 |
+| `GET /api/test-runs/{runId}` | 실행 결과 조회. `summary`에 전체·응답 수신·오류 건수 |
 
 ### 결과 해석
 
