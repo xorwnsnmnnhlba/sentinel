@@ -10,11 +10,15 @@ spring:
       connection-timeout: 10000
       keepalive-time: 300000
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     properties:
       hibernate.default_schema: sentinel
       hibernate.format_sql: true
+  mvc:
+    problemdetails:
+      enabled: true
 
 sentinel:
   runner:

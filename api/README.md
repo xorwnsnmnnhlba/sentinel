@@ -85,6 +85,49 @@ set -a; source ../sentinel.env; set +a
 
 `TestSentinelApplication`이 PostgreSQL 컨테이너를 띄워 연결. 종료 시 데이터 소멸
 
+## 케이스 1건 실행 확인
+
+케이스 등록 API·화면이 없는 단계이므로 SQL로 등록 후 API로 실행
+
+### 1. 케이스 등록 (SQL)
+
+```sql
+INSERT INTO sentinel.project (name, created_at, updated_at) VALUES ('sample', now(), now());
+INSERT INTO sentinel.environment (project_id, name, base_url, variables, created_at, updated_at)
+  VALUES (1, 'dev', 'https://<gw-host>', '{"userId": "42"}', now(), now());
+INSERT INTO sentinel.test_suite (project_id, name, created_at, updated_at) VALUES (1, 'smoke', now(), now());
+INSERT INTO sentinel.test_case (suite_id, name, method, path, headers, body, created_at, updated_at)
+  VALUES (1, 'user lookup', 'GET', '/users/{{userId}}', '{"Accept": ["application/json"]}', NULL, now(), now());
+```
+
+- `bootTestRun` 사용 시 DB 접속: `docker ps`로 `postgres:18-alpine` 컨테이너 확인 후 `docker exec -it <컨테이너> psql -U test -d test`
+- `path`는 `/` 시작 상대 경로. 경로·헤더 값·본문에 `{{변수}}` 사용 가능, `\{{`는 치환 없이 `{{` 출력
+- `headers`는 `{"이름": ["값", ...]}` 형식
+
+### 2. 실행 (API)
+
+```bash
+curl -i -X POST localhost:8080/api/test-cases/1/runs \
+  -H 'Content-Type: application/json' -d '{"environmentId": 1}'
+```
+
+| API | 설명 |
+|-----|------|
+| `POST /api/test-cases/{id}/runs` | 케이스 1건 실행. 본문 `{"environmentId": 1}`. 201 + `Location: /api/test-runs/{runId}` |
+| `GET /api/test-runs/{runId}` | 실행 결과 조회 |
+
+### 결과 해석
+
+| 필드 | 의미 |
+|------|------|
+| `outcome: RESPONDED` | 응답 수신. 4xx·5xx 포함. 성공·실패 판정은 3단계(Assertion)에서 추가 |
+| `outcome: ERROR` | 응답 미수신 또는 전송 전 실패. 사유는 `errorReason` |
+| `errorReason` | `UNRESOLVED_VARIABLE`(변수 누락, 미전송) / `INVALID_REQUEST`(잘못된 URL·헤더) / `TIMEOUT` / `CONNECTION_FAILED` / `IO_ERROR` / `UNEXPECTED` |
+
+- 저장되는 요청·응답 헤더 중 `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` 값은 `****`로 마스킹. 실제 전송 값은 원본 사용
+- 응답 본문은 64KB(UTF-8 기준) 초과 시 잘라서 저장, `bodyTruncated: true` 표시
+- 요청 URL의 변수 값은 인코딩하지 않음. 공백 등 URL에 쓸 수 없는 문자는 `INVALID_REQUEST`
+
 ## 패키지 구조 (계획)
 
 ```
