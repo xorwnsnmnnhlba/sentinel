@@ -129,6 +129,13 @@ Project ─ Environment (baseUrl, 변수셋, 시크릿)
 - 모듈별 환경 분리 금지. 개발/스테이징/운영 전환이 baseUrl 치환 한 번으로 끝나야 함
 - 모듈 단위 실행 요구는 TestSuite(묶음)와 tags(교차 조회)로 해결
 
+### Assertion 저장
+- test_case.assertions jsonb 단일 컬럼 확정 (2026-09-19). 규칙 종류 추가 시 스키마 변경 불필요, 케이스 조회 시 함께 로딩
+- `type` 속성으로 종류 구분하는 다형 JSON (statusCode, responseTime, header, jsonPath, bodyContains)
+- 규칙 미지정 시 기본 판정 `status in [2xx]`. 미적용 시 5xx 응답도 통과 처리되는 문제 방지
+- 결과는 test_result.verdict(PASSED/FAILED/ERROR) + assertion_results jsonb(규칙별 설명·통과 여부·실제 값)
+- 판정 단위 SQL 조회(예: 응답 시간 규칙 보유 케이스 검색)는 불편. 현재 요구사항에 없음
+
 ### 엔티티 유의사항
 - TestRun에 TestResult 양방향 @OneToMany 금지. 단방향 @ManyToOne만 두고 리포지토리 조회
 - responseBody는 저장 전 크기 제한 (예: 64KB) 후 truncate
@@ -313,7 +320,6 @@ docker run -d --name sentinel-api \
 ## 10. 미결 사항
 
 - SSO 연동 가능 여부 (인증 방식 확정에 필요)
-- Assertion 저장 방식 (단일 테이블 jsonb vs 타입별 상속)
 - 실패 알림 채널 (메신저 Webhook 규격)
 - 개발환경 야간 가동 여부
 - RDS 파라미터 그룹의 타임아웃 설정값

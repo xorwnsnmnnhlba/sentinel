@@ -14,6 +14,7 @@ import java.util.Objects;
 import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.ResolvedRequest;
+import com.sentinel.runner.assertion.AssertionResult;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -28,7 +29,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * 케이스 1건의 실행 결과. 판정(Assertion)은 3단계에서 추가, 현재는 응답 수신 여부와 원문만 기록.
+ * 케이스 1건의 실행 결과. 응답 수신 여부({@link Outcome}), 판정({@link Verdict}), 규칙별 결과, 요청·응답 원문 기록.
  * <p>
  * 요청·응답 헤더의 자격증명은 마스킹, 응답 본문은 {@link #MAX_BODY_BYTES} 초과 시 잘라서 저장.
  */
@@ -42,6 +43,15 @@ public class TestResult extends BaseEntity {
 	public enum Outcome {
 		/** 상태 코드와 무관하게 응답 수신 */
 		RESPONDED,
+		/** 응답 미수신 또는 전송 전 실패 */
+		ERROR
+	}
+
+	public enum Verdict {
+		/** 모든 판정 규칙 통과 */
+		PASSED,
+		/** 응답은 받았으나 판정 규칙 실패 */
+		FAILED,
 		/** 응답 미수신 또는 전송 전 실패 */
 		ERROR
 	}
@@ -61,6 +71,14 @@ public class TestResult extends BaseEntity {
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private Outcome outcome;
+
+	/** 판정 도입 전 기록과의 호환을 위해 null 허용 */
+	@Enumerated(EnumType.STRING)
+	@Column(length = 10)
+	private Verdict verdict;
+
+	@JdbcTypeCode(SqlTypes.JSON)
+	private List<AssertionResult> assertionResults;
 
 	@Enumerated(EnumType.STRING)
 	@Column(length = 30)
@@ -106,8 +124,11 @@ public class TestResult extends BaseEntity {
 		this.requestMethod = Objects.requireNonNull(requestMethod, "requestMethod");
 	}
 
-	public static TestResult responded(TestRun run, TestCase testCase, HttpExchange exchange) {
+	public static TestResult responded(TestRun run, TestCase testCase, HttpExchange exchange,
+			List<AssertionResult> assertionResults) {
 		TestResult result = new TestResult(run, testCase, Outcome.RESPONDED, exchange.request().method());
+		result.assertionResults = List.copyOf(assertionResults);
+		result.verdict = assertionResults.stream().allMatch(AssertionResult::passed) ? Verdict.PASSED : Verdict.FAILED;
 		result.recordRequest(exchange.request());
 		result.statusCode = exchange.statusCode();
 		result.responseHeaders = SensitiveHeaders.mask(exchange.headers());
@@ -124,6 +145,8 @@ public class TestResult extends BaseEntity {
 	public static TestResult failed(TestRun run, TestCase testCase, HttpMethod method, ErrorReason reason,
 			String message, ResolvedRequest sent, Duration elapsed) {
 		TestResult result = new TestResult(run, testCase, Outcome.ERROR, method);
+		result.verdict = Verdict.ERROR;
+		result.assertionResults = List.of();
 		result.errorReason = Objects.requireNonNull(reason, "reason");
 		result.errorMessage = message == null ? null : truncateChars(message, 1000);
 		if (sent != null) {
@@ -173,6 +196,14 @@ public class TestResult extends BaseEntity {
 
 	public Outcome getOutcome() {
 		return outcome;
+	}
+
+	public Verdict getVerdict() {
+		return verdict;
+	}
+
+	public List<AssertionResult> getAssertionResults() {
+		return assertionResults == null ? List.of() : assertionResults;
 	}
 
 	public ErrorReason getErrorReason() {

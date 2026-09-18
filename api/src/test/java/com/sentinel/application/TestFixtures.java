@@ -17,6 +17,7 @@ import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpMethod;
+import com.sentinel.runner.assertion.Assertion;
 import org.springframework.stereotype.Component;
 
 /**
@@ -72,7 +73,13 @@ public class TestFixtures {
 
 	public TestCase testCase(TestSuite suite, HttpMethod method, String path, Map<String, List<String>> headers,
 			String body) {
-		return testCases.save(new TestCase(suite, "case-" + UUID.randomUUID(), new RequestSpec(method, path, headers, body)));
+		return testCase(suite, method, path, headers, body, List.of());
+	}
+
+	public TestCase testCase(TestSuite suite, HttpMethod method, String path, Map<String, List<String>> headers,
+			String body, List<Assertion> assertions) {
+		return testCases.save(new TestCase(suite, "case-" + UUID.randomUUID(),
+				new RequestSpec(method, path, headers, body), assertions));
 	}
 
 	public void deleteAll() {
