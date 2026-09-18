@@ -1,0 +1,44 @@
+{
+  "mappings": [
+    {
+      "request": { "method": "GET", "url": "/users/1" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json", "X-Trace-Id": "trace-123" },
+        "body": "{\"id\":1,\"name\":\"kim\"}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "/users",
+        "headers": {
+          "Authorization": { "equalTo": "Bearer test-token" },
+          "Content-Type": { "equalTo": "application/json" }
+        },
+        "bodyPatterns": [ { "equalToJson": "{\"name\":\"이순신\"}" } ]
+      },
+      "response": { "status": 201, "body": "created" }
+    },
+    {
+      "request": { "method": "GET", "url": "/errors/500" },
+      "response": { "status": 500, "body": "internal error" }
+    },
+    {
+      "request": { "method": "GET", "url": "/redirect" },
+      "response": { "status": 302, "headers": { "Location": "/users/1" } }
+    },
+    {
+      "request": { "method": "GET", "url": "/slow" },
+      "response": { "status": 200, "fixedDelayMilliseconds": 3000 }
+    },
+    {
+      "request": { "method": "GET", "url": "/euc-kr" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/plain; charset=EUC-KR" },
+        "base64Body": "vsiz5w=="
+      }
+    }
+  ]
+}
