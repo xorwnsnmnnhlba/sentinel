@@ -1,6 +1,6 @@
 package com.sentinel.api;
 
-import com.sentinel.application.InvalidRunRequestException;
+import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.NotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -15,8 +15,8 @@ class ApiExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
 	}
 
-	@ExceptionHandler(InvalidRunRequestException.class)
-	ProblemDetail handleInvalidRunRequest(InvalidRunRequestException ex) {
+	@ExceptionHandler(InvalidRequestException.class)
+	ProblemDetail handleInvalidRequest(InvalidRequestException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
 	}
 

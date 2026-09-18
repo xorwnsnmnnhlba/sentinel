@@ -129,6 +129,27 @@ curl -i -X POST localhost:8080/api/test-cases/1/runs \
 - 응답 본문은 64KB(UTF-8 기준) 초과 시 잘라서 저장, `bodyTruncated: true` 표시
 - 요청 URL의 변수 값은 인코딩하지 않음. 공백 등 URL에 쓸 수 없는 문자는 `INVALID_REQUEST`
 
+## 스케줄 실행
+
+| API | 설명 |
+|-----|------|
+| `POST /api/test-schedules` | 스케줄 등록. 본문 `{"suiteId": 1, "environmentId": 1, "cron": "10 9 * * 1-5"}` |
+| `GET /api/test-schedules/{id}` | 조회. `nextRunAt`(다음 실행 시각), `lastTriggeredAt`(마지막 실행 시각) 포함 |
+| `POST /api/test-schedules/{id}/disable` | 비활성화. `nextRunAt` 제거 |
+| `POST /api/test-schedules/{id}/enable` | 활성화. 현재 시각 기준 `nextRunAt` 재계산 |
+
+- cron은 5자리 표준 형식(`분 시 일 월 요일`), `Asia/Seoul` 기준. 예: `10 9 * * 1-5` = 평일 09:10
+- 60초 간격 폴링으로 실행 시각 도달 스케줄의 스위트 실행 (`trigger: SCHEDULED`)
+- 노트북 절전 등으로 놓친 실행은 1회만 실행 후 다음 시각으로 이동
+- 기동 시 `RUNNING`으로 남은 실행은 `ABORTED` 처리
+- DB 접속 실패 시 해당 주기 건너뜀, 경고 로그만 기록
+
+| 설정 | 기본값 | 설명 |
+|------|--------|------|
+| `sentinel.schedule.enabled` | `true` | 폴링 동작 여부 |
+| `sentinel.schedule.zone` | `Asia/Seoul` | cron 해석 시간대 |
+| `sentinel.schedule.poll-interval` | `60s` | 폴링 주기 |
+
 ## 패키지 구조 (계획)
 
 ```

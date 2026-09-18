@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import com.sentinel.domain.BaseEntity;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.RequestSpec;
 import com.sentinel.domain.TestCase;
@@ -70,7 +71,7 @@ public class TestRunService {
 	 * 케이스 1건 수동 실행. 응답 미수신·변수 누락도 실패 결과로 기록하며 예외로 전파하지 않음.
 	 * @return 생성된 실행 ID
 	 * @throws NotFoundException 케이스 또는 환경 미존재
-	 * @throws InvalidRunRequestException 케이스와 환경의 프로젝트 불일치
+	 * @throws InvalidRequestException 케이스와 환경의 프로젝트 불일치
 	 */
 	public long runTestCase(long testCaseId, long environmentId) {
 		Prepared prepared = transaction.execute(status -> {
@@ -86,7 +87,7 @@ public class TestRunService {
 	 * 스위트 전체 실행. 케이스가 없는 스위트도 결과 0건의 완료된 실행으로 기록.
 	 * @return 생성된 실행 ID
 	 * @throws NotFoundException 스위트 또는 환경 미존재
-	 * @throws InvalidRunRequestException 스위트와 환경의 프로젝트 불일치
+	 * @throws InvalidRequestException 스위트와 환경의 프로젝트 불일치
 	 */
 	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger) {
 		Prepared prepared = transaction.execute(status -> {
@@ -109,8 +110,8 @@ public class TestRunService {
 	}
 
 	private Prepared start(TestSuite suite, Environment environment, List<TestCase> cases, TestRun.Trigger trigger) {
-		if (!suite.getProject().getId().equals(environment.getProject().getId())) {
-			throw new InvalidRunRequestException("environment " + environment.getId()
+		if (!BaseEntity.same(suite.getProject(), environment.getProject())) {
+			throw new InvalidRequestException("environment " + environment.getId()
 					+ " does not belong to the project of test suite " + suite.getId());
 		}
 		TestRun run = runs.save(TestRun.start(suite, environment, trigger, Instant.now()));

@@ -70,7 +70,7 @@ sentinel/
 | ORM | JPA (heavy query 부재, 단순 스키마) |
 | DB | PostgreSQL — 개발기 AWS RDS의 sentinel 스키마 |
 | 실행기 | RestClient |
-| 스케줄 | Quartz 또는 DB 폴링 (5장 참조) |
+| 스케줄 | DB 폴링 (5장 참조) |
 | 스키마 관리 | 초기 ddl-auto: update → 배포 전 Flyway + validate 전환 |
 | FE | Next.js 16.3.4 (Active LTS), App Router, TanStack Query |
 | 실행 환경 | 노트북 상시 실행, Docker 컨테이너 2개 |
@@ -81,7 +81,7 @@ sentinel/
 - @Retryable이 프레임워크에 포함 (재시도 횟수·지연·지터·백오프 설정 가능)
 - @ConcurrencyLimit으로 동시 호출 수 제한 가능. 스위트 실행 시 GW 동시 호출 제어에 활용
 - @Async 비동기 컨텍스트 전파 지원. 스케줄 실행 로그 추적에 유리
-- Quartz 스타터 지원 여부 미확인 (미결 사항)
+- 스케줄러는 DB 폴링으로 확정하여 Quartz 스타터 미사용
 
 ### Next.js 버전 근거
 - 16은 Active LTS, 보안 지원 종료 2027년 10월 예상
@@ -188,23 +188,16 @@ BFF나 브라우저에서 실행을 트리거하지 않는 이유
 - 브라우저: 탭을 닫으면 종료, 비활성 탭에서 타이머 지연, GW 직접 호출 불가
 - BFF(Node): 스케줄이 메모리에만 존재해 재시작 시 소실, misfire 복구 개념 없음, 스케줄 설정과 실행 이력이 분리되어 관리 지점 이원화
 
-### 스케줄러 구현 선택지
-Quartz의 Spring Boot 4 지원이 확인되면 Quartz, 아니면 DB 폴링 방식
+### 스케줄러 구현
+DB 폴링 방식 확정 (2026-09-18). next_run_at 컬럼 하나로 재시작 복구 처리, misfire 동작 직접 제어. Quartz는 JDBC JobStore 테이블·스키마 접두어 관리 부담 대비 이점 부족으로 미채택
 
-Quartz 사용 시
-- JDBC JobStore 필수. 인메모리 사용 시 재기동으로 스케줄 소실
-- 스키마 접두어 지정 필요 (org.quartz.jobStore.tablePrefix: sentinel.QRTZ_)
-- misfire 정책은 withMisfireHandlingInstructionFireAndProceed 사용. 놓친 실행을 1회만 수행, IgnoreMisfires는 몰아서 실행하므로 부적합
-
-폴링 방식 사용 시
-```java
-@Scheduled(fixedDelay = 60_000)
-public void pollSchedules() {
-    scheduleRepository.findDue(LocalDateTime.now())
-        .forEach(this::executeAndUpdateNextRun);
-}
-```
-next_run_at 컬럼 하나로 재시작 복구 자동 처리. 코드 50줄 수준이며 misfire 동작을 직접 제어 가능. 노트북 상시 실행 환경에는 이쪽이 더 적합할 수 있음
+- `SchedulePoller`: 60초 간격(`sentinel.schedule.poll-interval`)으로 `enabled = true AND next_run_at <= now` 조회
+- 실행 전 next_run_at 선갱신. 실행 중 장애 시 동일 스케줄 반복 실행 방지
+- misfire: 놓친 실행은 1회만 수행, 다음 시각은 현재 시각 기준으로 계산 (Quartz FireAndProceed와 동일 동작)
+- cron은 5자리 표준 형식(`분 시 일 월 요일`). FE의 react-js-cron과 형식 일치. 내부적으로 Spring CronExpression에 0초 필드를 붙여 해석
+- cron 해석 시간대는 `sentinel.schedule.zone`(기본 Asia/Seoul). 컨테이너 TZ와 무관하게 동작
+- 스위트 내 케이스는 순차 실행하여 GW 동시 호출 없음
+- 기동 시 RUNNING으로 남은 실행은 ABORTED 처리 (`StaleRunRecovery`). 단일 인스턴스 전제
 
 ### 실행 시각 설계
 노트북 상시 실행 전제이므로 특정 시간대 기준으로 배치
@@ -219,7 +212,7 @@ next_run_at 컬럼 하나로 재시작 복구 자동 처리. 코드 50줄 수준
 ### 연결 실패 처리
 IP 변경으로 RDS 접속이 끊기면 스케줄이 실행되지 않는 상태 발생
 
-- 스케줄 진입 시 커넥션 획득 실패는 케이스 실패가 아닌 별도 이벤트로 기록
+- 스케줄 진입 시 커넥션 획득 실패는 케이스 실패가 아닌 별도 이벤트로 처리. DB 불가 상태이므로 DB 대신 경고 로그로 기록, 알림 연동은 3단계
 - 재시도 금지. VPN 끊김은 즉시 재시도해도 복구되지 않으므로 스킵 후 다음 주기 대기
 - RDS 파라미터 그룹의 statement_timeout, idle_in_transaction_session_timeout 확인 필요
 
@@ -319,7 +312,6 @@ docker run -d --name sentinel-api \
 
 ## 10. 미결 사항
 
-- Spring Boot 4의 Quartz 스타터 지원 여부 (미지원 시 폴링 방식으로 확정)
 - SSO 연동 가능 여부 (인증 방식 확정에 필요)
 - Assertion 저장 방식 (단일 테이블 jsonb vs 타입별 상속)
 - 실패 알림 채널 (메신저 Webhook 규격)
