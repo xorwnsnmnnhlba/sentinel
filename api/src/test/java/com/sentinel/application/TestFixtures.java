@@ -13,6 +13,7 @@ import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestResultRepository;
+import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpMethod;
@@ -36,14 +37,18 @@ public class TestFixtures {
 
 	private final TestResultRepository results;
 
+	private final TestScheduleRepository schedules;
+
 	TestFixtures(ProjectRepository projects, EnvironmentRepository environments, TestSuiteRepository suites,
-			TestCaseRepository testCases, TestRunRepository runs, TestResultRepository results) {
+			TestCaseRepository testCases, TestRunRepository runs, TestResultRepository results,
+			TestScheduleRepository schedules) {
 		this.projects = projects;
 		this.environments = environments;
 		this.suites = suites;
 		this.testCases = testCases;
 		this.runs = runs;
 		this.results = results;
+		this.schedules = schedules;
 	}
 
 	public Project project() {
@@ -71,6 +76,7 @@ public class TestFixtures {
 	}
 
 	public void deleteAll() {
+		schedules.deleteAllInBatch();
 		results.deleteAllInBatch();
 		runs.deleteAllInBatch();
 		testCases.deleteAllInBatch();

@@ -21,6 +21,10 @@ spring:
       enabled: true
 
 sentinel:
+  schedule:
+    enabled: true
+    zone: Asia/Seoul
+    poll-interval: 60s
   runner:
     http:
       connect-timeout: 5s

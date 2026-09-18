@@ -25,6 +25,16 @@ public abstract class BaseEntity {
 	@Column(nullable = false)
 	private Instant updatedAt;
 
+	/**
+	 * 동일 엔티티 여부. 저장 전(ID 없음)은 인스턴스 동일성, 저장 후는 ID로 비교. 지연 로딩 프록시에도 사용 가능.
+	 */
+	public static boolean same(BaseEntity a, BaseEntity b) {
+		if (a == b) {
+			return true;
+		}
+		return a != null && b != null && a.getId() != null && a.getId().equals(b.getId());
+	}
+
 	public Long getId() {
 		return id;
 	}

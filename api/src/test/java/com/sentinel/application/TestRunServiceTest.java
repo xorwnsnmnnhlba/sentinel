@@ -147,7 +147,7 @@ class TestRunServiceTest {
 		Environment otherEnvironment = fixtures.environment(fixtures.project(), Map.of());
 
 		assertThatThrownBy(() -> service.runSuite(suite.getId(), otherEnvironment.getId(), TestRun.Trigger.MANUAL))
-				.isInstanceOf(InvalidRunRequestException.class);
+				.isInstanceOf(InvalidRequestException.class);
 		assertThatThrownBy(() -> service.runSuite(-1, otherEnvironment.getId(), TestRun.Trigger.MANUAL))
 				.isInstanceOf(NotFoundException.class);
 	}
@@ -159,7 +159,7 @@ class TestRunServiceTest {
 		Environment otherEnvironment = fixtures.environment(fixtures.project(), Map.of());
 
 		assertThatThrownBy(() -> service.runTestCase(testCase.getId(), otherEnvironment.getId()))
-				.isInstanceOf(InvalidRunRequestException.class);
+				.isInstanceOf(InvalidRequestException.class);
 		assertThat(executor.requests()).isEmpty();
 	}
 

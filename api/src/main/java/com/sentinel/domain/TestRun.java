@@ -26,7 +26,9 @@ public class TestRun extends BaseEntity {
 	}
 
 	public enum Status {
-		RUNNING, COMPLETED
+		RUNNING, COMPLETED,
+		/** 실행 중 앱 종료로 중단. 재기동 시 기록 */
+		ABORTED
 	}
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -71,6 +73,14 @@ public class TestRun extends BaseEntity {
 		}
 		this.status = Status.COMPLETED;
 		this.finishedAt = Objects.requireNonNull(finishedAt, "finishedAt");
+	}
+
+	public void abort(Instant abortedAt) {
+		if (status != Status.RUNNING) {
+			throw new IllegalStateException("run " + getId() + " is already " + status);
+		}
+		this.status = Status.ABORTED;
+		this.finishedAt = Objects.requireNonNull(abortedAt, "abortedAt");
 	}
 
 	public TestSuite getSuite() {
