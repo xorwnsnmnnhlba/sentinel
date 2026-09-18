@@ -165,7 +165,8 @@ runner 패키지는 Spring 의존성 없는 순수 자바로 유지. 제품의 �
 
 ### 테스트 전략
 - 순수 UT 대상: VariableResolver(변수 치환, 미해결 변수, 이스케이프), AssertionEvaluator 구현체(경계값, null, 타입 불일치), Extractor
-- 통합 테스트 대상: RequestExecutor. MockWebServer 또는 WireMock으로 타임아웃·리다이렉트·4xx/5xx 검증
+- 통합 테스트 대상: RequestExecutor. Testcontainers WireMock 컨테이너로 타임아웃·리다이렉트·4xx/5xx 검증
+- DB 의존 테스트는 Testcontainers PostgreSQL 컨테이너 사용. RDS 접속 없이 빌드·테스트 가능
 - RequestExecutor를 인터페이스로 분리하면 TestRunService 테스트에서 Fake 주입으로 네트워크 없이 흐름 검증 가능
 - 커버리지 불필요 영역: api 컨트롤러, infra 리포지토리
 

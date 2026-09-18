@@ -15,3 +15,9 @@ spring:
     properties:
       hibernate.default_schema: sentinel
       hibernate.format_sql: true
+
+sentinel:
+  runner:
+    http:
+      connect-timeout: 5s
+      read-timeout: 30s
