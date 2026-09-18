@@ -2,6 +2,7 @@ package com.sentinel.application;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import com.sentinel.domain.Environment;
@@ -15,6 +16,7 @@ import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
+import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.RequestExecutionException;
 import com.sentinel.runner.RequestExecutor;
@@ -26,12 +28,15 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 케이스 실행 흐름: 준비(트랜잭션) → 전송(트랜잭션 밖) → 기록(트랜잭션).
+ * 실행 흐름: 준비(트랜잭션) → 케이스별 전송(트랜잭션 밖) + 결과 기록(케이스별 트랜잭션) → 완료 처리(트랜잭션).
  * <p>
  * HTTP 호출 동안 DB 커넥션을 점유하지 않기 위해 전송 구간을 트랜잭션에서 분리. 커넥션 풀 크기 5 전제.
+ * 스위트 내 케이스는 ID 순서로 순차 실행하여 GW 동시 호출 없음.
  */
 @Service
 public class TestRunService {
+
+	private final TestSuiteRepository suites;
 
 	private final TestCaseRepository testCases;
 
@@ -47,8 +52,10 @@ public class TestRunService {
 
 	private final TransactionTemplate readOnlyTransaction;
 
-	public TestRunService(TestCaseRepository testCases, EnvironmentRepository environments, TestRunRepository runs,
-			TestResultRepository results, RequestExecutor executor, PlatformTransactionManager transactionManager) {
+	public TestRunService(TestSuiteRepository suites, TestCaseRepository testCases, EnvironmentRepository environments,
+			TestRunRepository runs, TestResultRepository results, RequestExecutor executor,
+			PlatformTransactionManager transactionManager) {
+		this.suites = suites;
 		this.testCases = testCases;
 		this.environments = environments;
 		this.runs = runs;
@@ -66,10 +73,27 @@ public class TestRunService {
 	 * @throws InvalidRunRequestException 케이스와 환경의 프로젝트 불일치
 	 */
 	public long runTestCase(long testCaseId, long environmentId) {
-		Prepared prepared = transaction.execute(status -> prepare(testCaseId, environmentId));
-		Execution execution = execute(prepared.template(), prepared.variables());
-		transaction.executeWithoutResult(status -> record(prepared, execution));
-		return prepared.runId();
+		Prepared prepared = transaction.execute(status -> {
+			TestCase testCase = testCases.findById(testCaseId)
+				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
+			return start(testCase.getSuite(), findEnvironment(environmentId), List.of(testCase),
+					TestRun.Trigger.MANUAL);
+		});
+		return executeAndRecord(prepared);
+	}
+
+	/**
+	 * 스위트 전체 실행. 케이스가 없는 스위트도 결과 0건의 완료된 실행으로 기록.
+	 * @return 생성된 실행 ID
+	 * @throws NotFoundException 스위트 또는 환경 미존재
+	 * @throws InvalidRunRequestException 스위트와 환경의 프로젝트 불일치
+	 */
+	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger) {
+		Prepared prepared = transaction.execute(status -> {
+			TestSuite suite = suites.findById(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
+			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdOrderById(suiteId), trigger);
+		});
+		return executeAndRecord(prepared);
 	}
 
 	public TestRunDetail getRun(long runId) {
@@ -79,22 +103,35 @@ public class TestRunService {
 		});
 	}
 
-	private Prepared prepare(long testCaseId, long environmentId) {
-		TestCase testCase = testCases.findById(testCaseId)
-			.orElseThrow(() -> new NotFoundException("test case", testCaseId));
-		Environment environment = environments.findById(environmentId)
+	private Environment findEnvironment(long environmentId) {
+		return environments.findById(environmentId)
 			.orElseThrow(() -> new NotFoundException("environment", environmentId));
-		TestSuite suite = testCase.getSuite();
-		if (!suite.getProject().getId().equals(environment.getProject().getId())) {
-			throw new InvalidRunRequestException("environment " + environmentId
-					+ " does not belong to the project of test case " + testCaseId);
-		}
+	}
 
-		TestRun run = runs.save(TestRun.start(suite, environment, TestRun.Trigger.MANUAL, Instant.now()));
-		RequestSpec spec = testCase.getRequest();
-		RequestTemplate template = new RequestTemplate(spec.getMethod(), environment.getBaseUrl() + spec.getPath(),
-				spec.getHeaders(), spec.getBody());
-		return new Prepared(run.getId(), testCaseId, template, Map.copyOf(environment.getVariables()));
+	private Prepared start(TestSuite suite, Environment environment, List<TestCase> cases, TestRun.Trigger trigger) {
+		if (!suite.getProject().getId().equals(environment.getProject().getId())) {
+			throw new InvalidRunRequestException("environment " + environment.getId()
+					+ " does not belong to the project of test suite " + suite.getId());
+		}
+		TestRun run = runs.save(TestRun.start(suite, environment, trigger, Instant.now()));
+		List<PreparedCase> preparedCases = cases.stream()
+			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment)))
+			.toList();
+		return new Prepared(run.getId(), preparedCases, Map.copyOf(environment.getVariables()));
+	}
+
+	private static RequestTemplate templateOf(RequestSpec spec, Environment environment) {
+		return new RequestTemplate(spec.getMethod(), environment.getBaseUrl() + spec.getPath(), spec.getHeaders(),
+				spec.getBody());
+	}
+
+	private long executeAndRecord(Prepared prepared) {
+		for (PreparedCase preparedCase : prepared.cases()) {
+			Execution execution = execute(preparedCase.template(), prepared.variables());
+			transaction.executeWithoutResult(status -> results.save(resultOf(prepared.runId(), preparedCase, execution)));
+		}
+		transaction.executeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(Instant.now()));
+		return prepared.runId();
 	}
 
 	private Execution execute(RequestTemplate template, Map<String, String> variables) {
@@ -126,16 +163,14 @@ public class TestRunService {
 		}
 	}
 
-	private void record(Prepared prepared, Execution execution) {
-		TestRun run = runs.findById(prepared.runId()).orElseThrow();
-		TestCase testCase = testCases.getReferenceById(prepared.testCaseId());
-		TestResult result = switch (execution) {
+	private TestResult resultOf(long runId, PreparedCase preparedCase, Execution execution) {
+		TestRun run = runs.getReferenceById(runId);
+		TestCase testCase = testCases.getReferenceById(preparedCase.testCaseId());
+		return switch (execution) {
 			case Responded responded -> TestResult.responded(run, testCase, responded.exchange());
-			case Failed failed -> TestResult.failed(run, testCase, prepared.template().method(), failed.reason(),
+			case Failed failed -> TestResult.failed(run, testCase, preparedCase.template().method(), failed.reason(),
 					failed.message(), failed.request(), failed.elapsed());
 		};
-		results.save(result);
-		run.complete(Instant.now());
 	}
 
 	private static String messageOf(Throwable ex) {
@@ -146,7 +181,10 @@ public class TestRunService {
 		return root == ex || root.getMessage() == null ? ex.getMessage() : ex.getMessage() + " (" + root + ")";
 	}
 
-	private record Prepared(long runId, long testCaseId, RequestTemplate template, Map<String, String> variables) {
+	private record Prepared(long runId, List<PreparedCase> cases, Map<String, String> variables) {
+	}
+
+	private record PreparedCase(long testCaseId, RequestTemplate template) {
 	}
 
 	private sealed interface Execution permits Responded, Failed {

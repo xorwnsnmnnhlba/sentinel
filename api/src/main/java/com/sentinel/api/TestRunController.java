@@ -4,6 +4,7 @@ import java.net.URI;
 
 import com.sentinel.application.TestRunDetail;
 import com.sentinel.application.TestRunService;
+import com.sentinel.domain.TestRun;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,14 +26,24 @@ class TestRunController {
 
 	@PostMapping("/test-cases/{testCaseId}/runs")
 	ResponseEntity<TestRunDetail> runTestCase(@PathVariable long testCaseId,
-			@Valid @RequestBody RunTestCaseRequest request) {
+			@Valid @RequestBody RunRequest request) {
 		long runId = testRunService.runTestCase(testCaseId, request.environmentId());
-		return ResponseEntity.created(URI.create("/api/test-runs/" + runId)).body(testRunService.getRun(runId));
+		return created(runId);
+	}
+
+	@PostMapping("/test-suites/{suiteId}/runs")
+	ResponseEntity<TestRunDetail> runSuite(@PathVariable long suiteId, @Valid @RequestBody RunRequest request) {
+		long runId = testRunService.runSuite(suiteId, request.environmentId(), TestRun.Trigger.MANUAL);
+		return created(runId);
 	}
 
 	@GetMapping("/test-runs/{runId}")
 	TestRunDetail getRun(@PathVariable long runId) {
 		return testRunService.getRun(runId);
+	}
+
+	private ResponseEntity<TestRunDetail> created(long runId) {
+		return ResponseEntity.created(URI.create("/api/test-runs/" + runId)).body(testRunService.getRun(runId));
 	}
 
 }
