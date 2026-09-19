@@ -53,7 +53,10 @@ export async function apiGetOrNotFound<T>(path: string): Promise<T> {
 export async function apiSend<T>(method: "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T | null> {
   const response = await apiFetch(path, {
     method,
-    headers: body === undefined ? { Accept: "application/json" } : { Accept: "application/json", "Content-Type": "application/json" },
+    headers:
+      body === undefined
+        ? { Accept: "application/json" }
+        : { Accept: "application/json", "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {

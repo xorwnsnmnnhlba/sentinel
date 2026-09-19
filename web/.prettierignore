@@ -1,0 +1,8 @@
+.next/
+node_modules/
+package-lock.json
+next-env.d.ts
+# shadcn/ui CLI 생성 파일. 원본 형식 유지하여 재생성 시 diff 최소화
+components/ui/
+# 문서는 저장소 전체 문서 형식(docs/*.md)과 맞추기 위해 제외
+*.md

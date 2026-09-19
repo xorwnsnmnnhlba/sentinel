@@ -108,7 +108,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                   <TableRow key={environment.id}>
                     <TableCell className="font-medium">{environment.name}</TableCell>
                     <TableCell className="font-mono text-xs">{environment.baseUrl}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-normal">
+                    <TableCell className="font-mono text-xs whitespace-normal text-muted-foreground">
                       {Object.keys(environment.variables).join(", ") || "-"}
                     </TableCell>
                     <TableCell>
@@ -180,7 +180,9 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                         {suite.name}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-muted-foreground whitespace-normal">{suite.description ?? "-"}</TableCell>
+                    <TableCell className="whitespace-normal text-muted-foreground">
+                      {suite.description ?? "-"}
+                    </TableCell>
                     <TableCell className="text-right">{suite.caseCount}</TableCell>
                     <TableCell>
                       <RowActions>

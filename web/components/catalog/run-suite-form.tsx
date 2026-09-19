@@ -29,7 +29,11 @@ export function RunSuiteForm({
   return (
     <form onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Select name="environmentId" defaultValue={environments.length === 1 ? String(environments[0].id) : undefined} required>
+        <Select
+          name="environmentId"
+          defaultValue={environments.length === 1 ? String(environments[0].id) : undefined}
+          required
+        >
           <SelectTrigger className="w-48" aria-label="실행 환경">
             <SelectValue placeholder="환경 선택" />
           </SelectTrigger>

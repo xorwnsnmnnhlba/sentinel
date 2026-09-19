@@ -6,7 +6,11 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 const screens = [
   { title: "실행 이력", description: "스케줄·수동 실행 결과 목록과 통과·실패·오류 요약", href: "/runs" },
   { title: "결과 상세", description: "케이스별 판정 규칙 결과와 요청·응답 원문", href: "/runs" },
-  { title: "프로젝트·스위트", description: "프로젝트·환경·스위트 등록·편집, 케이스 목록과 즉시 실행", href: "/projects" },
+  {
+    title: "프로젝트·스위트",
+    description: "프로젝트·환경·스위트 등록·편집, 케이스 목록과 즉시 실행",
+    href: "/projects",
+  },
   { title: "케이스 편집", description: "요청 정의와 판정 규칙 등록·편집" },
   { title: "스케줄", description: "cron 설정과 다음 실행 시각 확인, 활성·비활성" },
 ];

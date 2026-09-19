@@ -87,7 +87,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 function ResultDetail({ result }: { result: RunResult }) {
   return (
     <div className="space-y-4">
-      <p className="break-all font-mono text-xs text-muted-foreground">
+      <p className="font-mono text-xs break-all text-muted-foreground">
         {result.request.method} {result.request.url ?? "(전송 전 실패)"}
       </p>
 
@@ -115,7 +115,7 @@ function ResultDetail({ result }: { result: RunResult }) {
                     <VerdictBadge verdict={assertion.passed ? "PASSED" : "FAILED"} />
                   </TableCell>
                   <TableCell className="font-mono text-xs whitespace-normal">{assertion.description}</TableCell>
-                  <TableCell className="font-mono text-xs whitespace-normal break-all">{assertion.message}</TableCell>
+                  <TableCell className="font-mono text-xs break-all whitespace-normal">{assertion.message}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

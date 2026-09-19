@@ -36,10 +36,7 @@ async function forward(request: NextRequest, ctx: RouteContext<"/api/[...path]">
     return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
   } catch {
     // 내부 주소·스택이 노출되지 않도록 고정 메시지 반환
-    return Response.json(
-      { title: "Bad Gateway", status: 502, detail: "API server is unavailable" },
-      { status: 502 },
-    );
+    return Response.json({ title: "Bad Gateway", status: 502, detail: "API server is unavailable" }, { status: 502 });
   }
 }
 
