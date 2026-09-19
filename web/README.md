@@ -19,7 +19,8 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 | 아이콘 | lucide-react 1.47.0 |
 | 클래스 유틸 | `cn` 0.3.0 (shadcn 공식, clsx + tailwind-merge 대체), class-variance-authority 0.7.1 |
 | TanStack Query | 5.103.1 |
-| ESLint | 9.39.5 (`eslint-config-next` 16.3.5) |
+| ESLint | 9.39.5 (`eslint-config-next` 16.3.5, `eslint-config-prettier` 10.1.8) |
+| Prettier | 3.9.8 (`prettier-plugin-tailwindcss` 0.8.1) |
 | Node.js | 로컬 24.21.0, Docker `node:24-alpine` (Next.js 요구사항 20.9.0 이상) |
 
 `package-lock.json` 설치 버전 기준
@@ -109,6 +110,8 @@ npm run dev
 | `npm run dev` | 개발 서버 |
 | `npm run build` | 프로덕션 빌드 (`output: "standalone"`) |
 | `npm run lint` | ESLint |
+| `npm run format` | Prettier로 서식 적용 |
+| `npm run format:check` | 서식 검사 (변경 없음) |
 
 컨테이너 실행은 루트에서 `docker compose up -d --build` (api와 함께 기동)
 
@@ -121,6 +124,14 @@ npx shadcn@latest add dialog
 `components/ui`에 소스 파일로 추가되므로 직접 수정 가능. 설정은 `components.json`
 
 ## 코드 작성 원칙
+
+- 서식은 Prettier, 코드 규칙은 ESLint 담당. ESLint의 서식 규칙은 `eslint-config-prettier`로 비활성화
+  - 설정: `.prettierrc.json` (한 줄 120자, Tailwind 클래스 자동 정렬), 제외 대상 `.prettierignore`
+  - `components/ui`(shadcn CLI 생성 파일)와 Markdown 문서는 서식 적용 제외
+  - `next build`는 ESLint를 실행하지 않으므로 커밋 전 `npm run lint`, `npm run format:check` 실행
+- IntelliJ 저장 시 자동 적용
+  - **Settings → Languages & Frameworks → JavaScript → Prettier**: Automatic Prettier configuration, Run on save
+  - **Settings → Languages & Frameworks → JavaScript → Code Quality Tools → ESLint**: Automatic ESLint configuration, Run eslint --fix on save
 
 - 함수형만 사용. 클래스 선언·클래스 컴포넌트 금지 (ESLint `no-restricted-syntax`로 차단)
 - 오류 객체는 팩토리 함수와 타입 가드로 처리: `apiError(status, detail)` 생성, `isApiError(error)` 판별 (`lib/api/server.ts`). `instanceof` 대신 타입 가드 사용

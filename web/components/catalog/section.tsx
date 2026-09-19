@@ -1,6 +1,14 @@
 /** 상세 화면 구획 공통 요소 */
 
-export function SectionHeader({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
+export function SectionHeader({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="flex items-end justify-between gap-4">
       <div>

@@ -119,13 +119,28 @@ function single(value: string | string[] | undefined): string | undefined {
 
 function FilterLink({ href, active, label }: { href: string; active: boolean; label: string }) {
   return (
-    <Button asChild size="sm" variant={active ? "default" : "outline"} className={cn(!active && "text-muted-foreground")}>
+    <Button
+      asChild
+      size="sm"
+      variant={active ? "default" : "outline"}
+      className={cn(!active && "text-muted-foreground")}
+    >
       <Link href={href}>{label}</Link>
     </Button>
   );
 }
 
-function PageLink({ page, suiteId, disabled, label }: { page: number; suiteId?: string; disabled: boolean; label: string }) {
+function PageLink({
+  page,
+  suiteId,
+  disabled,
+  label,
+}: {
+  page: number;
+  suiteId?: string;
+  disabled: boolean;
+  label: string;
+}) {
   if (disabled) {
     return (
       <Button size="sm" variant="outline" disabled>
