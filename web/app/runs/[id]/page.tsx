@@ -6,7 +6,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ApiError, apiGet } from "@/lib/api/server";
+import { apiGetOrNotFound } from "@/lib/api/server";
 import type { Headers, RunDetail, RunResult } from "@/lib/api/types";
 import { formatDateTime, formatElapsed, formatRunDuration, prettyBody } from "@/lib/format";
 
@@ -20,7 +20,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
   if (!/^\d+$/.test(id)) {
     notFound();
   }
-  const run = await getRun(id);
+  const run = await apiGetOrNotFound<RunDetail>(`/api/runs/${id}`);
   // 실패·오류 케이스는 펼친 상태로 표시
   const openByDefault = run.results.filter((result) => result.verdict !== "PASSED").map((result) => String(result.id));
 
@@ -73,17 +73,6 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
       )}
     </div>
   );
-}
-
-async function getRun(id: string): Promise<RunDetail> {
-  try {
-    return await apiGet<RunDetail>(`/api/runs/${id}`);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      notFound();
-    }
-    throw error;
-  }
 }
 
 function Meta({ label, value }: { label: string; value: string }) {

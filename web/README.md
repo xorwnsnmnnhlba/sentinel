@@ -120,6 +120,11 @@ npx shadcn@latest add dialog
 
 `components/ui`에 소스 파일로 추가되므로 직접 수정 가능. 설정은 `components.json`
 
+## 코드 작성 원칙
+
+- 함수형만 사용. 클래스 선언·클래스 컴포넌트 금지 (ESLint `no-restricted-syntax`로 차단)
+- 오류 객체는 팩토리 함수와 타입 가드로 처리: `apiError(status, detail)` 생성, `isApiError(error)` 판별 (`lib/api/server.ts`). `instanceof` 대신 타입 가드 사용
+
 ## 유의사항
 
 - Next.js 16은 이전 버전과 API·규칙 차이 존재. 코드 작성 전 `node_modules/next/dist/docs/` 가이드 확인 (AI 에이전트용 규칙은 [AGENTS.md](AGENTS.md))

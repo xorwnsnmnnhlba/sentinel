@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiSend } from "@/lib/api/server";
+import { apiSend, isApiError } from "@/lib/api/server";
 import type { EnvironmentItem, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
 
 /**
@@ -176,7 +176,7 @@ function variablesOf(form: FormData): Record<string, string> | string {
 
 /** Spring 오류를 화면용 메시지로 변환. 그 외 오류(연결 실패 등)는 내부 정보 없이 고정 문구 */
 function failure(error: unknown): ActionState {
-  if (error instanceof ApiError) {
+  if (isApiError(error)) {
     switch (error.status) {
       case 400:
         return { error: `입력값을 확인해 주세요: ${error.detail}` };
