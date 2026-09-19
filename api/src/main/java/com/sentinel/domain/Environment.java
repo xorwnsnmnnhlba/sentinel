@@ -26,8 +26,8 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(name = "environment",
-		uniqueConstraints = @UniqueConstraint(name = "uk_environment_project_name", columnNames = { "project_id", "name" }))
-public class Environment extends BaseEntity {
+		uniqueConstraints = @UniqueConstraint(name = "uk_environment_project_name", columnNames = { "project_id", "name", "archive_key" }))
+public class Environment extends ArchivableEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "project_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))

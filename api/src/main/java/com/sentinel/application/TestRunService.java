@@ -83,7 +83,7 @@ public class TestRunService {
 	 */
 	public long runTestCase(long testCaseId, long environmentId) {
 		Prepared prepared = transaction.execute(status -> {
-			TestCase testCase = testCases.findById(testCaseId)
+			TestCase testCase = testCases.findByIdAndArchivedAtIsNull(testCaseId)
 				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
 			return start(testCase.getSuite(), findEnvironment(environmentId), List.of(testCase),
 					TestRun.Trigger.MANUAL);
@@ -99,8 +99,8 @@ public class TestRunService {
 	 */
 	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger) {
 		Prepared prepared = transaction.execute(status -> {
-			TestSuite suite = suites.findById(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
-			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdOrderById(suiteId), trigger);
+			TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
+			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId), trigger);
 		});
 		return executeAndRecord(prepared);
 	}
@@ -113,7 +113,7 @@ public class TestRunService {
 	}
 
 	private Environment findEnvironment(long environmentId) {
-		return environments.findById(environmentId)
+		return environments.findByIdAndArchivedAtIsNull(environmentId)
 			.orElseThrow(() -> new NotFoundException("environment", environmentId));
 	}
 

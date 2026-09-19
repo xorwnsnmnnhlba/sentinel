@@ -15,7 +15,6 @@ import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 프로젝트·환경·스위트·케이스 조회.
  * <p>
  * 목록의 부모 ID는 필터 조건. 존재하지 않는 부모로 필터링하면 빈 목록 반환, 단건 조회만 미존재 시 {@link NotFoundException}.
+ * 보관(소프트 삭제)된 항목은 목록에서 제외하고 단건 조회도 미존재로 취급.
  */
 @Service
 @Transactional(readOnly = true)
@@ -45,24 +45,24 @@ public class CatalogQueryService {
 	}
 
 	public List<ProjectItem> listProjects() {
-		return projects.findAll(Sort.by("name")).stream().map(ProjectItem::of).toList();
+		return projects.findByArchivedAtIsNullOrderByName().stream().map(ProjectItem::of).toList();
 	}
 
 	public ProjectItem getProject(long projectId) {
-		return ProjectItem.of(projects.findById(projectId).orElseThrow(() -> new NotFoundException("project", projectId)));
+		return ProjectItem.of(projects.findByIdAndArchivedAtIsNull(projectId).orElseThrow(() -> new NotFoundException("project", projectId)));
 	}
 
 	/**
 	 * @param projectId null이면 전체
 	 */
 	public List<EnvironmentItem> listEnvironments(Long projectId) {
-		List<Environment> found = projectId == null ? environments.findAllByOrderByName()
-				: environments.findByProjectIdOrderByName(projectId);
+		List<Environment> found = projectId == null ? environments.findByArchivedAtIsNullOrderByName()
+				: environments.findByProjectIdAndArchivedAtIsNullOrderByName(projectId);
 		return found.stream().map(EnvironmentItem::of).toList();
 	}
 
 	public EnvironmentItem getEnvironment(long environmentId) {
-		return EnvironmentItem.of(environments.findById(environmentId)
+		return EnvironmentItem.of(environments.findByIdAndArchivedAtIsNull(environmentId)
 			.orElseThrow(() -> new NotFoundException("environment", environmentId)));
 	}
 
@@ -75,29 +75,29 @@ public class CatalogQueryService {
 		Map<Long, Long> caseCounts = counts.stream()
 			.collect(Collectors.toMap(TestSuiteRepository.SuiteCaseCount::getSuiteId,
 					TestSuiteRepository.SuiteCaseCount::getCount));
-		List<TestSuite> found = projectId == null ? suites.findAllByOrderByName()
-				: suites.findByProjectIdOrderByName(projectId);
+		List<TestSuite> found = projectId == null ? suites.findByArchivedAtIsNullOrderByName()
+				: suites.findByProjectIdAndArchivedAtIsNullOrderByName(projectId);
 		return found.stream()
 			.map(suite -> SuiteItem.of(suite, caseCounts.getOrDefault(suite.getId(), 0L).intValue()))
 			.toList();
 	}
 
 	public SuiteItem getSuite(long suiteId) {
-		TestSuite suite = suites.findById(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
-		return SuiteItem.of(suite, testCases.findBySuiteIdOrderById(suiteId).size());
+		TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
+		return SuiteItem.of(suite, (int) testCases.countBySuiteIdAndArchivedAtIsNull(suiteId));
 	}
 
 	/**
 	 * @param suiteId null이면 전체
 	 */
 	public List<CaseItem> listCases(Long suiteId) {
-		List<TestCase> found = suiteId == null ? testCases.findAllByOrderById()
-				: testCases.findBySuiteIdOrderById(suiteId);
+		List<TestCase> found = suiteId == null ? testCases.findByArchivedAtIsNullOrderById()
+				: testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId);
 		return found.stream().map(CaseItem::of).toList();
 	}
 
 	public CaseItem getCase(long caseId) {
-		return CaseItem.of(testCases.findById(caseId).orElseThrow(() -> new NotFoundException("test case", caseId)));
+		return CaseItem.of(testCases.findByIdAndArchivedAtIsNull(caseId).orElseThrow(() -> new NotFoundException("test case", caseId)));
 	}
 
 	public record ProjectItem(long id, String name, String description) {
