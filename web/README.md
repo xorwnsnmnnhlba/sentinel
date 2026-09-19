@@ -21,6 +21,9 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 | TanStack Query | 5.103.1 |
 | ESLint | 9.39.5 (`eslint-config-next` 16.3.5, `eslint-config-prettier` 10.1.8) |
 | Prettier | 3.9.8 (`prettier-plugin-tailwindcss` 0.8.1) |
+| Vitest | 5.0.1 (Vite 8.3.0, jsdom 30.1.0) |
+| MSW | 2.15.0 |
+| Testing Library | React 16.3.3, DOM 10.4.2, user-event 14.6.7, jest-dom 7.0.1 |
 | Node.js | 로컬 24.21.0, Docker `node:24-alpine` (Next.js 요구사항 20.9.0 이상) |
 
 `package-lock.json` 설치 버전 기준
@@ -47,6 +50,7 @@ components/
  ├─ catalog/                등록·수정 다이얼로그, 삭제 확인, 변수 편집기, 실행 폼
  ├─ run-badges.tsx          판정·상태·주체 배지
  └─ site-header.tsx
+test/                       테스트 공통 (MSW 서버, 환경 설정, redirect·notFound 확인)
 lib/
  ├─ actions/catalog.ts      Server Actions (등록·수정·삭제·실행 → Spring 호출 후 refresh·redirect)
  ├─ api/server.ts           Spring 호출 (서버 전용, server-only)
@@ -112,6 +116,8 @@ npm run dev
 | `npm run lint` | ESLint |
 | `npm run format` | Prettier로 서식 적용 |
 | `npm run format:check` | 서식 검사 (변경 없음) |
+| `npm test` | 테스트 1회 실행 |
+| `npm run test:watch` | 테스트 감시 모드 |
 
 컨테이너 실행은 루트에서 `docker compose up -d --build` (api와 함께 기동)
 
@@ -122,6 +128,21 @@ npx shadcn@latest add dialog
 ```
 
 `components/ui`에 소스 파일로 추가되므로 직접 수정 가능. 설정은 `components.json`
+
+## 테스트
+
+Vitest + MSW + React Testing Library. 설정은 `vitest.config.mts`
+
+| 구분 | 환경 | 대상 | 방법 |
+|------|------|------|------|
+| server | Node | `lib/**/*.test.ts`, `app/**/*.test.ts` | Spring API를 MSW(`test/msw.ts`)로 대체. 요청 본문, 오류 문구 변환, `refresh`·`redirect` 검증 |
+| components | jsdom | `components/**/*.test.tsx` | Server Action을 테스트용 함수로 대체, 사용자 조작(user-event)으로 검증 |
+
+- 테스트 파일은 대상 파일 옆에 `*.test.ts(x)`로 작성
+- MSW는 처리하지 않은 요청을 실패로 처리(`onUnhandledRequest: "error"`). 테스트마다 `server.use()`로 필요한 응답만 지정
+- `redirect()`·`notFound()`는 throw된 오류의 digest로 확인 (`test/next.ts`)
+- async Server Component 화면(`page.tsx`)은 Vitest 미지원(Next.js 문서)으로 제외. 추후 E2E로 검증
+- Radix UI 목록(Select 등)은 jsdom에 레이아웃이 없어 접근성 트리에서 숨김으로 판정. 키보드로 열고 목록 안 텍스트로 선택
 
 ## 코드 작성 원칙
 
