@@ -7,5 +7,5 @@ import java.util.Map;
  *
  * @param variables 지정 시 전체 교체. 빈 객체면 전부 제거
  */
-public record UpdateEnvironmentRequest(String name, String baseUrl, Map<String, String> variables) {
+record UpdateEnvironmentRequest(String name, String baseUrl, Map<String, String> variables) {
 }

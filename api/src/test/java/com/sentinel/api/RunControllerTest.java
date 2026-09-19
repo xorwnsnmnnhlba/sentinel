@@ -89,7 +89,12 @@ class RunControllerTest {
 	@Test
 	void requiresExactlyOneTarget() {
 		assertThat(createRun("{\"environmentId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST);
-		assertThat(createRun("{\"suiteId\": 1, \"caseId\": 1, \"environmentId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST);
+		// package-private record의 @AssertTrue 검증 적용 여부. 미적용 시 스위트 실행으로 넘어가 404
+		assertThat(createRun("{\"suiteId\": 1, \"caseId\": 1, \"environmentId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.asString()
+			.contains("Invalid request content");
 		assertThat(createRun("{\"suiteId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST);
 	}
 

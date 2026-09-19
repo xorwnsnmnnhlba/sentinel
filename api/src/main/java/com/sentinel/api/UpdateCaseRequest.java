@@ -11,5 +11,5 @@ import com.sentinel.runner.assertion.Assertion;
  * @param request 지정 시 요청 정의 전체 교체
  * @param assertions 지정 시 전체 교체. 빈 목록이면 기본 판정으로 복귀
  */
-public record UpdateCaseRequest(String name, Request request, List<Assertion> assertions) {
+record UpdateCaseRequest(String name, Request request, List<Assertion> assertions) {
 }

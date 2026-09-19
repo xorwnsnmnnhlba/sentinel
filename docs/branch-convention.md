@@ -83,6 +83,12 @@ docs: add branch convention
 - 요약은 50자 이내. 상세 설명이 필요하면 한 줄 비우고 본문 작성
 - 호환성을 깨는 변경은 타입 뒤 `!` 표기: `feat(api)!: change run result response format`
 
+### PR
+
+- 제목과 본문은 한글로 작성. 제목 앞에는 커밋과 같은 `<type>(<scope>):` 유지
+- 제목 예시: `feat(web): 카탈로그 편집 화면 추가`, `refactor(api): 요청 DTO 접근 제한자 정리`
+- 본문은 `## 요약`(변경 내용), `## 테스트`(확인 항목 체크리스트) 구성
+
 ---
 
 ## 4. 운영 원칙
