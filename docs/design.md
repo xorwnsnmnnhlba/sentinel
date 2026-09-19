@@ -138,6 +138,11 @@ Project ─ Environment (baseUrl, 변수셋, 시크릿)
 
 ### 엔티티 유의사항
 - TestRun에 TestResult 양방향 @OneToMany 금지. 단방향 @ManyToOne만 두고 리포지토리 조회
+- 외래키 제약 미사용 (2026-09-19, V2에서 제거). 참조 무결성은 애플리케이션에서 보장
+  - 엔티티 `@JoinColumn(foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))`로 DDL 생성 시에도 FK 미생성
+  - 조회용 인덱스와 유니크 제약은 유지
+  - SQL 직접 입력 시 존재하지 않는 ID 참조를 DB가 막지 않으므로 ID 하드코딩 대신 INSERT ... RETURNING 참조 사용 (`docs/sample-cases.sql` 방식)
+  - 삭제 시 하위 데이터(결과·실행·스케줄) 처리는 애플리케이션 책임. 삭제 정책(소프트 삭제 등)은 FE 단계에서 결정
 - responseBody는 저장 전 크기 제한 (예: 64KB) 후 truncate
 - 인덱스는 데이터 축적 전 선반영
 

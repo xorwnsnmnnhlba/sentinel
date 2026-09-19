@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
@@ -29,7 +30,7 @@ import org.hibernate.type.SqlTypes;
 public class Environment extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "project_id", nullable = false, foreignKey = @ForeignKey(name = "fk_environment_project"))
+	@JoinColumn(name = "project_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private Project project;
 
 	@Column(nullable = false, length = 50)

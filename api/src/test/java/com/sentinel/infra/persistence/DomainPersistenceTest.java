@@ -66,7 +66,17 @@ class DomainPersistenceTest {
 				WHERE success AND version IS NOT NULL ORDER BY installed_rank
 				""").getResultList();
 
-		assertThat(versions).containsExactly("1");
+		assertThat(versions).containsExactly("1", "2");
+	}
+
+	@Test
+	void hasNoForeignKeyConstraints() {
+		Object foreignKeys = entityManager.createNativeQuery("""
+				SELECT count(*) FROM information_schema.table_constraints
+				WHERE constraint_schema = 'sentinel' AND constraint_type = 'FOREIGN KEY'
+				""").getSingleResult();
+
+		assertThat(((Number) foreignKeys).intValue()).isZero();
 	}
 
 	@Test

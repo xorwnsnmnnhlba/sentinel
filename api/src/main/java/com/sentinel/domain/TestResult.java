@@ -16,6 +16,7 @@ import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.ResolvedRequest;
 import com.sentinel.runner.assertion.AssertionResult;
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -61,11 +62,11 @@ public class TestResult extends BaseEntity {
 	}
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "run_id", nullable = false, foreignKey = @ForeignKey(name = "fk_test_result_run"))
+	@JoinColumn(name = "run_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private TestRun run;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "test_case_id", nullable = false, foreignKey = @ForeignKey(name = "fk_test_result_test_case"))
+	@JoinColumn(name = "test_case_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private TestCase testCase;
 
 	@Enumerated(EnumType.STRING)
