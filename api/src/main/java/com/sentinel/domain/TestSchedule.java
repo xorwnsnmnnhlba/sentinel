@@ -6,6 +6,7 @@ import java.time.ZonedDateTime;
 import java.util.Objects;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
@@ -25,12 +26,12 @@ import org.springframework.scheduling.support.CronExpression;
 public class TestSchedule extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "suite_id", nullable = false, foreignKey = @ForeignKey(name = "fk_test_schedule_suite"))
+	@JoinColumn(name = "suite_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private TestSuite suite;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "environment_id", nullable = false,
-			foreignKey = @ForeignKey(name = "fk_test_schedule_environment"))
+			foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private Environment environment;
 
 	@Column(nullable = false, length = 100)

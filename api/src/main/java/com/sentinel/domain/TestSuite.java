@@ -3,6 +3,7 @@ package com.sentinel.domain;
 import java.util.Objects;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
@@ -17,7 +18,7 @@ import jakarta.persistence.UniqueConstraint;
 public class TestSuite extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "project_id", nullable = false, foreignKey = @ForeignKey(name = "fk_test_suite_project"))
+	@JoinColumn(name = "project_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private Project project;
 
 	@Column(nullable = false, length = 100)

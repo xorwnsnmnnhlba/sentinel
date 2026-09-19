@@ -99,6 +99,7 @@ Flyway 마이그레이션으로만 변경. 기동 시 `ddl-auto: validate`가 �
 
 - 적용된 마이그레이션 파일 수정 금지. Flyway가 체크섬 불일치로 기동 거부
 - 스키마 접두어(`sentinel.`) 미사용. Flyway `default-schema` 설정으로 지정
+- 외래키 제약 미사용. 새 연관관계는 `@JoinColumn(foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))` 지정, 조회 컬럼에는 인덱스 추가
 - 데이터가 있는 테이블에 NOT NULL 컬럼 추가 시 `DEFAULT` 지정 또는 값 채운 뒤 제약 추가
 - 적용 이력: `sentinel.flyway_schema_history`
 

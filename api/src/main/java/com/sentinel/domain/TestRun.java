@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -32,11 +33,11 @@ public class TestRun extends BaseEntity {
 	}
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "suite_id", nullable = false, foreignKey = @ForeignKey(name = "fk_test_run_suite"))
+	@JoinColumn(name = "suite_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private TestSuite suite;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "environment_id", nullable = false, foreignKey = @ForeignKey(name = "fk_test_run_environment"))
+	@JoinColumn(name = "environment_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private Environment environment;
 
 	@Enumerated(EnumType.STRING)

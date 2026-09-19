@@ -7,6 +7,7 @@ import java.util.Objects;
 import com.sentinel.runner.assertion.Assertion;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -27,7 +28,7 @@ import org.hibernate.type.SqlTypes;
 public class TestCase extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "suite_id", nullable = false, foreignKey = @ForeignKey(name = "fk_test_case_suite"))
+	@JoinColumn(name = "suite_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private TestSuite suite;
 
 	@Column(nullable = false, length = 200)
