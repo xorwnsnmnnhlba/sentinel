@@ -9,6 +9,11 @@ spring:
       maximum-pool-size: 5
       connection-timeout: 10000
       keepalive-time: 300000
+      # PostgreSQL JDBC 드라이버 옵션. socketTimeout 기본값 0(무제한)은 쿼리 도중 네트워크 단절 시 무기한 대기
+      data-source-properties:
+        socketTimeout: 30
+        connectTimeout: 10
+        tcpKeepAlive: true
   jpa:
     open-in-view: false
     hibernate:

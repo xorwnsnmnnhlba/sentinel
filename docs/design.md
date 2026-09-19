@@ -223,6 +223,7 @@ IP 변경으로 RDS 접속이 끊기면 스케줄이 실행되지 않는 상태 
 - 연결 실패 알림은 최초 주기 1회, 복구 시 1회만 발송(중단 기간 포함). 폴링 주기마다 반복 발송 금지
 - 재시도 금지. VPN 끊김은 즉시 재시도해도 복구되지 않으므로 스킵 후 다음 주기 대기
 - RDS 파라미터 그룹의 statement_timeout, idle_in_transaction_session_timeout 확인 필요
+- 클라이언트 측 타임아웃 적용 (2026-09-19): PostgreSQL JDBC `socketTimeout` 30초, `connectTimeout` 10초, `tcpKeepAlive` 사용. 드라이버 기본값 socketTimeout 0(무제한)은 쿼리 도중 네트워크 단절 시 무기한 대기하여 폴링 스레드 정지 유발
 
 ### 알림
 - 실패 시에만 발송. 성공 알림은 곧 무시됨
