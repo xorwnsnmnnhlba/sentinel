@@ -2,9 +2,10 @@ spring:
   application:
     name: sentinel
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    # 기본값: 로컬 PostgreSQL. RDS·컨테이너 실행 시 sentinel.env로 재정의
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/sentinel?currentSchema=sentinel}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
     hikari:
       maximum-pool-size: 5
       connection-timeout: 10000

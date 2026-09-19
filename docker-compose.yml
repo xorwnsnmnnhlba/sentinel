@@ -1,0 +1,16 @@
+services:
+  sentinel-api:
+    build: ./api
+    image: sentinel-api:latest
+    container_name: sentinel-api
+    # DB 접속 정보. sentinel.env.example 복사 후 작성
+    env_file: ./sentinel.env
+    environment:
+      TZ: Asia/Seoul
+    ports:
+      - "8080:8080"
+    # 호스트의 PostgreSQL(localhost:5432) 접근용. Docker Desktop은 기본 제공, Linux용 명시
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # always는 설정 오류 시 무한 재시작 루프. 수동 중지 시에는 재시작하지 않음
+    restart: unless-stopped

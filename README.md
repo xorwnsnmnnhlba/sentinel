@@ -9,15 +9,17 @@ API 검증의 정시 자동 실행 및 결과 이력 공유 도구
 ```
 [브라우저] → Next.js (:3000, BFF) → Spring Boot (:8080) → GW → 내부 모듈
                                           ↓
-                              AWS RDS (sentinel 스키마)
+                        PostgreSQL (sentinel 스키마, 로컬 또는 RDS)
 ```
 
 ```
 sentinel/
- ├─ api/          Spring Boot 백엔드 (러너, 스케줄러, API)
- ├─ web/          Next.js 프론트엔드 (BFF, 화면)
- ├─ docs/         설계 문서
- └─ sentinel.env  로컬 시크릿 (git 제외, 직접 생성)
+ ├─ api/                  Spring Boot 백엔드 (러너, 스케줄러, API)
+ ├─ web/                  Next.js 프론트엔드 (BFF, 화면)
+ ├─ docs/                 설계 문서
+ ├─ docker-compose.yml    컨테이너 실행 구성 (현재 api만)
+ ├─ sentinel.env.example  컨테이너 환경변수 템플릿
+ └─ sentinel.env          컨테이너 환경변수 (git 제외, 직접 생성)
 ```
 
 ## 스택
@@ -40,28 +42,37 @@ sentinel/
 ## 빠른 시작
 
 ### 1. 사전 준비
-- JDK 25
-- Node.js 20.9.0 이상
-- 개발기 RDS 접속 환경 (VPN 또는 보안 그룹 IP 허용)
+- Docker (컨테이너 실행, 테스트)
+- PostgreSQL: 로컬 `localhost:5432`의 `sentinel` DB(기본값) 또는 개발기 RDS
+  - `sentinel` 스키마와 테이블은 기동 시 Flyway가 생성
+- 로컬 개발 시: JDK 25, Node.js 20.9.0 이상
 
-### 2. 환경변수 파일 작성
-루트에 `sentinel.env` 생성 후 값 입력. `.gitignore` 등록 완료
-
-```
-DB_URL=jdbc:postgresql://<rds-endpoint>:5432/<db>?currentSchema=sentinel
-DB_USERNAME=
-DB_PASSWORD=
-```
-
-값에 따옴표 사용 금지. `docker --env-file`은 따옴표까지 값으로 인식
-
-### 3. 실행
+### 2. 컨테이너 실행 (api)
 
 ```bash
-# api (:8080)
+cp sentinel.env.example sentinel.env
+```
+
+`sentinel.env`의 `DB_PASSWORD` 입력 후 실행. 값에 따옴표 사용 금지(`--env-file`은 따옴표까지 값으로 인식)
+
+```bash
+docker compose up -d --build
+```
+
+```bash
+docker compose logs -f sentinel-api
+```
+
+- 로그의 `Started SentinelApplication` 확인 후 사용. `docker ps`에 `Restarting` 표시 시 설정 오류
+- 컨테이너 안의 `localhost`는 컨테이너 자신이므로 호스트 PostgreSQL은 `host.docker.internal`로 접속 (템플릿 기본값)
+- RDS 사용 시 `sentinel.env`의 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 RDS 값으로 변경
+
+### 3. 로컬 개발 실행
+
+```bash
+# api (:8080). 기본값 localhost:5432/sentinel, 사용자 postgres
 cd api
-set -a; source ../sentinel.env; set +a
-./gradlew bootRun
+DB_PASSWORD=<비밀번호> ./gradlew bootRun
 ```
 
 ```bash
