@@ -1,0 +1,191 @@
+"use server";
+
+import { refresh } from "next/cache";
+import { redirect } from "next/navigation";
+
+import { ApiError, apiSend } from "@/lib/api/server";
+import type { EnvironmentItem, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
+
+/**
+ * 프로젝트·환경·스위트·케이스 등록·수정·삭제, 스위트 실행. Spring 호출 후 refresh()로 현재 화면 재조회 또는 redirect.
+ *
+ * Server Action은 화면을 거치지 않고 직접 POST로도 호출 가능하므로 입력값(바인딩된 ID 포함)을 모두 신뢰하지 않고 검사.
+ * 값 검증의 최종 판단은 Spring(400·404·409), 여기서는 형식만 확인
+ */
+
+/** 폼 결과. 오류 시 화면에 표시할 메시지 */
+export type ActionState = { error?: string } | undefined;
+
+export async function createProject(_: ActionState, form: FormData): Promise<ActionState> {
+  let created: ProjectItem | null;
+  try {
+    created = await apiSend<ProjectItem>("POST", "/api/projects", {
+      name: text(form, "name"),
+      description: text(form, "description"),
+    });
+  } catch (error) {
+    return failure(error);
+  }
+  redirect(`/projects/${created!.id}`);
+}
+
+export async function updateProject(projectId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  return mutate("PATCH", `/api/projects/${id(projectId)}`, {
+    name: raw(form, "name"),
+    description: raw(form, "description"),
+  });
+}
+
+export async function deleteProject(projectId: number): Promise<ActionState> {
+  try {
+    await apiSend("DELETE", `/api/projects/${id(projectId)}`);
+  } catch (error) {
+    return failure(error);
+  }
+  redirect("/projects");
+}
+
+export async function createEnvironment(projectId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  const variables = variablesOf(form);
+  if (typeof variables === "string") {
+    return { error: variables };
+  }
+  return mutate("POST", "/api/environments", {
+    projectId: id(projectId),
+    name: text(form, "name"),
+    baseUrl: text(form, "baseUrl"),
+    variables,
+  });
+}
+
+export async function updateEnvironment(environmentId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  const variables = variablesOf(form);
+  if (typeof variables === "string") {
+    return { error: variables };
+  }
+  return mutate("PATCH", `/api/environments/${id(environmentId)}`, {
+    name: raw(form, "name"),
+    baseUrl: raw(form, "baseUrl"),
+    variables,
+  });
+}
+
+export async function deleteEnvironment(environmentId: number): Promise<ActionState> {
+  return mutate("DELETE", `/api/environments/${id(environmentId)}`);
+}
+
+export async function createSuite(projectId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  return mutate("POST", "/api/suites", {
+    projectId: id(projectId),
+    name: text(form, "name"),
+    description: text(form, "description"),
+  });
+}
+
+export async function updateSuite(suiteId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  return mutate("PATCH", `/api/suites/${id(suiteId)}`, {
+    name: raw(form, "name"),
+    description: raw(form, "description"),
+  });
+}
+
+/**
+ * @param projectId 지정 시 삭제 후 프로젝트 화면으로 이동(스위트 화면에서 삭제). 미지정 시 현재 화면 재조회
+ */
+export async function deleteSuite(suiteId: number, projectId?: number): Promise<ActionState> {
+  const result = await mutate("DELETE", `/api/suites/${id(suiteId)}`);
+  if (result?.error || projectId === undefined) {
+    return result;
+  }
+  redirect(`/projects/${id(projectId)}`);
+}
+
+export async function deleteCase(caseId: number): Promise<ActionState> {
+  return mutate("DELETE", `/api/cases/${id(caseId)}`);
+}
+
+/**
+ * 스위트 즉시 실행. 실행 완료까지 대기 후 결과 상세로 이동
+ */
+export async function runSuite(suiteId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  const environmentId = Number(form.get("environmentId"));
+  if (!Number.isSafeInteger(environmentId) || environmentId <= 0) {
+    return { error: "실행할 환경을 선택해 주세요" };
+  }
+  let run: RunDetail | null;
+  try {
+    run = await apiSend<RunDetail>("POST", "/api/runs", { suiteId: id(suiteId), environmentId });
+  } catch (error) {
+    return failure(error);
+  }
+  redirect(`/runs/${run!.id}`);
+}
+
+async function mutate(method: "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<ActionState> {
+  try {
+    await apiSend<EnvironmentItem | SuiteItem | ProjectItem>(method, path, body);
+  } catch (error) {
+    return failure(error);
+  }
+  refresh();
+  return {};
+}
+
+/** 등록용. 빈 값은 null(선택 항목 생략) */
+function text(form: FormData, name: string): string | null {
+  const value = form.get(name);
+  return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+/**
+ * 수정용. 폼은 모든 필드를 보내므로 빈 값도 그대로 전달. 빈 이름·URL은 Spring이 400으로 거부, 빈 설명은 설명 제거
+ */
+function raw(form: FormData, name: string): string {
+  const value = form.get(name);
+  return typeof value === "string" ? value : "";
+}
+
+function id(value: number): number {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error("invalid id");
+  }
+  return value;
+}
+
+/** 변수 편집기가 hidden input(variables)에 담은 JSON. 오류 시 메시지 반환 */
+function variablesOf(form: FormData): Record<string, string> | string {
+  const raw = form.get("variables");
+  if (typeof raw !== "string" || raw === "") {
+    return {};
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return "변수 형식이 올바르지 않습니다";
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return "변수 형식이 올바르지 않습니다";
+  }
+  const entries = Object.entries(parsed);
+  if (entries.some(([, value]) => typeof value !== "string")) {
+    return "변수 값은 문자열이어야 합니다";
+  }
+  return Object.fromEntries(entries) as Record<string, string>;
+}
+
+/** Spring 오류를 화면용 메시지로 변환. 그 외 오류(연결 실패 등)는 내부 정보 없이 고정 문구 */
+function failure(error: unknown): ActionState {
+  if (error instanceof ApiError) {
+    switch (error.status) {
+      case 400:
+        return { error: `입력값을 확인해 주세요: ${error.detail}` };
+      case 404:
+        return { error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다" };
+      case 409:
+        return { error: "이미 사용 중인 이름입니다" };
+    }
+  }
+  console.error("catalog action failed", error);
+  return { error: "요청을 처리하지 못했습니다. API 서버 상태를 확인해 주세요" };
+}

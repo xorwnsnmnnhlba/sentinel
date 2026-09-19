@@ -81,3 +81,32 @@ export interface SuiteItem {
   description: string | null;
   caseCount: number;
 }
+
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+
+export interface ProjectItem {
+  id: number;
+  name: string;
+  description: string | null;
+}
+
+export interface EnvironmentItem {
+  id: number;
+  projectId: number;
+  name: string;
+  baseUrl: string;
+  /** 평문 저장. 토큰·API 키 입력 금지 */
+  variables: Record<string, string>;
+}
+
+/** 판정 규칙. type별 필드는 api/README.md "판정 규칙 (assertions)" 참고 */
+export type Assertion = { type: string } & Record<string, unknown>;
+
+export interface CaseItem {
+  id: number;
+  suiteId: number;
+  name: string;
+  request: { method: HttpMethod; path: string; headers: Headers; body: string | null };
+  /** 비어 있으면 기본 판정(status in [2xx]) */
+  assertions: Assertion[];
+}
