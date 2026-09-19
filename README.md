@@ -17,7 +17,7 @@ sentinel/
  ├─ api/                  Spring Boot 백엔드 (러너, 스케줄러, API)
  ├─ web/                  Next.js 프론트엔드 (BFF, 화면)
  ├─ docs/                 설계 문서
- ├─ docker-compose.yml    컨테이너 실행 구성 (현재 api만)
+ ├─ docker-compose.yml    컨테이너 실행 구성 (api :8080, web :3000)
  ├─ sentinel.env.example  컨테이너 환경변수 템플릿
  └─ sentinel.env          컨테이너 환경변수 (git 제외, 직접 생성)
 ```
@@ -35,7 +35,9 @@ sentinel/
 | | React | 19.2.8 | |
 | | TypeScript | 5.9.3 | |
 | | Tailwind CSS | 4.3.3 | |
-| | Node.js | 20.9.0 이상 | |
+| | shadcn/ui | CLI 4.21.0 (Radix UI) | |
+| | TanStack Query | 5.103.1 | |
+| | Node.js | 24.21.0 (요구사항 20.9.0 이상) | |
 
 모듈별 전체 의존성 버전은 각 README 참고
 
@@ -47,7 +49,7 @@ sentinel/
   - `sentinel` 스키마와 테이블은 기동 시 Flyway가 생성
 - 로컬 개발 시: JDK 25, Node.js 20.9.0 이상
 
-### 2. 컨테이너 실행 (api)
+### 2. 컨테이너 실행 (api, web)
 
 ```bash
 cp sentinel.env.example sentinel.env
@@ -64,6 +66,7 @@ docker compose logs -f sentinel-api
 ```
 
 - 로그의 `Started SentinelApplication` 확인 후 사용. `docker ps`에 `Restarting` 표시 시 설정 오류
+- 화면: [http://localhost:3000](http://localhost:3000), API: `localhost:8080`
 - 컨테이너 안의 `localhost`는 컨테이너 자신이므로 호스트 PostgreSQL은 `host.docker.internal`로 접속 (템플릿 기본값)
 - RDS 사용 시 `sentinel.env`의 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 RDS 값으로 변경
 
