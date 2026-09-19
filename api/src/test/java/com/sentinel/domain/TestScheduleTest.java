@@ -64,6 +64,31 @@ class TestScheduleTest {
 	}
 
 	@Test
+	void changingCronRecomputesNextRunOnlyWhenEnabled() {
+		TestSchedule schedule = schedule("10 9 * * *", SEOUL);
+
+		schedule.changeCron("30 17 * * *", NINE_AM_KST, SEOUL);
+		assertThat(schedule.getCron()).isEqualTo("30 17 * * *");
+		assertThat(schedule.getNextRunAt()).isEqualTo("2026-09-18T08:30:00Z");
+
+		schedule.disable();
+		schedule.changeCron("0 12 * * *", NINE_AM_KST, SEOUL);
+		assertThat(schedule.getCron()).isEqualTo("0 12 * * *");
+		assertThat(schedule.getNextRunAt()).isNull();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "10 9 * *", "0 0 30 2 *" })
+	void rejectsInvalidCronChangeAndKeepsPrevious(String cron) {
+		TestSchedule schedule = schedule("10 9 * * *", SEOUL);
+		schedule.disable();
+
+		assertThatThrownBy(() -> schedule.changeCron(cron, NINE_AM_KST, SEOUL))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThat(schedule.getCron()).isEqualTo("10 9 * * *");
+	}
+
+	@Test
 	void normalizesWhitespace() {
 		assertThat(schedule("  30   17 * *  1-5 ", SEOUL).getCron()).isEqualTo("30 17 * * 1-5");
 	}

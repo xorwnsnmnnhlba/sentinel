@@ -52,12 +52,38 @@ public class Environment extends ArchivableEntity {
 		this.baseUrl = normalizeBaseUrl(baseUrl);
 	}
 
+	public void rename(String name) {
+		this.name = Preconditions.requireText(name, "name", 50);
+	}
+
 	public void changeBaseUrl(String baseUrl) {
 		this.baseUrl = normalizeBaseUrl(baseUrl);
 	}
 
 	public void putVariable(String key, String value) {
-		variables.put(Preconditions.requireText(key, "variable key", 100), Objects.requireNonNull(value, "value"));
+		String validKey = Preconditions.requireText(key, "variable key", 100);
+		if (value == null) {
+			throw new IllegalArgumentException("variable '" + validKey + "' must not be null");
+		}
+		variables.put(validKey, value);
+	}
+
+	/**
+	 * 변수 전체 교체. 검증 실패 시 기존 변수 유지
+	 */
+	public void replaceVariables(Map<String, String> variables) {
+		Map<String, String> previous = new LinkedHashMap<>(this.variables);
+		this.variables.clear();
+		try {
+			if (variables != null) {
+				variables.forEach(this::putVariable);
+			}
+		}
+		catch (IllegalArgumentException ex) {
+			this.variables.clear();
+			this.variables.putAll(previous);
+			throw ex;
+		}
 	}
 
 	public void removeVariable(String key) {

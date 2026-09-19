@@ -193,10 +193,10 @@ curl -i -X POST localhost:8080/api/runs \
 
 | 리소스 | 목록 | 단건 | 생성·수정 | 삭제 |
 |--------|------|------|-----------|------|
-| 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | | `DELETE /api/projects/{id}` |
-| 환경 | `GET /api/environments?projectId=` | `GET /api/environments/{id}` | | `DELETE /api/environments/{id}` |
-| 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | | `DELETE /api/suites/{id}` |
-| 케이스 | `GET /api/cases?suiteId=` | `GET /api/cases/{id}` | | `DELETE /api/cases/{id}` |
+| 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | `POST /api/projects`, `PATCH /api/projects/{id}` | `DELETE /api/projects/{id}` |
+| 환경 | `GET /api/environments?projectId=` | `GET /api/environments/{id}` | `POST /api/environments`, `PATCH /api/environments/{id}` | `DELETE /api/environments/{id}` |
+| 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | `POST /api/suites`, `PATCH /api/suites/{id}` | `DELETE /api/suites/{id}` |
+| 케이스 | `GET /api/cases?suiteId=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
 | 실행 | `GET /api/runs?suiteId=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs` | |
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
 
@@ -207,6 +207,23 @@ curl -i -X POST localhost:8080/api/runs \
   - 행: 프로젝트·스위트·환경의 `{id, name}`, `trigger`, `status`, 시각, `summary`(전체·통과·실패·오류)
   - 실행 건수와 무관하게 페이지당 쿼리 최대 3회 (이름 함께 로딩, 판정 건수 일괄 집계)
 - 실행 상세: 스위트·환경·케이스 이름과 케이스별 결과 포함
+- 등록·수정
+  - 등록은 201 + `Location`, 본문은 단건 조회와 같은 형태. 수정은 200 + 수정 후 항목
+  - `PATCH`는 부분 수정. 생략(null)한 필드는 유지, `description`은 빈 문자열로 제거
+  - 환경 `variables`, 케이스 `request`·`assertions`는 지정 시 전체 교체. `assertions: []`는 기본 판정(2xx)으로 복귀
+  - 같은 부모 아래 사용 중인 이름과 중복 시 409 (프로젝트는 전체에서 유일). 앞뒤 공백은 제거 후 비교
+  - 잘못된 값(빈 이름, 길이 초과, 잘못된 `baseUrl`·경로·메서드·판정 규칙)은 400, 미존재·보관된 부모는 404
+  - 부모 변경(다른 프로젝트·스위트로 이동)은 미지원
+
+| 등록 | 본문 예시 |
+|------|-----------|
+| 프로젝트 | `{"name": "billing", "description": "결제"}` |
+| 환경 | `{"projectId": 1, "name": "dev", "baseUrl": "https://gw.dev.internal", "variables": {"userId": "42"}}` |
+| 스위트 | `{"projectId": 1, "name": "smoke", "description": null}` |
+| 케이스 | `{"suiteId": 1, "name": "결제 내역 조회", "request": {"method": "GET", "path": "/billing/v1/history?userId={{userId}}", "headers": {"Accept": ["application/json"]}, "body": null}, "assertions": [{"type": "statusCode", "anyOf": ["200"]}]}` |
+
+- 환경 변수는 평문 저장. 운영 토큰·API 키 입력 금지 (암호화 구현 후 시크릿으로 분리 예정)
+
 - 삭제는 소프트 삭제(보관). 204 응답, 하위 항목 연쇄 보관, 실행 이력은 유지
   - 프로젝트 → 환경·스위트·케이스·스케줄, 환경 → 해당 스케줄, 스위트 → 케이스·스케줄
   - 보관된 항목은 목록에서 제외되고 단건 조회·재삭제·실행은 404. 같은 이름으로 새로 등록 가능
@@ -217,7 +234,7 @@ curl -i -X POST localhost:8080/api/runs \
 |-----|------|
 | `POST /api/schedules` | 스케줄 등록. 본문 `{"suiteId": 1, "environmentId": 1, "cron": "10 9 * * 1-5"}`. 201 + `Location` |
 | `GET /api/schedules/{id}` | 조회. `nextRunAt`(다음 실행 시각), `lastTriggeredAt`(마지막 실행 시각) 포함 |
-| `PATCH /api/schedules/{id}` | 부분 수정. `{"enabled": false}`는 `nextRunAt` 제거, `{"enabled": true}`는 현재 시각 기준 재계산. 생략한 필드는 유지 |
+| `PATCH /api/schedules/{id}` | 부분 수정. `{"enabled": false}`는 `nextRunAt` 제거, `{"enabled": true}`는 현재 시각 기준 재계산. `{"cron": "30 17 * * 1-5"}`는 활성 상태면 `nextRunAt` 재계산. 생략한 필드는 유지 |
 
 - cron은 5자리 표준 형식(`분 시 일 월 요일`), `Asia/Seoul` 기준. 예: `10 9 * * 1-5` = 평일 09:10
 - 60초 간격 폴링으로 실행 시각 도달 스케줄의 스위트 실행 (`trigger: SCHEDULED`)

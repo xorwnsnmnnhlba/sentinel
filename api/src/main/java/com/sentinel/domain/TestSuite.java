@@ -33,7 +33,7 @@ public class TestSuite extends ArchivableEntity {
 	public TestSuite(Project project, String name, String description) {
 		this.project = Objects.requireNonNull(project, "project");
 		this.name = Preconditions.requireText(name, "name", 100);
-		this.description = description;
+		this.description = Preconditions.optionalText(description, "description", 500);
 	}
 
 	public void rename(String name) {
@@ -41,7 +41,7 @@ public class TestSuite extends ArchivableEntity {
 	}
 
 	public void describe(String description) {
-		this.description = description;
+		this.description = Preconditions.optionalText(description, "description", 500);
 	}
 
 	public Project getProject() {

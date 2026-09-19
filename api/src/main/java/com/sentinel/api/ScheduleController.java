@@ -44,11 +44,11 @@ class ScheduleController {
 	}
 
 	/**
-	 * 부분 수정. 현재 enabled만 지원, 생략한 필드는 유지
+	 * 부분 수정. enabled, cron 지원, 생략한 필드는 유지
 	 */
 	@PatchMapping("/{scheduleId}")
 	ScheduleDetail update(@PathVariable long scheduleId, @RequestBody UpdateScheduleRequest request) {
-		return scheduleService.update(scheduleId, request.enabled());
+		return scheduleService.update(scheduleId, request.enabled(), request.cron());
 	}
 
 	/**

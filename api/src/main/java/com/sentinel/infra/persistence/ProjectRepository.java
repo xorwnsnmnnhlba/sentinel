@@ -11,7 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
  */
 public interface ProjectRepository extends JpaRepository<Project, Long> {
 
-	Optional<Project> findByName(String name);
+	Optional<Project> findByNameAndArchivedAtIsNull(String name);
 
 	List<Project> findByArchivedAtIsNullOrderByName();
 

@@ -17,6 +17,8 @@ public interface TestCaseRepository extends JpaRepository<TestCase, Long> {
 
 	Optional<TestCase> findByIdAndArchivedAtIsNull(Long id);
 
+	Optional<TestCase> findBySuiteIdAndNameAndArchivedAtIsNull(Long suiteId, String name);
+
 	long countBySuiteIdAndArchivedAtIsNull(Long suiteId);
 
 }
