@@ -98,6 +98,7 @@ Flyway 마이그레이션으로만 변경. 기동 시 `ddl-auto: validate`가 �
 3. `./gradlew test`로 검증. 테스트 컨테이너에 마이그레이션 적용 후 `validate` 수행
 
 - 적용된 마이그레이션 파일 수정 금지. Flyway가 체크섬 불일치로 기동 거부
+- ANSI SQL 표준만 사용 (`docs/design.md` "SQL 작성 원칙"). JSON 값은 `JSON`, 긴 문자열은 `VARCHAR(n)`, 표준 예약어 컬럼명 금지
 - 스키마 접두어(`sentinel.`) 미사용. Flyway `default-schema` 설정으로 지정
 - 외래키 제약 미사용. 새 연관관계는 `@JoinColumn(foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))` 지정, 조회 컬럼에는 인덱스 추가
 - 데이터가 있는 테이블에 NOT NULL 컬럼 추가 시 `DEFAULT` 지정 또는 값 채운 뒤 제약 추가
@@ -110,17 +111,29 @@ Flyway 마이그레이션으로만 변경. 기동 시 `ddl-auto: validate`가 �
 ### 1. 케이스 등록 (SQL)
 
 ```sql
-INSERT INTO sentinel.project (name, created_at, updated_at) VALUES ('sample', now(), now());
+INSERT INTO sentinel.project (name, created_at, updated_at)
+VALUES ('sample', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
 INSERT INTO sentinel.environment (project_id, name, base_url, variables, created_at, updated_at)
-  VALUES (1, 'dev', 'https://<gw-host>', '{"userId": "42"}', now(), now());
-INSERT INTO sentinel.test_suite (project_id, name, created_at, updated_at) VALUES (1, 'smoke', now(), now());
-INSERT INTO sentinel.test_case (suite_id, name, method, path, headers, body, assertions, created_at, updated_at)
-  VALUES (1, 'user lookup', 'GET', '/users/{{userId}}', '{"Accept": ["application/json"]}', NULL,
-          '[{"type": "statusCode", "anyOf": ["200"]},
-            {"type": "responseTime", "maxMillis": 2000},
-            {"type": "jsonPath", "path": "$.id", "operator": "EQUALS", "expected": 42}]',
-          now(), now());
+VALUES ((SELECT id FROM sentinel.project WHERE name = 'sample'),
+        'dev', 'https://<gw-host>', '{"userId": "42"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+INSERT INTO sentinel.test_suite (project_id, name, created_at, updated_at)
+VALUES ((SELECT id FROM sentinel.project WHERE name = 'sample'), 'smoke', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
+VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
+         WHERE p.name = 'sample' AND s.name = 'smoke'),
+        'user lookup', 'GET', '/users/{{userId}}', '{"Accept": ["application/json"]}', NULL,
+        '[{"type": "statusCode", "anyOf": ["200"]},
+          {"type": "responseTime", "maxMillis": 2000},
+          {"type": "jsonPath", "path": "$.id", "operator": "EQUALS", "expected": 42}]',
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 ```
+
+- 표준 SQL만 사용 (`RETURNING`, `::` 캐스트, `now()` 등 PostgreSQL 전용 문법 미사용)
+- 부모 ID는 유니크한 이름(프로젝트명, 프로젝트 내 스위트명)으로 조회. 이름 오타 시 `NOT NULL` 위반으로 실패
+- 판정 규칙 5종·의도적 실패 케이스·GW 템플릿을 포함한 전체 예시: [docs/sample-cases.sql](../docs/sample-cases.sql)
 
 - `bootTestRun` 사용 시 DB 접속: `docker ps`로 `postgres:18-alpine` 컨테이너 확인 후 `docker exec -it <컨테이너> psql -U test -d test`
 - `path`는 `/` 시작 상대 경로. 경로·헤더 값·본문에 `{{변수}}` 사용 가능, `\{{`는 치환 없이 `{{` 출력

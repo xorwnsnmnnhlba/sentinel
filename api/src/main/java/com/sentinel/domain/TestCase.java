@@ -39,6 +39,7 @@ public class TestCase extends BaseEntity {
 
 	/** 판정 규칙. 기존 데이터 호환을 위해 null 허용, null은 빈 목록으로 취급 */
 	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "json")
 	private List<Assertion> assertions = new ArrayList<>();
 
 	protected TestCase() {

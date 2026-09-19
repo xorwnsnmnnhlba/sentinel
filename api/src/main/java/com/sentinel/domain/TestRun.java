@@ -40,8 +40,9 @@ public class TestRun extends BaseEntity {
 	@JoinColumn(name = "environment_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
 	private Environment environment;
 
+	/** TRIGGER는 SQL 표준 예약어이므로 컬럼명 trigger_type */
 	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 20)
+	@Column(name = "trigger_type", nullable = false, length = 20)
 	private Trigger trigger;
 
 	@Enumerated(EnumType.STRING)

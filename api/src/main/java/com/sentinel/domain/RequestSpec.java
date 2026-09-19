@@ -21,8 +21,11 @@ import org.hibernate.type.SqlTypes;
 @Embeddable
 public class RequestSpec {
 
+	/** 요청 본문 최대 길이(문자). 컬럼 VARCHAR(65536)과 일치 */
+	public static final int MAX_BODY_LENGTH = 65_536;
+
 	@Enumerated(EnumType.STRING)
-	@Column(name = "method", nullable = false, length = 10)
+	@Column(name = "http_method", nullable = false, length = 10)
 	private HttpMethod method;
 
 	/** Environment baseUrl 기준 상대 경로. {@code /}로 시작, 쿼리스트링 포함 가능 */
@@ -30,10 +33,10 @@ public class RequestSpec {
 	private String path;
 
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(name = "headers", nullable = false)
+	@Column(name = "headers", nullable = false, columnDefinition = "json")
 	private Map<String, List<String>> headers;
 
-	@Column(name = "body", columnDefinition = "text")
+	@Column(name = "body", length = MAX_BODY_LENGTH)
 	private String body;
 
 	protected RequestSpec() {
@@ -43,7 +46,14 @@ public class RequestSpec {
 		this.method = Objects.requireNonNull(method, "method");
 		this.path = requirePath(path);
 		this.headers = copyOf(headers);
-		this.body = body;
+		this.body = requireBodyLength(body);
+	}
+
+	private static String requireBodyLength(String body) {
+		if (body != null && body.length() > MAX_BODY_LENGTH) {
+			throw new IllegalArgumentException("body must be at most " + MAX_BODY_LENGTH + " characters");
+		}
+		return body;
 	}
 
 	private static String requirePath(String path) {

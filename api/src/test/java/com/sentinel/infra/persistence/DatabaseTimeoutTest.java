@@ -55,7 +55,7 @@ class DatabaseTimeoutTest {
 			.satisfies(ex -> assertThat(NestedExceptionUtils.getRootCause(ex)).isInstanceOf(SocketTimeoutException.class));
 
 		assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofSeconds(5));
-		assertThat(jdbcTemplate.queryForObject("SELECT 1", Integer.class)).isEqualTo(1);
+		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sentinel.project", Integer.class)).isNotNull();
 	}
 
 }
