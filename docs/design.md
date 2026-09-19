@@ -43,7 +43,7 @@ sentinel/
 
 ### 구간별 인증 분리
 - 브라우저 → Next.js: 세션 쿠키. Next가 쿠키 관리, 브라우저에는 Next 도메인 쿠키만 노출
-- Next.js → Spring: Route Handler에서 서버사이드 호출, CORS 미발생
+- Next.js → Spring: 서버사이드 호출, CORS 미발생. Server Component는 Spring 직접 호출(`lib/api/server.ts`), 브라우저 요청은 Route Handler 프록시(`/api/**`) 경유 (Next.js 16 권장 방식, 2026-09-19 구현)
 - Spring → GW: 환경별로 저장된 시스템 자격증명을 Spring이 주입. 사용자 토큰 패스스루 금지
 
 ### 인증 범위
@@ -72,7 +72,7 @@ sentinel/
 | 실행기 | RestClient |
 | 스케줄 | DB 폴링 (5장 참조) |
 | 스키마 관리 | Flyway + ddl-auto: validate (2026-09-19 배포 구성 시 전환) |
-| FE | Next.js 16.3.4 (Active LTS), App Router, TanStack Query |
+| FE | Next.js 16.3.5 (Active LTS), App Router, TanStack Query, shadcn/ui (Radix UI) |
 | 실행 환경 | 노트북 상시 실행, Docker 컨테이너 2개 |
 
 ### Spring Boot 4 관련 유의사항
@@ -271,13 +271,14 @@ sentinel-api   :8080   Spring Boot
 sentinel-web   :3000   Next.js (standalone)
 ```
 
-루트 `docker-compose.yml`로 실행 (2026-09-19 구성, 현재 api만. web은 4단계에서 추가)
+루트 `docker-compose.yml`로 실행 (2026-09-19 구성, api와 web 컨테이너 2개)
 
 ```bash
 docker compose up -d --build
 ```
 
 - 이미지: `api/Dockerfile` 멀티 스테이지 (eclipse-temurin 25 JDK 빌드 → 25 JRE 실행, 비root 사용자)
+- web 이미지: `web/Dockerfile` 멀티 스테이지 (node:24-alpine, Next.js standalone 출력, 비root 사용자). `INTERNAL_API_URL=http://sentinel-api:8080`
 - DB: 기본 로컬 PostgreSQL(`host.docker.internal:5432/sentinel`), RDS 전환은 `sentinel.env` 값 변경만으로 처리
 - 스키마는 Flyway가 관리 (`api/src/main/resources/db/migration`). `sentinel` 스키마 미존재 시 생성, RDS처럼 이미 존재하면 마이그레이션만 적용
 - 기동 시 `ddl-auto: validate`로 엔티티와 테이블 일치 검증. 불일치 시 기동 실패로 드리프트 조기 발견

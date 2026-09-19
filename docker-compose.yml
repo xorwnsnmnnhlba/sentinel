@@ -14,3 +14,17 @@ services:
       - "host.docker.internal:host-gateway"
     # always는 설정 오류 시 무한 재시작 루프. 수동 중지 시에는 재시작하지 않음
     restart: unless-stopped
+
+  sentinel-web:
+    build: ./web
+    image: sentinel-web:latest
+    container_name: sentinel-web
+    environment:
+      # 서버 전용 Spring 주소. 컨테이너 간 통신은 localhost가 아닌 서비스 이름 사용
+      INTERNAL_API_URL: http://sentinel-api:8080
+      TZ: Asia/Seoul
+    ports:
+      - "3000:3000"
+    depends_on:
+      - sentinel-api
+    restart: unless-stopped
