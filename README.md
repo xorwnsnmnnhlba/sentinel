@@ -79,7 +79,7 @@ docker exec -i postgres psql -U postgres -d sentinel -v ON_ERROR_STOP=1 < docs/s
 ```
 
 ```bash
-curl -s -X POST localhost:8080/api/test-suites/1/runs -H 'Content-Type: application/json' -d '{"environmentId": 1}'
+curl -s -X POST localhost:8080/api/runs -H 'Content-Type: application/json' -d '{"suiteId": 1, "environmentId": 1}'
 ```
 
 - 빈 DB 기준 스위트·환경 ID는 1. 그 외에는 파일 안의 ID 조회 쿼리 사용

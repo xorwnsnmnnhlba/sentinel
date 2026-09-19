@@ -1,6 +1,7 @@
 package com.sentinel.application;
 
 import java.time.Clock;
+import java.util.List;
 
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.TestSchedule;
@@ -52,18 +53,31 @@ public class ScheduleService {
 		return detailOf(schedules.save(schedule));
 	}
 
+	/**
+	 * 부분 수정. null 필드는 변경하지 않음
+	 * @param enabled true면 현재 시각 기준 다음 실행 시각 재계산, false면 다음 실행 시각 제거
+	 */
 	@Transactional
-	public ScheduleDetail enable(long scheduleId) {
+	public ScheduleDetail update(long scheduleId, Boolean enabled) {
 		TestSchedule schedule = find(scheduleId);
-		schedule.enable(clock.instant(), properties.zone());
+		if (Boolean.TRUE.equals(enabled)) {
+			schedule.enable(clock.instant(), properties.zone());
+		}
+		else if (Boolean.FALSE.equals(enabled)) {
+			schedule.disable();
+		}
 		return detailOf(schedule);
 	}
 
-	@Transactional
-	public ScheduleDetail disable(long scheduleId) {
-		TestSchedule schedule = find(scheduleId);
-		schedule.disable();
-		return detailOf(schedule);
+	/**
+	 * @param suiteId null이면 전체
+	 */
+	@Transactional(readOnly = true)
+	public List<ScheduleDetail> list(Long suiteId) {
+		return (suiteId == null ? schedules.findAllByOrderById() : schedules.findBySuiteIdOrderById(suiteId))
+			.stream()
+			.map(this::detailOf)
+			.toList();
 	}
 
 	@Transactional(readOnly = true)

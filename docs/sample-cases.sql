@@ -33,7 +33,7 @@ VALUES ((SELECT id FROM sentinel.project WHERE name = 'sentinel-self-check'),
 INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
          WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'),
-        '존재하지 않는 실행 조회는 404 ProblemDetail', 'GET', '{{apiPrefix}}/test-runs/{{missingRunId}}',
+        '존재하지 않는 실행 조회는 404 ProblemDetail', 'GET', '{{apiPrefix}}/runs/{{missingRunId}}',
         '{"Accept": ["application/json"]}',
         NULL,
         '[{"type": "statusCode", "anyOf": ["404"]},
@@ -48,7 +48,7 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
          WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'),
-        '스케줄 등록 필수값 누락은 400', 'POST', '{{apiPrefix}}/test-schedules',
+        '스케줄 등록 필수값 누락은 400', 'POST', '{{apiPrefix}}/schedules',
         '{"Content-Type": ["application/json"]}',
         '{}',
         '[{"type": "statusCode", "anyOf": ["4xx"]},
@@ -59,7 +59,7 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
          WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'),
-        '[의도적 실패] 판정 실패 알림 확인', 'GET', '{{apiPrefix}}/test-runs/{{missingRunId}}',
+        '[의도적 실패] 판정 실패 알림 확인', 'GET', '{{apiPrefix}}/runs/{{missingRunId}}',
         '{}',
         NULL,
         '[{"type": "statusCode", "anyOf": ["200"]}]',
@@ -69,7 +69,7 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
          WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'),
-        '[의도적 실패] 변수 누락 오류 확인', 'GET', '{{apiPrefix}}/test-runs/{{undefinedRunId}}',
+        '[의도적 실패] 변수 누락 오류 확인', 'GET', '{{apiPrefix}}/runs/{{undefinedRunId}}',
         '{}',
         NULL,
         NULL,
@@ -90,12 +90,12 @@ COMMIT;
 --   WHERE p.name = 'sentinel-self-check';
 --
 -- 스위트 즉시 실행 (<suiteId>, <environmentId> 치환):
---   curl -s -X POST localhost:8080/api/test-suites/<suiteId>/runs \
---     -H 'Content-Type: application/json' -d '{"environmentId": <environmentId>}'
+--   curl -s -X POST localhost:8080/api/runs \
+--     -H 'Content-Type: application/json' -d '{"suiteId": <suiteId>, "environmentId": <environmentId>}'
 --   → summary: total 4, passed 2, failed 1, errors 1
 --
 -- 스케줄 등록 (평일 09:10). next_run_at 계산이 필요하므로 SQL 대신 API 사용:
---   curl -s -X POST localhost:8080/api/test-schedules -H 'Content-Type: application/json' \
+--   curl -s -X POST localhost:8080/api/schedules -H 'Content-Type: application/json' \
 --     -d '{"suiteId": <suiteId>, "environmentId": <environmentId>, "cron": "10 9 * * 1-5"}'
 --
 -- 실행 완료·실패 알림 확인 (알림은 채널 확정 전까지 로그):

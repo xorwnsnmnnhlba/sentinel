@@ -12,13 +12,18 @@ import com.sentinel.domain.TestRun;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.AssertionResult;
 
-public record TestRunDetail(long id, long suiteId, long environmentId, TestRun.Trigger trigger, TestRun.Status status,
-		Instant startedAt, Instant finishedAt, Summary summary, List<Result> results) {
+public record TestRunDetail(long id, long suiteId, String suiteName, long environmentId, String environmentName,
+		TestRun.Trigger trigger, TestRun.Status status, Instant startedAt, Instant finishedAt, Summary summary,
+		List<Result> results) {
 
+	/**
+	 * @param results 케이스가 함께 로딩된 결과. 트랜잭션 안에서 호출
+	 */
 	static TestRunDetail of(TestRun run, List<TestResult> results) {
 		List<Result> mapped = results.stream().map(Result::of).toList();
-		return new TestRunDetail(run.getId(), run.getSuite().getId(), run.getEnvironment().getId(), run.getTrigger(),
-				run.getStatus(), run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped);
+		return new TestRunDetail(run.getId(), run.getSuite().getId(), run.getSuite().getName(),
+				run.getEnvironment().getId(), run.getEnvironment().getName(), run.getTrigger(), run.getStatus(),
+				run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped);
 	}
 
 	/**
@@ -39,7 +44,7 @@ public record TestRunDetail(long id, long suiteId, long environmentId, TestRun.T
 
 	}
 
-	public record Result(long id, long testCaseId, Verdict verdict, Outcome outcome,
+	public record Result(long id, long testCaseId, String testCaseName, Verdict verdict, Outcome outcome,
 			List<AssertionResult> assertionResults, ErrorReason errorReason, String errorMessage, Long elapsedMs,
 			Request request, Response response) {
 
@@ -48,7 +53,8 @@ public record TestRunDetail(long id, long suiteId, long environmentId, TestRun.T
 					? new Response(result.getStatusCode(), result.getResponseHeaders(), result.getResponseBody(),
 							result.isResponseBodyTruncated())
 					: null;
-			return new Result(result.getId(), result.getTestCase().getId(), result.getVerdict(), result.getOutcome(),
+			return new Result(result.getId(), result.getTestCase().getId(), result.getTestCase().getName(),
+					result.getVerdict(), result.getOutcome(),
 					result.getAssertionResults(), result.getErrorReason(), result.getErrorMessage(), result.getElapsedMs(),
 					new Request(result.getRequestMethod(), result.getRequestUrl(), result.getRequestHeaders(),
 							result.getRequestBody()),

@@ -108,7 +108,7 @@ public class TestRunService {
 	public TestRunDetail getRun(long runId) {
 		return readOnlyTransaction.execute(status -> {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
-			return TestRunDetail.of(run, results.findByRunIdOrderById(runId));
+			return TestRunDetail.of(run, results.findWithTestCaseByRunId(runId));
 		});
 	}
 

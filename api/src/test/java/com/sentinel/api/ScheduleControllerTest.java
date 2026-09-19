@@ -43,53 +43,69 @@ class ScheduleControllerTest {
 	}
 
 	@Test
-	void createsDisablesAndEnablesSchedule() {
+	void createsListsAndPatchesSchedule() {
 		Project project = fixtures.project();
 		Environment environment = fixtures.environment(project, Map.of());
 		TestSuite suite = fixtures.suite(project);
+		TestSuite other = fixtures.suite(project);
 
-		MvcTestResult created = mvc.post()
-			.uri("/api/test-schedules")
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("""
-					{"suiteId": %d, "environmentId": %d, "cron": "10 9 * * 1-5"}
-					""".formatted(suite.getId(), environment.getId()))
-			.exchange();
+		MvcTestResult created = create(suite, environment, "10 9 * * 1-5");
+		create(other, environment, "30 12 * * 1-5");
 
 		assertThat(created).hasStatus(HttpStatus.CREATED);
-		assertThat(created).bodyJson().extractingPath("$.cron").isEqualTo("10 9 * * 1-5");
 		assertThat(created).bodyJson().extractingPath("$.zone").isEqualTo("Asia/Seoul");
-		assertThat(created).bodyJson().extractingPath("$.enabled").isEqualTo(true);
 		assertThat(created).bodyJson().extractingPath("$.nextRunAt").isNotNull();
-
 		String location = created.getResponse().getHeader("Location");
-		assertThat(mvc.post().uri(location + "/disable")).hasStatusOk()
+		assertThat(location).startsWith("/api/schedules/");
+
+		assertThat(mvc.get().uri("/api/schedules?suiteId={id}", suite.getId())).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$[*].cron")
+			.asArray()
+			.containsExactly("10 9 * * 1-5");
+		assertThat(mvc.get().uri("/api/schedules")).bodyJson().extractingPath("$.length()").isEqualTo(2);
+
+		assertThat(patch(location, "{\"enabled\": false}")).hasStatusOk()
 			.bodyJson()
 			.extractingPath("$.nextRunAt")
 			.isNull();
-		assertThat(mvc.post().uri(location + "/enable")).hasStatusOk()
+		assertThat(patch(location, "{}")).hasStatusOk().bodyJson().extractingPath("$.enabled").isEqualTo(false);
+		assertThat(patch(location, "{\"enabled\": true}")).hasStatusOk()
 			.bodyJson()
-			.extractingPath("$.enabled")
-			.isEqualTo(true);
+			.extractingPath("$.nextRunAt")
+			.isNotNull();
+		assertThat(mvc.get().uri(location)).hasStatusOk().bodyJson().extractingPath("$.enabled").isEqualTo(true);
 	}
 
 	@Test
 	void rejectsInvalidCronWithProblemDetail() {
 		Project project = fixtures.project();
 		Environment environment = fixtures.environment(project, Map.of());
-		TestSuite suite = fixtures.suite(project);
 
-		assertThat(mvc.post()
-			.uri("/api/test-schedules")
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("""
-					{"suiteId": %d, "environmentId": %d, "cron": "0 10 9 * * *"}
-					""".formatted(suite.getId(), environment.getId())))
-			.hasStatus(HttpStatus.BAD_REQUEST)
+		assertThat(create(fixtures.suite(project), environment, "0 10 9 * * *")).hasStatus(HttpStatus.BAD_REQUEST)
 			.bodyJson()
 			.extractingPath("$.detail")
 			.asString()
 			.contains("5 fields");
+	}
+
+	@Test
+	void returnsNotFoundForMissingSchedule() {
+		assertThat(mvc.get().uri("/api/schedules/{id}", -1)).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(patch("/api/schedules/-1", "{\"enabled\": true}")).hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	private MvcTestResult create(TestSuite suite, Environment environment, String cron) {
+		return mvc.post()
+			.uri("/api/schedules")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"suiteId\": %d, \"environmentId\": %d, \"cron\": \"%s\"}".formatted(suite.getId(),
+					environment.getId(), cron))
+			.exchange();
+	}
+
+	private MvcTestResult patch(String uri, String body) {
+		return mvc.patch().uri(uri).contentType(MediaType.APPLICATION_JSON).content(body).exchange();
 	}
 
 }

@@ -164,15 +164,13 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 ### 2. 실행 (API)
 
 ```bash
-curl -i -X POST localhost:8080/api/test-cases/1/runs \
-  -H 'Content-Type: application/json' -d '{"environmentId": 1}'
+curl -i -X POST localhost:8080/api/runs \
+  -H 'Content-Type: application/json' -d '{"caseId": 1, "environmentId": 1}'
 ```
 
-| API | 설명 |
-|-----|------|
-| `POST /api/test-cases/{id}/runs` | 케이스 1건 실행. 본문 `{"environmentId": 1}`. 201 + `Location: /api/test-runs/{runId}` |
-| `POST /api/test-suites/{id}/runs` | 스위트 전체 실행. 케이스 ID 순 순차 실행, 실패 케이스가 있어도 나머지 계속 실행 |
-| `GET /api/test-runs/{runId}` | 실행 결과 조회. `summary`에 전체·통과·실패·오류 건수 |
+- 본문 `suiteId`(스위트 전체)와 `caseId`(케이스 1건) 중 정확히 하나 지정. 둘 다 없거나 둘 다 있으면 400
+- 201 + `Location: /api/runs/{id}`, 본문은 실행 결과
+- 스위트 실행은 케이스 ID 순 순차 실행, 실패 케이스가 있어도 나머지 계속 실행
 
 ### 결과 해석
 
@@ -188,14 +186,34 @@ curl -i -X POST localhost:8080/api/test-cases/1/runs \
 - 응답 본문은 64KB(UTF-8 기준) 초과 시 잘라서 저장, `bodyTruncated: true` 표시
 - 요청 URL의 변수 값은 인코딩하지 않음. 공백 등 URL에 쓸 수 없는 문자는 `INVALID_REQUEST`
 
+## REST API
+
+모든 리소스는 최상위 컬렉션, 관계는 쿼리 파라미터로 필터 (`docs/design.md` "REST API 설계")
+
+| 리소스 | 목록 | 단건 | 생성·수정 |
+|--------|------|------|-----------|
+| 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | |
+| 환경 | `GET /api/environments?projectId=` | `GET /api/environments/{id}` | |
+| 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | |
+| 케이스 | `GET /api/cases?suiteId=` | `GET /api/cases/{id}` | |
+| 실행 | `GET /api/runs?suiteId=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs` |
+| 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` |
+
+- 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
+- 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
+- 스위트는 `caseCount`, 케이스는 요청 정의(`request`)와 판정 규칙(`assertions`), 환경은 `baseUrl`과 변수 포함
+- 실행 목록: 최신순, 페이지 응답 `{content, page, size, totalElements, totalPages}` (`page`는 0부터, `size`는 1~100으로 보정)
+  - 행: 프로젝트·스위트·환경의 `{id, name}`, `trigger`, `status`, 시각, `summary`(전체·통과·실패·오류)
+  - 실행 건수와 무관하게 페이지당 쿼리 최대 3회 (이름 함께 로딩, 판정 건수 일괄 집계)
+- 실행 상세: 스위트·환경·케이스 이름과 케이스별 결과 포함
+
 ## 스케줄 실행
 
 | API | 설명 |
 |-----|------|
-| `POST /api/test-schedules` | 스케줄 등록. 본문 `{"suiteId": 1, "environmentId": 1, "cron": "10 9 * * 1-5"}` |
-| `GET /api/test-schedules/{id}` | 조회. `nextRunAt`(다음 실행 시각), `lastTriggeredAt`(마지막 실행 시각) 포함 |
-| `POST /api/test-schedules/{id}/disable` | 비활성화. `nextRunAt` 제거 |
-| `POST /api/test-schedules/{id}/enable` | 활성화. 현재 시각 기준 `nextRunAt` 재계산 |
+| `POST /api/schedules` | 스케줄 등록. 본문 `{"suiteId": 1, "environmentId": 1, "cron": "10 9 * * 1-5"}`. 201 + `Location` |
+| `GET /api/schedules/{id}` | 조회. `nextRunAt`(다음 실행 시각), `lastTriggeredAt`(마지막 실행 시각) 포함 |
+| `PATCH /api/schedules/{id}` | 부분 수정. `{"enabled": false}`는 `nextRunAt` 제거, `{"enabled": true}`는 현재 시각 기준 재계산. 생략한 필드는 유지 |
 
 - cron은 5자리 표준 형식(`분 시 일 월 요일`), `Asia/Seoul` 기준. 예: `10 9 * * 1-5` = 평일 09:10
 - 60초 간격 폴링으로 실행 시각 도달 스케줄의 스위트 실행 (`trigger: SCHEDULED`)

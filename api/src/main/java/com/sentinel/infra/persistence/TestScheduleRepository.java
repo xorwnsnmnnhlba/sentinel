@@ -10,4 +10,8 @@ public interface TestScheduleRepository extends JpaRepository<TestSchedule, Long
 
 	List<TestSchedule> findByEnabledTrueAndNextRunAtLessThanEqualOrderByNextRunAt(Instant now);
 
+	List<TestSchedule> findBySuiteIdOrderById(Long suiteId);
+
+	List<TestSchedule> findAllByOrderById();
+
 }

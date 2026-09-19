@@ -9,4 +9,6 @@ public interface TestCaseRepository extends JpaRepository<TestCase, Long> {
 
 	List<TestCase> findBySuiteIdOrderById(Long suiteId);
 
+	List<TestCase> findAllByOrderById();
+
 }

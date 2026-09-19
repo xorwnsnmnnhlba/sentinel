@@ -122,12 +122,12 @@ class SchedulePollingTest {
 	@Test
 	void skipsDisabledScheduleAndResumesAfterEnable() {
 		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *");
-		scheduleService.disable(schedule.id());
+		scheduleService.update(schedule.id(), false);
 		clock.set(Instant.parse("2026-09-18T01:00:00Z"));
 
 		assertThat(poller.poll()).isEmpty();
 
-		ScheduleDetail enabled = scheduleService.enable(schedule.id());
+		ScheduleDetail enabled = scheduleService.update(schedule.id(), true);
 		assertThat(enabled.nextRunAt()).isEqualTo("2026-09-19T00:10:00Z");
 	}
 
