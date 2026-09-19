@@ -66,7 +66,7 @@ class DomainPersistenceTest {
 				WHERE success AND version IS NOT NULL ORDER BY installed_rank
 				""").getResultList();
 
-		assertThat(versions).containsExactly("1", "2");
+		assertThat(versions).containsExactly("1");
 	}
 
 	@Test
@@ -80,14 +80,14 @@ class DomainPersistenceTest {
 	}
 
 	@Test
-	void mapsJsonColumnsToJsonb() {
+	void mapsJsonColumnsToStandardJsonType() {
 		List<Object> types = entityManager.createNativeQuery("""
 				SELECT data_type FROM information_schema.columns
 				WHERE table_schema = 'sentinel'
 				  AND (table_name, column_name) IN (('environment', 'variables'), ('test_case', 'headers'))
 				""").getResultList();
 
-		assertThat(types).containsExactly("jsonb", "jsonb");
+		assertThat(types).containsExactly("json", "json");
 	}
 
 	@Test

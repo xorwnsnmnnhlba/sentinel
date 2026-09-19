@@ -40,7 +40,7 @@ public class Environment extends BaseEntity {
 	private String baseUrl;
 
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(nullable = false)
+	@Column(nullable = false, columnDefinition = "json")
 	private Map<String, String> variables = new LinkedHashMap<>();
 
 	protected Environment() {

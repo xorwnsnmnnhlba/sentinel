@@ -27,6 +27,15 @@ class RequestSpecTest {
 	}
 
 	@Test
+	void limitsBodyLengthToColumnSize() {
+		String max = "a".repeat(RequestSpec.MAX_BODY_LENGTH);
+
+		assertThat(new RequestSpec(HttpMethod.POST, "/a", null, max).getBody()).hasSize(RequestSpec.MAX_BODY_LENGTH);
+		assertThatThrownBy(() -> new RequestSpec(HttpMethod.POST, "/a", null, max + "a"))
+				.isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
 	void copiesHeadersDefensively() {
 		List<String> values = new ArrayList<>(List.of("Bearer {{token}}"));
 		RequestSpec spec = new RequestSpec(HttpMethod.GET, "/users", Map.of("Authorization", values), null);

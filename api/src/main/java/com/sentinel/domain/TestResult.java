@@ -79,6 +79,7 @@ public class TestResult extends BaseEntity {
 	private Verdict verdict;
 
 	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "json")
 	private List<AssertionResult> assertionResults;
 
 	@Enumerated(EnumType.STRING)
@@ -97,17 +98,21 @@ public class TestResult extends BaseEntity {
 	private String requestUrl;
 
 	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "json")
 	private Map<String, List<String>> requestHeaders;
 
-	@Column(columnDefinition = "text")
+	/** 변수 치환으로 길어질 수 있으므로 컬럼 길이 초과분은 잘라서 저장 */
+	@Column(length = RequestSpec.MAX_BODY_LENGTH)
 	private String requestBody;
 
 	private Integer statusCode;
 
 	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "json")
 	private Map<String, List<String>> responseHeaders;
 
-	@Column(columnDefinition = "text")
+	/** {@link #MAX_BODY_BYTES}(UTF-8) 이하로 잘라 저장하므로 문자 수는 컬럼 길이 이내 */
+	@Column(length = RequestSpec.MAX_BODY_LENGTH)
 	private String responseBody;
 
 	@Column(nullable = false)
@@ -160,7 +165,7 @@ public class TestResult extends BaseEntity {
 	private void recordRequest(ResolvedRequest request) {
 		this.requestUrl = truncateChars(request.uri().toString(), 2000);
 		this.requestHeaders = SensitiveHeaders.mask(request.headers());
-		this.requestBody = request.body();
+		this.requestBody = request.body() == null ? null : truncateChars(request.body(), RequestSpec.MAX_BODY_LENGTH);
 	}
 
 	private static String truncateChars(String value, int maxLength) {
