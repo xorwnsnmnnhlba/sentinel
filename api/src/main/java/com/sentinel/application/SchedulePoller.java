@@ -1,10 +1,15 @@
 package com.sentinel.application;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.sentinel.application.notification.Notification;
+import com.sentinel.application.notification.Notifier;
+import com.sentinel.application.notification.RunFailureNotifier;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSchedule;
 import com.sentinel.infra.persistence.TestScheduleRepository;
@@ -20,15 +25,23 @@ import org.springframework.transaction.support.TransactionTemplate;
  * DB 폴링 스케줄러. 실행 시각에 도달한 스케줄을 찾아 다음 실행 시각을 먼저 갱신한 뒤 스위트 실행.
  * <p>
  * DB 접속 실패(VPN 끊김 등)는 즉시 재시도해도 복구되지 않으므로 해당 주기를 건너뛰고 다음 주기 대기.
+ * 접속 실패는 최초 1회, 복구 시 1회 알림 발송. 스케줄 실행 결과에 실패가 있으면 실패 알림 발송.
+ * 알림 발송 실패는 로그만 남기고 폴링 계속.
  */
 @Component
 public class SchedulePoller {
 
 	private static final Logger log = LoggerFactory.getLogger(SchedulePoller.class);
 
+	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
 	private final TestScheduleRepository schedules;
 
 	private final TestRunService testRunService;
+
+	private final RunFailureNotifier runFailureNotifier;
+
+	private final Notifier notifier;
 
 	private final ScheduleProperties properties;
 
@@ -36,10 +49,16 @@ public class SchedulePoller {
 
 	private final TransactionTemplate transaction;
 
-	SchedulePoller(TestScheduleRepository schedules, TestRunService testRunService, ScheduleProperties properties,
-			Clock clock, PlatformTransactionManager transactionManager) {
+	/** DB 접속 실패 시작 시각. 정상 시 null. 스케줄러 단일 스레드에서만 갱신 */
+	private volatile Instant databaseUnavailableSince;
+
+	SchedulePoller(TestScheduleRepository schedules, TestRunService testRunService,
+			RunFailureNotifier runFailureNotifier, Notifier notifier, ScheduleProperties properties, Clock clock,
+			PlatformTransactionManager transactionManager) {
 		this.schedules = schedules;
 		this.testRunService = testRunService;
+		this.runFailureNotifier = runFailureNotifier;
+		this.notifier = notifier;
 		this.properties = properties;
 		this.clock = clock;
 		this.transaction = new TransactionTemplate(transactionManager);
@@ -59,21 +78,28 @@ public class SchedulePoller {
 				.toList());
 		}
 		catch (DataAccessException | TransactionException ex) {
-			log.warn("Skipping schedule poll at {}: database unavailable ({})", now, ex.getMessage());
+			String reason = ex.getMostSpecificCause().getMessage();
+			log.warn("Skipping schedule poll at {}: database unavailable ({})", now, reason);
+			onDatabaseUnavailable(now, reason);
 			return List.of();
 		}
+		onDatabaseAvailable(now);
 
 		List<Long> runIds = new ArrayList<>();
 		for (Long scheduleId : dueIds) {
 			try {
 				Trigger trigger = transaction.execute(status -> claim(scheduleId, now));
 				if (trigger != null) {
-					runIds.add(testRunService.runSuite(trigger.suiteId(), trigger.environmentId(),
-							TestRun.Trigger.SCHEDULED));
+					long runId = testRunService.runSuite(trigger.suiteId(), trigger.environmentId(),
+							TestRun.Trigger.SCHEDULED);
+					runIds.add(runId);
+					notifyRunFailures(runId);
 				}
 			}
 			catch (RuntimeException ex) {
 				log.error("Scheduled run failed for schedule {}", scheduleId, ex);
+				send(new Notification("[Sentinel] 스케줄 " + scheduleId + " 실행 오류",
+						List.of("시각: " + format(now), "사유: " + ex.getMessage())));
 			}
 		}
 		return runIds;
@@ -86,6 +112,58 @@ public class SchedulePoller {
 		}
 		schedule.markTriggered(now, properties.zone());
 		return new Trigger(schedule.getSuite().getId(), schedule.getEnvironment().getId());
+	}
+
+	private void onDatabaseUnavailable(Instant now, String reason) {
+		if (databaseUnavailableSince != null) {
+			return;
+		}
+		databaseUnavailableSince = now;
+		send(new Notification("[Sentinel] DB 연결 실패 - 스케줄 실행 중단",
+				List.of("발생 시각: " + format(now), "사유: " + reason, "복구될 때까지 스케줄 실행을 건너뜁니다")));
+	}
+
+	private void onDatabaseAvailable(Instant now) {
+		Instant since = databaseUnavailableSince;
+		if (since == null) {
+			return;
+		}
+		databaseUnavailableSince = null;
+		send(new Notification("[Sentinel] DB 연결 복구 - 스케줄 실행 재개",
+				List.of("중단 기간: " + format(since) + " ~ " + format(now) + " (" + formatDuration(Duration.between(since, now))
+						+ ")", "중단 기간 중 놓친 스케줄은 1회씩 실행됩니다")));
+	}
+
+	private void notifyRunFailures(long runId) {
+		try {
+			runFailureNotifier.notifyIfFailed(runId);
+		}
+		catch (RuntimeException ex) {
+			log.error("Failed to send failure notification for run {}", runId, ex);
+		}
+	}
+
+	private void send(Notification notification) {
+		try {
+			notifier.send(notification);
+		}
+		catch (RuntimeException ex) {
+			log.error("Failed to send notification: {}", notification.title(), ex);
+		}
+	}
+
+	private String format(Instant instant) {
+		return TIME.format(instant.atZone(properties.zone())) + " (" + properties.zone().getId() + ")";
+	}
+
+	static String formatDuration(Duration duration) {
+		if (duration.toMinutes() < 1) {
+			return duration.toSeconds() + "초";
+		}
+		if (duration.toHours() < 1) {
+			return duration.toMinutes() + "분";
+		}
+		return duration.toHours() + "시간 " + duration.toMinutesPart() + "분";
 	}
 
 	private record Trigger(long suiteId, long environmentId) {

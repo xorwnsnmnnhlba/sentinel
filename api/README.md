@@ -170,13 +170,33 @@ curl -i -X POST localhost:8080/api/test-cases/1/runs \
 - 60초 간격 폴링으로 실행 시각 도달 스케줄의 스위트 실행 (`trigger: SCHEDULED`)
 - 노트북 절전 등으로 놓친 실행은 1회만 실행 후 다음 시각으로 이동
 - 기동 시 `RUNNING`으로 남은 실행은 `ABORTED` 처리
-- DB 접속 실패 시 해당 주기 건너뜀, 경고 로그만 기록
+- DB 접속 실패 시 해당 주기 건너뜀. 연결 실패 시 1회, 복구 시 1회 알림
 
 | 설정 | 기본값 | 설명 |
 |------|--------|------|
 | `sentinel.schedule.enabled` | `true` | 폴링 동작 여부 |
 | `sentinel.schedule.zone` | `Asia/Seoul` | cron 해석 시간대 |
 | `sentinel.schedule.poll-interval` | `60s` | 폴링 주기 |
+
+## 실패 알림
+
+스케줄 실행에 판정 실패(`FAILED`)·오류(`ERROR`)가 있을 때만 발송. 성공·수동 실행은 미발송
+
+```
+[Sentinel] dev 결제 - 12건 중 2건 실패
+POST   /billing/v1/charge → status in [2xx]: was 500
+GET    /billing/v1/history → response time <= 2000ms: was 3200ms
+```
+
+| 알림 | 발송 시점 |
+|------|-----------|
+| `[Sentinel] {환경} {스위트} - N건 중 M건 실패` | 스케줄 실행 결과에 실패·오류 존재 |
+| `[Sentinel] 스케줄 {id} 실행 오류` | 스케줄 실행 자체가 예외로 중단 |
+| `[Sentinel] DB 연결 실패 - 스케줄 실행 중단` | DB 접속 실패 첫 주기 1회 |
+| `[Sentinel] DB 연결 복구 - 스케줄 실행 재개` | 접속 복구 시 1회, 중단 기간 포함 |
+
+- 채널 미정으로 현재는 WARN 로그(`LoggingNotifier`)로만 기록
+- 채널 확정 시 `com.sentinel.application.notification.Notifier` 구현체 추가 후 `NotificationConfig`의 빈 교체
 
 ## 패키지 구조 (계획)
 
