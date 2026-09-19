@@ -88,6 +88,7 @@ docs: add branch convention
 - 제목은 영어. 커밋 메시지와 같은 형식 (`<type>(<scope>): <요약>`)
 - 제목 예시: `feat(web): add catalog editor pages`, `refactor(api): make request DTOs package-private`
 - 본문은 한글. `## 요약`(변경 내용), `## 테스트`(확인 항목 체크리스트) 구성
+- 본문에 도구 자동 생성 문구(예: `Generated with ...`) 미포함
 
 ---
 
@@ -114,7 +115,8 @@ docs: add branch convention
 | 항목 | 확인 방법 |
 |------|-----------|
 | 작업 단위 완결 | 브랜치 이름에 명시한 작업의 동작 확인 |
-| 빌드·테스트 통과 | api: `./gradlew build` / web: `npm run build`, `npm run lint` |
+| CI 통과 | PR의 **CI** 체크 통과 (`.github/workflows/ci.yml`: web lint·서식·테스트·빌드, api 테스트) |
+| 빌드·테스트 통과 (로컬) | api: `./gradlew build` / web: `npm run lint`, `npm run format:check`, `npm test`, `npm run build` |
 | 기동 확인 | 로컬 실행 후 변경 부분 동작 확인 |
 | 셀프 리뷰 | PR **Files changed** 탭에서 diff 확인 (디버그 코드, 시크릿, 불필요한 파일) |
 | 문서 반영 | 환경변수·실행 방법 변경 시 README 동시 수정 |

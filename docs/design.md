@@ -241,6 +241,11 @@ runner 패키지는 Spring 의존성 없는 순수 자바로 유지. 제품의 �
 - DB 의존 테스트는 Testcontainers PostgreSQL 컨테이너 사용. RDS 접속 없이 빌드·테스트 가능
 - RequestExecutor를 인터페이스로 분리하면 TestRunService 테스트에서 Fake 주입으로 네트워크 없이 흐름 검증 가능
 - 커버리지 불필요 영역: api 컨트롤러, infra 리포지토리
+- web: Vitest + MSW(Spring API 대체) + React Testing Library (2026-09-20)
+  - 서버 코드(Server Actions, Spring 호출, BFF 프록시): Node 환경에서 MSW로 Spring 응답 지정, 요청 본문·오류 변환·이동 경로 검증
+  - 클라이언트 컴포넌트: jsdom 환경, Server Action은 테스트용 함수로 대체
+  - async Server Component 화면은 Vitest 미지원(Next.js 문서)으로 제외. 화면 단위 검증은 추후 E2E(Playwright) 검토
+- CI: GitHub Actions에서 PR·main 푸시마다 web(lint, 서식, 테스트, 빌드)과 api(Testcontainers 포함 테스트) 병렬 실행
 
 ```java
 public interface RequestExecutor {
