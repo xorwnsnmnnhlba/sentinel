@@ -67,7 +67,23 @@ docker compose logs -f sentinel-api
 - 컨테이너 안의 `localhost`는 컨테이너 자신이므로 호스트 PostgreSQL은 `host.docker.internal`로 접속 (템플릿 기본값)
 - RDS 사용 시 `sentinel.env`의 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 RDS 값으로 변경
 
-### 3. 로컬 개발 실행
+### 3. 샘플 케이스 등록·실행
+
+[docs/sample-cases.sql](docs/sample-cases.sql)로 자체 점검 스위트(케이스 4건) 등록
+
+```bash
+docker exec -i postgres psql -U postgres -d sentinel -v ON_ERROR_STOP=1 < docs/sample-cases.sql
+```
+
+```bash
+curl -s -X POST localhost:8080/api/test-suites/1/runs -H 'Content-Type: application/json' -d '{"environmentId": 1}'
+```
+
+- 빈 DB 기준 스위트·환경 ID는 1. 그 외에는 파일 안의 ID 조회 쿼리 사용
+- 결과 `summary`: 통과 2, 실패 1, 오류 1 (실패 알림 확인용 의도적 실패 2건 포함)
+- 스케줄 등록, GW 케이스 템플릿: 파일 안 주석 참고
+
+### 4. 로컬 개발 실행
 
 ```bash
 # api (:8080). 기본값 localhost:5432/sentinel, 사용자 postgres
@@ -88,3 +104,4 @@ IDE 설정은 모듈별 README 참고
 
 - [설계 정리](docs/design.md): 아키텍처, 도메인 모델, 러너 및 스케줄 설계, 실행 환경, 구현 순서, 미결 사항
 - [브랜치 규칙](docs/branch-convention.md): 브랜치 전략, 브랜치 이름, 커밋 메시지, 운영 원칙, 머지 기준
+- [샘플 케이스 SQL](docs/sample-cases.sql): 자체 점검 스위트(판정 규칙 5종, 의도적 실패 2건), 실행·스케줄 명령, GW 케이스 템플릿
