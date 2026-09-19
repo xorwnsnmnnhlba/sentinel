@@ -59,6 +59,17 @@ class DomainPersistenceTest {
 	}
 
 	@Test
+	void appliesFlywayMigrationsToSentinelSchema() {
+		// Flyway가 스키마를 직접 생성하면 version NULL인 스키마 생성 기록이 함께 남으므로 제외
+		List<Object> versions = entityManager.createNativeQuery("""
+				SELECT version FROM sentinel.flyway_schema_history
+				WHERE success AND version IS NOT NULL ORDER BY installed_rank
+				""").getResultList();
+
+		assertThat(versions).containsExactly("1");
+	}
+
+	@Test
 	void mapsJsonColumnsToJsonb() {
 		List<Object> types = entityManager.createNativeQuery("""
 				SELECT data_type FROM information_schema.columns
