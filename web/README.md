@@ -31,14 +31,32 @@ app/
  ├─ layout.tsx              공통 레이아웃 (헤더, TanStack Query Provider)
  ├─ providers.tsx           클라이언트 Provider
  ├─ page.tsx                홈
+ ├─ error.tsx               오류 화면 (retry()로 재조회)
+ ├─ runs/
+ │   ├─ (list)/page.tsx     실행 이력 목록 (스위트 필터, 페이지 이동)
+ │   ├─ (list)/loading.tsx  목록 전용 로딩 화면
+ │   └─ [id]/               결과 상세, 미존재 시 404
  └─ api/[...path]/route.ts  브라우저용 BFF 프록시 (/api/** → Spring /api/**)
 components/
  ├─ ui/                     shadcn/ui 컴포넌트 (CLI로 추가, 직접 수정 가능)
+ ├─ run-badges.tsx          판정·상태·주체 배지
  └─ site-header.tsx
 lib/
  ├─ api/server.ts           Spring 호출 (서버 전용, server-only)
+ ├─ api/types.ts            API 응답 타입
+ ├─ format.ts               KST 시각·소요 시간·JSON 본문 표시
  └─ utils.ts
 ```
+
+## 화면
+
+| 경로 | 내용 |
+|------|------|
+| `/runs` | 실행 이력. 최신순 20건 단위, 스위트 필터(`?suiteId=`), 통과·실패·오류 건수 |
+| `/runs/{id}` | 결과 상세. 케이스별 판정(실패·오류는 펼침), 판정 규칙 결과, 요청·응답 헤더와 본문(JSON 정렬) |
+
+- 시각은 서버·브라우저 시간대와 무관하게 KST(`YYYY-MM-DD HH:mm:ss`)로 표시
+- 로딩 화면은 목록에만 적용(라우트 그룹 `(list)`). 상세까지 감싸면 `notFound()`가 200 스트리밍 이후 렌더링되어 404 상태 코드 유실
 
 ## 데이터 조회 원칙
 

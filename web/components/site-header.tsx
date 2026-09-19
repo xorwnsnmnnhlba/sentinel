@@ -3,7 +3,10 @@ import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 
 /** 화면 추가 시 항목 추가 */
-const navigation = [{ href: "/", label: "홈" }];
+const navigation = [
+  { href: "/", label: "홈" },
+  { href: "/runs", label: "실행 이력" },
+];
 
 export function SiteHeader() {
   return (
