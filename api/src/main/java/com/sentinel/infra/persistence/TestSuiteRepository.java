@@ -19,6 +19,8 @@ public interface TestSuiteRepository extends JpaRepository<TestSuite, Long> {
 
 	Optional<TestSuite> findByIdAndArchivedAtIsNull(Long id);
 
+	Optional<TestSuite> findByProjectIdAndNameAndArchivedAtIsNull(Long projectId, String name);
+
 	/** 프로젝트 내 스위트별 사용 중인 케이스 수. 케이스가 없는 스위트는 결과에 없음 */
 	@Query("""
 			select c.suite.id as suiteId, count(c) as count

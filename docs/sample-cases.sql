@@ -2,6 +2,8 @@
 --
 -- 실행: docker exec -i postgres psql -U postgres -d sentinel -v ON_ERROR_STOP=1 < docs/sample-cases.sql
 --
+-- 같은 내용은 등록 API(POST /api/projects, /environments, /suites, /cases)로도 등록 가능. 본문 형식: api/README.md "REST API"
+--
 -- 작성 원칙
 -- - 표준 SQL만 사용. RETURNING, :: 캐스트, now() 등 PostgreSQL 전용 문법 미사용
 -- - ID 하드코딩 없이 유니크한 이름(프로젝트명, 프로젝트 내 스위트명)으로 부모 ID 조회

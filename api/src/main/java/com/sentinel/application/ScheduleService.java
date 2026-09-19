@@ -54,12 +54,22 @@ public class ScheduleService {
 	}
 
 	/**
-	 * 부분 수정. null 필드는 변경하지 않음
+	 * 부분 수정. null 필드는 변경하지 않음. cron 변경 후 활성 여부 적용
 	 * @param enabled true면 현재 시각 기준 다음 실행 시각 재계산, false면 다음 실행 시각 제거
+	 * @param cron 활성 상태면 현재 시각 기준 다음 실행 시각 재계산
+	 * @throws InvalidRequestException 잘못된 cron
 	 */
 	@Transactional
-	public ScheduleDetail update(long scheduleId, Boolean enabled) {
+	public ScheduleDetail update(long scheduleId, Boolean enabled, String cron) {
 		TestSchedule schedule = find(scheduleId);
+		if (cron != null) {
+			try {
+				schedule.changeCron(cron, clock.instant(), properties.zone());
+			}
+			catch (IllegalArgumentException ex) {
+				throw new InvalidRequestException(ex.getMessage());
+			}
+		}
 		if (Boolean.TRUE.equals(enabled)) {
 			schedule.enable(clock.instant(), properties.zone());
 		}

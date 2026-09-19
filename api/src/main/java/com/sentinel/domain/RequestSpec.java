@@ -43,7 +43,10 @@ public class RequestSpec {
 	}
 
 	public RequestSpec(HttpMethod method, String path, Map<String, List<String>> headers, String body) {
-		this.method = Objects.requireNonNull(method, "method");
+		if (method == null) {
+			throw new IllegalArgumentException("method must not be null");
+		}
+		this.method = method;
 		this.path = requirePath(path);
 		this.headers = copyOf(headers);
 		this.body = requireBodyLength(body);
@@ -67,8 +70,13 @@ public class RequestSpec {
 	private static Map<String, List<String>> copyOf(Map<String, List<String>> headers) {
 		Map<String, List<String>> copy = new LinkedHashMap<>();
 		if (headers != null) {
-			headers.forEach((name, values) -> copy.put(Preconditions.requireText(name, "header name", 200),
-					new ArrayList<>(values)));
+			headers.forEach((name, values) -> {
+				String validName = Preconditions.requireText(name, "header name", 200);
+				if (values == null || values.stream().anyMatch(Objects::isNull)) {
+					throw new IllegalArgumentException("header '" + validName + "' values must not be null");
+				}
+				copy.put(validName, new ArrayList<>(values));
+			});
 		}
 		return copy;
 	}

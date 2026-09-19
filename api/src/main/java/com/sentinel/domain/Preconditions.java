@@ -16,4 +16,14 @@ final class Preconditions {
 		return trimmed;
 	}
 
+	/**
+	 * 선택 입력. 공백뿐이면 null로 저장
+	 */
+	static String optionalText(String value, String name, int maxLength) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		return requireText(value, name, maxLength);
+	}
+
 }

@@ -57,6 +57,9 @@ public class TestCase extends ArchivableEntity {
 	}
 
 	public void changeAssertions(List<Assertion> assertions) {
+		if (assertions != null && assertions.stream().anyMatch(Objects::isNull)) {
+			throw new IllegalArgumentException("assertions must not contain null");
+		}
 		this.assertions = new ArrayList<>(assertions == null ? List.of() : assertions);
 	}
 

@@ -1,5 +1,8 @@
 package com.sentinel.domain;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -38,6 +41,23 @@ class EnvironmentTest {
 		assertThat(environment.getVariables()).containsEntry("userId", "1");
 		assertThatThrownBy(() -> environment.getVariables().put("x", "y"))
 				.isInstanceOf(UnsupportedOperationException.class);
+	}
+
+	@Test
+	void replacesAllVariablesAndKeepsPreviousOnInvalidInput() {
+		Environment environment = new Environment(project, "dev", "https://gw.dev.internal");
+		environment.putVariable("userId", "1");
+
+		environment.replaceVariables(Map.of("token", "t"));
+		assertThat(environment.getVariables()).containsExactly(Map.entry("token", "t"));
+
+		Map<String, String> invalid = new HashMap<>();
+		invalid.put("userId", null);
+		assertThatThrownBy(() -> environment.replaceVariables(invalid)).isInstanceOf(IllegalArgumentException.class);
+		assertThat(environment.getVariables()).containsExactly(Map.entry("token", "t"));
+
+		environment.replaceVariables(Map.of());
+		assertThat(environment.getVariables()).isEmpty();
 	}
 
 }

@@ -17,4 +17,6 @@ public interface EnvironmentRepository extends JpaRepository<Environment, Long> 
 
 	Optional<Environment> findByIdAndArchivedAtIsNull(Long id);
 
+	Optional<Environment> findByProjectIdAndNameAndArchivedAtIsNull(Long projectId, String name);
+
 }

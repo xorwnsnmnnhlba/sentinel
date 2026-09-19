@@ -20,7 +20,7 @@ public class Project extends ArchivableEntity {
 
 	public Project(String name, String description) {
 		this.name = Preconditions.requireText(name, "name", 100);
-		this.description = description;
+		this.description = Preconditions.optionalText(description, "description", 500);
 	}
 
 	public void rename(String name) {
@@ -28,7 +28,7 @@ public class Project extends ArchivableEntity {
 	}
 
 	public void describe(String description) {
-		this.description = description;
+		this.description = Preconditions.optionalText(description, "description", 500);
 	}
 
 	public String getName() {
