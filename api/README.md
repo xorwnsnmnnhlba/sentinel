@@ -188,6 +188,15 @@ curl -i -X POST localhost:8080/api/test-cases/1/runs \
 - 노트북 절전 등으로 놓친 실행은 1회만 실행 후 다음 시각으로 이동
 - 기동 시 `RUNNING`으로 남은 실행은 `ABORTED` 처리
 - DB 접속 실패 시 해당 주기 건너뜀. 연결 실패 시 1회, 복구 시 1회 알림
+- 실행 완료 시 INFO 로그 1줄 (수동·스케줄 공통)
+
+```
+Run 12 completed: trigger=SCHEDULED suite=3 total=4 passed=2 failed=1 errors=1 elapsed=1203ms
+```
+
+```bash
+docker compose logs sentinel-api | grep "completed:"
+```
 
 | 설정 | 기본값 | 설명 |
 |------|--------|------|
