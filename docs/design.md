@@ -82,6 +82,7 @@ sentinel/
 | 실행기 | RestClient |
 | 스케줄 | DB 폴링 (5장 참조) |
 | 스키마 관리 | Flyway + ddl-auto: validate (2026-09-19 배포 구성 시 전환) |
+| 코드 생성 | Lombok `@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor(access = PROTECTED)`만 사용 (2026-09-19, 아래 "Lombok 사용 규칙") |
 | FE | Next.js 16.3.5 (Active LTS), App Router, TanStack Query, shadcn/ui (Radix UI) |
 | 실행 환경 | 노트북 상시 실행, Docker 컨테이너 2개 |
 
@@ -92,6 +93,27 @@ sentinel/
 - @ConcurrencyLimit으로 동시 호출 수 제한 가능. 스위트 실행 시 GW 동시 호출 제어에 활용
 - @Async 비동기 컨텍스트 전파 지원. 스케줄 실행 로그 추적에 유리
 - 스케줄러는 DB 폴링으로 확정하여 Quartz 스타터 미사용
+
+### Lombok 사용 규칙 (2026-09-19)
+- 허용 기능은 세 가지. 그 외 기능은 `api/lombok.config`에서 사용 시 컴파일 오류로 차단
+  - `@Getter`: 엔티티·임베더블 전용. 서비스·컨트롤러에는 미사용 (필드 노출 불필요)
+  - `@RequiredArgsConstructor`: 필드 대입만 하는 생성자 대체. 생성자에 검증·조립 로직이 있으면 직접 작성
+    - 프로그래밍 방식 트랜잭션은 `Transactions` 빈(`write`, `writeWithoutResult`, `readOnly`)으로 모아 사용하는 쪽 생성자를 대입만으로 유지
+    - 직접 작성 대상: 검증하는 도메인 생성자, 예외, 입력을 복사·조립하는 생성자(`Transactions`, `VariableResolver`, `RestClientRequestExecutor`)
+  - `@NoArgsConstructor(access = AccessLevel.PROTECTED)`: JPA 기본 생성자 전용. public이면 검증 없는 빈 엔티티 생성이 가능하므로 PROTECTED 필수
+    - 접근 수준은 lombok.config로 강제할 수 없어 `JpaDefaultConstructorTest`로 모든 엔티티·임베더블 검사
+    - 유틸리티 클래스의 private 생성자는 직접 작성 유지 (`@UtilityClass` 차단)
+- 차단 기능과 이유
+  - `@Setter`, `@Data`: 상태 변경은 검증을 포함한 도메인 메서드(`rename`, `changeBaseUrl`, `archive` 등)로만 수행
+  - `@Builder`, `@AllArgsConstructor`: 생성자 검증 우회
+  - `@EqualsAndHashCode`, `@ToString`: 지연 로딩 프록시와 충돌. 동일성 비교는 `BaseEntity.same()`
+  - `@Value`: DTO·값 객체는 record 사용
+- 방어적 getter는 직접 작성 유지. 같은 이름의 메서드가 있으면 Lombok은 생성하지 않음
+  - 대상: `Environment.getVariables()`, `RequestSpec.getHeaders()`, `TestCase.getAssertions()`, `TestResult.getAssertionResults()`
+  - 컬렉션 필드를 수정할 수 없는 형태로 반환. Lombok getter로 바뀌면 내부 컬렉션이 노출되어 도메인 메서드 검증 우회, 변경 감지로 DB 반영
+  - 삭제해도 컴파일 오류가 나지 않으므로 반환값 수정 시 예외 발생을 테스트로 고정 (DB에서 읽은 JSON 목록은 가변 목록이므로 저장 후 재조회로 검증)
+- 노출이 불필요한 필드는 `@Getter(AccessLevel.NONE)` (`ArchivableEntity.archiveKey`)
+- 버전은 Spring Boot 의존성 관리 버전 사용. JDK 25는 Lombok 1.18.40 이상 필요
 
 ### Next.js 버전 근거
 - 16은 Active LTS, 보안 지원 종료 2027년 10월 예상

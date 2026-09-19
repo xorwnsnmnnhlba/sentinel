@@ -16,6 +16,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -27,6 +30,8 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "environment",
 		uniqueConstraints = @UniqueConstraint(name = "uk_environment_project_name", columnNames = { "project_id", "name", "archive_key" }))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Environment extends ArchivableEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -42,9 +47,6 @@ public class Environment extends ArchivableEntity {
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(nullable = false, columnDefinition = "json")
 	private Map<String, String> variables = new LinkedHashMap<>();
-
-	protected Environment() {
-	}
 
 	public Environment(Project project, String name, String baseUrl) {
 		this.project = Objects.requireNonNull(project, "project");
@@ -112,18 +114,6 @@ public class Environment extends ArchivableEntity {
 			throw new IllegalArgumentException("baseUrl must not have a query or fragment: " + value);
 		}
 		return value.replaceAll("/+$", "");
-	}
-
-	public Project getProject() {
-		return project;
-	}
-
-	public String getName() {
-		return name;
-	}
-
-	public String getBaseUrl() {
-		return baseUrl;
 	}
 
 	public Map<String, String> getVariables() {

@@ -7,10 +7,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
+import lombok.Getter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @MappedSuperclass
+@Getter
 public abstract class BaseEntity {
 
 	@Id
@@ -33,18 +35,6 @@ public abstract class BaseEntity {
 			return true;
 		}
 		return a != null && b != null && a.getId() != null && a.getId().equals(b.getId());
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public Instant getCreatedAt() {
-		return createdAt;
-	}
-
-	public Instant getUpdatedAt() {
-		return updatedAt;
 	}
 
 }

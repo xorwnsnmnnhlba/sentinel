@@ -9,10 +9,12 @@ import com.sentinel.domain.TestSuite;
 import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ScheduleService {
 
 	private final TestScheduleRepository schedules;
@@ -24,15 +26,6 @@ public class ScheduleService {
 	private final ScheduleProperties properties;
 
 	private final Clock clock;
-
-	ScheduleService(TestScheduleRepository schedules, TestSuiteRepository suites, EnvironmentRepository environments,
-			ScheduleProperties properties, Clock clock) {
-		this.schedules = schedules;
-		this.suites = suites;
-		this.environments = environments;
-		this.properties = properties;
-		this.clock = clock;
-	}
 
 	/**
 	 * @throws NotFoundException 스위트 또는 환경 미존재

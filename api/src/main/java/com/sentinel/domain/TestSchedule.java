@@ -14,6 +14,9 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.springframework.scheduling.support.CronExpression;
 
 /**
@@ -23,6 +26,8 @@ import org.springframework.scheduling.support.CronExpression;
  */
 @Entity
 @Table(name = "test_schedule", indexes = @Index(name = "idx_schedule_due", columnList = "enabled, next_run_at"))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TestSchedule extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -47,9 +52,6 @@ public class TestSchedule extends BaseEntity {
 
 	/** 삭제(보관) 시각. 보관 시 비활성화하여 폴링 대상에서 제외 */
 	private Instant archivedAt;
-
-	protected TestSchedule() {
-	}
 
 	public TestSchedule(TestSuite suite, Environment environment, String cron, Instant now, ZoneId zone) {
 		this.suite = Objects.requireNonNull(suite, "suite");
@@ -127,10 +129,6 @@ public class TestSchedule extends BaseEntity {
 		return archivedAt != null;
 	}
 
-	public Instant getArchivedAt() {
-		return archivedAt;
-	}
-
 	private Instant nextAfter(Instant instant, ZoneId zone) {
 		ZonedDateTime next = toSpringCron(cron).next(instant.atZone(zone));
 		if (next == null) {
@@ -156,30 +154,6 @@ public class TestSchedule extends BaseEntity {
 		catch (IllegalArgumentException ex) {
 			throw new IllegalArgumentException("invalid cron: " + cron + " (" + ex.getMessage() + ")", ex);
 		}
-	}
-
-	public TestSuite getSuite() {
-		return suite;
-	}
-
-	public Environment getEnvironment() {
-		return environment;
-	}
-
-	public String getCron() {
-		return cron;
-	}
-
-	public boolean isEnabled() {
-		return enabled;
-	}
-
-	public Instant getNextRunAt() {
-		return nextRunAt;
-	}
-
-	public Instant getLastTriggeredAt() {
-		return lastTriggeredAt;
 	}
 
 }

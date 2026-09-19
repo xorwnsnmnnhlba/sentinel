@@ -44,6 +44,9 @@ class RequestSpecTest {
 		assertThat(spec.getHeaders()).containsExactly(Map.entry("Authorization", List.of("Bearer {{token}}")));
 		assertThatThrownBy(() -> spec.getHeaders().get("Authorization").add("x"))
 				.isInstanceOf(UnsupportedOperationException.class);
+		// 직접 작성한 방어적 getter. Lombok @Getter로 바뀌면 내부 Map이 노출되어 실패
+		assertThatThrownBy(() -> spec.getHeaders().put("X-Added", List.of("x")))
+				.isInstanceOf(UnsupportedOperationException.class);
 	}
 
 }

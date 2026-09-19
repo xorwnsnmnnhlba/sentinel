@@ -16,6 +16,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -25,6 +28,8 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "test_case",
 		uniqueConstraints = @UniqueConstraint(name = "uk_test_case_suite_name", columnNames = { "suite_id", "name", "archive_key" }))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TestCase extends ArchivableEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -41,9 +46,6 @@ public class TestCase extends ArchivableEntity {
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(columnDefinition = "json")
 	private List<Assertion> assertions = new ArrayList<>();
-
-	protected TestCase() {
-	}
 
 	public TestCase(TestSuite suite, String name, RequestSpec request) {
 		this(suite, name, request, List.of());
@@ -69,18 +71,6 @@ public class TestCase extends ArchivableEntity {
 
 	public void changeRequest(RequestSpec request) {
 		this.request = Objects.requireNonNull(request, "request");
-	}
-
-	public TestSuite getSuite() {
-		return suite;
-	}
-
-	public String getName() {
-		return name;
-	}
-
-	public RequestSpec getRequest() {
-		return request;
 	}
 
 	public List<Assertion> getAssertions() {

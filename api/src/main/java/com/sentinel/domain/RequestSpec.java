@@ -12,6 +12,9 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -19,6 +22,8 @@ import org.hibernate.type.SqlTypes;
  * 변수 치환 전 요청 정의. 경로·헤더·본문에 {@code {{변수}}} 사용 가능.
  */
 @Embeddable
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RequestSpec {
 
 	/** 요청 본문 최대 길이(문자). 컬럼 VARCHAR(65536)과 일치 */
@@ -38,9 +43,6 @@ public class RequestSpec {
 
 	@Column(name = "body", length = MAX_BODY_LENGTH)
 	private String body;
-
-	protected RequestSpec() {
-	}
 
 	public RequestSpec(HttpMethod method, String path, Map<String, List<String>> headers, String body) {
 		if (method == null) {
@@ -81,22 +83,10 @@ public class RequestSpec {
 		return copy;
 	}
 
-	public HttpMethod getMethod() {
-		return method;
-	}
-
-	public String getPath() {
-		return path;
-	}
-
 	public Map<String, List<String>> getHeaders() {
 		Map<String, List<String>> view = new LinkedHashMap<>();
 		headers.forEach((name, values) -> view.put(name, List.copyOf(values)));
 		return Collections.unmodifiableMap(view);
-	}
-
-	public String getBody() {
-		return body;
 	}
 
 	@Override

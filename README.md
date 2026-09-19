@@ -29,6 +29,7 @@ sentinel/
 | `api` | Java | 25 (로컬 Azul Zulu 25.0.4.1) | [api/README.md](api/README.md) |
 | | Spring Boot | 4.1.0 (Spring Framework 7.0.8) | |
 | | Hibernate ORM | 7.4.1.Final | |
+| | Lombok | 1.18.46 (`@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor`만 사용) | |
 | | PostgreSQL JDBC | 42.7.11 | |
 | | Gradle | 9.7.1 | |
 | `web` | Next.js | 16.3.5 | [web/README.md](web/README.md) |

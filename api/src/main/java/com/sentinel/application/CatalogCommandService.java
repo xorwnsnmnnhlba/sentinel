@@ -25,6 +25,7 @@ import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.assertion.Assertion;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class CatalogCommandService {
 
 	private final ProjectRepository projects;
@@ -63,16 +65,6 @@ public class CatalogCommandService {
 	private final TestScheduleRepository schedules;
 
 	private final Clock clock;
-
-	CatalogCommandService(ProjectRepository projects, EnvironmentRepository environments, TestSuiteRepository suites,
-			TestCaseRepository testCases, TestScheduleRepository schedules, Clock clock) {
-		this.projects = projects;
-		this.environments = environments;
-		this.suites = suites;
-		this.testCases = testCases;
-		this.schedules = schedules;
-		this.clock = clock;
-	}
 
 	public ProjectItem createProject(String name, String description) {
 		requireUnusedName("project", name, null, projects::findByNameAndArchivedAtIsNull);

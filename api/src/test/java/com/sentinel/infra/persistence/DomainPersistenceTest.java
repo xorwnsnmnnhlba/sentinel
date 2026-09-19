@@ -1,5 +1,7 @@
 package com.sentinel.infra.persistence;
 
+import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -9,9 +11,14 @@ import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.RequestSpec;
 import com.sentinel.domain.TestCase;
+import com.sentinel.domain.TestResult;
+import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.HttpMethod;
+import com.sentinel.runner.ResolvedRequest;
 import com.sentinel.runner.assertion.Assertion;
+import com.sentinel.runner.assertion.AssertionResult;
 import com.sentinel.runner.assertion.BodyContainsAssertion;
 import com.sentinel.runner.assertion.HeaderAssertion;
 import com.sentinel.runner.assertion.JsonPathAssertion;
@@ -45,6 +52,12 @@ class DomainPersistenceTest {
 
 	@Autowired
 	private TestCaseRepository testCases;
+
+	@Autowired
+	private TestRunRepository runs;
+
+	@Autowired
+	private TestResultRepository results;
 
 	@Autowired
 	private EntityManager entityManager;
@@ -154,6 +167,34 @@ class DomainPersistenceTest {
 
 		assertThat(testCases.findById(saved.getId()).orElseThrow().getAssertions()).containsExactly(
 				new StatusCodeAssertion(List.of("2xx")), new JsonPathAssertion("$.status", Operator.EQUALS, "UP"));
+	}
+
+	/**
+	 * DB에서 읽은 JSON 목록은 가변 목록으로 역직렬화됨. 직접 작성한 방어적 getter가 Lombok @Getter로 바뀌면 내부 목록이 노출되어 실패
+	 */
+	@Test
+	void exposesJsonListsReadOnlyAfterLoading() {
+		Project project = projects.save(new Project("billing", null));
+		Environment environment = environments.save(new Environment(project, "dev", "https://gw"));
+		TestSuite suite = suites.save(new TestSuite(project, "charge", null));
+		StatusCodeAssertion assertion = new StatusCodeAssertion(List.of("200"));
+		TestCase testCase = testCases.save(new TestCase(suite, "health",
+				new RequestSpec(HttpMethod.GET, "/health", null, null), List.of(assertion)));
+		TestRun run = runs.save(TestRun.start(suite, environment, TestRun.Trigger.MANUAL, Instant.now()));
+		ResolvedRequest request = new ResolvedRequest(HttpMethod.GET, URI.create("https://gw/health"), Map.of(), null);
+		TestResult result = results.save(TestResult.responded(run, testCase,
+				new HttpExchange(request, 200, Map.of(), "", Duration.ofMillis(1)),
+				List.of(AssertionResult.pass(assertion, "was 200"))));
+		flushAndClear();
+
+		TestCase foundCase = testCases.findById(testCase.getId()).orElseThrow();
+		TestResult foundResult = results.findById(result.getId()).orElseThrow();
+
+		assertThatThrownBy(() -> foundCase.getAssertions().add(new BodyContainsAssertion("ok")))
+				.isInstanceOf(UnsupportedOperationException.class);
+		assertThatThrownBy(() -> foundResult.getAssertionResults().clear())
+				.isInstanceOf(UnsupportedOperationException.class);
+		assertThat(foundResult.getAssertionResults()).hasSize(1);
 	}
 
 	@Test

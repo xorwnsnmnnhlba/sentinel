@@ -15,6 +15,7 @@ import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class CatalogQueryService {
 
 	private final ProjectRepository projects;
@@ -35,14 +37,6 @@ public class CatalogQueryService {
 	private final TestSuiteRepository suites;
 
 	private final TestCaseRepository testCases;
-
-	CatalogQueryService(ProjectRepository projects, EnvironmentRepository environments, TestSuiteRepository suites,
-			TestCaseRepository testCases) {
-		this.projects = projects;
-		this.environments = environments;
-		this.suites = suites;
-		this.testCases = testCases;
-	}
 
 	public List<ProjectItem> listProjects() {
 		return projects.findByArchivedAtIsNullOrderByName().stream().map(ProjectItem::of).toList();

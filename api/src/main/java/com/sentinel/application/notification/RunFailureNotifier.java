@@ -3,19 +3,20 @@ package com.sentinel.application.notification;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.sentinel.application.Transactions;
 import com.sentinel.domain.TestResult;
 import com.sentinel.domain.TestRun;
 import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.runner.assertion.AssertionResult;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 실행 결과에 판정 실패·오류가 있을 때만 알림 발송. 성공 알림은 발송하지 않음.
  */
 @Component
+@RequiredArgsConstructor
 public class RunFailureNotifier {
 
 	private static final int MAX_REASON_LENGTH = 200;
@@ -26,22 +27,13 @@ public class RunFailureNotifier {
 
 	private final Notifier notifier;
 
-	private final TransactionTemplate readOnlyTransaction;
-
-	RunFailureNotifier(TestRunRepository runs, TestResultRepository results, Notifier notifier,
-			PlatformTransactionManager transactionManager) {
-		this.runs = runs;
-		this.results = results;
-		this.notifier = notifier;
-		this.readOnlyTransaction = new TransactionTemplate(transactionManager);
-		this.readOnlyTransaction.setReadOnly(true);
-	}
+	private final Transactions transactions;
 
 	/**
 	 * @return 알림 발송 여부
 	 */
 	public boolean notifyIfFailed(long runId) {
-		RunReport report = readOnlyTransaction.execute(status -> reportOf(runId));
+		RunReport report = transactions.readOnly(status -> reportOf(runId));
 		if (!report.hasFailures()) {
 			return false;
 		}

@@ -6,6 +6,7 @@ import java.util.List;
 import com.sentinel.application.ScheduleDetail;
 import com.sentinel.application.ScheduleService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,13 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/schedules")
+@RequiredArgsConstructor
 class ScheduleController {
 
 	private final ScheduleService scheduleService;
-
-	ScheduleController(ScheduleService scheduleService) {
-		this.scheduleService = scheduleService;
-	}
 
 	@GetMapping
 	List<ScheduleDetail> list(@RequestParam(required = false) Long suiteId) {

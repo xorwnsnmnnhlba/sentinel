@@ -39,6 +39,7 @@ class EnvironmentTest {
 		environment.putVariable("userId", "1");
 
 		assertThat(environment.getVariables()).containsEntry("userId", "1");
+		// 직접 작성한 방어적 getter. Lombok @Getter로 바뀌면 내부 Map이 노출되어 실패
 		assertThatThrownBy(() -> environment.getVariables().put("x", "y"))
 				.isInstanceOf(UnsupportedOperationException.class);
 	}

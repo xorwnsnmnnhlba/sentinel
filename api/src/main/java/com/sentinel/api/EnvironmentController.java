@@ -7,6 +7,7 @@ import com.sentinel.application.CatalogCommandService;
 import com.sentinel.application.CatalogQueryService;
 import com.sentinel.application.CatalogQueryService.EnvironmentItem;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,16 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/environments")
+@RequiredArgsConstructor
 class EnvironmentController {
 
 	private final CatalogQueryService catalog;
 
 	private final CatalogCommandService commands;
-
-	EnvironmentController(CatalogQueryService catalog, CatalogCommandService commands) {
-		this.catalog = catalog;
-		this.commands = commands;
-	}
 
 	@GetMapping
 	List<EnvironmentItem> list(@RequestParam(required = false) Long projectId) {

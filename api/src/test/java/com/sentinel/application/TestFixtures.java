@@ -18,12 +18,14 @@ import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
  * 실행 흐름 테스트용 데이터 생성·정리. 스프링 컨텍스트 공유 시 이름 충돌을 피하기 위해 무작위 접미사 사용.
  */
 @Component
+@RequiredArgsConstructor
 public class TestFixtures {
 
 	private final ProjectRepository projects;
@@ -39,18 +41,6 @@ public class TestFixtures {
 	private final TestResultRepository results;
 
 	private final TestScheduleRepository schedules;
-
-	TestFixtures(ProjectRepository projects, EnvironmentRepository environments, TestSuiteRepository suites,
-			TestCaseRepository testCases, TestRunRepository runs, TestResultRepository results,
-			TestScheduleRepository schedules) {
-		this.projects = projects;
-		this.environments = environments;
-		this.suites = suites;
-		this.testCases = testCases;
-		this.runs = runs;
-		this.results = results;
-		this.schedules = schedules;
-	}
 
 	public Project project() {
 		return projects.save(new Project("project-" + UUID.randomUUID(), null));

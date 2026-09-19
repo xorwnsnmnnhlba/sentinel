@@ -13,13 +13,12 @@ import com.sentinel.application.notification.RunFailureNotifier;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSchedule;
 import com.sentinel.infra.persistence.TestScheduleRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionException;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * DB 폴링 스케줄러. 실행 시각에 도달한 스케줄을 찾아 다음 실행 시각을 먼저 갱신한 뒤 스위트 실행.
@@ -29,6 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 알림 발송 실패는 로그만 남기고 폴링 계속.
  */
 @Component
+@RequiredArgsConstructor
 public class SchedulePoller {
 
 	private static final Logger log = LoggerFactory.getLogger(SchedulePoller.class);
@@ -47,22 +47,10 @@ public class SchedulePoller {
 
 	private final Clock clock;
 
-	private final TransactionTemplate transaction;
+	private final Transactions transactions;
 
 	/** DB 접속 실패 시작 시각. 정상 시 null. 스케줄러 단일 스레드에서만 갱신 */
 	private volatile Instant databaseUnavailableSince;
-
-	SchedulePoller(TestScheduleRepository schedules, TestRunService testRunService,
-			RunFailureNotifier runFailureNotifier, Notifier notifier, ScheduleProperties properties, Clock clock,
-			PlatformTransactionManager transactionManager) {
-		this.schedules = schedules;
-		this.testRunService = testRunService;
-		this.runFailureNotifier = runFailureNotifier;
-		this.notifier = notifier;
-		this.properties = properties;
-		this.clock = clock;
-		this.transaction = new TransactionTemplate(transactionManager);
-	}
 
 	/**
 	 * @return 이번 주기에 생성된 실행 ID
@@ -71,7 +59,7 @@ public class SchedulePoller {
 		Instant now = clock.instant();
 		List<Long> dueIds;
 		try {
-			dueIds = transaction.execute(status -> schedules
+			dueIds = transactions.write(status -> schedules
 				.findByEnabledTrueAndNextRunAtLessThanEqualOrderByNextRunAt(now)
 				.stream()
 				.map(TestSchedule::getId)
@@ -88,7 +76,7 @@ public class SchedulePoller {
 		List<Long> runIds = new ArrayList<>();
 		for (Long scheduleId : dueIds) {
 			try {
-				Trigger trigger = transaction.execute(status -> claim(scheduleId, now));
+				Trigger trigger = transactions.write(status -> claim(scheduleId, now));
 				if (trigger != null) {
 					long runId = testRunService.runSuite(trigger.suiteId(), trigger.environmentId(),
 							TestRun.Trigger.SCHEDULED);
