@@ -21,14 +21,18 @@ import com.sentinel.runner.assertion.ResponseTimeAssertion;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@ExtendWith(OutputCaptureExtension.class)
 @Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class })
 class TestRunServiceTest {
 
@@ -157,6 +161,21 @@ class TestRunServiceTest {
 			assertThat(assertion.message()).isEqualTo("was 12ms");
 		});
 		assertThat(run.summary()).isEqualTo(new TestRunDetail.Summary(2, 1, 1, 0));
+	}
+
+	@Test
+	void logsOneSummaryLinePerCompletedRun(CapturedOutput output) {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/ok", null, null);
+		fixtures.testCase(suite, HttpMethod.GET, "/fail", null, null, List.of(new StatusCodeAssertion(List.of("201"))));
+		fixtures.testCase(suite, HttpMethod.GET, "/{{missing}}", null, null);
+
+		long runId = service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED);
+
+		assertThat(output).containsPattern("Run " + runId + " completed: trigger=SCHEDULED suite=" + suite.getId()
+				+ " total=3 passed=1 failed=1 errors=1 elapsed=\\d+ms");
 	}
 
 	@Test

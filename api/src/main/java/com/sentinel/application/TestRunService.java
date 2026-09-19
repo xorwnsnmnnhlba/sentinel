@@ -2,6 +2,7 @@ package com.sentinel.application;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +28,8 @@ import com.sentinel.runner.UnresolvedVariableException;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.assertion.AssertionEvaluator;
 import com.sentinel.runner.assertion.AssertionResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -39,6 +42,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class TestRunService {
+
+	private static final Logger log = LoggerFactory.getLogger(TestRunService.class);
 
 	private final TestSuiteRepository suites;
 
@@ -122,7 +127,7 @@ public class TestRunService {
 			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment),
 					testCase.getAssertions()))
 			.toList();
-		return new Prepared(run.getId(), preparedCases, Map.copyOf(environment.getVariables()));
+		return new Prepared(run.getId(), suite.getId(), trigger, preparedCases, Map.copyOf(environment.getVariables()));
 	}
 
 	private static RequestTemplate templateOf(RequestSpec spec, Environment environment) {
@@ -131,11 +136,19 @@ public class TestRunService {
 	}
 
 	private long executeAndRecord(Prepared prepared) {
+		long startedAt = System.nanoTime();
+		Map<TestResult.Verdict, Integer> counts = new EnumMap<>(TestResult.Verdict.class);
 		for (PreparedCase preparedCase : prepared.cases()) {
 			Execution execution = execute(preparedCase, prepared.variables());
-			transaction.executeWithoutResult(status -> results.save(resultOf(prepared.runId(), preparedCase, execution)));
+			TestResult.Verdict verdict = transaction
+				.execute(status -> results.save(resultOf(prepared.runId(), preparedCase, execution)).getVerdict());
+			counts.merge(verdict, 1, Integer::sum);
 		}
 		transaction.executeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(Instant.now()));
+		log.info("Run {} completed: trigger={} suite={} total={} passed={} failed={} errors={} elapsed={}ms",
+				prepared.runId(), prepared.trigger(), prepared.suiteId(), prepared.cases().size(),
+				counts.getOrDefault(TestResult.Verdict.PASSED, 0), counts.getOrDefault(TestResult.Verdict.FAILED, 0),
+				counts.getOrDefault(TestResult.Verdict.ERROR, 0), Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
 		return prepared.runId();
 	}
 
@@ -188,7 +201,8 @@ public class TestRunService {
 		return root == ex || root.getMessage() == null ? ex.getMessage() : ex.getMessage() + " (" + root + ")";
 	}
 
-	private record Prepared(long runId, List<PreparedCase> cases, Map<String, String> variables) {
+	private record Prepared(long runId, long suiteId, TestRun.Trigger trigger, List<PreparedCase> cases,
+			Map<String, String> variables) {
 	}
 
 	private record PreparedCase(long testCaseId, RequestTemplate template, List<Assertion> assertions) {
