@@ -24,6 +24,9 @@ import com.sentinel.runner.RequestExecutor;
 import com.sentinel.runner.RequestTemplate;
 import com.sentinel.runner.ResolvedRequest;
 import com.sentinel.runner.UnresolvedVariableException;
+import com.sentinel.runner.assertion.Assertion;
+import com.sentinel.runner.assertion.AssertionEvaluator;
+import com.sentinel.runner.assertion.AssertionResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -116,7 +119,8 @@ public class TestRunService {
 		}
 		TestRun run = runs.save(TestRun.start(suite, environment, trigger, Instant.now()));
 		List<PreparedCase> preparedCases = cases.stream()
-			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment)))
+			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment),
+					testCase.getAssertions()))
 			.toList();
 		return new Prepared(run.getId(), preparedCases, Map.copyOf(environment.getVariables()));
 	}
@@ -128,17 +132,17 @@ public class TestRunService {
 
 	private long executeAndRecord(Prepared prepared) {
 		for (PreparedCase preparedCase : prepared.cases()) {
-			Execution execution = execute(preparedCase.template(), prepared.variables());
+			Execution execution = execute(preparedCase, prepared.variables());
 			transaction.executeWithoutResult(status -> results.save(resultOf(prepared.runId(), preparedCase, execution)));
 		}
 		transaction.executeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(Instant.now()));
 		return prepared.runId();
 	}
 
-	private Execution execute(RequestTemplate template, Map<String, String> variables) {
+	private Execution execute(PreparedCase preparedCase, Map<String, String> variables) {
 		ResolvedRequest request;
 		try {
-			request = template.resolve(variables);
+			request = preparedCase.template().resolve(variables);
 		}
 		catch (UnresolvedVariableException ex) {
 			return new Failed(ErrorReason.UNRESOLVED_VARIABLE, ex.getMessage(), null, null);
@@ -149,7 +153,8 @@ public class TestRunService {
 
 		long startedAt = System.nanoTime();
 		try {
-			return new Responded(executor.execute(request));
+			HttpExchange exchange = executor.execute(request);
+			return new Responded(exchange, AssertionEvaluator.evaluate(preparedCase.assertions(), exchange));
 		}
 		catch (RequestExecutionException ex) {
 			return new Failed(ErrorReason.valueOf(ex.reason().name()), messageOf(ex), request, ex.elapsed());
@@ -168,7 +173,8 @@ public class TestRunService {
 		TestRun run = runs.getReferenceById(runId);
 		TestCase testCase = testCases.getReferenceById(preparedCase.testCaseId());
 		return switch (execution) {
-			case Responded responded -> TestResult.responded(run, testCase, responded.exchange());
+			case Responded responded -> TestResult.responded(run, testCase, responded.exchange(),
+					responded.assertionResults());
 			case Failed failed -> TestResult.failed(run, testCase, preparedCase.template().method(), failed.reason(),
 					failed.message(), failed.request(), failed.elapsed());
 		};
@@ -185,13 +191,13 @@ public class TestRunService {
 	private record Prepared(long runId, List<PreparedCase> cases, Map<String, String> variables) {
 	}
 
-	private record PreparedCase(long testCaseId, RequestTemplate template) {
+	private record PreparedCase(long testCaseId, RequestTemplate template, List<Assertion> assertions) {
 	}
 
 	private sealed interface Execution permits Responded, Failed {
 	}
 
-	private record Responded(HttpExchange exchange) implements Execution {
+	private record Responded(HttpExchange exchange, List<AssertionResult> assertionResults) implements Execution {
 	}
 
 	private record Failed(ErrorReason reason, String message, ResolvedRequest request, Duration elapsed)

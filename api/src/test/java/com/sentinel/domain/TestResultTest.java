@@ -7,6 +7,7 @@ import java.util.Map;
 import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.ResolvedRequest;
+import com.sentinel.runner.assertion.AssertionResult;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +28,7 @@ class TestResultTest {
 	void keepsBodyUpToLimit() {
 		String body = "a".repeat(TestResult.MAX_BODY_BYTES);
 
-		TestResult result = TestResult.responded(run, testCase, exchange(body, Map.of()));
+		TestResult result = TestResult.responded(run, testCase, exchange(body, Map.of()), List.of());
 
 		assertThat(result.getResponseBody()).isEqualTo(body);
 		assertThat(result.isResponseBodyTruncated()).isFalse();
@@ -38,7 +39,7 @@ class TestResultTest {
 		// 한글 1자 = UTF-8 3바이트. 한도 65536은 3의 배수가 아니므로 마지막 글자가 경계에 걸림
 		String body = "가".repeat(30_000);
 
-		TestResult result = TestResult.responded(run, testCase, exchange(body, Map.of()));
+		TestResult result = TestResult.responded(run, testCase, exchange(body, Map.of()), List.of());
 
 		assertThat(result.isResponseBodyTruncated()).isTrue();
 		assertThat(result.getResponseBody()).hasSize(65536 / 3).matches("^가+$");
@@ -51,12 +52,26 @@ class TestResultTest {
 		HttpExchange exchange = new HttpExchange(request, 200, Map.of("Set-Cookie", List.of("sid=secret")), "",
 				Duration.ofMillis(3));
 
-		TestResult result = TestResult.responded(run, testCase, exchange);
+		TestResult result = TestResult.responded(run, testCase, exchange, List.of());
 
 		assertThat(result.getRequestHeaders()).containsEntry("authorization", List.of(SensitiveHeaders.MASK))
 				.containsEntry("X-Trace", List.of("t1"));
 		assertThat(result.getResponseHeaders()).containsEntry("Set-Cookie", List.of(SensitiveHeaders.MASK));
 		assertThat(request.headers().get("Authorization")).containsExactly("Bearer secret");
+	}
+
+	@Test
+	void derivesVerdictFromAssertionResults() {
+		HttpExchange exchange = exchange("", Map.of());
+		AssertionResult pass = new AssertionResult("status in [2xx]", true, "was 200");
+		AssertionResult fail = new AssertionResult("response time <= 10ms", false, "was 30ms");
+
+		assertThat(TestResult.responded(run, testCase, exchange, List.of(pass)).getVerdict())
+				.isEqualTo(TestResult.Verdict.PASSED);
+		assertThat(TestResult.responded(run, testCase, exchange, List.of(pass, fail)).getVerdict())
+				.isEqualTo(TestResult.Verdict.FAILED);
+		assertThat(TestResult.failed(run, testCase, HttpMethod.GET, TestResult.ErrorReason.TIMEOUT, "t", null, null)
+				.getVerdict()).isEqualTo(TestResult.Verdict.ERROR);
 	}
 
 	@Test

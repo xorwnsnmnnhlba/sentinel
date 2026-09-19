@@ -10,6 +10,13 @@ import com.sentinel.domain.RequestSpec;
 import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.runner.HttpMethod;
+import com.sentinel.runner.assertion.Assertion;
+import com.sentinel.runner.assertion.BodyContainsAssertion;
+import com.sentinel.runner.assertion.HeaderAssertion;
+import com.sentinel.runner.assertion.JsonPathAssertion;
+import com.sentinel.runner.assertion.Operator;
+import com.sentinel.runner.assertion.ResponseTimeAssertion;
+import com.sentinel.runner.assertion.StatusCodeAssertion;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,6 +100,38 @@ class DomainPersistenceTest {
 		assertThat(found).extracting(TestCase::getName).containsExactly("정상 결제", "금액 누락");
 		assertThat(found.getFirst().getRequest()).isEqualTo(request);
 		assertThat(found.get(1).getRequest().getHeaders()).isEmpty();
+	}
+
+	@Test
+	void storesPolymorphicAssertionsAsJson() {
+		TestSuite suite = suites.save(new TestSuite(projects.save(new Project("billing", null)), "charge", null));
+		List<Assertion> assertions = List.of(new StatusCodeAssertion(List.of("200", "2xx")),
+				new ResponseTimeAssertion(2000), new HeaderAssertion("Content-Type", Operator.CONTAINS, "json"),
+				new JsonPathAssertion("$.amount", Operator.GREATER_THAN_OR_EQUAL, 1000),
+				new JsonPathAssertion("$.memo", Operator.EQUALS, null), new BodyContainsAssertion("ok"));
+		TestCase saved = testCases.save(new TestCase(suite, "정상 결제",
+				new RequestSpec(HttpMethod.POST, "/billing/v1/charge", null, "{}"), assertions));
+		flushAndClear();
+
+		assertThat(testCases.findById(saved.getId()).orElseThrow().getAssertions()).isEqualTo(assertions);
+	}
+
+	@Test
+	void readsAssertionsWrittenAsRawJsonBySql() {
+		TestSuite suite = suites.save(new TestSuite(projects.save(new Project("billing", null)), "charge", null));
+		TestCase saved = testCases.save(new TestCase(suite, "sql",
+				new RequestSpec(HttpMethod.GET, "/health", null, null)));
+		flushAndClear();
+		entityManager.createNativeQuery("""
+				UPDATE sentinel.test_case SET assertions = '[
+				  {"type": "statusCode", "anyOf": ["2xx"]},
+				  {"type": "jsonPath", "path": "$.status", "operator": "EQUALS", "expected": "UP"}
+				]' WHERE id = :id
+				""").setParameter("id", saved.getId()).executeUpdate();
+		flushAndClear();
+
+		assertThat(testCases.findById(saved.getId()).orElseThrow().getAssertions()).containsExactly(
+				new StatusCodeAssertion(List.of("2xx")), new JsonPathAssertion("$.status", Operator.EQUALS, "UP"));
 	}
 
 	@Test

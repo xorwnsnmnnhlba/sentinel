@@ -9,11 +9,16 @@ import com.sentinel.domain.Project;
 import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestResult.ErrorReason;
 import com.sentinel.domain.TestResult.Outcome;
+import com.sentinel.domain.TestResult.Verdict;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.RequestExecutionException;
 import com.sentinel.runner.ResolvedRequest;
+import com.sentinel.runner.assertion.JsonPathAssertion;
+import com.sentinel.runner.assertion.Operator;
+import com.sentinel.runner.assertion.ResponseTimeAssertion;
+import com.sentinel.runner.assertion.StatusCodeAssertion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +67,9 @@ class TestRunServiceTest {
 		assertThat(run.finishedAt()).isAfterOrEqualTo(run.startedAt());
 		TestRunDetail.Result result = run.results().getFirst();
 		assertThat(result.outcome()).isEqualTo(Outcome.RESPONDED);
+		assertThat(result.verdict()).isEqualTo(Verdict.FAILED);
+		assertThat(result.assertionResults()).singleElement()
+			.satisfies(assertion -> assertThat(assertion.description()).isEqualTo("status in [2xx]"));
 		assertThat(result.response().statusCode()).isEqualTo(503);
 		assertThat(result.response().body()).isEqualTo("unavailable");
 		assertThat(result.request().url()).isEqualTo("https://gw.dev.internal/users/42/orders");
@@ -125,7 +133,30 @@ class TestRunServiceTest {
 			.containsExactly(first.getId(), second.getId(), third.getId());
 		assertThat(run.results()).extracting(TestRunDetail.Result::outcome)
 			.containsExactly(Outcome.RESPONDED, Outcome.ERROR, Outcome.RESPONDED);
-		assertThat(run.summary()).isEqualTo(new TestRunDetail.Summary(3, 2, 1));
+		assertThat(run.summary()).isEqualTo(new TestRunDetail.Summary(3, 2, 0, 1));
+	}
+
+	@Test
+	void judgesResponsesWithCaseAssertions() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/health", null, null,
+				List.of(new StatusCodeAssertion(List.of("200")),
+						new JsonPathAssertion("$.status", Operator.EQUALS, "UP")));
+		fixtures.testCase(suite, HttpMethod.GET, "/slow", null, null,
+				List.of(new ResponseTimeAssertion(10)));
+		executor.respond(200, Map.of(), "{\"status\": \"UP\"}");
+
+		TestRunDetail run = service.getRun(service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL));
+
+		assertThat(run.results()).extracting(TestRunDetail.Result::verdict).containsExactly(Verdict.PASSED, Verdict.FAILED);
+		assertThat(run.results().get(1).assertionResults()).singleElement().satisfies(assertion -> {
+			assertThat(assertion.passed()).isFalse();
+			assertThat(assertion.description()).isEqualTo("response time <= 10ms");
+			assertThat(assertion.message()).isEqualTo("was 12ms");
+		});
+		assertThat(run.summary()).isEqualTo(new TestRunDetail.Summary(2, 1, 1, 0));
 	}
 
 	@Test
@@ -138,7 +169,7 @@ class TestRunServiceTest {
 
 		assertThat(run.status()).isEqualTo(TestRun.Status.COMPLETED);
 		assertThat(run.results()).isEmpty();
-		assertThat(run.summary()).isEqualTo(new TestRunDetail.Summary(0, 0, 0));
+		assertThat(run.summary()).isEqualTo(new TestRunDetail.Summary(0, 0, 0, 0));
 	}
 
 	@Test

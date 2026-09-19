@@ -83,7 +83,9 @@ class TestRunControllerTest {
 
 		assertThat(result).hasStatus(HttpStatus.CREATED);
 		assertThat(result).bodyJson().extractingPath("$.summary.total").isEqualTo(2);
-		assertThat(result).bodyJson().extractingPath("$.summary.responded").isEqualTo(2);
+		assertThat(result).bodyJson().extractingPath("$.summary.passed").isEqualTo(2);
+		assertThat(result).bodyJson().extractingPath("$.results[0].verdict").isEqualTo("PASSED");
+		assertThat(result).bodyJson().extractingPath("$.results[0].assertionResults[0].description").isEqualTo("status in [2xx]");
 		assertThat(result).bodyJson().extractingPath("$.trigger").isEqualTo("MANUAL");
 	}
 

@@ -96,13 +96,39 @@ INSERT INTO sentinel.project (name, created_at, updated_at) VALUES ('sample', no
 INSERT INTO sentinel.environment (project_id, name, base_url, variables, created_at, updated_at)
   VALUES (1, 'dev', 'https://<gw-host>', '{"userId": "42"}', now(), now());
 INSERT INTO sentinel.test_suite (project_id, name, created_at, updated_at) VALUES (1, 'smoke', now(), now());
-INSERT INTO sentinel.test_case (suite_id, name, method, path, headers, body, created_at, updated_at)
-  VALUES (1, 'user lookup', 'GET', '/users/{{userId}}', '{"Accept": ["application/json"]}', NULL, now(), now());
+INSERT INTO sentinel.test_case (suite_id, name, method, path, headers, body, assertions, created_at, updated_at)
+  VALUES (1, 'user lookup', 'GET', '/users/{{userId}}', '{"Accept": ["application/json"]}', NULL,
+          '[{"type": "statusCode", "anyOf": ["200"]},
+            {"type": "responseTime", "maxMillis": 2000},
+            {"type": "jsonPath", "path": "$.id", "operator": "EQUALS", "expected": 42}]',
+          now(), now());
 ```
 
 - `bootTestRun` 사용 시 DB 접속: `docker ps`로 `postgres:18-alpine` 컨테이너 확인 후 `docker exec -it <컨테이너> psql -U test -d test`
 - `path`는 `/` 시작 상대 경로. 경로·헤더 값·본문에 `{{변수}}` 사용 가능, `\{{`는 치환 없이 `{{` 출력
 - `headers`는 `{"이름": ["값", ...]}` 형식
+- `assertions`는 판정 규칙 배열. 생략(NULL·빈 배열) 시 기본 판정 `status in [2xx]` 적용
+
+### 판정 규칙 (`assertions`)
+
+| `type` | 속성 | 예 |
+|--------|------|-----|
+| `statusCode` | `anyOf`: 상태 코드 목록, `x` 와일드카드 | `{"type": "statusCode", "anyOf": ["200", "2xx"]}` |
+| `responseTime` | `maxMillis`: 응답 시간 상한(포함) | `{"type": "responseTime", "maxMillis": 2000}` |
+| `header` | `name`, `operator`, `value` | `{"type": "header", "name": "Content-Type", "operator": "CONTAINS", "value": "json"}` |
+| `jsonPath` | `path`(JsonPath), `operator`, `expected`(JSON 값) | `{"type": "jsonPath", "path": "$.items.length()", "operator": "GREATER_THAN", "expected": 0}` |
+| `bodyContains` | `text`: 포함 문자열(대소문자 구분) | `{"type": "bodyContains", "text": "OK"}` |
+
+| `operator` | `header` | `jsonPath` | 의미 |
+|------------|:--------:|:----------:|------|
+| `EXISTS` / `NOT_EXISTS` | O | O | 존재 여부 |
+| `EQUALS` / `NOT_EQUALS` | O | O | 일치. `jsonPath` 숫자는 값 비교(`1 == 1.0`), 문자열 `"1000"`과 숫자 `1000`은 불일치 |
+| `CONTAINS` | O | O | 부분 문자열 포함 또는 배열 원소 포함 |
+| `MATCHES` | O | O | 정규식 부분 일치. 문자열만 대상 |
+| `GREATER_THAN` / `GREATER_THAN_OR_EQUAL` / `LESS_THAN` / `LESS_THAN_OR_EQUAL` | X | O | 숫자 비교. 숫자가 아니면 타입 불일치로 실패 |
+
+- 규칙은 실패가 있어도 전부 평가하여 `assertionResults`에 규칙별 결과 기록
+- HTML 오류 페이지 등 JSON 객체·배열이 아닌 본문은 `jsonPath` 규칙 실패(`response body is not JSON`)
 
 ### 2. 실행 (API)
 
@@ -115,14 +141,16 @@ curl -i -X POST localhost:8080/api/test-cases/1/runs \
 |-----|------|
 | `POST /api/test-cases/{id}/runs` | 케이스 1건 실행. 본문 `{"environmentId": 1}`. 201 + `Location: /api/test-runs/{runId}` |
 | `POST /api/test-suites/{id}/runs` | 스위트 전체 실행. 케이스 ID 순 순차 실행, 실패 케이스가 있어도 나머지 계속 실행 |
-| `GET /api/test-runs/{runId}` | 실행 결과 조회. `summary`에 전체·응답 수신·오류 건수 |
+| `GET /api/test-runs/{runId}` | 실행 결과 조회. `summary`에 전체·통과·실패·오류 건수 |
 
 ### 결과 해석
 
 | 필드 | 의미 |
 |------|------|
-| `outcome: RESPONDED` | 응답 수신. 4xx·5xx 포함. 성공·실패 판정은 3단계(Assertion)에서 추가 |
-| `outcome: ERROR` | 응답 미수신 또는 전송 전 실패. 사유는 `errorReason` |
+| `verdict: PASSED` | 판정 규칙 전부 통과 |
+| `verdict: FAILED` | 응답 수신 후 판정 규칙 실패. 규칙별 결과는 `assertionResults` (`description`, `passed`, `message`) |
+| `verdict: ERROR` | 응답 미수신 또는 전송 전 실패. 사유는 `errorReason` |
+| `outcome` | 응답 수신 여부. `RESPONDED`(4xx·5xx 포함) / `ERROR` |
 | `errorReason` | `UNRESOLVED_VARIABLE`(변수 누락, 미전송) / `INVALID_REQUEST`(잘못된 URL·헤더) / `TIMEOUT` / `CONNECTION_FAILED` / `IO_ERROR` / `UNEXPECTED` |
 
 - 저장되는 요청·응답 헤더 중 `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` 값은 `****`로 마스킹. 실제 전송 값은 원본 사용
