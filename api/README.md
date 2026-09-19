@@ -19,30 +19,34 @@ Sentinel 백엔드. 테스트 케이스 실행(러너), 스케줄 실행, 결과
 | HikariCP | 7.0.2 |
 | PostgreSQL JDBC | 42.7.11 |
 | DB | PostgreSQL 18, 개발기 AWS RDS `sentinel` 스키마 |
+| Flyway | 12.4.0 |
 | Testcontainers | 2.0.5 |
 
 `./gradlew dependencies --configuration runtimeClasspath` 기준
 
 ## 환경변수
 
-`src/main/resources/application.yml`의 DB 접속 정보는 환경변수로 주입. 값은 루트 `sentinel.env`에 보관
+`src/main/resources/application.yml`의 DB 접속 정보는 환경변수로 주입. 미설정 시 로컬 PostgreSQL 기본값 사용
 
-| 이름 | 설명 | 예시 |
-|------|------|------|
-| `DB_URL` | JDBC URL | `jdbc:postgresql://<rds-endpoint>:5432/<db>?currentSchema=sentinel` |
-| `DB_USERNAME` | DB 계정 (`sentinel` 스키마 한정 권한 계정) | `sentinel_app` |
-| `DB_PASSWORD` | DB 비밀번호 | |
+| 이름 | 기본값 | RDS 예시 |
+|------|--------|----------|
+| `DB_URL` | `jdbc:postgresql://localhost:5432/sentinel?currentSchema=sentinel` | `jdbc:postgresql://<rds-endpoint>:5432/<db>?currentSchema=sentinel` |
+| `DB_USERNAME` | `postgres` | `sentinel_app` (`sentinel` 스키마 한정 권한 계정) |
+| `DB_PASSWORD` | (빈 값) | |
 
-미설정 시 `Could not resolve placeholder 'DB_URL'` 오류로 기동 실패
+- 스키마·테이블은 기동 시 Flyway가 생성 (아래 "스키마 변경" 참고)
+- DB 드라이버 타임아웃: `socketTimeout` 30초, `connectTimeout` 10초, `tcpKeepAlive` 사용
+- 컨테이너 실행 시에는 루트 `sentinel.env` 사용 (`sentinel.env.example` 참고)
 
 ## 실행
 
 ### 터미널
 
 ```bash
-set -a; source ../sentinel.env; set +a
-./gradlew bootRun
+DB_PASSWORD=<비밀번호> ./gradlew bootRun
 ```
+
+`sentinel.env`의 `DB_URL`은 컨테이너용(`host.docker.internal`)이므로 로컬 실행에 불러오지 않음
 
 로그의 `Tomcat started on port 8080` 출력으로 정상 기동 확인
 
@@ -59,7 +63,7 @@ set -a; source ../sentinel.env; set +a
 5. **Run → Edit Configurations → SentinelApplication**
    - JDK 25, 클래스패스 모듈 `sentinel.main`
    - Main class: `com.sentinel.SentinelApplication`
-   - Environment variables: `sentinel.env` 불러오기 또는 직접 입력
+   - Environment variables: `DB_PASSWORD=<비밀번호>` (RDS 사용 시 `DB_URL`, `DB_USERNAME` 추가)
 
 `build.gradle` 수정 후에는 🐘 **Load Gradle Changes** 실행 필수. 미실행 시 새 의존성 import에서 `Cannot resolve symbol` 발생
 
@@ -84,6 +88,19 @@ set -a; source ../sentinel.env; set +a
 ```
 
 `TestSentinelApplication`이 PostgreSQL 컨테이너를 띄워 연결. 종료 시 데이터 소멸
+
+## 스키마 변경
+
+Flyway 마이그레이션으로만 변경. 기동 시 `ddl-auto: validate`가 엔티티와 테이블 일치 여부 검증, 불일치 시 기동 실패
+
+1. 엔티티 수정
+2. `src/main/resources/db/migration/V{다음 번호}__{설명}.sql` 추가 (예: `V2__add_test_case_tags.sql`)
+3. `./gradlew test`로 검증. 테스트 컨테이너에 마이그레이션 적용 후 `validate` 수행
+
+- 적용된 마이그레이션 파일 수정 금지. Flyway가 체크섬 불일치로 기동 거부
+- 스키마 접두어(`sentinel.`) 미사용. Flyway `default-schema` 설정으로 지정
+- 데이터가 있는 테이블에 NOT NULL 컬럼 추가 시 `DEFAULT` 지정 또는 값 채운 뒤 제약 추가
+- 적용 이력: `sentinel.flyway_schema_history`
 
 ## 케이스 1건 실행 확인
 

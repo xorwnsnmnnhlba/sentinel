@@ -71,7 +71,7 @@ sentinel/
 | DB | PostgreSQL — 개발기 AWS RDS의 sentinel 스키마 |
 | 실행기 | RestClient |
 | 스케줄 | DB 폴링 (5장 참조) |
-| 스키마 관리 | 초기 ddl-auto: update → 배포 전 Flyway + validate 전환 |
+| 스키마 관리 | Flyway + ddl-auto: validate (2026-09-19 배포 구성 시 전환) |
 | FE | Next.js 16.3.4 (Active LTS), App Router, TanStack Query |
 | 실행 환경 | 노트북 상시 실행, Docker 컨테이너 2개 |
 
@@ -100,7 +100,7 @@ spring:
       keepalive-time: 300000
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate   # 2026-09-19 update에서 전환. 스키마 변경은 Flyway 마이그레이션으로만 수행
     properties:
       hibernate.default_schema: sentinel
       hibernate.format_sql: true
@@ -151,7 +151,7 @@ CREATE INDEX idx_result_case_time ON test_result(test_case_id, id DESC);
 CREATE INDEX idx_run_suite_time   ON test_run(suite_id, started_at DESC);
 ```
 
-공용 RDS이므로 스키마 한정 권한 계정 사용이 ddl-auto: update 사용의 전제
+공용 RDS이므로 스키마 한정 권한 계정 사용. Flyway가 sentinel 스키마 안에 테이블과 이력 테이블(flyway_schema_history)을 생성하므로 스키마 내 CREATE 권한 필요
 
 ---
 
@@ -251,23 +251,24 @@ sentinel-api   :8080   Spring Boot
 sentinel-web   :3000   Next.js (standalone)
 ```
 
-```bash
-docker network create sentinel-net
+루트 `docker-compose.yml`로 실행 (2026-09-19 구성, 현재 api만. web은 4단계에서 추가)
 
-docker run -d --name sentinel-api \
-  --network sentinel-net \
-  --restart always \
-  --env-file ./sentinel.env \
-  -e TZ=Asia/Seoul \
-  -p 8080:8080 \
-  sentinel-api:latest
+```bash
+docker compose up -d --build
 ```
+
+- 이미지: `api/Dockerfile` 멀티 스테이지 (eclipse-temurin 25 JDK 빌드 → 25 JRE 실행, 비root 사용자)
+- DB: 기본 로컬 PostgreSQL(`host.docker.internal:5432/sentinel`), RDS 전환은 `sentinel.env` 값 변경만으로 처리
+- 스키마는 Flyway가 관리 (`api/src/main/resources/db/migration`). `sentinel` 스키마 미존재 시 생성, RDS처럼 이미 존재하면 마이그레이션만 적용
+- 기동 시 `ddl-auto: validate`로 엔티티와 테이블 일치 검증. 불일치 시 기동 실패로 드리프트 조기 발견
+- `update` 미사용 사유: 컬럼 삭제·변경 미반영으로 조용한 드리프트 발생, 데이터 존재 시 NOT NULL 컬럼 추가 불가, 변경 이력 부재, 공용 RDS에 앱이 DDL 직접 실행
 
 ### 유의사항
 - TZ 지정 필수. 컨테이너 기본이 UTC라 미지정 시 크론이 9시간 어긋남
 - 시크릿은 --env-file로 분리. 환경변수 직접 전달 시 docker inspect와 셸 히스토리에 잔존. sentinel.env는 .gitignore 등록
 - 컨테이너 간 통신은 localhost가 아닌 컨테이너 이름 사용 (INTERNAL_API_URL=http://sentinel-api:8080)
-- restart always는 무한 재시작 루프 가능. 초기 세팅 시 docker logs -f로 정상 기동 확인 후 진행. docker ps에 Restarting 상태로 표시되면 해당 상황
+- restart always는 무한 재시작 루프 가능. `unless-stopped` 사용(수동 중지 시 재시작 안 함). 초기 세팅 시 docker compose logs -f로 정상 기동 확인 후 진행. docker ps에 Restarting 상태로 표시되면 해당 상황
+- 컨테이너 안의 localhost는 컨테이너 자신. 호스트의 PostgreSQL은 host.docker.internal로 접속 (compose에 `host-gateway` 매핑 명시)
 - RDS 접속은 보안 그룹에 IP/VPN 대역 5432 인바운드 개방으로 해결. 터널 불필요
 
 ---

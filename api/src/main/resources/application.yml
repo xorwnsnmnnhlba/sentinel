@@ -2,9 +2,10 @@ spring:
   application:
     name: sentinel
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    # 기본값: 로컬 PostgreSQL. RDS·컨테이너 실행 시 sentinel.env로 재정의
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/sentinel?currentSchema=sentinel}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
     hikari:
       maximum-pool-size: 5
       connection-timeout: 10000
@@ -17,10 +18,15 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      # 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 수행. 기동 시 엔티티와 테이블 일치 여부만 검증
+      ddl-auto: validate
     properties:
       hibernate.default_schema: sentinel
       hibernate.format_sql: true
+  flyway:
+    # sentinel 스키마 미존재 시 생성, 이력 테이블(flyway_schema_history)도 이 스키마에 생성
+    schemas: sentinel
+    default-schema: sentinel
   mvc:
     problemdetails:
       enabled: true
