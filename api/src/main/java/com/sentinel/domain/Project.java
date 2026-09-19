@@ -6,8 +6,8 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "project", uniqueConstraints = @UniqueConstraint(name = "uk_project_name", columnNames = "name"))
-public class Project extends BaseEntity {
+@Table(name = "project", uniqueConstraints = @UniqueConstraint(name = "uk_project_name", columnNames = { "name", "archive_key" }))
+public class Project extends ArchivableEntity {
 
 	@Column(nullable = false, length = 100)
 	private String name;

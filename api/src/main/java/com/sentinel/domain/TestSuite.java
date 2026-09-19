@@ -14,8 +14,8 @@ import jakarta.persistence.UniqueConstraint;
 
 @Entity
 @Table(name = "test_suite",
-		uniqueConstraints = @UniqueConstraint(name = "uk_test_suite_project_name", columnNames = { "project_id", "name" }))
-public class TestSuite extends BaseEntity {
+		uniqueConstraints = @UniqueConstraint(name = "uk_test_suite_project_name", columnNames = { "project_id", "name", "archive_key" }))
+public class TestSuite extends ArchivableEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "project_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))

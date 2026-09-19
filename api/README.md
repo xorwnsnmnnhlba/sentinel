@@ -115,15 +115,16 @@ INSERT INTO sentinel.project (name, created_at, updated_at)
 VALUES ('sample', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO sentinel.environment (project_id, name, base_url, variables, created_at, updated_at)
-VALUES ((SELECT id FROM sentinel.project WHERE name = 'sample'),
+VALUES ((SELECT id FROM sentinel.project WHERE name = 'sample' AND archived_at IS NULL),
         'dev', 'https://<gw-host>', '{"userId": "42"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO sentinel.test_suite (project_id, name, created_at, updated_at)
-VALUES ((SELECT id FROM sentinel.project WHERE name = 'sample'), 'smoke', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+VALUES ((SELECT id FROM sentinel.project WHERE name = 'sample' AND archived_at IS NULL), 'smoke', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
-         WHERE p.name = 'sample' AND s.name = 'smoke'),
+         WHERE p.name = 'sample' AND s.name = 'smoke'
+         AND p.archived_at IS NULL AND s.archived_at IS NULL),
         'user lookup', 'GET', '/users/{{userId}}', '{"Accept": ["application/json"]}', NULL,
         '[{"type": "statusCode", "anyOf": ["200"]},
           {"type": "responseTime", "maxMillis": 2000},
@@ -190,14 +191,14 @@ curl -i -X POST localhost:8080/api/runs \
 
 모든 리소스는 최상위 컬렉션, 관계는 쿼리 파라미터로 필터 (`docs/design.md` "REST API 설계")
 
-| 리소스 | 목록 | 단건 | 생성·수정 |
-|--------|------|------|-----------|
-| 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | |
-| 환경 | `GET /api/environments?projectId=` | `GET /api/environments/{id}` | |
-| 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | |
-| 케이스 | `GET /api/cases?suiteId=` | `GET /api/cases/{id}` | |
-| 실행 | `GET /api/runs?suiteId=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs` |
-| 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` |
+| 리소스 | 목록 | 단건 | 생성·수정 | 삭제 |
+|--------|------|------|-----------|------|
+| 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | | `DELETE /api/projects/{id}` |
+| 환경 | `GET /api/environments?projectId=` | `GET /api/environments/{id}` | | `DELETE /api/environments/{id}` |
+| 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | | `DELETE /api/suites/{id}` |
+| 케이스 | `GET /api/cases?suiteId=` | `GET /api/cases/{id}` | | `DELETE /api/cases/{id}` |
+| 실행 | `GET /api/runs?suiteId=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs` | |
+| 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
 
 - 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
 - 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
@@ -206,6 +207,9 @@ curl -i -X POST localhost:8080/api/runs \
   - 행: 프로젝트·스위트·환경의 `{id, name}`, `trigger`, `status`, 시각, `summary`(전체·통과·실패·오류)
   - 실행 건수와 무관하게 페이지당 쿼리 최대 3회 (이름 함께 로딩, 판정 건수 일괄 집계)
 - 실행 상세: 스위트·환경·케이스 이름과 케이스별 결과 포함
+- 삭제는 소프트 삭제(보관). 204 응답, 하위 항목 연쇄 보관, 실행 이력은 유지
+  - 프로젝트 → 환경·스위트·케이스·스케줄, 환경 → 해당 스케줄, 스위트 → 케이스·스케줄
+  - 보관된 항목은 목록에서 제외되고 단건 조회·재삭제·실행은 404. 같은 이름으로 새로 등록 가능
 
 ## 스케줄 실행
 

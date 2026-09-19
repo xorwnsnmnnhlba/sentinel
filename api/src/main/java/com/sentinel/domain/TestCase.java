@@ -24,8 +24,8 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(name = "test_case",
-		uniqueConstraints = @UniqueConstraint(name = "uk_test_case_suite_name", columnNames = { "suite_id", "name" }))
-public class TestCase extends BaseEntity {
+		uniqueConstraints = @UniqueConstraint(name = "uk_test_case_suite_name", columnNames = { "suite_id", "name", "archive_key" }))
+public class TestCase extends ArchivableEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "suite_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))

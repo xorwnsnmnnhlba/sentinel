@@ -7,6 +7,7 @@ import com.sentinel.application.ScheduleDetail;
 import com.sentinel.application.ScheduleService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,6 +49,15 @@ class ScheduleController {
 	@PatchMapping("/{scheduleId}")
 	ScheduleDetail update(@PathVariable long scheduleId, @RequestBody UpdateScheduleRequest request) {
 		return scheduleService.update(scheduleId, request.enabled());
+	}
+
+	/**
+	 * 삭제(보관). 비활성화되며 실행 이력은 유지
+	 */
+	@DeleteMapping("/{scheduleId}")
+	ResponseEntity<Void> delete(@PathVariable long scheduleId) {
+		scheduleService.delete(scheduleId);
+		return ResponseEntity.noContent().build();
 	}
 
 }

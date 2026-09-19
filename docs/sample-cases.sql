@@ -6,6 +6,7 @@
 -- - 표준 SQL만 사용. RETURNING, :: 캐스트, now() 등 PostgreSQL 전용 문법 미사용
 -- - ID 하드코딩 없이 유니크한 이름(프로젝트명, 프로젝트 내 스위트명)으로 부모 ID 조회
 -- - 부모 이름 오타 시 서브쿼리가 NULL을 반환하여 NOT NULL 제약 위반으로 실패. 외래키 없이도 잘못된 참조 차단
+-- - 이름 조회 시 archived_at IS NULL 조건 필수. 보관(삭제)된 같은 이름의 행이 있으면 서브쿼리가 여러 행을 반환
 -- - 한 트랜잭션으로 등록. 같은 이름의 프로젝트가 이미 있으면 유니크 제약으로 실패 (ON_ERROR_STOP으로 전체 중단)
 
 
@@ -21,18 +22,19 @@ INSERT INTO sentinel.project (name, description, created_at, updated_at)
 VALUES ('sentinel-self-check', 'Sentinel API 자체 점검 샘플', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO sentinel.environment (project_id, name, base_url, variables, created_at, updated_at)
-VALUES ((SELECT id FROM sentinel.project WHERE name = 'sentinel-self-check'),
+VALUES ((SELECT id FROM sentinel.project WHERE name = 'sentinel-self-check' AND archived_at IS NULL),
         'local', 'http://localhost:8080', '{"missingRunId": "999999", "apiPrefix": "/api"}',
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO sentinel.test_suite (project_id, name, description, created_at, updated_at)
-VALUES ((SELECT id FROM sentinel.project WHERE name = 'sentinel-self-check'),
+VALUES ((SELECT id FROM sentinel.project WHERE name = 'sentinel-self-check' AND archived_at IS NULL),
         'smoke', '판정 규칙 5종·변수·헤더 사용 예시', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- 통과: 판정 규칙 5종 전부 사용
 INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
-         WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'),
+         WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'
+         AND p.archived_at IS NULL AND s.archived_at IS NULL),
         '존재하지 않는 실행 조회는 404 ProblemDetail', 'GET', '{{apiPrefix}}/runs/{{missingRunId}}',
         '{"Accept": ["application/json"]}',
         NULL,
@@ -47,7 +49,8 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 -- 통과: POST + 요청 본문 + 4xx 판정. 검증 단계에서 거부되므로 데이터 생성 없음
 INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
-         WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'),
+         WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'
+         AND p.archived_at IS NULL AND s.archived_at IS NULL),
         '스케줄 등록 필수값 누락은 400', 'POST', '{{apiPrefix}}/schedules',
         '{"Content-Type": ["application/json"]}',
         '{}',
@@ -58,7 +61,8 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 -- 의도적 실패(FAILED): 404 응답에 200 기대
 INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
-         WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'),
+         WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'
+         AND p.archived_at IS NULL AND s.archived_at IS NULL),
         '[의도적 실패] 판정 실패 알림 확인', 'GET', '{{apiPrefix}}/runs/{{missingRunId}}',
         '{}',
         NULL,
@@ -68,7 +72,8 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 -- 의도적 실패(ERROR): 환경에 없는 변수 참조. 전송하지 않고 UNRESOLVED_VARIABLE 기록
 INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
-         WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'),
+         WHERE p.name = 'sentinel-self-check' AND s.name = 'smoke'
+         AND p.archived_at IS NULL AND s.archived_at IS NULL),
         '[의도적 실패] 변수 누락 오류 확인', 'GET', '{{apiPrefix}}/runs/{{undefinedRunId}}',
         '{}',
         NULL,
@@ -114,16 +119,17 @@ COMMIT;
 -- VALUES ('<프로젝트명>', '<설명>', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 --
 -- INSERT INTO sentinel.environment (project_id, name, base_url, variables, created_at, updated_at)
--- VALUES ((SELECT id FROM sentinel.project WHERE name = '<프로젝트명>'),
+-- VALUES ((SELECT id FROM sentinel.project WHERE name = '<프로젝트명>' AND archived_at IS NULL),
 --         'dev', 'https://<gw-host>', '{"userId": "<테스트 사용자 ID>"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 --
 -- INSERT INTO sentinel.test_suite (project_id, name, description, created_at, updated_at)
--- VALUES ((SELECT id FROM sentinel.project WHERE name = '<프로젝트명>'),
+-- VALUES ((SELECT id FROM sentinel.project WHERE name = '<프로젝트명>' AND archived_at IS NULL),
 --         '<스위트명, 예: billing>', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 --
 -- INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 -- VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
---          WHERE p.name = '<프로젝트명>' AND s.name = '<스위트명, 예: billing>'),
+--          WHERE p.name = '<프로젝트명>' AND s.name = '<스위트명, 예: billing>'
+--          AND p.archived_at IS NULL AND s.archived_at IS NULL),
 --         '결제 내역 조회', 'GET', '/billing/v1/history?userId={{userId}}',
 --         '{"Accept": ["application/json"]}',
 --         NULL,
@@ -134,7 +140,8 @@ COMMIT;
 --
 -- INSERT INTO sentinel.test_case (suite_id, name, http_method, path, headers, body, assertions, created_at, updated_at)
 -- VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id = s.project_id
---          WHERE p.name = '<프로젝트명>' AND s.name = '<스위트명, 예: billing>'),
+--          WHERE p.name = '<프로젝트명>' AND s.name = '<스위트명, 예: billing>'
+--          AND p.archived_at IS NULL AND s.archived_at IS NULL),
 --         '결제 요청', 'POST', '/billing/v1/charge',
 --         '{"Content-Type": ["application/json"]}',
 --         '{"userId": "{{userId}}", "amount": 1000}',

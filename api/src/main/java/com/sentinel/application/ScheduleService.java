@@ -40,8 +40,8 @@ public class ScheduleService {
 	 */
 	@Transactional
 	public ScheduleDetail create(long suiteId, long environmentId, String cron) {
-		TestSuite suite = suites.findById(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
-		Environment environment = environments.findById(environmentId)
+		TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
+		Environment environment = environments.findByIdAndArchivedAtIsNull(environmentId)
 			.orElseThrow(() -> new NotFoundException("environment", environmentId));
 		TestSchedule schedule;
 		try {
@@ -74,10 +74,19 @@ public class ScheduleService {
 	 */
 	@Transactional(readOnly = true)
 	public List<ScheduleDetail> list(Long suiteId) {
-		return (suiteId == null ? schedules.findAllByOrderById() : schedules.findBySuiteIdOrderById(suiteId))
+		return (suiteId == null ? schedules.findByArchivedAtIsNullOrderById() : schedules.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId))
 			.stream()
 			.map(this::detailOf)
 			.toList();
+	}
+
+	/**
+	 * 삭제(보관). 비활성화 후 목록·단건 조회에서 제외
+	 * @throws NotFoundException 미존재 또는 이미 삭제
+	 */
+	@Transactional
+	public void delete(long scheduleId) {
+		find(scheduleId).archive(clock.instant());
 	}
 
 	@Transactional(readOnly = true)
@@ -86,7 +95,7 @@ public class ScheduleService {
 	}
 
 	private TestSchedule find(long scheduleId) {
-		return schedules.findById(scheduleId).orElseThrow(() -> new NotFoundException("test schedule", scheduleId));
+		return schedules.findByIdAndArchivedAtIsNull(scheduleId).orElseThrow(() -> new NotFoundException("test schedule", scheduleId));
 	}
 
 	private ScheduleDetail detailOf(TestSchedule schedule) {

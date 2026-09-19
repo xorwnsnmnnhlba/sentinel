@@ -45,6 +45,9 @@ public class TestSchedule extends BaseEntity {
 
 	private Instant lastTriggeredAt;
 
+	/** 삭제(보관) 시각. 보관 시 비활성화하여 폴링 대상에서 제외 */
+	private Instant archivedAt;
+
 	protected TestSchedule() {
 	}
 
@@ -78,6 +81,9 @@ public class TestSchedule extends BaseEntity {
 	}
 
 	public void enable(Instant now, ZoneId zone) {
+		if (isArchived()) {
+			throw new IllegalStateException("schedule " + getId() + " is archived");
+		}
 		this.enabled = true;
 		this.nextRunAt = nextAfter(now, zone);
 	}
@@ -85,6 +91,22 @@ public class TestSchedule extends BaseEntity {
 	public void disable() {
 		this.enabled = false;
 		this.nextRunAt = null;
+	}
+
+	public void archive(Instant archivedAt) {
+		if (isArchived()) {
+			throw new IllegalStateException("schedule " + getId() + " is already archived");
+		}
+		disable();
+		this.archivedAt = Objects.requireNonNull(archivedAt, "archivedAt");
+	}
+
+	public boolean isArchived() {
+		return archivedAt != null;
+	}
+
+	public Instant getArchivedAt() {
+		return archivedAt;
 	}
 
 	private Instant nextAfter(Instant instant, ZoneId zone) {

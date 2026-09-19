@@ -1,5 +1,6 @@
 package com.sentinel.infra.persistence;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -66,7 +67,7 @@ class DomainPersistenceTest {
 				WHERE success AND version IS NOT NULL ORDER BY installed_rank
 				""").getResultList();
 
-		assertThat(versions).containsExactly("1");
+		assertThat(versions).containsExactly("1", "2");
 	}
 
 	@Test
@@ -99,7 +100,7 @@ class DomainPersistenceTest {
 		environments.save(environment);
 		flushAndClear();
 
-		Environment found = environments.findByProjectIdOrderByName(project.getId()).getFirst();
+		Environment found = environments.findByProjectIdAndArchivedAtIsNullOrderByName(project.getId()).getFirst();
 
 		assertThat(found.getBaseUrl()).isEqualTo("https://gw.dev.internal");
 		assertThat(found.getVariables()).containsExactlyInAnyOrderEntriesOf(Map.of("userId", "42", "locale", "ko-KR"));
@@ -116,7 +117,7 @@ class DomainPersistenceTest {
 		testCases.save(new TestCase(suite, "금액 누락", new RequestSpec(HttpMethod.POST, "/billing/v1/charge", null, "{}")));
 		flushAndClear();
 
-		List<TestCase> found = testCases.findBySuiteIdOrderById(suite.getId());
+		List<TestCase> found = testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suite.getId());
 
 		assertThat(found).extracting(TestCase::getName).containsExactly("정상 결제", "금액 누락");
 		assertThat(found.getFirst().getRequest()).isEqualTo(request);
@@ -153,6 +154,23 @@ class DomainPersistenceTest {
 
 		assertThat(testCases.findById(saved.getId()).orElseThrow().getAssertions()).containsExactly(
 				new StatusCodeAssertion(List.of("2xx")), new JsonPathAssertion("$.status", Operator.EQUALS, "UP"));
+	}
+
+	@Test
+	void allowsReusingNameOfArchivedRowButNotOfActiveRow() {
+		Project project = projects.save(new Project("billing", null));
+		TestSuite archived = suites.saveAndFlush(new TestSuite(project, "smoke", null));
+		archived.archive(Instant.parse("2026-09-19T00:00:00Z"));
+		suites.saveAndFlush(archived);
+
+		TestSuite reused = suites.saveAndFlush(new TestSuite(project, "smoke", "재사용"));
+
+		assertThat(reused.getId()).isNotEqualTo(archived.getId());
+		assertThat(suites.findByProjectIdAndArchivedAtIsNullOrderByName(project.getId()))
+			.extracting(TestSuite::getId)
+			.containsExactly(reused.getId());
+		assertThatThrownBy(() -> suites.saveAndFlush(new TestSuite(project, "smoke", "중복")))
+				.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test
