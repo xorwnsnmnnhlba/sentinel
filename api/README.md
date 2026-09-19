@@ -21,6 +21,7 @@ Sentinel 백엔드. 테스트 케이스 실행(러너), 스케줄 실행, 결과
 | DB | PostgreSQL 18, 개발기 AWS RDS `sentinel` 스키마 |
 | Flyway | 12.4.0 |
 | Testcontainers | 2.0.5 |
+| Lombok | 1.18.46 (`@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor(access = PROTECTED)`만 사용, `lombok.config`로 제한) |
 
 `./gradlew dependencies --configuration runtimeClasspath` 기준
 
@@ -64,6 +65,8 @@ DB_PASSWORD=<비밀번호> ./gradlew bootRun
    - JDK 25, 클래스패스 모듈 `sentinel.main`
    - Main class: `com.sentinel.SentinelApplication`
    - Environment variables: `DB_PASSWORD=<비밀번호>` (RDS 사용 시 `DB_URL`, `DB_USERNAME` 추가)
+
+Lombok은 IntelliJ 번들 플러그인으로 인식. **Settings → Build, Execution, Deployment → Compiler → Annotation Processors**에서 annotation processing 활성화 알림 표시 시 활성화
 
 `build.gradle` 수정 후에는 🐘 **Load Gradle Changes** 실행 필수. 미실행 시 새 의존성 import에서 `Cannot resolve symbol` 발생
 

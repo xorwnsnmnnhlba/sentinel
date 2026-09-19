@@ -9,6 +9,7 @@ import com.sentinel.domain.TestResult.Verdict;
 import com.sentinel.domain.TestRun;
 import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 결과가 한 페이지에 모두 들어가면 Spring Data가 전체 건수 쿼리를 생략하여 2회.
  */
 @Service
+@RequiredArgsConstructor
 public class RunQueryService {
 
 	public static final int MAX_PAGE_SIZE = 100;
@@ -29,11 +31,6 @@ public class RunQueryService {
 	private final TestRunRepository runs;
 
 	private final TestResultRepository results;
-
-	RunQueryService(TestRunRepository runs, TestResultRepository results) {
-		this.runs = runs;
-		this.results = results;
-	}
 
 	/**
 	 * @param suiteId null이면 전체 스위트

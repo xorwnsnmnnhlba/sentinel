@@ -11,10 +11,15 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "test_suite",
 		uniqueConstraints = @UniqueConstraint(name = "uk_test_suite_project_name", columnNames = { "project_id", "name", "archive_key" }))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TestSuite extends ArchivableEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -26,9 +31,6 @@ public class TestSuite extends ArchivableEntity {
 
 	@Column(length = 500)
 	private String description;
-
-	protected TestSuite() {
-	}
 
 	public TestSuite(Project project, String name, String description) {
 		this.project = Objects.requireNonNull(project, "project");
@@ -42,18 +44,6 @@ public class TestSuite extends ArchivableEntity {
 
 	public void describe(String description) {
 		this.description = Preconditions.optionalText(description, "description", 500);
-	}
-
-	public Project getProject() {
-		return project;
-	}
-
-	public String getName() {
-		return name;
-	}
-
-	public String getDescription() {
-		return description;
 	}
 
 }

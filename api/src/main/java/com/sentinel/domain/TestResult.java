@@ -26,6 +26,9 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -37,6 +40,8 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "test_result", indexes = { @Index(name = "idx_result_run", columnList = "run_id"),
 		@Index(name = "idx_result_case_time", columnList = "test_case_id, id DESC") })
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TestResult extends BaseEntity {
 
 	public static final int MAX_BODY_BYTES = 64 * 1024;
@@ -120,9 +125,6 @@ public class TestResult extends BaseEntity {
 
 	private Long elapsedMs;
 
-	protected TestResult() {
-	}
-
 	private TestResult(TestRun run, TestCase testCase, Outcome outcome, HttpMethod requestMethod) {
 		this.run = Objects.requireNonNull(run, "run");
 		this.testCase = Objects.requireNonNull(testCase, "testCase");
@@ -192,68 +194,8 @@ public class TestResult extends BaseEntity {
 		}
 	}
 
-	public TestRun getRun() {
-		return run;
-	}
-
-	public TestCase getTestCase() {
-		return testCase;
-	}
-
-	public Outcome getOutcome() {
-		return outcome;
-	}
-
-	public Verdict getVerdict() {
-		return verdict;
-	}
-
 	public List<AssertionResult> getAssertionResults() {
-		return assertionResults == null ? List.of() : assertionResults;
-	}
-
-	public ErrorReason getErrorReason() {
-		return errorReason;
-	}
-
-	public String getErrorMessage() {
-		return errorMessage;
-	}
-
-	public HttpMethod getRequestMethod() {
-		return requestMethod;
-	}
-
-	public String getRequestUrl() {
-		return requestUrl;
-	}
-
-	public Map<String, List<String>> getRequestHeaders() {
-		return requestHeaders;
-	}
-
-	public String getRequestBody() {
-		return requestBody;
-	}
-
-	public Integer getStatusCode() {
-		return statusCode;
-	}
-
-	public Map<String, List<String>> getResponseHeaders() {
-		return responseHeaders;
-	}
-
-	public String getResponseBody() {
-		return responseBody;
-	}
-
-	public boolean isResponseBodyTruncated() {
-		return responseBodyTruncated;
-	}
-
-	public Long getElapsedMs() {
-		return elapsedMs;
+		return assertionResults == null ? List.of() : List.copyOf(assertionResults);
 	}
 
 }

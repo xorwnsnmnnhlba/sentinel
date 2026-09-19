@@ -41,7 +41,7 @@ class SchedulePollerDatabaseOutageTest {
 		when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
 		poller = new SchedulePoller(schedules, mock(TestRunService.class), mock(RunFailureNotifier.class), notifier,
 				new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60)), clock,
-				transactionManager);
+				new Transactions(transactionManager));
 	}
 
 	@Test
@@ -109,7 +109,7 @@ class SchedulePollerDatabaseOutageTest {
 				mock(RunFailureNotifier.class), notification -> {
 					throw new IllegalStateException("webhook down");
 				}, new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60)), clock,
-				transactionManager);
+				new Transactions(transactionManager));
 		databaseDown();
 
 		assertThat(failingNotifierPoller.poll()).isEmpty();

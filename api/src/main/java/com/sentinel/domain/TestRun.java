@@ -14,12 +14,17 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 실행 1회. 결과({@link TestResult})는 단방향 {@code @ManyToOne}으로만 참조, 리포지토리로 조회.
  */
 @Entity
 @Table(name = "test_run", indexes = @Index(name = "idx_run_suite_time", columnList = "suite_id, started_at DESC"))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TestRun extends BaseEntity {
 
 	public enum Trigger {
@@ -54,9 +59,6 @@ public class TestRun extends BaseEntity {
 
 	private Instant finishedAt;
 
-	protected TestRun() {
-	}
-
 	private TestRun(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt) {
 		this.suite = Objects.requireNonNull(suite, "suite");
 		this.environment = Objects.requireNonNull(environment, "environment");
@@ -83,30 +85,6 @@ public class TestRun extends BaseEntity {
 		}
 		this.status = Status.ABORTED;
 		this.finishedAt = Objects.requireNonNull(abortedAt, "abortedAt");
-	}
-
-	public TestSuite getSuite() {
-		return suite;
-	}
-
-	public Environment getEnvironment() {
-		return environment;
-	}
-
-	public Trigger getTrigger() {
-		return trigger;
-	}
-
-	public Status getStatus() {
-		return status;
-	}
-
-	public Instant getStartedAt() {
-		return startedAt;
-	}
-
-	public Instant getFinishedAt() {
-		return finishedAt;
 	}
 
 }

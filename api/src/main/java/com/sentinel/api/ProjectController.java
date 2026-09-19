@@ -7,6 +7,7 @@ import com.sentinel.application.CatalogCommandService;
 import com.sentinel.application.CatalogQueryService;
 import com.sentinel.application.CatalogQueryService.ProjectItem;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,16 +20,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/projects")
+@RequiredArgsConstructor
 class ProjectController {
 
 	private final CatalogQueryService catalog;
 
 	private final CatalogCommandService commands;
-
-	ProjectController(CatalogQueryService catalog, CatalogCommandService commands) {
-		this.catalog = catalog;
-		this.commands = commands;
-	}
 
 	@GetMapping
 	List<ProjectItem> list() {

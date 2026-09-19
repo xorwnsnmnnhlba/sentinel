@@ -9,6 +9,7 @@ import com.sentinel.application.TestRunDetail;
 import com.sentinel.application.TestRunService;
 import com.sentinel.domain.TestRun;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,16 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/runs")
+@RequiredArgsConstructor
 class RunController {
 
 	private final TestRunService testRunService;
 
 	private final RunQueryService runQueryService;
-
-	RunController(TestRunService testRunService, RunQueryService runQueryService) {
-		this.testRunService = testRunService;
-		this.runQueryService = runQueryService;
-	}
 
 	/**
 	 * 최신순 실행 목록. size는 1~100으로 보정

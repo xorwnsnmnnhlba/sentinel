@@ -28,11 +28,10 @@ import com.sentinel.runner.UnresolvedVariableException;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.assertion.AssertionEvaluator;
 import com.sentinel.runner.assertion.AssertionResult;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 실행 흐름: 준비(트랜잭션) → 케이스별 전송(트랜잭션 밖) + 결과 기록(케이스별 트랜잭션) → 완료 처리(트랜잭션).
@@ -41,6 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 스위트 내 케이스는 ID 순서로 순차 실행하여 GW 동시 호출 없음.
  */
 @Service
+@RequiredArgsConstructor
 public class TestRunService {
 
 	private static final Logger log = LoggerFactory.getLogger(TestRunService.class);
@@ -57,23 +57,7 @@ public class TestRunService {
 
 	private final RequestExecutor executor;
 
-	private final TransactionTemplate transaction;
-
-	private final TransactionTemplate readOnlyTransaction;
-
-	public TestRunService(TestSuiteRepository suites, TestCaseRepository testCases, EnvironmentRepository environments,
-			TestRunRepository runs, TestResultRepository results, RequestExecutor executor,
-			PlatformTransactionManager transactionManager) {
-		this.suites = suites;
-		this.testCases = testCases;
-		this.environments = environments;
-		this.runs = runs;
-		this.results = results;
-		this.executor = executor;
-		this.transaction = new TransactionTemplate(transactionManager);
-		this.readOnlyTransaction = new TransactionTemplate(transactionManager);
-		this.readOnlyTransaction.setReadOnly(true);
-	}
+	private final Transactions transactions;
 
 	/**
 	 * 케이스 1건 수동 실행. 응답 미수신·변수 누락도 실패 결과로 기록하며 예외로 전파하지 않음.
@@ -82,7 +66,7 @@ public class TestRunService {
 	 * @throws InvalidRequestException 케이스와 환경의 프로젝트 불일치
 	 */
 	public long runTestCase(long testCaseId, long environmentId) {
-		Prepared prepared = transaction.execute(status -> {
+		Prepared prepared = transactions.write(status -> {
 			TestCase testCase = testCases.findByIdAndArchivedAtIsNull(testCaseId)
 				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
 			return start(testCase.getSuite(), findEnvironment(environmentId), List.of(testCase),
@@ -98,7 +82,7 @@ public class TestRunService {
 	 * @throws InvalidRequestException 스위트와 환경의 프로젝트 불일치
 	 */
 	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger) {
-		Prepared prepared = transaction.execute(status -> {
+		Prepared prepared = transactions.write(status -> {
 			TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
 			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId), trigger);
 		});
@@ -106,7 +90,7 @@ public class TestRunService {
 	}
 
 	public TestRunDetail getRun(long runId) {
-		return readOnlyTransaction.execute(status -> {
+		return transactions.readOnly(status -> {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
 			return TestRunDetail.of(run, results.findWithTestCaseByRunId(runId));
 		});
@@ -140,11 +124,11 @@ public class TestRunService {
 		Map<TestResult.Verdict, Integer> counts = new EnumMap<>(TestResult.Verdict.class);
 		for (PreparedCase preparedCase : prepared.cases()) {
 			Execution execution = execute(preparedCase, prepared.variables());
-			TestResult.Verdict verdict = transaction
-				.execute(status -> results.save(resultOf(prepared.runId(), preparedCase, execution)).getVerdict());
+			TestResult.Verdict verdict = transactions
+				.write(status -> results.save(resultOf(prepared.runId(), preparedCase, execution)).getVerdict());
 			counts.merge(verdict, 1, Integer::sum);
 		}
-		transaction.executeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(Instant.now()));
+		transactions.writeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(Instant.now()));
 		log.info("Run {} completed: trigger={} suite={} total={} passed={} failed={} errors={} elapsed={}ms",
 				prepared.runId(), prepared.trigger(), prepared.suiteId(), prepared.cases().size(),
 				counts.getOrDefault(TestResult.Verdict.PASSED, 0), counts.getOrDefault(TestResult.Verdict.FAILED, 0),
