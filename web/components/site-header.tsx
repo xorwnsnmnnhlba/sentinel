@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 /** 화면 추가 시 항목 추가 */
 const navigation = [
   { href: "/", label: "홈" },
+  { href: "/projects", label: "프로젝트" },
   { href: "/runs", label: "실행 이력" },
 ];
 

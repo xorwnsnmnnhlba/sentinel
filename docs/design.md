@@ -43,7 +43,7 @@ sentinel/
 
 ### 구간별 인증 분리
 - 브라우저 → Next.js: 세션 쿠키. Next가 쿠키 관리, 브라우저에는 Next 도메인 쿠키만 노출
-- Next.js → Spring: 서버사이드 호출, CORS 미발생. Server Component는 Spring 직접 호출(`lib/api/server.ts`), 브라우저 요청은 Route Handler 프록시(`/api/**`) 경유 (Next.js 16 권장 방식, 2026-09-19 구현)
+- Next.js → Spring: 서버사이드 호출, CORS 미발생. Server Component는 Spring 직접 호출(`lib/api/server.ts`), 브라우저 요청은 Route Handler 프록시(`/api/**`) 경유 (Next.js 16 권장 방식, 2026-09-19 구현). 등록·수정·삭제·실행은 Server Actions에서 Spring 호출 후 `refresh()`·`redirect`로 화면 갱신 (2026-09-20)
 - Spring → GW: 환경별로 저장된 시스템 자격증명을 Spring이 주입. 사용자 토큰 패스스루 금지
 
 ### REST API 설계 (2026-09-19)

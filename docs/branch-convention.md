@@ -85,9 +85,9 @@ docs: add branch convention
 
 ### PR
 
-- 제목과 본문은 한글로 작성. 제목 앞에는 커밋과 같은 `<type>(<scope>):` 유지
-- 제목 예시: `feat(web): 카탈로그 편집 화면 추가`, `refactor(api): 요청 DTO 접근 제한자 정리`
-- 본문은 `## 요약`(변경 내용), `## 테스트`(확인 항목 체크리스트) 구성
+- 제목은 영어. 커밋 메시지와 같은 형식 (`<type>(<scope>): <요약>`)
+- 제목 예시: `feat(web): add catalog editor pages`, `refactor(api): make request DTOs package-private`
+- 본문은 한글. `## 요약`(변경 내용), `## 테스트`(확인 항목 체크리스트) 구성
 
 ---
 
