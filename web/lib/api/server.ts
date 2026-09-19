@@ -8,14 +8,18 @@ import { notFound } from "next/navigation";
  */
 export const apiBaseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8080";
 
-/** Spring ProblemDetail 응답을 담는 오류 */
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly detail: string,
-  ) {
-    super(`API ${status}: ${detail}`);
-  }
+/**
+ * Spring ProblemDetail 응답 오류. throw 대상이므로 Error 객체에 status·detail을 더한 형태 (클래스 미사용).
+ * 판별은 instanceof 대신 isApiError 사용
+ */
+export type ApiError = Error & { name: "ApiError"; status: number; detail: string };
+
+export function apiError(status: number, detail: string): ApiError {
+  return Object.assign(new Error(`API ${status}: ${detail}`), { name: "ApiError" as const, status, detail });
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof Error && error.name === "ApiError" && typeof (error as Partial<ApiError>).status === "number";
 }
 
 /** 최신 실행 결과를 보여주는 도구이므로 캐시 미사용 */
@@ -36,7 +40,7 @@ export async function apiGetOrNotFound<T>(path: string): Promise<T> {
   try {
     return await apiGet<T>(path);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
+    if (isApiError(error) && error.status === 404) {
       notFound();
     }
     throw error;
@@ -61,8 +65,8 @@ export async function apiSend<T>(method: "POST" | "PATCH" | "DELETE", path: stri
 async function toApiError(response: Response): Promise<ApiError> {
   try {
     const problem = (await response.json()) as { detail?: string; title?: string };
-    return new ApiError(response.status, problem.detail ?? problem.title ?? response.statusText);
+    return apiError(response.status, problem.detail ?? problem.title ?? response.statusText);
   } catch {
-    return new ApiError(response.status, response.statusText);
+    return apiError(response.status, response.statusText);
   }
 }
