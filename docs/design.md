@@ -46,6 +46,14 @@ sentinel/
 - Next.js → Spring: 서버사이드 호출, CORS 미발생. Server Component는 Spring 직접 호출(`lib/api/server.ts`), 브라우저 요청은 Route Handler 프록시(`/api/**`) 경유 (Next.js 16 권장 방식, 2026-09-19 구현)
 - Spring → GW: 환경별로 저장된 시스템 자격증명을 Spring이 주입. 사용자 토큰 패스스루 금지
 
+### REST API 설계 (2026-09-19)
+- 모든 리소스는 최상위 컬렉션: `/api/projects`, `/api/environments`, `/api/suites`, `/api/cases`, `/api/runs`, `/api/schedules`
+- 관계는 중첩 경로 대신 쿼리 파라미터 필터 (`/api/suites?projectId=1`). 실행·스케줄은 부모가 둘(스위트·환경)이고 실행 이력은 필터 조건이 늘어날 예정이므로 중첩보다 일관성 유지에 유리
+- 존재하지 않는 부모 ID로 필터링하면 빈 목록(200). 404는 단건 조회(`/{id}`)만
+- URL에 동사 미사용. 상태 변경은 `PATCH` 부분 수정 (`PATCH /api/schedules/{id}` `{"enabled": false}`)
+- 실행 생성 입구는 `POST /api/runs` 하나. 대상은 본문의 `suiteId` 또는 `caseId` 중 정확히 하나
+- 생성은 201 + `Location`, 오류는 ProblemDetail
+
 ### 인증 범위
 - 회원가입, 비밀번호 찾기, 이메일 인증, 약관 동의 전부 불필요
 - SSO 존재 시 SSO만 연동, 없으면 관리자 직접 등록

@@ -9,4 +9,6 @@ public interface EnvironmentRepository extends JpaRepository<Environment, Long> 
 
 	List<Environment> findByProjectIdOrderByName(Long projectId);
 
+	List<Environment> findAllByOrderByName();
+
 }
