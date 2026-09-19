@@ -6,12 +6,14 @@ import java.util.List;
 import java.util.Map;
 
 import com.sentinel.TestcontainersConfiguration;
+import com.sentinel.application.notification.RecordingNotifier;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.runner.HttpMethod;
+import com.sentinel.runner.assertion.StatusCodeAssertion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +61,9 @@ class SchedulePollingTest {
 	@Autowired
 	private MutableClock clock;
 
+	@Autowired
+	private RecordingNotifier notifier;
+
 	private TestSuite suite;
 
 	private Environment environment;
@@ -76,6 +81,7 @@ class SchedulePollingTest {
 	void cleanUp() {
 		fixtures.deleteAll();
 		executor.reset();
+		notifier.reset();
 	}
 
 	@Test
@@ -126,6 +132,31 @@ class SchedulePollingTest {
 	}
 
 	@Test
+	void notifiesOnlyWhenScheduledRunHasFailures() {
+		fixtures.testCase(suite, HttpMethod.POST, "/billing/v1/charge", null, "{}",
+				List.of(new StatusCodeAssertion(List.of("201"))));
+		scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *");
+		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
+
+		poller.poll();
+
+		assertThat(notifier.sent()).singleElement().satisfies(notification -> {
+			assertThat(notification.title()).startsWith("[Sentinel] dev suite-").endsWith(" - 2건 중 1건 실패");
+			assertThat(notification.lines())
+				.containsExactly("POST   /billing/v1/charge → status in [201]: was 200");
+		});
+	}
+
+	@Test
+	void sendsNothingWhenScheduledRunPasses() {
+		scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *");
+		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
+
+		assertThat(poller.poll()).hasSize(1);
+		assertThat(notifier.sent()).isEmpty();
+	}
+
+	@Test
 	void abortsRunsLeftRunning() {
 		TestRun stale = runs.save(TestRun.start(suite, environment, TestRun.Trigger.SCHEDULED, NINE_AM_KST));
 		clock.set(Instant.parse("2026-09-18T02:00:00Z"));
@@ -144,6 +175,12 @@ class SchedulePollingTest {
 		@Primary
 		MutableClock mutableClock() {
 			return new MutableClock(NINE_AM_KST);
+		}
+
+		@Bean
+		@Primary
+		RecordingNotifier recordingNotifier() {
+			return new RecordingNotifier();
 		}
 
 	}
