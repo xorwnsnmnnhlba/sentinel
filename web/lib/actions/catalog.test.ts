@@ -114,7 +114,9 @@ describe("environments", () => {
       form({ name: "dev", baseUrl: "https://gw", variables: JSON.stringify({ userId: "42" }) }),
     );
 
-    expect(bodies).toEqual([{ projectId: 2, name: "dev", baseUrl: "https://gw", variables: { userId: "42" } }]);
+    expect(bodies).toEqual([
+      { projectId: 2, name: "dev", baseUrl: "https://gw", variables: { userId: "42" }, secrets: {} },
+    ]);
   });
 
   it("treats a missing variables field as no variables", async () => {
@@ -122,7 +124,45 @@ describe("environments", () => {
 
     await updateEnvironment(4, undefined, form({ name: "dev", baseUrl: "https://gw" }));
 
-    expect(bodies).toEqual([{ name: "dev", baseUrl: "https://gw", variables: {} }]);
+    expect(bodies).toEqual([{ name: "dev", baseUrl: "https://gw", variables: {}, secrets: {} }]);
+  });
+
+  it("sends secrets by name, with null for removals", async () => {
+    const bodies = capture("patch", "/api/environments/4", () => HttpResponse.json({}));
+
+    await updateEnvironment(
+      4,
+      undefined,
+      form({ name: "dev", baseUrl: "https://gw", secrets: JSON.stringify({ token: "value", old: null }) }),
+    );
+
+    expect(bodies).toEqual([
+      { name: "dev", baseUrl: "https://gw", variables: {}, secrets: { token: "value", old: null } },
+    ]);
+  });
+
+  it.each([
+    ["not json", "시크릿 형식이 올바르지 않습니다"],
+    ["[1]", "시크릿 형식이 올바르지 않습니다"],
+    ['{"token": 42}', "시크릿 값은 문자열이어야 합니다"],
+  ])("rejects secrets %s without calling Spring", async (secrets, message) => {
+    await expect(
+      createEnvironment(2, undefined, form({ name: "dev", baseUrl: "https://gw", secrets })),
+    ).resolves.toEqual({ error: message });
+  });
+
+  it("explains that the server has no encryption key", async () => {
+    server.use(
+      http.post(springUrl("/api/environments"), () =>
+        problem(400, "secrets are disabled: set sentinel.secret.key (SENTINEL_SECRET_KEY) to use them"),
+      ),
+    );
+
+    await expect(
+      createEnvironment(2, undefined, form({ name: "dev", baseUrl: "https://gw", secrets: '{"token": "v"}' })),
+    ).resolves.toEqual({
+      error: "시크릿 기능이 꺼져 있습니다. 서버에 암호화 키(SENTINEL_SECRET_KEY) 설정이 필요합니다",
+    });
   });
 
   it.each([

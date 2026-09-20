@@ -51,11 +51,16 @@ export async function createEnvironment(projectId: number, _: ActionState, form:
   if (typeof variables === "string") {
     return { error: variables };
   }
+  const secrets = secretsOf(form);
+  if (typeof secrets === "string") {
+    return { error: secrets };
+  }
   return mutate("POST", "/api/environments", {
     projectId: id(projectId),
     name: text(form, "name"),
     baseUrl: text(form, "baseUrl"),
     variables,
+    secrets,
   });
 }
 
@@ -64,10 +69,15 @@ export async function updateEnvironment(environmentId: number, _: ActionState, f
   if (typeof variables === "string") {
     return { error: variables };
   }
+  const secrets = secretsOf(form);
+  if (typeof secrets === "string") {
+    return { error: secrets };
+  }
   return mutate("PATCH", `/api/environments/${id(environmentId)}`, {
     name: raw(form, "name"),
     baseUrl: raw(form, "baseUrl"),
     variables,
+    secrets,
   });
 }
 
@@ -241,11 +251,40 @@ function variablesOf(form: FormData): Record<string, string> | string {
   return Object.fromEntries(entries) as Record<string, string>;
 }
 
+/**
+ * 시크릿 편집기가 hidden input(secrets)에 담은 JSON. 값이 문자열이면 등록·교체, null이면 삭제.
+ * 평문 값이므로 로그·오류 메시지에 담지 않음
+ */
+function secretsOf(form: FormData): Record<string, string | null> | string {
+  const raw = form.get("secrets");
+  if (typeof raw !== "string" || raw === "") {
+    return {};
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return "시크릿 형식이 올바르지 않습니다";
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return "시크릿 형식이 올바르지 않습니다";
+  }
+  const entries = Object.entries(parsed);
+  if (entries.some(([, value]) => value !== null && typeof value !== "string")) {
+    return "시크릿 값은 문자열이어야 합니다";
+  }
+  return Object.fromEntries(entries) as Record<string, string | null>;
+}
+
 /** Spring 오류를 화면용 메시지로 변환. 그 외 오류(연결 실패 등)는 내부 정보 없이 고정 문구 */
 function failure(error: unknown): ActionState {
   if (isApiError(error)) {
     switch (error.status) {
       case 400:
+        // 서버에 암호화 키가 없으면 시크릿 등록 자체가 거부됨. 사용자가 조치할 수 없는 설정 문제라 별도 안내
+        if (error.detail.includes("secrets are disabled")) {
+          return { error: "시크릿 기능이 꺼져 있습니다. 서버에 암호화 키(SENTINEL_SECRET_KEY) 설정이 필요합니다" };
+        }
         return { error: `입력값을 확인해 주세요: ${error.detail}` };
       case 404:
         return { error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다" };
