@@ -102,18 +102,23 @@ public class AuthService {
 		return passwordEncoder.encode(password);
 	}
 
+	public boolean matches(String rawPassword, String passwordHash) {
+		return rawPassword != null && passwordEncoder.matches(rawPassword, passwordHash);
+	}
+
 	static String normalize(String email) {
 		return email == null ? "" : email.strip().toLowerCase();
 	}
 
-	private static String newToken() {
+	/** 초대·재설정 토큰도 같은 방식으로 생성 */
+	static String newToken() {
 		byte[] bytes = new byte[32];
 		RANDOM.nextBytes(bytes);
 		return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
 	}
 
 	/** 토큰은 무작위 값이라 사전 공격 대상이 아니므로 SHA-256으로 충분. 비밀번호와 달리 BCrypt 불필요 */
-	private static String hash(String token) {
+	static String hash(String token) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
 			return HexFormat.of().formatHex(digest.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));

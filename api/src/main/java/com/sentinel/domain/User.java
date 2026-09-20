@@ -54,7 +54,7 @@ public class User extends ArchivableEntity {
 	}
 
 	/** 대소문자 차이로 같은 사람이 두 계정을 만들지 않도록 소문자로 보관 */
-	static String normalizeEmail(String email) {
+	public static String normalizeEmail(String email) {
 		String value = Preconditions.requireText(email, "email", 255).toLowerCase();
 		if (!value.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
 			throw new IllegalArgumentException("email is not valid: " + value);

@@ -203,7 +203,30 @@ curl -i -X POST localhost:8080/api/runs \
 - 브라우저는 Next.js(BFF)의 httpOnly 쿠키를 사용하고, Spring은 쿠키를 모름 (토큰만 헤더로 수신)
 - 비밀번호는 BCrypt 해시, 세션 토큰은 SHA-256 해시로만 저장. 로그인 실패 사유는 구분하지 않음(계정 존재 여부 비노출)
 - 세션 만료는 로그인 시점 기준 고정 (`sentinel.auth.session-validity`, 기본 12h). 사용해도 연장되지 않음
-- 가입은 관리자 초대 방식 예정. 현재는 최초 관리자 계정만 환경변수로 생성
+### 사용자 관리
+
+| API | 권한 | 설명 |
+|-----|------|------|
+| `GET /api/users` | 관리자 | 사용자 목록 |
+| `POST /api/users/invites` | 관리자 | 초대 링크 발급. 본문 `{"email": "...", "role": "MEMBER"}`. 201 + `{"token": "...", "expiresAt": "..."}` |
+| `POST /api/users/{id}/password-resets` | 관리자 | 재설정 링크 발급 |
+| `DELETE /api/users/{id}` | 관리자 | 삭제(보관). 세션·남은 링크 정리 |
+| `POST /api/users/me/password` | 본인 | 비밀번호 변경. 본문 `{"currentPassword": "...", "newPassword": "..."}` |
+| `GET /api/invites/{token}` | 없음 | 초대 링크 확인 (대상 이메일) |
+| `POST /api/invites/{token}` | 없음 | 초대 수락. 본문 `{"name": "...", "password": "..."}`. 201 + 세션 토큰 |
+| `GET /api/password-resets/{token}` | 없음 | 재설정 링크 확인 |
+| `POST /api/password-resets/{token}` | 없음 | 새 비밀번호 설정. 204 |
+
+- 가입 경로는 초대뿐. 공개 가입·비밀번호 찾기 폼 없음 (메일 발송 미사용)
+- 링크 토큰은 1회용이며 저장은 해시로만. 만료·사용·위조는 모두 404로 동일하게 응답
+- 비밀번호는 10자 이상. 변경·재설정 시 해당 사용자의 모든 세션 종료
+- 자기 자신 삭제와 마지막 관리자 삭제는 400으로 거부
+- 링크 전달은 사람이 직접 (메신저 등). 링크 자체가 자격증명이므로 공개 채널 금지
+
+| 설정 | 기본값 | 설명 |
+|------|--------|------|
+| `sentinel.auth.invite-validity` | `7d` | 초대 링크 유효 기간 |
+| `sentinel.auth.password-reset-validity` | `2h` | 재설정 링크 유효 기간 |
 
 | 설정 | 기본값 | 설명 |
 |------|--------|------|
