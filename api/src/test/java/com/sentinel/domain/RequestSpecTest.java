@@ -13,11 +13,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RequestSpecTest {
 
 	@Test
-	void requiresPathStartingWithSlash() {
+	void requiresPathStartingWithSlashOrVariable() {
 		assertThatThrownBy(() -> new RequestSpec(HttpMethod.GET, "users/1", Map.of(), null))
 				.isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> new RequestSpec(HttpMethod.GET, "https://gw/users", Map.of(), null))
 				.isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> new RequestSpec(HttpMethod.GET, "{apiPrefix}/users", Map.of(), null))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThat(new RequestSpec(HttpMethod.GET, "{{apiPrefix}}/users", Map.of(), null).getPath())
+				.isEqualTo("{{apiPrefix}}/users");
 	}
 
 	@Test

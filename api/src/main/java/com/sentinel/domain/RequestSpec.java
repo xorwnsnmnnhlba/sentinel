@@ -33,7 +33,10 @@ public class RequestSpec {
 	@Column(name = "http_method", nullable = false, length = 10)
 	private HttpMethod method;
 
-	/** Environment baseUrl 기준 상대 경로. {@code /}로 시작, 쿼리스트링 포함 가능 */
+	/**
+	 * Environment baseUrl 기준 상대 경로. {@code /} 또는 {@code {{변수}}}로 시작, 쿼리스트링 포함 가능.
+	 * 변수로 시작하면 실행 시 치환 결과가 {@code /}로 시작하는지 확인 ({@link com.sentinel.runner.RequestTemplate})
+	 */
 	@Column(name = "path", nullable = false, length = 2000)
 	private String path;
 
@@ -63,8 +66,8 @@ public class RequestSpec {
 
 	private static String requirePath(String path) {
 		String value = Preconditions.requireText(path, "path", 2000);
-		if (!value.startsWith("/")) {
-			throw new IllegalArgumentException("path must start with '/': " + value);
+		if (!value.startsWith("/") && !value.startsWith("{{")) {
+			throw new IllegalArgumentException("path must start with '/' or a {{variable}}: " + value);
 		}
 		return value;
 	}
