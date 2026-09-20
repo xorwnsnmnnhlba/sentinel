@@ -1,0 +1,124 @@
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
+import type { CaseActionState } from "@/lib/actions/catalog";
+import { type CaseDraft, emptyDraft } from "@/lib/case-draft";
+
+import { CaseEditor } from "./case-editor";
+
+type Action = (draft: CaseDraft) => Promise<CaseActionState>;
+
+function renderEditor(action: Action, initial: CaseDraft = emptyDraft()) {
+  render(<CaseEditor initial={initial} action={action} cancelHref="/suites/1" submitLabel="등록" />);
+}
+
+describe("CaseEditor", () => {
+  it("builds a request with headers, body and rules", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => undefined);
+    renderEditor(action);
+
+    await user.type(screen.getByLabelText("이름"), "결제 요청");
+    await user.selectOptions(screen.getByLabelText("메서드"), "POST");
+    await user.clear(screen.getByLabelText("경로"));
+    await user.type(screen.getByLabelText("경로"), "/billing/v1/charge");
+    await user.click(screen.getByRole("button", { name: "헤더 추가" }));
+    await user.type(screen.getByLabelText("헤더 1 이름"), "Content-Type");
+    await user.type(screen.getByLabelText("헤더 1 값"), "application/json");
+    // user-event에서 { 는 특수 문자이므로 {{ 로 입력
+    await user.type(screen.getByLabelText(/본문/), '{{"amount":1000}');
+    await user.click(screen.getByRole("button", { name: "JSON 정렬" }));
+
+    await user.click(screen.getByRole("button", { name: "규칙 추가" }));
+    await user.selectOptions(screen.getByLabelText("추가할 판정 규칙"), "jsonPath");
+    await user.click(screen.getByRole("button", { name: "규칙 추가" }));
+    await user.type(screen.getByLabelText("판정 규칙 2 JsonPath"), "amount");
+    await user.selectOptions(screen.getByLabelText("판정 규칙 2 비교"), "EQUALS");
+    await user.type(screen.getByLabelText("판정 규칙 2 기대값"), "1000");
+    await user.click(screen.getByRole("button", { name: "등록" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(action.mock.calls[0][0]).toEqual({
+      name: "결제 요청",
+      method: "POST",
+      path: "/billing/v1/charge",
+      headers: [{ name: "Content-Type", value: "application/json" }],
+      body: '{\n  "amount": 1000\n}',
+      assertions: [
+        { type: "statusCode", anyOf: "2xx" },
+        { type: "jsonPath", path: "$.amount", operator: "EQUALS", expected: "1000" },
+      ],
+    });
+  });
+
+  it("shows validation errors without calling the action", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => undefined);
+    renderEditor(action);
+
+    await user.clear(screen.getByLabelText("경로"));
+    await user.type(screen.getByLabelText("경로"), "health");
+    await user.selectOptions(screen.getByLabelText("추가할 판정 규칙"), "bodyContains");
+    await user.click(screen.getByRole("button", { name: "규칙 추가" }));
+    await user.click(screen.getByRole("button", { name: "등록" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(
+      within(alert)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual([
+      "이름을 입력해 주세요",
+      "경로는 / 또는 {{변수}}로 시작해야 합니다 (기본 URL 뒤에 붙는 상대 경로)",
+      "판정 규칙 1 (본문 포함): 포함할 문자열을 입력해 주세요",
+    ]);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("shows server errors and keeps the form", async () => {
+    const user = userEvent.setup();
+    renderEditor(async () => ({ errors: ["이미 사용 중인 이름입니다"] }), { ...emptyDraft(), name: "health" });
+
+    await user.click(screen.getByRole("button", { name: "등록" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("이미 사용 중인 이름입니다");
+    expect(screen.getByLabelText("이름")).toHaveValue("health");
+  });
+
+  it("disables the value when the operator needs none", async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn<Action>());
+
+    await user.selectOptions(screen.getByLabelText("추가할 판정 규칙"), "header");
+    await user.click(screen.getByRole("button", { name: "규칙 추가" }));
+    expect(screen.getByLabelText("판정 규칙 1 값")).toBeEnabled();
+
+    await user.selectOptions(screen.getByLabelText("판정 규칙 1 비교"), "EXISTS");
+    expect(screen.getByLabelText("판정 규칙 1 값")).toBeDisabled();
+    // 응답 헤더는 숫자 비교 선택지 없음
+    expect(within(screen.getByLabelText("판정 규칙 1 비교")).queryByRole("option", { name: /초과/ })).toBeNull();
+  });
+
+  it("removes a rule and renumbers the rest", async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn<Action>(), {
+      ...emptyDraft(),
+      assertions: [
+        { type: "statusCode", anyOf: "200" },
+        { type: "bodyContains", text: "OK" },
+      ],
+    });
+
+    await user.click(screen.getByRole("button", { name: "판정 규칙 1 삭제" }));
+
+    expect(screen.queryByLabelText("판정 규칙 1 상태 코드")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("판정 규칙 1 포함할 문자열")).toHaveValue("OK");
+  });
+
+  it("links back without saving", () => {
+    renderEditor(vi.fn<Action>());
+
+    expect(screen.getByRole("link", { name: "취소" })).toHaveAttribute("href", "/suites/1");
+  });
+});
