@@ -27,6 +27,8 @@ public class RunFailureNotifier {
 
 	private final Notifier notifier;
 
+	private final NotificationProperties properties;
+
 	private final Transactions transactions;
 
 	/**
@@ -50,7 +52,8 @@ public class RunFailureNotifier {
 			.map(result -> new RunReport.FailedCase(result.getRequestMethod(),
 					result.getTestCase().getRequest().getPath(), reasonOf(result)))
 			.toList();
-		return new RunReport(run.getSuite().getName(), run.getEnvironment().getName(), all.size(), failures);
+		return new RunReport(run.getSuite().getName(), run.getEnvironment().getName(), all.size(), failures,
+				properties.runUrl(runId));
 	}
 
 	private static String reasonOf(TestResult result) {

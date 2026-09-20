@@ -43,5 +43,7 @@ sentinel:
   notification:
     # 수신 Webhook 주소. 미지정 시 알림을 로그로 기록. 자격증명이므로 환경변수로 주입
     webhook-url: ${SENTINEL_WEBHOOK_URL:}
+    # 결과 화면 주소. 지정 시 실패 알림에 실행 결과 링크 추가
+    web-base-url: ${SENTINEL_WEB_URL:}
     connect-timeout: 3s
     read-timeout: 5s

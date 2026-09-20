@@ -269,6 +269,7 @@ docker compose logs sentinel-api | grep "completed:"
 [Sentinel] dev 결제 - 12건 중 2건 실패
 POST   /billing/v1/charge → status in [2xx]: was 500
 GET    /billing/v1/history → response time <= 2000ms: was 3200ms
+결과: http://sentinel.example.com/runs/12
 ```
 
 | 알림 | 발송 시점 |
@@ -283,6 +284,7 @@ GET    /billing/v1/history → response time <= 2000ms: was 3200ms
 | 설정 | 기본값 | 설명 |
 |------|--------|------|
 | `sentinel.notification.webhook-url` | 없음 (`SENTINEL_WEBHOOK_URL`) | 수신 Webhook 주소. 미지정 시 WARN 로그로만 기록 |
+| `sentinel.notification.web-base-url` | 없음 (`SENTINEL_WEB_URL`) | 결과 화면 주소. 지정 시 실패 알림 마지막 줄에 `결과: {주소}/runs/{id}` 추가 |
 | `sentinel.notification.connect-timeout` | `3s` | 연결 제한 시간 |
 | `sentinel.notification.read-timeout` | `5s` | 응답 대기 제한 시간 |
 

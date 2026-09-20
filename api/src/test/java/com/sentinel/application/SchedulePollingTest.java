@@ -29,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 자동 폴링을 끄고 {@link SchedulePoller#poll()}을 직접 호출하여 시각을 제어.
  */
-@SpringBootTest(properties = "sentinel.schedule.enabled=false")
+@SpringBootTest(properties = { "sentinel.schedule.enabled=false",
+		"sentinel.notification.web-base-url=http://sentinel.test" })
 @Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class,
 		SchedulePollingTest.ClockConfiguration.class })
 class SchedulePollingTest {
@@ -138,12 +139,12 @@ class SchedulePollingTest {
 		scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *");
 		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
 
-		poller.poll();
+		List<Long> runIds = poller.poll();
 
 		assertThat(notifier.sent()).singleElement().satisfies(notification -> {
 			assertThat(notification.title()).startsWith("[Sentinel] dev suite-").endsWith(" - 2건 중 1건 실패");
-			assertThat(notification.lines())
-				.containsExactly("POST   /billing/v1/charge → status in [201]: was 200");
+			assertThat(notification.lines()).containsExactly("POST   /billing/v1/charge → status in [201]: was 200",
+					"결과: http://sentinel.test/runs/" + runIds.getFirst());
 		});
 	}
 

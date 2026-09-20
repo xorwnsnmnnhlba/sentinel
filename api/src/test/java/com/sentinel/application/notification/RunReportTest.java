@@ -15,7 +15,8 @@ class RunReportTest {
 		RunReport report = new RunReport("결제", "dev", 12,
 				List.of(new RunReport.FailedCase(HttpMethod.POST, "/billing/v1/charge", "status in [2xx]: was 500"),
 						new RunReport.FailedCase(HttpMethod.GET, "/billing/v1/history",
-								"response time <= 2000ms: was 3200ms")));
+								"response time <= 2000ms: was 3200ms")),
+				null);
 
 		Notification notification = report.toNotification();
 
@@ -31,7 +32,7 @@ class RunReportTest {
 			.mapToObj(i -> new RunReport.FailedCase(HttpMethod.GET, "/c/" + i, "TIMEOUT"))
 			.toList();
 
-		Notification notification = new RunReport("s", "dev", 30, failures).toNotification();
+		Notification notification = new RunReport("s", "dev", 30, failures, null).toNotification();
 
 		assertThat(notification.title()).endsWith("30건 중 25건 실패");
 		assertThat(notification.lines()).hasSize(RunReport.MAX_LINES + 1).last().isEqualTo("… 외 5건");
@@ -39,7 +40,16 @@ class RunReportTest {
 
 	@Test
 	void reportsNoFailuresWhenAllPassed() {
-		assertThat(new RunReport("s", "dev", 3, List.of()).hasFailures()).isFalse();
+		assertThat(new RunReport("s", "dev", 3, List.of(), null).hasFailures()).isFalse();
+	}
+
+	@Test
+	void addsTheRunLinkWhenTheWebAddressIsConfigured() {
+		RunReport report = new RunReport("결제", "dev", 3,
+				List.of(new RunReport.FailedCase(HttpMethod.GET, "/a", "TIMEOUT")),
+				"http://sentinel.example.com/runs/12");
+
+		assertThat(report.toNotification().lines()).last().isEqualTo("결과: http://sentinel.example.com/runs/12");
 	}
 
 }

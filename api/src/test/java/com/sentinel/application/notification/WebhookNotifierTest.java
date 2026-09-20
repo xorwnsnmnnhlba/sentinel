@@ -87,6 +87,17 @@ class WebhookNotifierTest {
 	}
 
 	@Test
+	void buildsTheRunLinkOnlyWhenTheWebAddressIsSet() {
+		assertThat(properties(null).runUrl(12)).isNull();
+		assertThat(webProperties("").runUrl(12)).isNull();
+		assertThat(webProperties("http://sentinel.example.com").runUrl(12))
+			.isEqualTo("http://sentinel.example.com/runs/12");
+		// 끝의 / 는 제거하여 //runs/12 방지
+		assertThat(webProperties("http://sentinel.example.com//").runUrl(12))
+			.isEqualTo("http://sentinel.example.com/runs/12");
+	}
+
+	@Test
 	void usesTheLogWhenNoWebhookIsConfigured() {
 		NotificationConfig config = new NotificationConfig();
 
@@ -95,8 +106,12 @@ class WebhookNotifierTest {
 		assertThat(config.notifier(properties(url()))).isInstanceOf(WebhookNotifier.class);
 	}
 
+	private static NotificationProperties webProperties(String webBaseUrl) {
+		return new NotificationProperties(null, webBaseUrl, Duration.ofSeconds(3), Duration.ofSeconds(5));
+	}
+
 	private static NotificationProperties properties(String webhookUrl) {
-		return new NotificationProperties(webhookUrl, Duration.ofSeconds(3), Duration.ofSeconds(5));
+		return new NotificationProperties(webhookUrl, null, Duration.ofSeconds(3), Duration.ofSeconds(5));
 	}
 
 	private WebhookNotifier notifier() {
