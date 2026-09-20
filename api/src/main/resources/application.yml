@@ -40,6 +40,10 @@ sentinel:
     http:
       connect-timeout: 5s
       read-timeout: 30s
+  secret:
+    # 시크릿 암호화 키 (Base64, 16·24·32바이트). 미지정 시 시크릿 등록 거부
+    # 생성 예: openssl rand -base64 32
+    key: ${SENTINEL_SECRET_KEY:}
   notification:
     # 수신 Webhook 주소. 미지정 시 알림을 로그로 기록. 자격증명이므로 환경변수로 주입
     webhook-url: ${SENTINEL_WEBHOOK_URL:}

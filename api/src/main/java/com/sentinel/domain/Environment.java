@@ -4,6 +4,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -48,6 +49,14 @@ public class Environment extends ArchivableEntity {
 	@Column(nullable = false, columnDefinition = "json")
 	private Map<String, String> variables = new LinkedHashMap<>();
 
+	/**
+	 * 시크릿. 값은 암호화된 문자열이며 이 클래스는 암호화를 수행하지 않음(호출부에서 암호화 후 전달).
+	 * 기존 데이터 호환을 위해 null 허용, null은 빈 맵으로 취급
+	 */
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "json")
+	private Map<String, String> secrets = new LinkedHashMap<>();
+
 	public Environment(Project project, String name, String baseUrl) {
 		this.project = Objects.requireNonNull(project, "project");
 		this.name = Preconditions.requireText(name, "name", 50);
@@ -64,6 +73,9 @@ public class Environment extends ArchivableEntity {
 
 	public void putVariable(String key, String value) {
 		String validKey = Preconditions.requireText(key, "variable key", 100);
+		if (secrets().containsKey(validKey)) {
+			throw new IllegalArgumentException("'" + validKey + "' is already used as a secret");
+		}
 		if (value == null) {
 			throw new IllegalArgumentException("variable '" + validKey + "' must not be null");
 		}
@@ -90,6 +102,42 @@ public class Environment extends ArchivableEntity {
 
 	public void removeVariable(String key) {
 		variables.remove(key);
+	}
+
+	/**
+	 * 시크릿 등록·교체. 변수와 이름이 겹치면 치환 시 어느 값을 쓸지 모호하므로 거부
+	 * @param cipherValue 암호화된 값
+	 */
+	public void putSecret(String name, String cipherValue) {
+		String validName = Preconditions.requireText(name, "secret name", 100);
+		if (variables.containsKey(validName)) {
+			throw new IllegalArgumentException("'" + validName + "' is already used as a variable");
+		}
+		if (cipherValue == null) {
+			throw new IllegalArgumentException("secret '" + validName + "' must not be null");
+		}
+		secrets().put(validName, cipherValue);
+	}
+
+	public void removeSecret(String name) {
+		secrets().remove(name);
+	}
+
+	/** 등록된 시크릿 이름. 값은 노출하지 않음 */
+	public List<String> getSecretNames() {
+		return List.copyOf(secrets().keySet());
+	}
+
+	/** 암호화된 값. 실행 시 복호화 용도로만 사용 */
+	public Map<String, String> getEncryptedSecrets() {
+		return Collections.unmodifiableMap(secrets());
+	}
+
+	private Map<String, String> secrets() {
+		if (secrets == null) {
+			secrets = new LinkedHashMap<>();
+		}
+		return secrets;
 	}
 
 	/**

@@ -43,7 +43,8 @@ class EnvironmentController {
 	 */
 	@PostMapping
 	ResponseEntity<EnvironmentItem> create(@Valid @RequestBody CreateEnvironmentRequest request) {
-		EnvironmentItem created = commands.createEnvironment(request.projectId(), request.name(), request.baseUrl(), request.variables());
+		EnvironmentItem created = commands.createEnvironment(request.projectId(), request.name(), request.baseUrl(), request.variables(),
+				request.secrets());
 		return ResponseEntity.created(URI.create("/api/environments/" + created.id())).body(created);
 	}
 
@@ -52,7 +53,8 @@ class EnvironmentController {
 	 */
 	@PatchMapping("/{environmentId}")
 	EnvironmentItem update(@PathVariable long environmentId, @RequestBody UpdateEnvironmentRequest request) {
-		return commands.updateEnvironment(environmentId, request.name(), request.baseUrl(), request.variables());
+		return commands.updateEnvironment(environmentId, request.name(), request.baseUrl(), request.variables(),
+				request.secrets());
 	}
 
 	/**

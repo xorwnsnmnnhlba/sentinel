@@ -24,6 +24,7 @@ import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
+import com.sentinel.application.secret.SecretCipher;
 import com.sentinel.runner.assertion.Assertion;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -64,6 +65,8 @@ public class CatalogCommandService {
 
 	private final TestScheduleRepository schedules;
 
+	private final SecretCipher secretCipher;
+
 	private final Clock clock;
 
 	public ProjectItem createProject(String name, String description) {
@@ -85,9 +88,10 @@ public class CatalogCommandService {
 
 	/**
 	 * @param variables null이면 변수 없음
+	 * @param secrets 시크릿 평문. 저장 시 암호화
 	 */
 	public EnvironmentItem createEnvironment(long projectId, String name, String baseUrl,
-			Map<String, String> variables) {
+			Map<String, String> variables, Map<String, String> secrets) {
 		Project project = findProject(projectId);
 		requireUnusedName("environment", name, null,
 				unique -> environments.findByProjectIdAndNameAndArchivedAtIsNull(projectId, unique));
@@ -96,14 +100,16 @@ public class CatalogCommandService {
 			created.replaceVariables(variables);
 			return created;
 		});
+		applySecrets(environment, secrets);
 		return EnvironmentItem.of(environments.save(environment));
 	}
 
 	/**
 	 * @param variables 지정 시 전체 교체
+	 * @param secrets 이름별 반영. 값이 있으면 등록·교체, null이면 삭제, 목록에 없는 이름은 유지
 	 */
 	public EnvironmentItem updateEnvironment(long environmentId, String name, String baseUrl,
-			Map<String, String> variables) {
+			Map<String, String> variables, Map<String, String> secrets) {
 		Environment environment = findEnvironment(environmentId);
 		long projectId = environment.getProject().getId();
 		if (name != null) {
@@ -117,6 +123,7 @@ public class CatalogCommandService {
 		if (variables != null) {
 			change(() -> environment.replaceVariables(variables));
 		}
+		applySecrets(environment, secrets);
 		return EnvironmentItem.of(environment);
 	}
 
@@ -193,6 +200,28 @@ public class CatalogCommandService {
 		testCases.findByIdAndArchivedAtIsNull(caseId)
 			.orElseThrow(() -> new NotFoundException("test case", caseId))
 			.archive(clock.instant());
+	}
+
+	/**
+	 * 시크릿 반영. 값은 암호화하여 저장하고 평문은 보관하지 않음
+	 * @throws InvalidRequestException 암호화 키 미설정, 변수와 이름 중복
+	 */
+	private void applySecrets(Environment environment, Map<String, String> secrets) {
+		if (secrets == null || secrets.isEmpty()) {
+			return;
+		}
+		if (!secretCipher.isEnabled()) {
+			throw new InvalidRequestException(
+					"secrets are disabled: set sentinel.secret.key (SENTINEL_SECRET_KEY) to use them");
+		}
+		change(() -> secrets.forEach((secretName, value) -> {
+			if (value == null) {
+				environment.removeSecret(secretName);
+			}
+			else {
+				environment.putSecret(secretName, secretCipher.encrypt(value));
+			}
+		}));
 	}
 
 	private void archive(Environment environment, Instant now) {

@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.HttpMethod;
@@ -134,14 +135,23 @@ public class TestResult extends BaseEntity {
 
 	public static TestResult responded(TestRun run, TestCase testCase, HttpExchange exchange,
 			List<AssertionResult> assertionResults) {
+		return responded(run, testCase, exchange, assertionResults, Set.of());
+	}
+
+	/**
+	 * @param secretValues 이력에서 가릴 시크릿 값
+	 */
+	public static TestResult responded(TestRun run, TestCase testCase, HttpExchange exchange,
+			List<AssertionResult> assertionResults, Set<String> secretValues) {
 		TestResult result = new TestResult(run, testCase, Outcome.RESPONDED, exchange.request().method());
 		result.assertionResults = List.copyOf(assertionResults);
 		result.verdict = assertionResults.stream().allMatch(AssertionResult::passed) ? Verdict.PASSED : Verdict.FAILED;
-		result.recordRequest(exchange.request());
+		result.recordRequest(exchange.request(), secretValues);
 		result.statusCode = exchange.statusCode();
-		result.responseHeaders = SensitiveHeaders.mask(exchange.headers());
-		result.responseBody = truncateUtf8(exchange.body(), MAX_BODY_BYTES);
-		result.responseBodyTruncated = result.responseBody.length() < exchange.body().length();
+		result.responseHeaders = SecretValues.mask(SensitiveHeaders.mask(exchange.headers()), secretValues);
+		String body = SecretValues.mask(exchange.body(), secretValues);
+		result.responseBody = truncateUtf8(body, MAX_BODY_BYTES);
+		result.responseBodyTruncated = result.responseBody.length() < body.length();
 		result.elapsedMs = exchange.elapsed().toMillis();
 		return result;
 	}
@@ -152,22 +162,31 @@ public class TestResult extends BaseEntity {
 	 */
 	public static TestResult failed(TestRun run, TestCase testCase, HttpMethod method, ErrorReason reason,
 			String message, ResolvedRequest sent, Duration elapsed) {
+		return failed(run, testCase, method, reason, message, sent, elapsed, Set.of());
+	}
+
+	/**
+	 * @param secretValues 이력에서 가릴 시크릿 값
+	 */
+	public static TestResult failed(TestRun run, TestCase testCase, HttpMethod method, ErrorReason reason,
+			String message, ResolvedRequest sent, Duration elapsed, Set<String> secretValues) {
 		TestResult result = new TestResult(run, testCase, Outcome.ERROR, method);
 		result.verdict = Verdict.ERROR;
 		result.assertionResults = List.of();
 		result.errorReason = Objects.requireNonNull(reason, "reason");
-		result.errorMessage = message == null ? null : truncateChars(message, 1000);
+		result.errorMessage = message == null ? null : truncateChars(SecretValues.mask(message, secretValues), 1000);
 		if (sent != null) {
-			result.recordRequest(sent);
+			result.recordRequest(sent, secretValues);
 		}
 		result.elapsedMs = elapsed == null ? null : elapsed.toMillis();
 		return result;
 	}
 
-	private void recordRequest(ResolvedRequest request) {
-		this.requestUrl = truncateChars(request.uri().toString(), 2000);
-		this.requestHeaders = SensitiveHeaders.mask(request.headers());
-		this.requestBody = request.body() == null ? null : truncateChars(request.body(), RequestSpec.MAX_BODY_LENGTH);
+	private void recordRequest(ResolvedRequest request, Set<String> secretValues) {
+		this.requestUrl = truncateChars(SecretValues.mask(request.uri().toString(), secretValues), 2000);
+		this.requestHeaders = SecretValues.mask(SensitiveHeaders.mask(request.headers()), secretValues);
+		this.requestBody = request.body() == null ? null
+				: truncateChars(SecretValues.mask(request.body(), secretValues), RequestSpec.MAX_BODY_LENGTH);
 	}
 
 	private static String truncateChars(String value, int maxLength) {
