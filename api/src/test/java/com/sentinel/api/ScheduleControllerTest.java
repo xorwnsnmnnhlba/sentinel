@@ -2,6 +2,7 @@ package com.sentinel.api;
 
 import java.util.Map;
 
+import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
@@ -24,7 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class })
+@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class,
+		TestAuthConfiguration.class })
 class ScheduleControllerTest {
 
 	@Autowired

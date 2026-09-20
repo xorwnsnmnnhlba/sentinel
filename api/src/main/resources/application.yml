@@ -40,6 +40,12 @@ sentinel:
     http:
       connect-timeout: 5s
       read-timeout: 30s
+  auth:
+    # 세션 유효 기간. 만료 시각은 로그인 시점에 고정
+    session-validity: 12h
+    # 최초 관리자 계정. 사용자가 한 명도 없을 때만 생성
+    admin-email: ${SENTINEL_ADMIN_EMAIL:}
+    admin-password: ${SENTINEL_ADMIN_PASSWORD:}
   secret:
     # 시크릿 암호화 키 (Base64, 16·24·32바이트). 미지정 시 시크릿 등록 거부
     # 생성 예: openssl rand -base64 32

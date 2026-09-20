@@ -1,6 +1,9 @@
 package com.sentinel.api;
 
 import com.sentinel.application.ConflictException;
+import com.sentinel.application.auth.ForbiddenException;
+import com.sentinel.application.auth.InvalidCredentialsException;
+import com.sentinel.application.auth.UnauthenticatedException;
 import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.NotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,6 +18,17 @@ class ApiExceptionHandler {
 	@ExceptionHandler(NotFoundException.class)
 	ProblemDetail handleNotFound(NotFoundException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
+
+	/** 로그인 실패. 계정 존재 여부를 알리지 않도록 사유를 구분하지 않음 */
+	@ExceptionHandler({ InvalidCredentialsException.class, UnauthenticatedException.class })
+	ProblemDetail handleUnauthenticated(RuntimeException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
+
+	@ExceptionHandler(ForbiddenException.class)
+	ProblemDetail handleForbidden(ForbiddenException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
 	}
 
 	@ExceptionHandler(ConflictException.class)

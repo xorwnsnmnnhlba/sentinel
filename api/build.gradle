@@ -23,6 +23,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'com.jayway.jsonpath:json-path'
 	implementation 'org.springframework.boot:spring-boot-starter-flyway'
+	// BCrypt만 사용. 보안 스타터는 자동 설정이 전체 요청을 가로채므로 미사용 (인증은 직접 구현)
+	implementation 'org.springframework.security:spring-security-crypto'
 	runtimeOnly 'org.flywaydb:flyway-database-postgresql'
 	runtimeOnly 'org.postgresql:postgresql'
 	compileOnly 'org.projectlombok:lombok'

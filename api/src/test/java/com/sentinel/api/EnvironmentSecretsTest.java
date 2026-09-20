@@ -3,6 +3,7 @@ package com.sentinel.api;
 import java.util.List;
 import java.util.Map;
 
+import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
@@ -31,7 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(properties = "sentinel.secret.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
 @AutoConfigureMockMvc
-@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class })
+@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class,
+		TestAuthConfiguration.class })
 class EnvironmentSecretsTest {
 
 	private static final String TOKEN = "super-secret-token-value";
