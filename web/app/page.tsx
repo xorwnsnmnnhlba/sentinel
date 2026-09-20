@@ -11,7 +11,7 @@ const screens = [
     description: "프로젝트·환경·스위트 등록·편집, 케이스 목록과 즉시 실행",
     href: "/projects",
   },
-  { title: "케이스 편집", description: "요청 정의와 판정 규칙 등록·편집" },
+  { title: "케이스 편집", description: "요청 정의와 판정 규칙 등록·편집 (스위트 화면에서 이동)", href: "/projects" },
   { title: "스케줄", description: "cron 설정과 다음 실행 시각 확인, 활성·비활성" },
 ];
 

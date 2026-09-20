@@ -140,7 +140,8 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 - 판정 규칙 5종·의도적 실패 케이스·GW 템플릿을 포함한 전체 예시: [docs/sample-cases.sql](../docs/sample-cases.sql)
 
 - `bootTestRun` 사용 시 DB 접속: `docker ps`로 `postgres:18-alpine` 컨테이너 확인 후 `docker exec -it <컨테이너> psql -U test -d test`
-- `path`는 `/` 시작 상대 경로. 경로·헤더 값·본문에 `{{변수}}` 사용 가능, `\{{`는 치환 없이 `{{` 출력
+- `path`는 `/` 또는 `{{변수}}`로 시작하는 상대 경로. 경로·헤더 값·본문에 `{{변수}}` 사용 가능, `\{{`는 치환 없이 `{{` 출력
+  - 변수로 시작하는 경로(`{{apiPrefix}}/runs`)는 실행 시 치환 결과가 `/`로 시작해야 함. 아니면 전송 없이 `INVALID_REQUEST` (기본 URL 뒤에 붙어 다른 호스트로 전송되는 것 방지)
 - `headers`는 `{"이름": ["값", ...]}` 형식
 - `assertions`는 판정 규칙 배열. 생략(NULL·빈 배열) 시 기본 판정 `status in [2xx]` 적용
 

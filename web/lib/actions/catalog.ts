@@ -4,7 +4,8 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { apiSend, isApiError } from "@/lib/api/server";
-import type { EnvironmentItem, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
+import type { CaseItem, EnvironmentItem, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
+import { type CaseDraft, isCaseDraft, validateDraft } from "@/lib/case-draft";
 
 /**
  * 프로젝트·환경·스위트·케이스 등록·수정·삭제, 스위트 실행. Spring 호출 후 refresh()로 현재 화면 재조회 또는 redirect.
@@ -102,6 +103,46 @@ export async function deleteSuite(suiteId: number, projectId?: number): Promise<
 
 export async function deleteCase(caseId: number): Promise<ActionState> {
   return mutate("DELETE", `/api/cases/${id(caseId)}`);
+}
+
+/** 케이스 저장 결과. 오류 시 화면에 목록으로 표시 */
+export type CaseActionState = { errors?: string[] } | undefined;
+
+/**
+ * 케이스 등록. 성공 시 스위트 화면으로 이동
+ */
+export async function createCase(suiteId: number, draft: CaseDraft): Promise<CaseActionState> {
+  return saveCase("POST", "/api/cases", id(suiteId), draft, { suiteId: id(suiteId) });
+}
+
+/**
+ * 케이스 수정. 요청 정의·판정 규칙은 전체 교체, 성공 시 스위트 화면으로 이동
+ */
+export async function updateCase(caseId: number, suiteId: number, draft: CaseDraft): Promise<CaseActionState> {
+  return saveCase("PATCH", `/api/cases/${id(caseId)}`, id(suiteId), draft, {});
+}
+
+async function saveCase(
+  method: "POST" | "PATCH",
+  path: string,
+  suiteId: number,
+  draft: unknown,
+  extra: Record<string, number>,
+): Promise<CaseActionState> {
+  if (!isCaseDraft(draft)) {
+    return { errors: ["요청 형식이 올바르지 않습니다"] };
+  }
+  const validation = validateDraft(draft);
+  if (!validation.ok) {
+    return { errors: validation.errors };
+  }
+  try {
+    await apiSend<CaseItem>(method, path, { ...extra, ...validation.payload });
+  } catch (error) {
+    const message = failure(error)?.error;
+    return { errors: message ? [message] : [] };
+  }
+  redirect(`/suites/${suiteId}`);
 }
 
 /**

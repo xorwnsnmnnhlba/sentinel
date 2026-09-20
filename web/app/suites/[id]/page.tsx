@@ -1,4 +1,4 @@
-import { History, Pencil } from "lucide-react";
+import { History, Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -79,7 +79,17 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
       </section>
 
       <section className="space-y-3">
-        <SectionHeader title="케이스" description="요청 정의와 판정 규칙. 실행 순서는 등록 순" />
+        <SectionHeader
+          title="케이스"
+          description="요청 정의와 판정 규칙. 실행 순서는 등록 순"
+          action={
+            <Button asChild size="sm">
+              <Link href={`/cases/new?suiteId=${suite.id}`}>
+                <Plus /> 케이스 추가
+              </Link>
+            </Button>
+          }
+        />
         {cases.length === 0 ? (
           <Empty message="등록된 케이스가 없습니다" />
         ) : (
@@ -91,14 +101,18 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                   <TableHead>이름</TableHead>
                   <TableHead>요청</TableHead>
                   <TableHead>판정 규칙</TableHead>
-                  <TableHead className="w-16" />
+                  <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {cases.map((testCase) => (
                   <TableRow key={testCase.id}>
                     <TableCell className="text-muted-foreground">{testCase.id}</TableCell>
-                    <TableCell className="font-medium whitespace-normal">{testCase.name}</TableCell>
+                    <TableCell className="font-medium whitespace-normal">
+                      <Link href={`/cases/${testCase.id}`} className="hover:underline">
+                        {testCase.name}
+                      </Link>
+                    </TableCell>
                     <TableCell className="min-w-72 whitespace-normal">
                       <div className="flex items-start gap-2 font-mono text-xs">
                         <Badge variant="outline" className="shrink-0 font-mono">
@@ -114,6 +128,11 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                     </TableCell>
                     <TableCell>
                       <RowActions>
+                        <Button asChild variant="ghost" size="icon-sm">
+                          <Link href={`/cases/${testCase.id}`} aria-label={`케이스 ${testCase.name} 수정`}>
+                            <Pencil />
+                          </Link>
+                        </Button>
                         <DeleteButton
                           title={`케이스 "${testCase.name}" 삭제`}
                           description="이 케이스의 실행 이력은 유지됩니다."

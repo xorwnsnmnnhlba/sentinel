@@ -5,13 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { problem, server, springUrl } from "@/test/msw";
 import { captureRedirect } from "@/test/next";
 
+import { type CaseDraft, emptyDraft } from "@/lib/case-draft";
+
 import {
+  createCase,
   createEnvironment,
   createProject,
   deleteCase,
   deleteProject,
   deleteSuite,
   runSuite,
+  updateCase,
   updateEnvironment,
   updateProject,
 } from "./catalog";
@@ -174,5 +178,62 @@ describe("runSuite", () => {
 
     await expect(captureRedirect(() => runSuite(1, undefined, form({ environmentId: "3" })))).resolves.toBe("/runs/42");
     expect(bodies).toEqual([{ suiteId: 1, environmentId: 3 }]);
+  });
+});
+
+describe("cases", () => {
+  const draft: CaseDraft = {
+    ...emptyDraft(),
+    name: "health",
+    method: "POST",
+    path: "/health",
+    headers: [{ name: "Accept", value: "application/json" }],
+    body: "{}",
+    assertions: [{ type: "jsonPath", path: "$.status", operator: "EQUALS", expected: "UP" }],
+  };
+
+  it("creates a case in the suite and returns to the suite page", async () => {
+    const bodies = capture("post", "/api/cases", () => HttpResponse.json({ id: 9 }, { status: 201 }));
+
+    await expect(captureRedirect(() => createCase(4, draft))).resolves.toBe("/suites/4");
+    expect(bodies).toEqual([
+      {
+        suiteId: 4,
+        name: "health",
+        request: { method: "POST", path: "/health", headers: { Accept: ["application/json"] }, body: "{}" },
+        assertions: [{ type: "jsonPath", path: "$.status", operator: "EQUALS", expected: "UP" }],
+      },
+    ]);
+  });
+
+  it("replaces the whole case on update without sending suiteId", async () => {
+    const bodies = capture("patch", "/api/cases/9", () => HttpResponse.json({ id: 9 }));
+
+    await expect(captureRedirect(() => updateCase(9, 4, { ...draft, assertions: [] }))).resolves.toBe("/suites/4");
+    expect(bodies).toEqual([
+      {
+        name: "health",
+        request: { method: "POST", path: "/health", headers: { Accept: ["application/json"] }, body: "{}" },
+        assertions: [],
+      },
+    ]);
+  });
+
+  it("revalidates on the server and skips Spring for invalid drafts", async () => {
+    await expect(createCase(4, { ...draft, path: "health" })).resolves.toEqual({
+      errors: ["경로는 / 또는 {{변수}}로 시작해야 합니다 (기본 URL 뒤에 붙는 상대 경로)"],
+    });
+  });
+
+  it("rejects malformed input sent without the form", async () => {
+    await expect(createCase(4, { name: "x" } as unknown as CaseDraft)).resolves.toEqual({
+      errors: ["요청 형식이 올바르지 않습니다"],
+    });
+  });
+
+  it("shows Spring errors", async () => {
+    server.use(http.post(springUrl("/api/cases"), () => problem(409, "test case name 'health' is already in use")));
+
+    await expect(createCase(4, draft)).resolves.toEqual({ errors: ["이미 사용 중인 이름입니다"] });
   });
 });

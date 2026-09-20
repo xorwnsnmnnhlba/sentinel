@@ -102,6 +102,33 @@ class TestRunServiceTest {
 	}
 
 	@Test
+	void resolvesPathStartingWithVariable() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of("prefix", "/billing/v1"));
+		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "{{prefix}}/history", null, null);
+
+		service.runTestCase(testCase.getId(), environment.getId());
+
+		assertThat(executor.requests().getFirst().uri()).hasToString("https://gw.dev.internal/billing/v1/history");
+	}
+
+	@Test
+	void recordsInvalidRequestWhenVariablePathDoesNotStartWithSlash() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of("prefix", ".evil.example"));
+		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "{{prefix}}/history", null, null);
+
+		TestRunDetail.Result result = service.getRun(service.runTestCase(testCase.getId(), environment.getId()))
+			.results()
+			.getFirst();
+
+		assertThat(executor.requests()).isEmpty();
+		assertThat(result.outcome()).isEqualTo(Outcome.ERROR);
+		assertThat(result.errorReason()).isEqualTo(ErrorReason.INVALID_REQUEST);
+		assertThat(result.errorMessage()).contains("after variable substitution");
+	}
+
+	@Test
 	void recordsTransportFailureReason() {
 		Project project = fixtures.project();
 		Environment environment = fixtures.environment(project, Map.of());

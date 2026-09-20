@@ -115,7 +115,7 @@ public class TestRunService {
 	}
 
 	private static RequestTemplate templateOf(RequestSpec spec, Environment environment) {
-		return new RequestTemplate(spec.getMethod(), environment.getBaseUrl() + spec.getPath(), spec.getHeaders(),
+		return new RequestTemplate(spec.getMethod(), environment.getBaseUrl(), spec.getPath(), spec.getHeaders(),
 				spec.getBody());
 	}
 
