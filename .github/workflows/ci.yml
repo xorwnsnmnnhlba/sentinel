@@ -34,6 +34,40 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  e2e:
+    name: e2e (playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      # PostgreSQL·api·web을 모두 띄운 실제 스택 대상 (web 13000, api 18080)
+      - name: E2E 스택 기동
+        run: docker compose -f docker-compose.e2e.yml up -d --build --wait
+      - run: npm run e2e
+        working-directory: web
+      - name: 실패 시 리포트·스택 로그 보관
+        if: failure()
+        run: |
+          mkdir -p web/playwright-report
+          docker compose -f docker-compose.e2e.yml logs --no-color > web/playwright-report/stack.log
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: web/playwright-report
+          retention-days: 7
+      - name: E2E 스택 정리
+        if: always()
+        run: docker compose -f docker-compose.e2e.yml down -v
+
   api:
     name: api (test)
     runs-on: ubuntu-latest

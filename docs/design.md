@@ -245,7 +245,11 @@ runner 패키지는 Spring 의존성 없는 순수 자바로 유지. 제품의 �
   - 서버 코드(Server Actions, Spring 호출, BFF 프록시): Node 환경에서 MSW로 Spring 응답 지정, 요청 본문·오류 변환·이동 경로 검증
   - 클라이언트 컴포넌트: jsdom 환경, Server Action은 테스트용 함수로 대체
   - async Server Component 화면은 Vitest 미지원(Next.js 문서)으로 제외. 화면 단위 검증은 추후 E2E(Playwright) 검토
-- CI: GitHub Actions에서 PR·main 푸시마다 web(lint, 서식, 테스트, 빌드)과 api(Testcontainers 포함 테스트) 병렬 실행
+- E2E: Playwright. PostgreSQL·api·web을 모두 띄운 실제 스택(`docker-compose.e2e.yml`) 대상으로 등록 → 실행 → 스케줄 → 삭제 흐름 검증 (2026-09-20)
+  - 케이스가 api 자신을 호출하도록 구성하여 외부 의존 없이 실행 결과까지 확인
+  - 개발/운영 스택과 포트·데이터 분리 (web 13000, api 18080, DB는 컨테이너 내부 전용·매 실행 폐기)
+  - async Server Component 화면은 단위 테스트 대상이 아니므로 이 경로로 검증
+- CI: GitHub Actions에서 PR·main 푸시마다 web(lint, 서식, 테스트, 빌드), api(Testcontainers 포함 테스트), E2E 병렬 실행
 
 ```java
 public interface RequestExecutor {

@@ -17,7 +17,8 @@ sentinel/
  ├─ api/                  Spring Boot 백엔드 (러너, 스케줄러, API)
  ├─ web/                  Next.js 프론트엔드 (BFF, 화면)
  ├─ docs/                 설계 문서
- ├─ .github/workflows/    CI (PR·main 푸시마다 web lint·서식·테스트·빌드, api 테스트)
+ ├─ .github/workflows/    CI (PR·main 푸시마다 web lint·서식·테스트·빌드, api 테스트, E2E)
+ ├─ docker-compose.e2e.yml E2E 테스트용 독립 스택 (PostgreSQL·api·web, 포트 18080·13000)
  ├─ docker-compose.yml    컨테이너 실행 구성 (api :8080, web :3000)
  ├─ sentinel.env.example  컨테이너 환경변수 템플릿
  └─ sentinel.env          컨테이너 환경변수 (git 제외, 직접 생성)

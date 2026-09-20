@@ -23,6 +23,7 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 | Prettier | 3.9.8 (`prettier-plugin-tailwindcss` 0.8.1) |
 | Vitest | 5.0.1 (Vite 8.3.0, jsdom 30.1.0) |
 | MSW | 2.15.0 |
+| Playwright | 1.63.0 (chromium) |
 | Testing Library | React 16.3.3, DOM 10.4.2, user-event 14.6.7, jest-dom 7.0.1 |
 | Node.js | 로컬 24.21.0, Docker `node:24-alpine` (Next.js 요구사항 20.9.0 이상) |
 
@@ -132,6 +133,9 @@ npm run dev
 | `npm run format:check` | 서식 검사 (변경 없음) |
 | `npm test` | 테스트 1회 실행 |
 | `npm run test:watch` | 테스트 감시 모드 |
+| `npm run e2e:up` | E2E 스택 기동 (PostgreSQL·api·web, 최초 실행 시 이미지 빌드) |
+| `npm run e2e` | E2E 테스트 실행 |
+| `npm run e2e:down` | E2E 스택 정리 (DB 데이터 삭제) |
 
 컨테이너 실행은 루트에서 `docker compose up -d --build` (api와 함께 기동)
 
@@ -157,6 +161,20 @@ Vitest + MSW + React Testing Library. 설정은 `vitest.config.mts`
 - `redirect()`·`notFound()`는 throw된 오류의 digest로 확인 (`test/next.ts`)
 - async Server Component 화면(`page.tsx`)은 Vitest 미지원(Next.js 문서)으로 제외. 추후 E2E로 검증
 - Radix UI 목록(Select 등)은 jsdom에 레이아웃이 없어 접근성 트리에서 숨김으로 판정. 키보드로 열고 목록 안 텍스트로 선택
+
+### E2E (Playwright)
+
+실제 스택(PostgreSQL·api·web) 대상. 설정은 `playwright.config.ts`, 테스트는 `e2e/`
+
+```bash
+npm run e2e:up && npm run e2e && npm run e2e:down
+```
+
+- 스택은 `docker-compose.e2e.yml`. 개발/운영 스택과 분리 (web 13000, api 18080, DB는 컨테이너 내부 전용)
+- 흐름: 프로젝트·환경·스위트 등록 → 케이스 등록 → 즉시 실행·결과 확인 → 스케줄 등록·전환·수정·삭제 → 프로젝트 삭제 후 이력 유지 확인, 404 확인
+- 케이스가 api 자신(`http://e2e-api:8080`)을 호출하므로 외부 서버 없이 실행 결과까지 검증
+- 스택을 내리지 않고 반복 실행해도 되도록 프로젝트·스위트 이름에 실행 시각 포함
+- `role="alert"` 선택 시 Next.js 라우트 알림(`#__next-route-announcer__`) 제외 필요
 
 ## 코드 작성 원칙
 
