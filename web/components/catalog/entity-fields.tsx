@@ -1,4 +1,5 @@
 import { TextField } from "@/components/catalog/field";
+import { SecretsEditor } from "@/components/catalog/secrets-editor";
 import { VariablesEditor } from "@/components/catalog/variables-editor";
 import type { EnvironmentItem, ProjectItem, SuiteItem } from "@/lib/api/types";
 
@@ -28,6 +29,7 @@ export function EnvironmentFields({ environment }: { environment?: EnvironmentIt
         hint="http(s) 절대 URL. 케이스 경로가 뒤에 붙음, 끝의 / 는 제거하여 저장"
       />
       <VariablesEditor defaultValue={environment?.variables} />
+      <SecretsEditor savedNames={environment?.secretNames} />
     </>
   );
 }

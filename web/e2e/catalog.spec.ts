@@ -7,7 +7,11 @@ import { expect, type Page, test } from "@playwright/test";
  */
 test.describe.configure({ mode: "serial" });
 
-const project = `e2e-${Date.now()}`;
+// 스택을 내리지 않고 반복 실행해도 충돌하지 않도록 매번 고유한 이름 사용
+const stamp = Date.now();
+const project = `e2e-${stamp}`;
+const suite = `smoke-${stamp}`;
+const secret = `secret-value-${stamp}`;
 
 /** 실행 이력 화면의 전체 건수 */
 async function totalRuns(page: Page): Promise<number> {
@@ -19,7 +23,6 @@ async function totalRuns(page: Page): Promise<number> {
 function alertIn(page: Page) {
   return page.locator('[role="alert"]:not(#__next-route-announcer__)');
 }
-const suite = "smoke";
 
 test("프로젝트·환경·스위트 등록", async ({ page }) => {
   await page.goto("/projects");
@@ -41,6 +44,16 @@ test("프로젝트·환경·스위트 등록", async ({ page }) => {
   const environments = page.getByRole("row", { name: /self/ });
   await expect(environments).toContainText("http://e2e-api:8080");
   await expect(environments).toContainText("apiPrefix");
+
+  // 시크릿 추가: 이름만 목록에 표시되고 값은 어디에도 남지 않음
+  await environments.getByRole("button", { name: /환경 self 수정/ }).click();
+  await page.getByRole("button", { name: "시크릿 추가" }).click();
+  await page.getByLabel("새 시크릿 1 이름").fill("token");
+  await page.getByLabel("새 시크릿 1 값").fill(secret);
+  await page.getByRole("button", { name: "저장" }).click();
+
+  await expect(page.getByRole("row", { name: /self/ })).toContainText("token");
+  expect(await page.content()).not.toContain(secret);
 
   await page.getByRole("button", { name: "스위트 추가" }).click();
   await page.getByLabel("이름", { exact: true }).fill(suite);

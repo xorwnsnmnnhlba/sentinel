@@ -28,6 +28,8 @@ services:
       DB_URL: jdbc:postgresql://e2e-postgres:5432/sentinel?currentSchema=sentinel
       DB_USERNAME: sentinel
       DB_PASSWORD: sentinel-e2e
+      # 시크릿 암호화 키. 일회용 테스트 스택 전용 값
+      SENTINEL_SECRET_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
       TZ: Asia/Seoul
     ports:
       - "18080:8080"

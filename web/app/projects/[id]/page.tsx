@@ -100,6 +100,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                   <TableHead>이름</TableHead>
                   <TableHead>기본 URL</TableHead>
                   <TableHead>변수</TableHead>
+                  <TableHead>시크릿</TableHead>
                   <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
@@ -110,6 +111,9 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                     <TableCell className="font-mono text-xs">{environment.baseUrl}</TableCell>
                     <TableCell className="font-mono text-xs whitespace-normal text-muted-foreground">
                       {Object.keys(environment.variables).join(", ") || "-"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs whitespace-normal text-muted-foreground">
+                      {environment.secretNames.join(", ") || "-"}
                     </TableCell>
                     <TableCell>
                       <RowActions>
