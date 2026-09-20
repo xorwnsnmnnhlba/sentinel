@@ -10,9 +10,20 @@ import { Empty, RowActions, SectionHeader } from "@/components/catalog/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { deleteCase, deleteSuite, runSuite, updateSuite } from "@/lib/actions/catalog";
+import { ScheduleFields } from "@/components/catalog/schedule-fields";
+import { ScheduleToggle } from "@/components/catalog/schedule-toggle";
+import {
+  createSchedule,
+  deleteCase,
+  deleteSchedule,
+  deleteSuite,
+  runSuite,
+  updateScheduleCron,
+  updateSuite,
+} from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
-import type { CaseItem, EnvironmentItem, ProjectItem, SuiteItem } from "@/lib/api/types";
+import type { CaseItem, EnvironmentItem, ProjectItem, ScheduleDetail, SuiteItem } from "@/lib/api/types";
+import { formatDateTime } from "@/lib/format";
 
 export async function generateMetadata(props: PageProps<"/suites/[id]">) {
   const { id } = await props.params;
@@ -25,11 +36,13 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
     notFound();
   }
   const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${id}`);
-  const [project, environments, cases] = await Promise.all([
+  const [project, environments, cases, schedules] = await Promise.all([
     apiGetOrNotFound<ProjectItem>(`/api/projects/${suite.projectId}`),
     apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`),
     apiGet<CaseItem[]>(`/api/cases?suiteId=${suite.id}`),
+    apiGet<ScheduleDetail[]>(`/api/schedules?suiteId=${suite.id}`),
   ]);
+  const environmentNames = new Map(environments.map((environment) => [environment.id, environment.name]));
 
   return (
     <div className="space-y-8">
@@ -76,6 +89,90 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
           <p className="text-sm text-muted-foreground">케이스를 ID 순서로 차례대로 실행. 완료 후 결과 화면으로 이동</p>
         </div>
         <RunSuiteForm environments={environments} caseCount={cases.length} action={runSuite.bind(null, suite.id)} />
+      </section>
+
+      <section className="space-y-3">
+        <SectionHeader
+          title="스케줄"
+          description={`정기 실행. cron은 ${schedules[0]?.zone ?? "Asia/Seoul"} 기준, 놓친 실행은 1회만 실행`}
+          action={
+            environments.length > 0 && (
+              <FormDialog
+                trigger={
+                  <Button size="sm">
+                    <Plus /> 스케줄 추가
+                  </Button>
+                }
+                title="스케줄 추가"
+                submitLabel="등록"
+                action={createSchedule.bind(null, suite.id)}
+              >
+                <ScheduleFields environments={environments} />
+              </FormDialog>
+            )
+          }
+        />
+        {schedules.length === 0 ? (
+          <Empty message={environments.length === 0 ? "환경을 먼저 등록해 주세요" : "등록된 스케줄이 없습니다"} />
+        ) : (
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>cron</TableHead>
+                  <TableHead>환경</TableHead>
+                  <TableHead>다음 실행 (KST)</TableHead>
+                  <TableHead>마지막 실행 (KST)</TableHead>
+                  <TableHead className="w-32">상태</TableHead>
+                  <TableHead className="w-24" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {schedules.map((schedule) => (
+                  <TableRow key={schedule.id}>
+                    <TableCell className="font-mono text-xs">{schedule.cron}</TableCell>
+                    <TableCell>{environmentNames.get(schedule.environmentId) ?? "-"}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {schedule.nextRunAt ? formatDateTime(schedule.nextRunAt) : "-"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {schedule.lastTriggeredAt ? formatDateTime(schedule.lastTriggeredAt) : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <ScheduleToggle
+                        scheduleId={schedule.id}
+                        enabled={schedule.enabled}
+                        label={`스케줄 ${schedule.cron} 활성`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <RowActions>
+                        <FormDialog
+                          trigger={
+                            <Button variant="ghost" size="icon-sm" aria-label={`스케줄 ${schedule.cron} 수정`}>
+                              <Pencil />
+                            </Button>
+                          }
+                          title="스케줄 수정"
+                          description="cron 변경. 활성 상태면 다음 실행 시각을 현재 시각 기준으로 다시 계산합니다."
+                          submitLabel="저장"
+                          action={updateScheduleCron.bind(null, schedule.id)}
+                        >
+                          <ScheduleFields schedule={schedule} />
+                        </FormDialog>
+                        <DeleteButton
+                          title={`스케줄 "${schedule.cron}" 삭제`}
+                          description="정기 실행이 중지됩니다. 실행 이력은 유지됩니다."
+                          action={deleteSchedule.bind(null, schedule.id)}
+                        />
+                      </RowActions>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">

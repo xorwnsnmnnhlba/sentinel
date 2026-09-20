@@ -110,3 +110,16 @@ export interface CaseItem {
   /** 비어 있으면 기본 판정(status in [2xx]) */
   assertions: Assertion[];
 }
+
+/** 스위트 정기 실행. cron은 5자리(분 시 일 월 요일), zone 기준 해석 */
+export interface ScheduleDetail {
+  id: number;
+  suiteId: number;
+  environmentId: number;
+  cron: string;
+  zone: string;
+  enabled: boolean;
+  /** 비활성 시 null */
+  nextRunAt: string | null;
+  lastTriggeredAt: string | null;
+}

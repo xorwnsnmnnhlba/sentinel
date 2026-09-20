@@ -145,6 +145,28 @@ async function saveCase(
   redirect(`/suites/${suiteId}`);
 }
 
+export async function createSchedule(suiteId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  const environmentId = Number(form.get("environmentId"));
+  if (!Number.isSafeInteger(environmentId) || environmentId <= 0) {
+    return { error: "실행할 환경을 선택해 주세요" };
+  }
+  return mutate("POST", "/api/schedules", { suiteId: id(suiteId), environmentId, cron: raw(form, "cron") });
+}
+
+/** cron 변경. 활성 상태면 다음 실행 시각 재계산 */
+export async function updateScheduleCron(scheduleId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  return mutate("PATCH", `/api/schedules/${id(scheduleId)}`, { cron: raw(form, "cron") });
+}
+
+/** 활성·비활성 전환. 활성화 시 현재 시각 기준으로 다음 실행 시각 재계산 */
+export async function setScheduleEnabled(scheduleId: number, enabled: boolean): Promise<ActionState> {
+  return mutate("PATCH", `/api/schedules/${id(scheduleId)}`, { enabled: enabled === true });
+}
+
+export async function deleteSchedule(scheduleId: number): Promise<ActionState> {
+  return mutate("DELETE", `/api/schedules/${id(scheduleId)}`);
+}
+
 /**
  * 스위트 즉시 실행. 실행 완료까지 대기 후 결과 상세로 이동
  */

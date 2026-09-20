@@ -9,14 +9,18 @@ import { type CaseDraft, emptyDraft } from "@/lib/case-draft";
 
 import {
   createCase,
+  createSchedule,
   createEnvironment,
   createProject,
   deleteCase,
   deleteProject,
   deleteSuite,
   runSuite,
+  deleteSchedule,
+  setScheduleEnabled,
   updateCase,
   updateEnvironment,
+  updateScheduleCron,
   updateProject,
 } from "./catalog";
 
@@ -235,5 +239,53 @@ describe("cases", () => {
     server.use(http.post(springUrl("/api/cases"), () => problem(409, "test case name 'health' is already in use")));
 
     await expect(createCase(4, draft)).resolves.toEqual({ errors: ["이미 사용 중인 이름입니다"] });
+  });
+});
+
+describe("schedules", () => {
+  it("creates a schedule for the suite and environment", async () => {
+    const bodies = capture("post", "/api/schedules", () => HttpResponse.json({ id: 5 }, { status: 201 }));
+
+    await expect(createSchedule(2, undefined, form({ environmentId: "3", cron: "10 9 * * 1-5" }))).resolves.toEqual({});
+
+    expect(bodies).toEqual([{ suiteId: 2, environmentId: 3, cron: "10 9 * * 1-5" }]);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("requires an environment", async () => {
+    await expect(createSchedule(2, undefined, form({ cron: "10 9 * * 1-5" }))).resolves.toEqual({
+      error: "실행할 환경을 선택해 주세요",
+    });
+  });
+
+  it("shows the Spring message for an invalid cron", async () => {
+    server.use(http.post(springUrl("/api/schedules"), () => problem(400, "cron must have 5 fields")));
+
+    await expect(createSchedule(2, undefined, form({ environmentId: "3", cron: "0 10 9 * * *" }))).resolves.toEqual({
+      error: "입력값을 확인해 주세요: cron must have 5 fields",
+    });
+  });
+
+  it("sends only cron when editing", async () => {
+    const bodies = capture("patch", "/api/schedules/5", () => HttpResponse.json({ id: 5 }));
+
+    await updateScheduleCron(5, undefined, form({ cron: "30 17 * * 1-5" }));
+
+    expect(bodies).toEqual([{ cron: "30 17 * * 1-5" }]);
+  });
+
+  it.each([true, false])("sends enabled=%s", async (enabled) => {
+    const bodies = capture("patch", "/api/schedules/5", () => HttpResponse.json({ id: 5 }));
+
+    await expect(setScheduleEnabled(5, enabled)).resolves.toEqual({});
+
+    expect(bodies).toEqual([{ enabled }]);
+  });
+
+  it("deletes a schedule", async () => {
+    capture("delete", "/api/schedules/5", () => new HttpResponse(null, { status: 204 }));
+
+    await expect(deleteSchedule(5)).resolves.toEqual({});
+    expect(refresh).toHaveBeenCalledOnce();
   });
 });
