@@ -278,8 +278,18 @@ GET    /billing/v1/history → response time <= 2000ms: was 3200ms
 | `[Sentinel] DB 연결 실패 - 스케줄 실행 중단` | DB 접속 실패 첫 주기 1회 |
 | `[Sentinel] DB 연결 복구 - 스케줄 실행 재개` | 접속 복구 시 1회, 중단 기간 포함 |
 
-- 채널 미정으로 현재는 WARN 로그(`LoggingNotifier`)로만 기록
-- 채널 확정 시 `com.sentinel.application.notification.Notifier` 구현체 추가 후 `NotificationConfig`의 빈 교체
+### 발송 채널
+
+| 설정 | 기본값 | 설명 |
+|------|--------|------|
+| `sentinel.notification.webhook-url` | 없음 (`SENTINEL_WEBHOOK_URL`) | 수신 Webhook 주소. 미지정 시 WARN 로그로만 기록 |
+| `sentinel.notification.connect-timeout` | `3s` | 연결 제한 시간 |
+| `sentinel.notification.read-timeout` | `5s` | 응답 대기 제한 시간 |
+
+- 본문은 `{"text": "제목\n본문"}` 한 필드. Slack·Teams 수신 Webhook 주소를 그대로 사용 가능
+- Webhook 주소는 자격증명이므로 환경변수로 주입하고 로그·git에 남기지 않음 (`sentinel.env`)
+- 발송 실패(4xx·5xx, 타임아웃, 연결 실패)는 WARN 로그만 남기고 실행·폴링은 계속
+- 다른 형식이 필요하면 `com.sentinel.application.notification.Notifier` 구현체 추가 후 `NotificationConfig`의 빈 교체
 
 ## 패키지 구조 (계획)
 
