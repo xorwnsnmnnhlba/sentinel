@@ -11,8 +11,22 @@ import { ScheduleFields } from "./schedule-fields";
 
 type Action = (state: ActionState, form: FormData) => Promise<ActionState>;
 
-const dev: EnvironmentItem = { id: 1, projectId: 1, name: "dev", baseUrl: "https://gw.dev", variables: {} };
-const staging: EnvironmentItem = { id: 2, projectId: 1, name: "staging", baseUrl: "https://gw.stg", variables: {} };
+const dev: EnvironmentItem = {
+  id: 1,
+  projectId: 1,
+  name: "dev",
+  baseUrl: "https://gw.dev",
+  variables: {},
+  secretNames: [],
+};
+const staging: EnvironmentItem = {
+  id: 2,
+  projectId: 1,
+  name: "staging",
+  baseUrl: "https://gw.stg",
+  variables: {},
+  secretNames: [],
+};
 
 const schedule: ScheduleDetail = {
   id: 7,

@@ -3,8 +3,10 @@ package com.sentinel.application;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.sentinel.domain.BaseEntity;
 import com.sentinel.domain.Environment;
@@ -27,6 +29,9 @@ import com.sentinel.runner.ResolvedRequest;
 import com.sentinel.runner.UnresolvedVariableException;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.assertion.AssertionEvaluator;
+import com.sentinel.application.secret.SecretCipher;
+import com.sentinel.application.secret.SecretDecryptionException;
+import com.sentinel.application.secret.SecretKeyMissingException;
 import com.sentinel.runner.assertion.AssertionResult;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -58,6 +63,8 @@ public class TestRunService {
 	private final RequestExecutor executor;
 
 	private final Transactions transactions;
+
+	private final SecretCipher secretCipher;
 
 	/**
 	 * 케이스 1건 수동 실행. 응답 미수신·변수 누락도 실패 결과로 기록하며 예외로 전파하지 않음.
@@ -111,7 +118,31 @@ public class TestRunService {
 			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment),
 					testCase.getAssertions()))
 			.toList();
-		return new Prepared(run.getId(), suite.getId(), trigger, preparedCases, Map.copyOf(environment.getVariables()));
+		Map<String, String> secrets = decrypt(environment);
+		Map<String, String> values = new LinkedHashMap<>(environment.getVariables());
+		values.putAll(secrets);
+		return new Prepared(run.getId(), suite.getId(), trigger, preparedCases, Map.copyOf(values),
+				Set.copyOf(secrets.values()));
+	}
+
+	/**
+	 * 시크릿 복호화. 키 미설정·불일치는 실행 전에 거부하여 미해결 변수로 전송되는 일이 없도록 함
+	 * @throws InvalidRequestException 키 미설정 또는 복호화 실패. 메시지에 값 미포함
+	 */
+	private Map<String, String> decrypt(Environment environment) {
+		Map<String, String> encrypted = environment.getEncryptedSecrets();
+		if (encrypted.isEmpty()) {
+			return Map.of();
+		}
+		Map<String, String> decrypted = new LinkedHashMap<>();
+		try {
+			encrypted.forEach((name, value) -> decrypted.put(name, secretCipher.decrypt(value)));
+		}
+		catch (SecretKeyMissingException | SecretDecryptionException ex) {
+			throw new InvalidRequestException(
+					"environment " + environment.getId() + " has secrets that cannot be read: " + ex.getMessage());
+		}
+		return decrypted;
 	}
 
 	private static RequestTemplate templateOf(RequestSpec spec, Environment environment) {
@@ -124,8 +155,9 @@ public class TestRunService {
 		Map<TestResult.Verdict, Integer> counts = new EnumMap<>(TestResult.Verdict.class);
 		for (PreparedCase preparedCase : prepared.cases()) {
 			Execution execution = execute(preparedCase, prepared.variables());
-			TestResult.Verdict verdict = transactions
-				.write(status -> results.save(resultOf(prepared.runId(), preparedCase, execution)).getVerdict());
+			TestResult.Verdict verdict = transactions.write(
+					status -> results.save(resultOf(prepared.runId(), preparedCase, execution, prepared.secretValues()))
+						.getVerdict());
 			counts.merge(verdict, 1, Integer::sum);
 		}
 		transactions.writeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(Instant.now()));
@@ -166,14 +198,14 @@ public class TestRunService {
 		}
 	}
 
-	private TestResult resultOf(long runId, PreparedCase preparedCase, Execution execution) {
+	private TestResult resultOf(long runId, PreparedCase preparedCase, Execution execution, Set<String> secretValues) {
 		TestRun run = runs.getReferenceById(runId);
 		TestCase testCase = testCases.getReferenceById(preparedCase.testCaseId());
 		return switch (execution) {
 			case Responded responded -> TestResult.responded(run, testCase, responded.exchange(),
-					responded.assertionResults());
+					responded.assertionResults(), secretValues);
 			case Failed failed -> TestResult.failed(run, testCase, preparedCase.template().method(), failed.reason(),
-					failed.message(), failed.request(), failed.elapsed());
+					failed.message(), failed.request(), failed.elapsed(), secretValues);
 		};
 	}
 
@@ -185,8 +217,12 @@ public class TestRunService {
 		return root == ex || root.getMessage() == null ? ex.getMessage() : ex.getMessage() + " (" + root + ")";
 	}
 
+	/**
+	 * @param variables 변수와 복호화한 시크릿
+	 * @param secretValues 이력 저장 시 가릴 시크릿 값
+	 */
 	private record Prepared(long runId, long suiteId, TestRun.Trigger trigger, List<PreparedCase> cases,
-			Map<String, String> variables) {
+			Map<String, String> variables, Set<String> secretValues) {
 	}
 
 	private record PreparedCase(long testCaseId, RequestTemplate template, List<Assertion> assertions) {

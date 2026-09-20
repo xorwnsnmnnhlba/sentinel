@@ -222,11 +222,23 @@ curl -i -X POST localhost:8080/api/runs \
 | 등록 | 본문 예시 |
 |------|-----------|
 | 프로젝트 | `{"name": "billing", "description": "결제"}` |
-| 환경 | `{"projectId": 1, "name": "dev", "baseUrl": "https://gw.dev.internal", "variables": {"userId": "42"}}` |
+| 환경 | `{"projectId": 1, "name": "dev", "baseUrl": "https://gw.dev.internal", "variables": {"userId": "42"}, "secrets": {"token": "..."}}` |
 | 스위트 | `{"projectId": 1, "name": "smoke", "description": null}` |
 | 케이스 | `{"suiteId": 1, "name": "결제 내역 조회", "request": {"method": "GET", "path": "/billing/v1/history?userId={{userId}}", "headers": {"Accept": ["application/json"]}, "body": null}, "assertions": [{"type": "statusCode", "anyOf": ["200"]}]}` |
 
-- 환경 변수는 평문 저장. 운영 토큰·API 키 입력 금지 (암호화 구현 후 시크릿으로 분리 예정)
+### 환경 변수와 시크릿
+
+| 구분 | 저장 | 조회 | 용도 |
+|------|------|------|------|
+| `variables` | 평문 | 값까지 조회 | 경로·헤더·본문 치환용 일반 값 (`userId`, `apiPrefix`) |
+| `secrets` | AES-GCM 암호화 | 이름만 조회(`secretNames`) | 토큰·API 키 |
+
+- 치환 방법은 동일 (`{{이름}}`). 변수와 시크릿에 같은 이름 사용 시 400
+- 수정 시 `variables`는 전체 교체, `secrets`는 이름별 반영 (값 지정 시 등록·교체, `null`이면 삭제, 생략한 이름은 유지)
+- 시크릿 값은 실행 이력에 저장할 때 `****`로 가림 (URL·헤더·본문·오류 메시지). 실제 전송에는 원래 값 사용
+- 암호화 키(`sentinel.secret.key`, `SENTINEL_SECRET_KEY`) 미설정 시 시크릿 등록은 400으로 거부. 평문 저장 방지
+  - Base64 16·24·32바이트. 생성 예: `openssl rand -base64 32`
+  - 키를 바꾸면 기존 시크릿을 읽지 못하므로 해당 환경의 실행이 400으로 실패. 값을 다시 입력해야 함
 
 - 삭제는 소프트 삭제(보관). 204 응답, 하위 항목 연쇄 보관, 실행 이력은 유지
   - 프로젝트 → 환경·스위트·케이스·스케줄, 환경 → 해당 스케줄, 스위트 → 케이스·스케줄

@@ -95,8 +95,10 @@ export interface EnvironmentItem {
   projectId: number;
   name: string;
   baseUrl: string;
-  /** 평문 저장. 토큰·API 키 입력 금지 */
+  /** 평문 저장. 토큰·API 키는 시크릿으로 등록 */
   variables: Record<string, string>;
+  /** 시크릿 이름. 값은 조회 불가 (암호화 저장) */
+  secretNames: string[];
 }
 
 /** 판정 규칙. type별 필드는 api/README.md "판정 규칙 (assertions)" 참고 */

@@ -103,13 +103,15 @@ public class CatalogQueryService {
 	}
 
 	/**
-	 * @param variables 비밀 값이 아닌 변수만 저장하는 원칙(시크릿 분리 전)이므로 값 포함
+	 * @param variables 비밀이 아닌 값만 저장하므로 값 포함
+	 * @param secretNames 시크릿 이름만 노출. 값은 조회 불가
 	 */
-	public record EnvironmentItem(long id, long projectId, String name, String baseUrl, Map<String, String> variables) {
+	public record EnvironmentItem(long id, long projectId, String name, String baseUrl, Map<String, String> variables,
+			List<String> secretNames) {
 
 		static EnvironmentItem of(Environment environment) {
 			return new EnvironmentItem(environment.getId(), environment.getProject().getId(), environment.getName(),
-					environment.getBaseUrl(), environment.getVariables());
+					environment.getBaseUrl(), environment.getVariables(), environment.getSecretNames());
 		}
 
 	}
