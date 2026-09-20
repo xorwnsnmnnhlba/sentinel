@@ -29,6 +29,9 @@ public class AuthFilter extends OncePerRequestFilter {
 
 	private static final String LOGIN_PATH = "/api/sessions";
 
+	/** 로그인 전에 쓰는 링크 API. 토큰 자체가 자격증명이며 만료·1회용 */
+	private static final Set<String> OPEN_PREFIXES = Set.of("/api/invites/", "/api/password-resets/");
+
 	private static final Set<String> OPEN_METHODS = Set.of("OPTIONS");
 
 	private final AuthService authService;
@@ -49,6 +52,9 @@ public class AuthFilter extends OncePerRequestFilter {
 	private boolean requiresAuthentication(HttpServletRequest request) {
 		String path = request.getRequestURI();
 		if (!path.startsWith("/api/") || OPEN_METHODS.contains(request.getMethod())) {
+			return false;
+		}
+		if (OPEN_PREFIXES.stream().anyMatch(path::startsWith)) {
 			return false;
 		}
 		// 로그인 요청만 예외. 로그아웃은 토큰이 있어야 처리 가능
