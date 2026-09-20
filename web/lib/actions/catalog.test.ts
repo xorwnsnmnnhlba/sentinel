@@ -20,7 +20,7 @@ import {
   setScheduleEnabled,
   updateCase,
   updateEnvironment,
-  updateScheduleCron,
+  updateSchedule,
   updateProject,
 } from "./catalog";
 
@@ -266,12 +266,30 @@ describe("schedules", () => {
     });
   });
 
-  it("sends only cron when editing", async () => {
+  it("sends cron and environment when editing", async () => {
     const bodies = capture("patch", "/api/schedules/5", () => HttpResponse.json({ id: 5 }));
 
-    await updateScheduleCron(5, undefined, form({ cron: "30 17 * * 1-5" }));
+    await updateSchedule(5, undefined, form({ cron: "30 17 * * 1-5", environmentId: "4" }));
 
-    expect(bodies).toEqual([{ cron: "30 17 * * 1-5" }]);
+    expect(bodies).toEqual([{ cron: "30 17 * * 1-5", environmentId: 4 }]);
+  });
+
+  it("requires an environment when editing", async () => {
+    await expect(updateSchedule(5, undefined, form({ cron: "30 17 * * 1-5" }))).resolves.toEqual({
+      error: "실행할 환경을 선택해 주세요",
+    });
+  });
+
+  it("shows the Spring message when the environment belongs to another project", async () => {
+    server.use(
+      http.patch(springUrl("/api/schedules/5"), () =>
+        problem(400, "suite and environment must belong to the same project"),
+      ),
+    );
+
+    await expect(updateSchedule(5, undefined, form({ cron: "30 17 * * 1-5", environmentId: "9" }))).resolves.toEqual({
+      error: "입력값을 확인해 주세요: suite and environment must belong to the same project",
+    });
   });
 
   it.each([true, false])("sends enabled=%s", async (enabled) => {

@@ -4,21 +4,27 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import type { EnvironmentItem, ScheduleDetail } from "@/lib/api/types";
 
 /**
- * 스케줄 등록·수정 입력 항목. 등록 시에만 환경 선택 (환경 변경은 미지원, 삭제 후 재등록)
+ * 스케줄 등록·수정 입력 항목. 수정 시 현재 환경이 선택된 상태로 표시되며 같은 프로젝트의 환경으로 변경 가능
  */
 export function ScheduleFields({
   environments,
   schedule,
 }: {
-  environments?: EnvironmentItem[];
+  environments: EnvironmentItem[];
   schedule?: ScheduleDetail;
 }) {
   return (
     <>
-      {environments && (
+      {environments.length > 0 && (
         <div className="space-y-2">
           <Label htmlFor="schedule-environment">실행 환경</Label>
-          <NativeSelect id="schedule-environment" name="environmentId" className="w-full" required>
+          <NativeSelect
+            id="schedule-environment"
+            name="environmentId"
+            className="w-full"
+            defaultValue={schedule?.environmentId}
+            required
+          >
             {environments.map((environment) => (
               <NativeSelectOption key={environment.id} value={environment.id}>
                 {environment.name}
