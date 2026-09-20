@@ -191,6 +191,26 @@ curl -i -X POST localhost:8080/api/runs \
 - 응답 본문은 64KB(UTF-8 기준) 초과 시 잘라서 저장, `bodyTruncated: true` 표시
 - 요청 URL의 변수 값은 인코딩하지 않음. 공백 등 URL에 쓸 수 없는 문자는 `INVALID_REQUEST`
 
+## 인증
+
+| API | 설명 |
+|-----|------|
+| `POST /api/sessions` | 로그인. 본문 `{"email": "...", "password": "..."}`. 201 + `{"token": "...", "user": {...}}` |
+| `GET /api/sessions/current` | 현재 세션 사용자 |
+| `DELETE /api/sessions/current` | 로그아웃. 세션 즉시 폐기 |
+
+- 로그인 외 모든 `/api/**`는 `Authorization: Bearer {토큰}` 필요. 없으면 401 ProblemDetail
+- 브라우저는 Next.js(BFF)의 httpOnly 쿠키를 사용하고, Spring은 쿠키를 모름 (토큰만 헤더로 수신)
+- 비밀번호는 BCrypt 해시, 세션 토큰은 SHA-256 해시로만 저장. 로그인 실패 사유는 구분하지 않음(계정 존재 여부 비노출)
+- 세션 만료는 로그인 시점 기준 고정 (`sentinel.auth.session-validity`, 기본 12h). 사용해도 연장되지 않음
+- 가입은 관리자 초대 방식 예정. 현재는 최초 관리자 계정만 환경변수로 생성
+
+| 설정 | 기본값 | 설명 |
+|------|--------|------|
+| `sentinel.auth.session-validity` | `12h` | 세션 유효 기간 |
+| `sentinel.auth.admin-email` | 없음 (`SENTINEL_ADMIN_EMAIL`) | 최초 관리자 이메일. 사용자가 없을 때만 생성 |
+| `sentinel.auth.admin-password` | 없음 (`SENTINEL_ADMIN_PASSWORD`) | 최초 관리자 비밀번호. 첫 로그인 후 변경 권장 |
+
 ## REST API
 
 모든 리소스는 최상위 컬렉션, 관계는 쿼리 파라미터로 필터 (`docs/design.md` "REST API 설계")

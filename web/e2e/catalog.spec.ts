@@ -7,11 +7,30 @@ import { expect, type Page, test } from "@playwright/test";
  */
 test.describe.configure({ mode: "serial" });
 
+/** 모든 화면이 로그인 필요. 스택의 최초 관리자 계정으로 로그인 후 진행 */
+test.beforeEach(async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("이메일").fill("admin@sentinel.test");
+  await page.getByLabel("비밀번호").fill("e2e-admin-password");
+  await page.getByRole("button", { name: "로그인" }).click();
+  // 머리말 메뉴가 보이면 로그인 완료 (홈 화면 카드 링크와 구분)
+  await expect(page.getByRole("banner").getByRole("link", { name: "프로젝트" })).toBeVisible();
+});
+
 // 스택을 내리지 않고 반복 실행해도 충돌하지 않도록 매번 고유한 이름 사용
 const stamp = Date.now();
 const project = `e2e-${stamp}`;
 const suite = `smoke-${stamp}`;
-const secret = `secret-value-${stamp}`;
+/** 케이스가 Sentinel API 자신을 호출하므로 실제 세션 토큰이 필요. 이 값을 시크릿으로 저장하여 마스킹까지 확인 */
+let secret: string;
+
+test.beforeAll(async ({ request }) => {
+  const response = await request.post(`${process.env.E2E_API_URL ?? "http://localhost:18080"}/api/sessions`, {
+    data: { email: "admin@sentinel.test", password: "e2e-admin-password" },
+  });
+  expect(response.status()).toBe(201);
+  secret = (await response.json()).token;
+});
 
 /** 실행 이력 화면의 전체 건수 */
 async function totalRuns(page: Page): Promise<number> {
@@ -80,7 +99,11 @@ test("케이스 등록 후 실행하면 결과 표시", async ({ page }) => {
 
   await page.getByRole("link", { name: "케이스 추가" }).click();
   await page.getByLabel("이름", { exact: true }).fill("프로젝트 목록 조회");
-  await page.getByLabel("경로").fill("{{apiPrefix}}/projects");
+  await page.getByLabel("경로").fill("{{apiPrefix}}/projects?key={{token}}");
+  // API 호출에도 세션이 필요하므로 시크릿을 인증 헤더로 사용
+  await page.getByRole("button", { name: "헤더 추가" }).click();
+  await page.getByLabel("헤더 1 이름").fill("Authorization");
+  await page.getByLabel("헤더 1 값").fill("Bearer {{token}}");
   await page.getByLabel("추가할 판정 규칙").selectOption("bodyContains");
   await page.getByRole("button", { name: "규칙 추가" }).click();
   await page.getByLabel("판정 규칙 1 포함할 문자열").fill(project);
@@ -95,6 +118,10 @@ test("케이스 등록 후 실행하면 결과 표시", async ({ page }) => {
   await expect(page.getByRole("heading", { name: new RegExp(suite) })).toBeVisible();
   await expect(page.getByText("통과 1")).toBeVisible();
   await expect(page.getByText("프로젝트 목록 조회")).toBeVisible();
+  // 통과한 케이스는 접혀 있으므로 펼쳐서 확인. 시크릿(세션 토큰) 값은 마스킹된 상태로 표시
+  await page.getByRole("button", { name: /프로젝트 목록 조회/ }).click();
+  await expect(page.getByText(/key=\*\*\*\*/)).toBeVisible();
+  expect(await page.content()).not.toContain(secret);
 });
 
 test("잘못된 경로는 저장 전에 막힘", async ({ page }) => {

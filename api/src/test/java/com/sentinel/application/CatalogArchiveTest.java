@@ -3,6 +3,7 @@ package com.sentinel.application;
 import java.util.List;
 import java.util.Map;
 
+import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
@@ -28,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class })
+@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class,
+		TestAuthConfiguration.class })
 class CatalogArchiveTest {
 
 	@Autowired

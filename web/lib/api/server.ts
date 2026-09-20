@@ -1,6 +1,8 @@
 import "server-only";
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+
+import { sessionToken } from "./session";
 
 /**
  * Spring API 서버 전용 클라이언트. 브라우저 번들 포함 시 빌드 실패(server-only).
@@ -22,13 +24,30 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof Error && error.name === "ApiError" && typeof (error as Partial<ApiError>).status === "number";
 }
 
-/** 최신 실행 결과를 보여주는 도구이므로 캐시 미사용 */
+/**
+ * 최신 실행 결과를 보여주는 도구이므로 캐시 미사용.
+ * 세션 쿠키가 있으면 Spring에는 Authorization 헤더로 전달 (Spring은 쿠키를 모름)
+ */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(new URL(path, apiBaseUrl), { ...init, cache: "no-store" });
+  const token = await sessionToken();
+  const headers = new Headers(init?.headers);
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return fetch(new URL(path, apiBaseUrl), { ...init, headers, cache: "no-store" });
+}
+
+/** 로그인 화면으로 이동. 세션 만료·미로그인 상태에서 보호된 화면을 열 때 사용 */
+export function redirectToLogin(from?: string): never {
+  redirect(from && from !== "/" ? `/login?from=${encodeURIComponent(from)}` : "/login");
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
   const response = await apiFetch(path, { headers: { Accept: "application/json" } });
+  if (response.status === 401) {
+    // 세션 만료. 오류 화면 대신 로그인 화면으로
+    redirectToLogin();
+  }
   if (!response.ok) {
     throw await toApiError(response);
   }

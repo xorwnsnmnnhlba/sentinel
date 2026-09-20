@@ -1,8 +1,9 @@
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
+import { testCookies } from "@/test/cookies";
 import { problem, server, springUrl } from "@/test/msw";
-import { captureNavigation } from "@/test/next";
+import { captureNavigation, captureRedirect } from "@/test/next";
 
 import { apiError, apiGet, apiGetOrNotFound, apiSend, isApiError } from "./server";
 
@@ -48,6 +49,44 @@ describe("apiGet", () => {
     );
 
     await expect(apiGet("/api/projects")).rejects.toMatchObject({ status: 502, detail: "Bad Gateway" });
+  });
+});
+
+describe("session", () => {
+  it("sends the session token as a bearer header", async () => {
+    testCookies.set("sentinel_session", "token-abc");
+    let authorization: string | null = null;
+    server.use(
+      http.get(springUrl("/api/projects"), ({ request }) => {
+        authorization = request.headers.get("authorization");
+        return HttpResponse.json([]);
+      }),
+    );
+
+    await apiGet("/api/projects");
+
+    expect(authorization).toBe("Bearer token-abc");
+  });
+
+  it("sends no authorization header without a session", async () => {
+    let authorization: string | null = "unset";
+    server.use(
+      http.get(springUrl("/api/projects"), ({ request }) => {
+        authorization = request.headers.get("authorization");
+        return HttpResponse.json([]);
+      }),
+    );
+
+    await apiGet("/api/projects");
+
+    expect(authorization).toBeNull();
+  });
+
+  it("sends the visitor to the login page when the session expired", async () => {
+    testCookies.set("sentinel_session", "expired");
+    server.use(http.get(springUrl("/api/projects"), () => problem(401, "authentication required")));
+
+    await expect(captureRedirect(() => apiGet("/api/projects"))).resolves.toBe("/login");
   });
 });
 
