@@ -125,3 +125,11 @@ export interface ScheduleDetail {
   nextRunAt: string | null;
   lastTriggeredAt: string | null;
 }
+
+/** 로그인 사용자. 비밀번호 등 민감한 값은 포함하지 않음 */
+export interface AuthenticatedUser {
+  id: number;
+  email: string;
+  name: string;
+  role: "ADMIN" | "MEMBER";
+}

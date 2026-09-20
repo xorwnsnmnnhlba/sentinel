@@ -30,6 +30,9 @@ services:
       DB_PASSWORD: sentinel-e2e
       # 시크릿 암호화 키. 일회용 테스트 스택 전용 값
       SENTINEL_SECRET_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      # 최초 관리자 계정. 일회용 테스트 스택 전용 값
+      SENTINEL_ADMIN_EMAIL: admin@sentinel.test
+      SENTINEL_ADMIN_PASSWORD: e2e-admin-password
       TZ: Asia/Seoul
     ports:
       - "18080:8080"
