@@ -9,6 +9,12 @@ test.describe.configure({ mode: "serial" });
 
 const project = `e2e-${Date.now()}`;
 
+/** 실행 이력 화면의 전체 건수 */
+async function totalRuns(page: Page): Promise<number> {
+  const summary = await page.getByText(/전체 \d+건/).innerText();
+  return Number(summary.match(/전체 (\d+)건/)![1]);
+}
+
 /** 화면의 오류 메시지. Next.js 라우트 알림(role=alert)은 제외 */
 function alertIn(page: Page) {
   return page.locator('[role="alert"]:not(#__next-route-announcer__)');
@@ -125,7 +131,9 @@ test("스케줄 등록·전환·수정·삭제", async ({ page }) => {
 
 test("프로젝트 삭제 시 하위 항목도 사라지고 실행 이력은 유지", async ({ page }) => {
   await page.goto("/runs");
-  const runsBefore = await page.getByRole("row").count();
+  const runRow = page.getByRole("row", { name: new RegExp(suite) });
+  await expect(runRow).toHaveCount(1);
+  const totalBefore = await totalRuns(page);
 
   await page.goto("/projects");
   await page.getByRole("link", { name: project }).click();
@@ -137,9 +145,9 @@ test("프로젝트 삭제 시 하위 항목도 사라지고 실행 이력은 유
   await expect(page.getByRole("link", { name: project })).toHaveCount(0);
 
   await page.goto("/runs");
-  await expect(page.getByRole("row")).toHaveCount(runsBefore);
-  // 스위트가 삭제되어도 이력의 스위트 이름은 그대로 표시
-  await expect(page.getByRole("row", { name: new RegExp(suite) }).first()).toBeVisible();
+  // 스위트가 삭제되어도 이력 건수와 스위트 이름은 그대로
+  expect(await totalRuns(page)).toBe(totalBefore);
+  await expect(runRow).toHaveCount(1);
 });
 
 test("없는 주소는 404", async ({ page }) => {
