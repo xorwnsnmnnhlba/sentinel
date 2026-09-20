@@ -104,6 +104,18 @@ public class TestSchedule extends BaseEntity {
 		}
 	}
 
+	/**
+	 * 실행 환경 변경. 지난 실행 이력은 실행 시점 환경을 따로 기록하므로 영향 없음
+	 * @throws IllegalArgumentException 스위트와 다른 프로젝트의 환경
+	 */
+	public void changeEnvironment(Environment environment) {
+		Objects.requireNonNull(environment, "environment");
+		if (!same(suite.getProject(), environment.getProject())) {
+			throw new IllegalArgumentException("suite and environment must belong to the same project");
+		}
+		this.environment = environment;
+	}
+
 	public void enable(Instant now, ZoneId zone) {
 		if (isArchived()) {
 			throw new IllegalStateException("schedule " + getId() + " is archived");

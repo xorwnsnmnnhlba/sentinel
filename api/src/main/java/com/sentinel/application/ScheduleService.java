@@ -47,14 +47,26 @@ public class ScheduleService {
 	}
 
 	/**
-	 * 부분 수정. null 필드는 변경하지 않음. cron 변경 후 활성 여부 적용
+	 * 부분 수정. null 필드는 변경하지 않음. 환경·cron 변경 후 활성 여부 적용
 	 * @param enabled true면 현재 시각 기준 다음 실행 시각 재계산, false면 다음 실행 시각 제거
 	 * @param cron 활성 상태면 현재 시각 기준 다음 실행 시각 재계산
-	 * @throws InvalidRequestException 잘못된 cron
+	 * @param environmentId 스위트와 같은 프로젝트의 환경만 허용
+	 * @throws NotFoundException 스케줄 또는 환경 미존재
+	 * @throws InvalidRequestException 잘못된 cron, 스위트와 환경의 프로젝트 불일치
 	 */
 	@Transactional
-	public ScheduleDetail update(long scheduleId, Boolean enabled, String cron) {
+	public ScheduleDetail update(long scheduleId, Boolean enabled, String cron, Long environmentId) {
 		TestSchedule schedule = find(scheduleId);
+		if (environmentId != null) {
+			Environment environment = environments.findByIdAndArchivedAtIsNull(environmentId)
+				.orElseThrow(() -> new NotFoundException("environment", environmentId));
+			try {
+				schedule.changeEnvironment(environment);
+			}
+			catch (IllegalArgumentException ex) {
+				throw new InvalidRequestException(ex.getMessage());
+			}
+		}
 		if (cron != null) {
 			try {
 				schedule.changeCron(cron, clock.instant(), properties.zone());
