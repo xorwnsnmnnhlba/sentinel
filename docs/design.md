@@ -310,7 +310,11 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 ```
 
 구현 (2026-09-19)
-- 채널 미정으로 `Notifier` 인터페이스 분리, 임시 구현 `LoggingNotifier`(WARN 로그). 채널 확정 시 구현체 추가 후 `NotificationConfig` 빈 교체
+- `Notifier` 인터페이스 분리. 기본 구현은 `LoggingNotifier`(WARN 로그)
+- Webhook 발송 추가 (2026-09-20): `sentinel.notification.webhook-url` 지정 시 `WebhookNotifier` 사용
+  - 본문은 `{"text": "..."}` 한 필드로 Slack·Teams 수신 Webhook 그대로 사용. 다른 형식은 구현체 추가로 대응
+  - 주소는 자격증명이므로 환경변수 주입, 로그 미기록
+  - 타임아웃은 짧게(연결 3s, 응답 5s) 설정하여 알림이 실행·폴링을 지연시키지 않도록 함
 - 발송 대상: 스케줄 실행 결과의 판정 실패·오류, 스케줄 실행 자체 오류, DB 연결 실패·복구. 수동 실행은 화면·API 응답으로 확인하므로 미발송
 - 실패 사유는 실패한 판정 규칙만 표시(`status in [2xx]: was 500`), 최대 20줄 후 `… 외 N건`
 - 알림 발송 실패는 로그만 기록하고 폴링 계속
