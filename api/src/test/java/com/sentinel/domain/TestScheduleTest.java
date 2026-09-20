@@ -100,6 +100,27 @@ class TestScheduleTest {
 	}
 
 	@Test
+	void changesEnvironmentWithinTheSameProject() {
+		TestSchedule schedule = schedule("10 9 * * *", SEOUL);
+		Environment staging = new Environment(project, "staging", "https://gw-stg");
+
+		schedule.changeEnvironment(staging);
+
+		assertThat(schedule.getEnvironment()).isSameAs(staging);
+		// 환경만 바뀌고 실행 시각은 유지
+		assertThat(schedule.getNextRunAt()).isEqualTo("2026-09-18T00:10:00Z");
+	}
+
+	@Test
+	void rejectsEnvironmentChangeToAnotherProject() {
+		TestSchedule schedule = schedule("10 9 * * *", SEOUL);
+		Environment other = new Environment(new Project("other", null), "dev", "https://gw");
+
+		assertThatThrownBy(() -> schedule.changeEnvironment(other)).isInstanceOf(IllegalArgumentException.class);
+		assertThat(schedule.getEnvironment()).isSameAs(environment);
+	}
+
+	@Test
 	void rejectsEnvironmentOfAnotherProject() {
 		Environment other = new Environment(new Project("other", null), "dev", "https://gw");
 

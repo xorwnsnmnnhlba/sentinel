@@ -18,7 +18,7 @@ import {
   deleteSchedule,
   deleteSuite,
   runSuite,
-  updateScheduleCron,
+  updateSchedule,
   updateSuite,
 } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
@@ -154,11 +154,11 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                             </Button>
                           }
                           title="스케줄 수정"
-                          description="cron 변경. 활성 상태면 다음 실행 시각을 현재 시각 기준으로 다시 계산합니다."
+                          description="환경·cron 변경. 활성 상태면 다음 실행 시각을 현재 시각 기준으로 다시 계산합니다."
                           submitLabel="저장"
-                          action={updateScheduleCron.bind(null, schedule.id)}
+                          action={updateSchedule.bind(null, schedule.id)}
                         >
-                          <ScheduleFields schedule={schedule} />
+                          <ScheduleFields environments={environments} schedule={schedule} />
                         </FormDialog>
                         <DeleteButton
                           title={`스케줄 "${schedule.cron}" 삭제`}

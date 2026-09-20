@@ -78,6 +78,41 @@ class ScheduleControllerTest {
 	}
 
 	@Test
+	void changesEnvironmentOfSchedule() {
+		Project project = fixtures.project();
+		Environment dev = fixtures.environment(project, Map.of());
+		Environment staging = fixtures.environment(project, "staging", Map.of());
+		TestSuite suite = fixtures.suite(project);
+		String location = create(suite, dev, "10 9 * * 1-5").getResponse().getHeader("Location");
+
+		assertThat(patch(location, "{\"environmentId\": %d}".formatted(staging.getId()))).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.environmentId")
+			.isEqualTo(staging.getId().intValue());
+		assertThat(mvc.get().uri(location)).bodyJson().extractingPath("$.cron").isEqualTo("10 9 * * 1-5");
+	}
+
+	@Test
+	void rejectsEnvironmentOfAnotherProjectOrMissingEnvironment() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		Environment otherProjectEnvironment = fixtures.environment(fixtures.project(), Map.of());
+		String location = create(fixtures.suite(project), environment, "10 9 * * 1-5").getResponse()
+			.getHeader("Location");
+
+		assertThat(patch(location, "{\"environmentId\": %d}".formatted(otherProjectEnvironment.getId())))
+			.hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.asString()
+			.contains("same project");
+		assertThat(patch(location, "{\"environmentId\": -1}")).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(mvc.get().uri(location)).bodyJson()
+			.extractingPath("$.environmentId")
+			.isEqualTo(environment.getId().intValue());
+	}
+
+	@Test
 	void rejectsInvalidCronWithProblemDetail() {
 		Project project = fixtures.project();
 		Environment environment = fixtures.environment(project, Map.of());

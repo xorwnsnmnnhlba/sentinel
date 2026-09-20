@@ -49,19 +49,33 @@ describe("ScheduleFields", () => {
     expect(Object.fromEntries(action.mock.calls[0][1])).toEqual({ environmentId: "2", cron: "0 */2 * * *" });
   });
 
-  it("edits cron only and keeps the saved value", async () => {
+  it("keeps the saved cron and environment when editing", async () => {
     const user = userEvent.setup();
     const action = vi.fn<Action>(async () => ({}));
-    renderDialog(action, <ScheduleFields schedule={schedule} />);
+    renderDialog(action, <ScheduleFields environments={[dev, staging]} schedule={schedule} />);
 
     await user.click(screen.getByRole("button", { name: "열기" }));
     expect(screen.getByLabelText("cron")).toHaveValue("30 17 * * 1-5");
-    expect(screen.queryByLabelText("실행 환경")).not.toBeInTheDocument();
+    // 저장된 환경이 선택된 상태
+    expect(screen.getByLabelText("실행 환경")).toHaveValue("2");
 
     await user.click(screen.getByRole("button", { name: "저장" }));
 
     await waitForCall(action);
-    expect(Object.fromEntries(action.mock.calls[0][1])).toEqual({ cron: "30 17 * * 1-5" });
+    expect(Object.fromEntries(action.mock.calls[0][1])).toEqual({ cron: "30 17 * * 1-5", environmentId: "2" });
+  });
+
+  it("changes the environment of a saved schedule", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => ({}));
+    renderDialog(action, <ScheduleFields environments={[dev, staging]} schedule={schedule} />);
+
+    await user.click(screen.getByRole("button", { name: "열기" }));
+    await user.selectOptions(screen.getByLabelText("실행 환경"), "1");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitForCall(action);
+    expect(Object.fromEntries(action.mock.calls[0][1])).toEqual({ cron: "30 17 * * 1-5", environmentId: "1" });
   });
 });
 

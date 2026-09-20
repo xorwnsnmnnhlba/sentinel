@@ -47,7 +47,12 @@ public class TestFixtures {
 	}
 
 	public Environment environment(Project project, Map<String, String> variables) {
-		Environment environment = new Environment(project, "dev", "https://gw.dev.internal");
+		return environment(project, "dev", variables);
+	}
+
+	/** 한 프로젝트에 환경을 여러 개 만들 때는 이름 지정 (프로젝트 내 이름 유니크) */
+	public Environment environment(Project project, String name, Map<String, String> variables) {
+		Environment environment = new Environment(project, name, "https://gw.dev.internal");
 		variables.forEach(environment::putVariable);
 		return environments.save(environment);
 	}
