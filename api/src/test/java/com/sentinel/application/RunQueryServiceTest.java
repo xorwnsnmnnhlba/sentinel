@@ -1,5 +1,8 @@
 package com.sentinel.application;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -60,7 +63,7 @@ class RunQueryServiceTest {
 		long first = testRunService.runSuite(billing.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, tester());
 		long second = testRunService.runSuite(empty.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 
-		PageResponse<RunSummary> page = runQueries.listRuns(null, 0, 20);
+		PageResponse<RunSummary> page = runQueries.listRuns(RunFilter.none(), 0, 20);
 
 		assertThat(page.totalElements()).isEqualTo(2);
 		assertThat(page.content()).extracting(RunSummary::id).containsExactly(second, first);
@@ -84,7 +87,7 @@ class RunQueryServiceTest {
 		}
 		testRunService.runSuite(other.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 
-		PageResponse<RunSummary> secondPage = runQueries.listRuns(target.getId(), 1, 2);
+		PageResponse<RunSummary> secondPage = runQueries.listRuns(suiteFilter(target.getId()), 1, 2);
 
 		assertThat(secondPage.totalElements()).isEqualTo(3);
 		assertThat(secondPage.totalPages()).isEqualTo(2);
@@ -95,10 +98,58 @@ class RunQueryServiceTest {
 
 	@Test
 	void clampsPageAndSize() {
-		PageResponse<RunSummary> page = runQueries.listRuns(null, -5, 10_000);
+		PageResponse<RunSummary> page = runQueries.listRuns(RunFilter.none(), -5, 10_000);
 
 		assertThat(page.page()).isZero();
 		assertThat(page.size()).isEqualTo(RunQueryService.MAX_PAGE_SIZE);
+	}
+
+	@Test
+	void filtersByProjectEnvironmentAndStatus() {
+		Project project = fixtures.project();
+		Environment dev = fixtures.environment(project, Map.of());
+		Environment staging = fixtures.environment(project, "staging", Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/a", null, null);
+		Project otherProject = fixtures.project();
+		TestSuite otherSuite = fixtures.suite(otherProject);
+		fixtures.testCase(otherSuite, HttpMethod.GET, "/a", null, null);
+		Environment otherEnvironment = fixtures.environment(otherProject, Map.of());
+
+		long devRun = testRunService.runSuite(suite.getId(), dev.getId(), TestRun.Trigger.MANUAL, tester());
+		long stagingRun = testRunService.runSuite(suite.getId(), staging.getId(), TestRun.Trigger.MANUAL, tester());
+		long otherRun = testRunService.runSuite(otherSuite.getId(), otherEnvironment.getId(), TestRun.Trigger.MANUAL,
+				tester());
+
+		assertThat(ids(new RunFilter(project.getId(), null, null, null, null, null)))
+			.containsExactly(stagingRun, devRun);
+		assertThat(ids(new RunFilter(null, null, dev.getId(), null, null, null))).containsExactly(devRun);
+		assertThat(ids(new RunFilter(null, otherSuite.getId(), null, null, null, null))).containsExactly(otherRun);
+		assertThat(ids(new RunFilter(null, null, null, TestRun.Status.COMPLETED, null, null)))
+			.containsExactly(otherRun, stagingRun, devRun);
+		assertThat(ids(new RunFilter(null, null, null, TestRun.Status.RUNNING, null, null))).isEmpty();
+		// 조건을 함께 지정하면 모두 만족하는 실행만
+		assertThat(ids(new RunFilter(project.getId(), null, staging.getId(), null, null, null)))
+			.containsExactly(stagingRun);
+		assertThat(ids(new RunFilter(otherProject.getId(), null, dev.getId(), null, null, null))).isEmpty();
+	}
+
+	@Test
+	void filtersByDateInTheScheduleTimeZone() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/a", null, null);
+		long run = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
+		LocalDate today = LocalDate.ofInstant(Instant.now(), ZoneId.of("Asia/Seoul"));
+
+		assertThat(ids(new RunFilter(null, null, null, null, today, today))).contains(run);
+		assertThat(ids(new RunFilter(null, null, null, null, today.plusDays(1), null))).doesNotContain(run);
+		assertThat(ids(new RunFilter(null, null, null, null, null, today.minusDays(1)))).doesNotContain(run);
+	}
+
+	private List<Long> ids(RunFilter filter) {
+		return runQueries.listRuns(filter, 0, 50).content().stream().map(RunSummary::id).toList();
 	}
 
 	@Test
@@ -114,20 +165,24 @@ class RunQueryServiceTest {
 		Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
 		statistics.clear();
 
-		PageResponse<RunSummary> singlePage = runQueries.listRuns(null, 0, 20);
+		PageResponse<RunSummary> singlePage = runQueries.listRuns(RunFilter.none(), 0, 20);
 
 		assertThat(singlePage.content()).hasSize(5);
 		// 실행+이름(fetch), 판정 집계, 실행 주체. 한 페이지에 모두 들어가 전체 건수 쿼리 생략
 		assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
 
 		statistics.clear();
-		PageResponse<RunSummary> firstOfMany = runQueries.listRuns(null, 0, 2);
+		PageResponse<RunSummary> firstOfMany = runQueries.listRuns(RunFilter.none(), 0, 2);
 
 		assertThat(firstOfMany.totalPages()).isEqualTo(3);
 		// 실행+이름(fetch), 전체 건수, 판정 집계, 실행 주체
 		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
 	}
 
+
+	private static RunFilter suiteFilter(long suiteId) {
+		return new RunFilter(null, suiteId, null, null, null, null);
+	}
 
 	/** 수동 실행 주체. 실행마다 같은 계정을 사용하도록 한 번만 생성 */
 	private long tester() {

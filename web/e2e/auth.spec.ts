@@ -37,7 +37,8 @@ test("로그인 후 원래 가려던 화면으로 이동하고 로그아웃하�
   await page.getByRole("button", { name: "로그인" }).click();
 
   await expect(page).toHaveURL(/\/runs$/);
-  await expect(page.getByText(email)).toBeVisible();
+  // 실행 이력에도 같은 이메일이 나올 수 있으므로 머리말로 한정
+  await expect(page.getByRole("banner").getByText(email)).toBeVisible();
 
   await page.getByRole("button", { name: "로그아웃" }).click();
 

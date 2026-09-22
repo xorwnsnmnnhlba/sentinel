@@ -1,8 +1,10 @@
 package com.sentinel.api;
 
 import java.net.URI;
+import java.time.LocalDate;
 
 import com.sentinel.application.PageResponse;
+import com.sentinel.application.RunFilter;
 import com.sentinel.application.RunQueryService;
 import com.sentinel.application.RunSummary;
 import com.sentinel.application.TestRunDetail;
@@ -10,6 +12,7 @@ import com.sentinel.application.TestRunService;
 import com.sentinel.domain.TestRun;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,12 +34,19 @@ class RunController {
 	private final CurrentUser currentUser;
 
 	/**
-	 * 최신순 실행 목록. size는 1~100으로 보정
+	 * 최신순 실행 목록. size는 1~100으로 보정, 지정하지 않은 필터는 조건에서 제외
+	 *
+	 * @param from 시작일(포함). 기간은 스케줄 시간대(기본 Asia/Seoul) 기준
+	 * @param to 종료일(포함)
 	 */
 	@GetMapping
-	PageResponse<RunSummary> list(@RequestParam(required = false) Long suiteId,
+	PageResponse<RunSummary> list(@RequestParam(required = false) Long projectId,
+			@RequestParam(required = false) Long suiteId, @RequestParam(required = false) Long environmentId,
+			@RequestParam(required = false) TestRun.Status status,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
 			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-		return runQueryService.listRuns(suiteId, page, size);
+		return runQueryService.listRuns(new RunFilter(projectId, suiteId, environmentId, status, from, to), page, size);
 	}
 
 	@GetMapping("/{runId}")

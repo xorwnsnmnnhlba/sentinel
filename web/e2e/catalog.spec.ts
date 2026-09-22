@@ -126,6 +126,40 @@ test("케이스 등록 후 실행하면 결과 표시", async ({ page }) => {
   expect(await page.content()).not.toContain(secret);
 });
 
+test("실행 이력을 조건으로 좁히고 초기화", async ({ page }) => {
+  await page.goto("/runs");
+  const runRow = page.getByRole("row", { name: new RegExp(suite) });
+  await expect(runRow).toHaveCount(1);
+
+  // 조건은 주소에 남아 새로고침해도 유지됨
+  await page.getByLabel("프로젝트").selectOption({ label: project });
+  await page.getByLabel("스위트").selectOption({ label: suite });
+  // 환경 이름은 프로젝트마다 겹칠 수 있어 이 프로젝트 묶음 안의 항목을 선택
+  const environment = page.getByLabel("환경").locator(`optgroup[label="${project}"] option`).first();
+  await page.getByLabel("환경").selectOption((await environment.getAttribute("value"))!);
+  await page.getByLabel("상태").selectOption({ label: "완료" });
+  await page.getByRole("button", { name: "조회" }).click();
+
+  await expect(page).toHaveURL(/projectId=\d+&suiteId=\d+&environmentId=\d+&status=COMPLETED/);
+  await expect(runRow).toHaveCount(1);
+  await page.reload();
+  await expect(runRow).toHaveCount(1);
+
+  // 앞으로의 날짜로 좁히면 결과 없음
+  await page.getByLabel("시작일 (KST)").fill(afterToday());
+  await page.getByRole("button", { name: "조회" }).click();
+  await expect(page.getByText("조건에 맞는 실행 이력이 없습니다")).toBeVisible();
+
+  await page.getByRole("link", { name: "초기화" }).click();
+  await expect(page).toHaveURL(/\/runs$/);
+  await expect(runRow).toHaveCount(1);
+});
+
+/** 어떤 시간대에서도 오늘보다 뒤인 날짜 */
+function afterToday(): string {
+  return new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 test("잘못된 경로는 저장 전에 막힘", async ({ page }) => {
   await page.goto("/projects");
   await page.getByRole("link", { name: project }).click();

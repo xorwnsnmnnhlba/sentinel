@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 import { RunCountBadges, StatusBadge, TriggerBadge } from "@/components/run-badges";
+import { RunFilters, type RunFilterValues } from "@/components/runs/run-filters";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiGet } from "@/lib/api/server";
-import type { Page, RunSummary, SuiteItem } from "@/lib/api/types";
+import type { EnvironmentItem, Page, ProjectItem, RunSummary, SuiteItem } from "@/lib/api/types";
 import { formatDateTime, formatRunDuration } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
@@ -15,39 +15,40 @@ export const metadata = { title: "실행 이력 · Sentinel" };
 export default async function RunsPage(props: PageProps<"/runs">) {
   const searchParams = await props.searchParams;
   const page = Math.max(Number(single(searchParams.page)) || 0, 0);
-  const suiteId = single(searchParams.suiteId);
+  const filters: RunFilterValues = {
+    projectId: single(searchParams.projectId),
+    suiteId: single(searchParams.suiteId),
+    environmentId: single(searchParams.environmentId),
+    status: single(searchParams.status),
+    from: single(searchParams.from),
+    to: single(searchParams.to),
+  };
+
+  const hasFilter = Object.values(filters).some((value) => value);
 
   const query = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
-  if (suiteId) {
-    query.set("suiteId", suiteId);
-  }
-  const [runs, suites] = await Promise.all([
+  appendFilters(query, filters);
+  const [runs, projects, suites, environments] = await Promise.all([
     apiGet<Page<RunSummary>>(`/api/runs?${query}`),
+    apiGet<ProjectItem[]>("/api/projects"),
     apiGet<SuiteItem[]>("/api/suites"),
+    apiGet<EnvironmentItem[]>("/api/environments"),
   ]);
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">실행 이력</h1>
-        <p className="text-sm text-muted-foreground">최신순. 스케줄·수동 실행 전체 {runs.totalElements}건</p>
+        <p className="text-sm text-muted-foreground">
+          최신순. {hasFilter ? "조건에 맞는 실행" : "전체"} {runs.totalElements}건
+        </p>
       </div>
 
-      <nav className="flex flex-wrap gap-2" aria-label="스위트 필터">
-        <FilterLink href="/runs" active={!suiteId} label="전체" />
-        {suites.map((suite) => (
-          <FilterLink
-            key={suite.id}
-            href={`/runs?suiteId=${suite.id}`}
-            active={suiteId === String(suite.id)}
-            label={suite.name}
-          />
-        ))}
-      </nav>
+      <RunFilters projects={projects} suites={suites} environments={environments} values={filters} />
 
       {runs.content.length === 0 ? (
         <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          실행 이력이 없습니다
+          {hasFilter ? "조건에 맞는 실행 이력이 없습니다" : "실행 이력이 없습니다"}
         </p>
       ) : (
         <div className="rounded-lg border">
@@ -105,8 +106,8 @@ export default async function RunsPage(props: PageProps<"/runs">) {
             {runs.page + 1} / {runs.totalPages} 페이지
           </span>
           <div className="flex gap-2">
-            <PageLink page={runs.page - 1} suiteId={suiteId} disabled={runs.page === 0} label="이전" />
-            <PageLink page={runs.page + 1} suiteId={suiteId} disabled={runs.page + 1 >= runs.totalPages} label="다음" />
+            <PageLink page={runs.page - 1} filters={filters} disabled={runs.page === 0} label="이전" />
+            <PageLink page={runs.page + 1} filters={filters} disabled={runs.page + 1 >= runs.totalPages} label="다음" />
           </div>
         </div>
       )}
@@ -118,27 +119,24 @@ function single(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function FilterLink({ href, active, label }: { href: string; active: boolean; label: string }) {
-  return (
-    <Button
-      asChild
-      size="sm"
-      variant={active ? "default" : "outline"}
-      className={cn(!active && "text-muted-foreground")}
-    >
-      <Link href={href}>{label}</Link>
-    </Button>
-  );
+/** 비어 있는 조건은 빼고 넘겨 주소와 API 호출을 간결하게 유지 */
+function appendFilters(query: URLSearchParams, filters: RunFilterValues) {
+  Object.entries(filters).forEach(([name, value]) => {
+    if (value) {
+      query.set(name, value);
+    }
+  });
 }
 
+/** 페이지를 넘겨도 필터가 풀리지 않도록 조건을 그대로 이어붙임 */
 function PageLink({
   page,
-  suiteId,
+  filters,
   disabled,
   label,
 }: {
   page: number;
-  suiteId?: string;
+  filters: RunFilterValues;
   disabled: boolean;
   label: string;
 }) {
@@ -150,9 +148,7 @@ function PageLink({
     );
   }
   const query = new URLSearchParams({ page: String(page) });
-  if (suiteId) {
-    query.set("suiteId", suiteId);
-  }
+  appendFilters(query, filters);
   return (
     <Button asChild size="sm" variant="outline">
       <Link href={`/runs?${query}`}>{label}</Link>
