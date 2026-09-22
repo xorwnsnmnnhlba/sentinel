@@ -20,6 +20,7 @@ import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
+import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.RequestExecutionException;
@@ -64,6 +65,8 @@ public class TestRunService {
 
 	private final Transactions transactions;
 
+	private final UserRepository users;
+
 	private final SecretCipher secretCipher;
 
 	/**
@@ -71,13 +74,14 @@ public class TestRunService {
 	 * @return 생성된 실행 ID
 	 * @throws NotFoundException 케이스 또는 환경 미존재
 	 * @throws InvalidRequestException 케이스와 환경의 프로젝트 불일치
+	 * @param triggeredBy 실행을 시작한 사용자
 	 */
-	public long runTestCase(long testCaseId, long environmentId) {
+	public long runTestCase(long testCaseId, long environmentId, long triggeredBy) {
 		Prepared prepared = transactions.write(status -> {
 			TestCase testCase = testCases.findByIdAndArchivedAtIsNull(testCaseId)
 				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
 			return start(testCase.getSuite(), findEnvironment(environmentId), List.of(testCase),
-					TestRun.Trigger.MANUAL);
+					TestRun.Trigger.MANUAL, triggeredBy);
 		});
 		return executeAndRecord(prepared);
 	}
@@ -87,11 +91,13 @@ public class TestRunService {
 	 * @return 생성된 실행 ID
 	 * @throws NotFoundException 스위트 또는 환경 미존재
 	 * @throws InvalidRequestException 스위트와 환경의 프로젝트 불일치
+	 * @param triggeredBy 수동 실행을 시작한 사용자. 스케줄 실행은 null
 	 */
-	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger) {
+	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
 		Prepared prepared = transactions.write(status -> {
 			TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
-			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId), trigger);
+			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId), trigger,
+					triggeredBy);
 		});
 		return executeAndRecord(prepared);
 	}
@@ -99,8 +105,18 @@ public class TestRunService {
 	public TestRunDetail getRun(long runId) {
 		return transactions.readOnly(status -> {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
-			return TestRunDetail.of(run, results.findWithTestCaseByRunId(runId));
+			return TestRunDetail.of(run, results.findWithTestCaseByRunId(runId), triggeredBy(run));
 		});
+	}
+
+	/** 실행 주체 이름. 스케줄 실행은 null, 삭제(보관)된 사용자도 이력 표시를 위해 조회 */
+	private IdName triggeredBy(TestRun run) {
+		if (run.getTriggeredBy() == null) {
+			return null;
+		}
+		return users.findById(run.getTriggeredBy())
+			.map(user -> new IdName(user.getId(), user.getEmail()))
+			.orElse(null);
 	}
 
 	private Environment findEnvironment(long environmentId) {
@@ -108,12 +124,13 @@ public class TestRunService {
 			.orElseThrow(() -> new NotFoundException("environment", environmentId));
 	}
 
-	private Prepared start(TestSuite suite, Environment environment, List<TestCase> cases, TestRun.Trigger trigger) {
+	private Prepared start(TestSuite suite, Environment environment, List<TestCase> cases, TestRun.Trigger trigger,
+			Long triggeredBy) {
 		if (!BaseEntity.same(suite.getProject(), environment.getProject())) {
 			throw new InvalidRequestException("environment " + environment.getId()
 					+ " does not belong to the project of test suite " + suite.getId());
 		}
-		TestRun run = runs.save(TestRun.start(suite, environment, trigger, Instant.now()));
+		TestRun run = runs.save(TestRun.start(suite, environment, trigger, Instant.now(), triggeredBy));
 		List<PreparedCase> preparedCases = cases.stream()
 			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment),
 					testCase.getAssertions()))

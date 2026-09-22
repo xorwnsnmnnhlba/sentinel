@@ -81,6 +81,7 @@ export default async function RunsPage(props: PageProps<"/runs">) {
                   <TableCell>{run.environment.name}</TableCell>
                   <TableCell>
                     <TriggerBadge trigger={run.trigger} />
+                    {run.triggeredBy && <div className="text-xs text-muted-foreground">{run.triggeredBy.name}</div>}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={run.status} />

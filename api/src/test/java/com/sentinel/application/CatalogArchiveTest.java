@@ -54,6 +54,7 @@ class CatalogArchiveTest {
 	@AfterEach
 	void cleanUp() {
 		fixtures.deleteAll();
+		testerId = null;
 		executor.reset();
 	}
 
@@ -64,7 +65,7 @@ class CatalogArchiveTest {
 		TestSuite suite = fixtures.suite(project);
 		TestCase removed = fixtures.testCase(suite, HttpMethod.GET, "/removed", null, null);
 		TestCase kept = fixtures.testCase(suite, HttpMethod.GET, "/kept", null, null);
-		long earlierRun = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL);
+		long earlierRun = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 
 		assertThat(mvc.delete().uri("/api/cases/{id}", removed.getId())).hasStatus(HttpStatus.NO_CONTENT);
 
@@ -81,9 +82,9 @@ class CatalogArchiveTest {
 			.contains(removed.getName());
 		// 이후 실행 대상에서 제외
 		executor.reset();
-		testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL);
+		testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 		assertThat(executor.requests()).extracting(request -> request.uri().getPath()).containsExactly("/kept");
-		assertThatThrownBy(() -> testRunService.runTestCase(removed.getId(), environment.getId()))
+		assertThatThrownBy(() -> testRunService.runTestCase(removed.getId(), environment.getId(), tester()))
 				.isInstanceOf(NotFoundException.class);
 	}
 
@@ -94,7 +95,7 @@ class CatalogArchiveTest {
 		TestSuite suite = fixtures.suite(project);
 		TestCase testCase = fixtures.testCase(suite, HttpMethod.GET, "/a", null, null);
 		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * 1-5");
-		long run = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL);
+		long run = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 
 		assertThat(mvc.delete().uri("/api/projects/{id}", project.getId())).hasStatus(HttpStatus.NO_CONTENT);
 
@@ -128,7 +129,7 @@ class CatalogArchiveTest {
 		assertThat(mvc.get().uri("/api/schedules/{id}", devSchedule.id())).hasStatus(HttpStatus.NOT_FOUND);
 		assertThat(mvc.get().uri("/api/suites/{id}", suite.getId())).hasStatusOk();
 		assertThat(mvc.get().uri("/api/environments/{id}", staging.getId())).hasStatusOk();
-		assertThatThrownBy(() -> testRunService.runSuite(suite.getId(), dev.getId(), TestRun.Trigger.MANUAL))
+		assertThatThrownBy(() -> testRunService.runSuite(suite.getId(), dev.getId(), TestRun.Trigger.MANUAL, tester()))
 				.isInstanceOf(NotFoundException.class);
 	}
 
@@ -182,5 +183,16 @@ class CatalogArchiveTest {
 			.extractingPath("$.caseCount")
 			.isEqualTo(1);
 	}
+
+
+	/** 수동 실행 주체. 실행마다 같은 계정을 사용하도록 한 번만 생성 */
+	private long tester() {
+		if (testerId == null) {
+			testerId = fixtures.user().getId();
+		}
+		return testerId;
+	}
+
+	private Long testerId;
 
 }

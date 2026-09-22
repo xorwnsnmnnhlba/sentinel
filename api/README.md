@@ -251,9 +251,11 @@ curl -i -X POST localhost:8080/api/runs \
 - 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
 - 스위트는 `caseCount`, 케이스는 요청 정의(`request`)와 판정 규칙(`assertions`), 환경은 `baseUrl`과 변수 포함
 - 실행 목록: 최신순, 페이지 응답 `{content, page, size, totalElements, totalPages}` (`page`는 0부터, `size`는 1~100으로 보정)
-  - 행: 프로젝트·스위트·환경의 `{id, name}`, `trigger`, `status`, 시각, `summary`(전체·통과·실패·오류)
-  - 실행 건수와 무관하게 페이지당 쿼리 최대 3회 (이름 함께 로딩, 판정 건수 일괄 집계)
-- 실행 상세: 스위트·환경·케이스 이름과 케이스별 결과 포함
+  - 행: 프로젝트·스위트·환경의 `{id, name}`, `trigger`, `status`, 시각, `summary`(전체·통과·실패·오류), `triggeredBy`
+  - `triggeredBy`: 수동 실행을 시작한 사용자 `{id, name}`(이메일). 스케줄 실행과 이전 기록은 `null`
+  - 실행 건수와 무관하게 페이지당 쿼리 최대 4회 (이름 함께 로딩, 판정 건수 일괄 집계, 실행 주체 일괄 조회)
+- 실행 상세: 스위트·환경·케이스 이름과 케이스별 결과, 수동 실행이면 실행 주체 포함
+  - 실행 주체는 ID로 보관하고 이름은 조회 시 확인. 사용자를 삭제해도 이력에는 그대로 표시
 - 등록·수정
   - 등록은 201 + `Location`, 본문은 단건 조회와 같은 형태. 수정은 200 + 수정 후 항목
   - `PATCH`는 부분 수정. 생략(null)한 필드는 유지, `description`은 빈 문자열로 제거

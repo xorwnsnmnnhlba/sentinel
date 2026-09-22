@@ -43,6 +43,7 @@ class RunQueryServiceTest {
 	@AfterEach
 	void cleanUp() {
 		fixtures.deleteAll();
+		testerId = null;
 		executor.reset();
 	}
 
@@ -56,8 +57,8 @@ class RunQueryServiceTest {
 		fixtures.testCase(billing, HttpMethod.GET, "/{{missing}}", null, null);
 		TestSuite empty = fixtures.suite(project);
 
-		long first = testRunService.runSuite(billing.getId(), environment.getId(), TestRun.Trigger.SCHEDULED);
-		long second = testRunService.runSuite(empty.getId(), environment.getId(), TestRun.Trigger.MANUAL);
+		long first = testRunService.runSuite(billing.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, tester());
+		long second = testRunService.runSuite(empty.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 
 		PageResponse<RunSummary> page = runQueries.listRuns(null, 0, 20);
 
@@ -79,9 +80,9 @@ class RunQueryServiceTest {
 		TestSuite target = fixtures.suite(project);
 		TestSuite other = fixtures.suite(project);
 		for (int i = 0; i < 3; i++) {
-			testRunService.runSuite(target.getId(), environment.getId(), TestRun.Trigger.MANUAL);
+			testRunService.runSuite(target.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 		}
-		testRunService.runSuite(other.getId(), environment.getId(), TestRun.Trigger.MANUAL);
+		testRunService.runSuite(other.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 
 		PageResponse<RunSummary> secondPage = runQueries.listRuns(target.getId(), 1, 2);
 
@@ -102,12 +103,13 @@ class RunQueryServiceTest {
 
 	@Test
 	void usesFixedNumberOfQueriesRegardlessOfRunCount() {
+		// 실행 주체가 여러 명이어도 한 번에 조회
 		Project project = fixtures.project();
 		Environment environment = fixtures.environment(project, Map.of());
 		for (int i = 0; i < 5; i++) {
 			TestSuite suite = fixtures.suite(project);
 			fixtures.testCase(suite, HttpMethod.GET, "/a", null, null);
-			testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL);
+			testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 		}
 		Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
 		statistics.clear();
@@ -115,15 +117,26 @@ class RunQueryServiceTest {
 		PageResponse<RunSummary> singlePage = runQueries.listRuns(null, 0, 20);
 
 		assertThat(singlePage.content()).hasSize(5);
-		// 실행+이름(fetch), 판정 집계. 한 페이지에 모두 들어가 전체 건수 쿼리 생략
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
+		// 실행+이름(fetch), 판정 집계, 실행 주체. 한 페이지에 모두 들어가 전체 건수 쿼리 생략
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
 
 		statistics.clear();
 		PageResponse<RunSummary> firstOfMany = runQueries.listRuns(null, 0, 2);
 
 		assertThat(firstOfMany.totalPages()).isEqualTo(3);
-		// 실행+이름(fetch), 전체 건수, 판정 집계
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+		// 실행+이름(fetch), 전체 건수, 판정 집계, 실행 주체
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
 	}
+
+
+	/** 수동 실행 주체. 실행마다 같은 계정을 사용하도록 한 번만 생성 */
+	private long tester() {
+		if (testerId == null) {
+			testerId = fixtures.user().getId();
+		}
+		return testerId;
+	}
+
+	private Long testerId;
 
 }

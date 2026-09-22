@@ -1,5 +1,6 @@
 package com.sentinel.application;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -12,6 +13,8 @@ import com.sentinel.domain.TestResult.Outcome;
 import com.sentinel.domain.TestResult.Verdict;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.domain.User;
+import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.RequestExecutionException;
 import com.sentinel.runner.ResolvedRequest;
@@ -45,9 +48,13 @@ class TestRunServiceTest {
 	@Autowired
 	private TestFixtures fixtures;
 
+	@Autowired
+	private UserRepository users;
+
 	@AfterEach
 	void cleanUp() {
 		fixtures.deleteAll();
+		testerId = null;
 		executor.reset();
 	}
 
@@ -59,7 +66,7 @@ class TestRunServiceTest {
 				Map.of("Authorization", List.of("Bearer {{token}}")), "{\"userId\": {{userId}}}");
 		executor.respond(503, Map.of("Retry-After", List.of("10")), "unavailable");
 
-		TestRunDetail run = service.getRun(service.runTestCase(testCase.getId(), environment.getId()));
+		TestRunDetail run = service.getRun(service.runTestCase(testCase.getId(), environment.getId(), tester()));
 
 		ResolvedRequest sent = executor.requests().getFirst();
 		assertThat(sent.uri()).hasToString("https://gw.dev.internal/users/42/orders");
@@ -88,7 +95,7 @@ class TestRunServiceTest {
 		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/users/{{userId}}",
 				Map.of("Authorization", List.of("Bearer {{token}}")), null);
 
-		TestRunDetail run = service.getRun(service.runTestCase(testCase.getId(), environment.getId()));
+		TestRunDetail run = service.getRun(service.runTestCase(testCase.getId(), environment.getId(), tester()));
 
 		assertThat(executor.requests()).isEmpty();
 		assertThat(run.status()).isEqualTo(TestRun.Status.COMPLETED);
@@ -107,7 +114,7 @@ class TestRunServiceTest {
 		Environment environment = fixtures.environment(project, Map.of("prefix", "/billing/v1"));
 		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "{{prefix}}/history", null, null);
 
-		service.runTestCase(testCase.getId(), environment.getId());
+		service.runTestCase(testCase.getId(), environment.getId(), tester());
 
 		assertThat(executor.requests().getFirst().uri()).hasToString("https://gw.dev.internal/billing/v1/history");
 	}
@@ -118,7 +125,7 @@ class TestRunServiceTest {
 		Environment environment = fixtures.environment(project, Map.of("prefix", ".evil.example"));
 		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "{{prefix}}/history", null, null);
 
-		TestRunDetail.Result result = service.getRun(service.runTestCase(testCase.getId(), environment.getId()))
+		TestRunDetail.Result result = service.getRun(service.runTestCase(testCase.getId(), environment.getId(), tester()))
 			.results()
 			.getFirst();
 
@@ -129,13 +136,54 @@ class TestRunServiceTest {
 	}
 
 	@Test
+	void recordsWhoStartedAManualRun() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/a", null, null);
+		User user = fixtures.user();
+
+		TestRunDetail run = service.getRun(service.runTestCase(testCase.getId(), environment.getId(), user.getId()));
+
+		assertThat(run.triggeredBy()).isNotNull();
+		assertThat(run.triggeredBy().id()).isEqualTo(user.getId());
+		assertThat(run.triggeredBy().name()).isEqualTo(user.getEmail());
+	}
+
+	@Test
+	void keepsTheRunHistoryOfDeletedUsers() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/a", null, null);
+		User user = fixtures.user();
+		long runId = service.runTestCase(testCase.getId(), environment.getId(), user.getId());
+
+		user.archive(Instant.now());
+		users.saveAndFlush(user);
+
+		// 보관된 사용자도 이력에는 그대로 표시
+		assertThat(service.getRun(runId).triggeredBy().name()).isEqualTo(user.getEmail());
+	}
+
+	@Test
+	void hasNoTriggeringUserForScheduledRuns() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/a", null, null);
+
+		long runId = service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
+
+		assertThat(service.getRun(runId).triggeredBy()).isNull();
+	}
+
+	@Test
 	void recordsTransportFailureReason() {
 		Project project = fixtures.project();
 		Environment environment = fixtures.environment(project, Map.of());
 		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/slow", null, null);
 		executor.fail(RequestExecutionException.Reason.TIMEOUT);
 
-		TestRunDetail.Result result = service.getRun(service.runTestCase(testCase.getId(), environment.getId()))
+		TestRunDetail.Result result = service.getRun(service.runTestCase(testCase.getId(), environment.getId(), tester()))
 			.results()
 			.getFirst();
 
@@ -155,7 +203,7 @@ class TestRunServiceTest {
 		TestCase third = fixtures.testCase(suite, HttpMethod.DELETE, "/c", null, null);
 		fixtures.testCase(fixtures.suite(project), HttpMethod.GET, "/other-suite", null, null);
 
-		TestRunDetail run = service.getRun(service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED));
+		TestRunDetail run = service.getRun(service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, tester()));
 
 		assertThat(executor.requests()).extracting(request -> request.uri().getPath()).containsExactly("/a/7", "/c");
 		assertThat(run.trigger()).isEqualTo(TestRun.Trigger.SCHEDULED);
@@ -179,7 +227,7 @@ class TestRunServiceTest {
 				List.of(new ResponseTimeAssertion(10)));
 		executor.respond(200, Map.of(), "{\"status\": \"UP\"}");
 
-		TestRunDetail run = service.getRun(service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL));
+		TestRunDetail run = service.getRun(service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester()));
 
 		assertThat(run.results()).extracting(TestRunDetail.Result::verdict).containsExactly(Verdict.PASSED, Verdict.FAILED);
 		assertThat(run.results().get(1).assertionResults()).singleElement().satisfies(assertion -> {
@@ -199,7 +247,7 @@ class TestRunServiceTest {
 		fixtures.testCase(suite, HttpMethod.GET, "/fail", null, null, List.of(new StatusCodeAssertion(List.of("201"))));
 		fixtures.testCase(suite, HttpMethod.GET, "/{{missing}}", null, null);
 
-		long runId = service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED);
+		long runId = service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, tester());
 
 		assertThat(output).containsPattern("Run " + runId + " completed: trigger=SCHEDULED suite=" + suite.getId()
 				+ " total=3 passed=1 failed=1 errors=1 elapsed=\\d+ms");
@@ -211,7 +259,7 @@ class TestRunServiceTest {
 		Environment environment = fixtures.environment(project, Map.of());
 		TestSuite suite = fixtures.suite(project);
 
-		TestRunDetail run = service.getRun(service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL));
+		TestRunDetail run = service.getRun(service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester()));
 
 		assertThat(run.status()).isEqualTo(TestRun.Status.COMPLETED);
 		assertThat(run.results()).isEmpty();
@@ -223,9 +271,9 @@ class TestRunServiceTest {
 		TestSuite suite = fixtures.suite(fixtures.project());
 		Environment otherEnvironment = fixtures.environment(fixtures.project(), Map.of());
 
-		assertThatThrownBy(() -> service.runSuite(suite.getId(), otherEnvironment.getId(), TestRun.Trigger.MANUAL))
+		assertThatThrownBy(() -> service.runSuite(suite.getId(), otherEnvironment.getId(), TestRun.Trigger.MANUAL, tester()))
 				.isInstanceOf(InvalidRequestException.class);
-		assertThatThrownBy(() -> service.runSuite(-1, otherEnvironment.getId(), TestRun.Trigger.MANUAL))
+		assertThatThrownBy(() -> service.runSuite(-1, otherEnvironment.getId(), TestRun.Trigger.MANUAL, tester()))
 				.isInstanceOf(NotFoundException.class);
 	}
 
@@ -235,7 +283,7 @@ class TestRunServiceTest {
 		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/a", null, null);
 		Environment otherEnvironment = fixtures.environment(fixtures.project(), Map.of());
 
-		assertThatThrownBy(() -> service.runTestCase(testCase.getId(), otherEnvironment.getId()))
+		assertThatThrownBy(() -> service.runTestCase(testCase.getId(), otherEnvironment.getId(), tester()))
 				.isInstanceOf(InvalidRequestException.class);
 		assertThat(executor.requests()).isEmpty();
 	}
@@ -246,9 +294,20 @@ class TestRunServiceTest {
 		Environment environment = fixtures.environment(project, Map.of());
 		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/a", null, null);
 
-		assertThatThrownBy(() -> service.runTestCase(-1, environment.getId())).isInstanceOf(NotFoundException.class);
-		assertThatThrownBy(() -> service.runTestCase(testCase.getId(), -1)).isInstanceOf(NotFoundException.class);
+		assertThatThrownBy(() -> service.runTestCase(-1, environment.getId(), tester())).isInstanceOf(NotFoundException.class);
+		assertThatThrownBy(() -> service.runTestCase(testCase.getId(), -1, tester())).isInstanceOf(NotFoundException.class);
 		assertThatThrownBy(() -> service.getRun(-1)).isInstanceOf(NotFoundException.class);
 	}
+
+
+	/** 수동 실행 주체. 실행마다 같은 계정을 사용하도록 한 번만 생성 */
+	private long tester() {
+		if (testerId == null) {
+			testerId = fixtures.user().getId();
+		}
+		return testerId;
+	}
+
+	private Long testerId;
 
 }

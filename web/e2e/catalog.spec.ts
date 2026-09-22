@@ -118,6 +118,8 @@ test("케이스 등록 후 실행하면 결과 표시", async ({ page }) => {
   await expect(page.getByRole("heading", { name: new RegExp(suite) })).toBeVisible();
   await expect(page.getByText("통과 1")).toBeVisible();
   await expect(page.getByText("프로젝트 목록 조회")).toBeVisible();
+  // 수동 실행은 실행한 사람이 이력에 남음 (머리말의 로그인 계정과 구분하기 위해 본문에서 확인)
+  await expect(page.getByRole("main").getByText("admin@sentinel.test")).toBeVisible();
   // 통과한 케이스는 접혀 있으므로 펼쳐서 확인. 시크릿(세션 토큰) 값은 마스킹된 상태로 표시
   await page.getByRole("button", { name: /프로젝트 목록 조회/ }).click();
   await expect(page.getByText(/key=\*\*\*\*/)).toBeVisible();

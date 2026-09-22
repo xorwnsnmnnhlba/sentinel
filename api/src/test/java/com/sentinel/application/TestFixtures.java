@@ -9,6 +9,7 @@ import com.sentinel.domain.Project;
 import com.sentinel.domain.RequestSpec;
 import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
@@ -16,6 +17,7 @@ import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
+import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,14 @@ public class TestFixtures {
 	private final TestResultRepository results;
 
 	private final TestScheduleRepository schedules;
+
+	private final UserRepository users;
+
+	/** 수동 실행 주체 등 사용자 필요한 테스트용 계정 */
+	public User user() {
+		return users.save(new User("tester-" + UUID.randomUUID() + "@sentinel.test", "테스터", "$2a$10$"
+				+ "ijklmnopqrstuvwxyzABCDE.FGHIJKLMNOPQRSTUVWXYZabcdefghi", User.Role.ADMIN));
+	}
 
 	public Project project() {
 		return projects.save(new Project("project-" + UUID.randomUUID(), null));
@@ -77,6 +87,7 @@ public class TestFixtures {
 				new RequestSpec(method, path, headers, body), assertions));
 	}
 
+	/** 사용자는 삭제하지 않음. 기본 로그인 계정(TestAuthConfiguration)이 함께 지워지면 이후 요청이 401 */
 	public void deleteAll() {
 		schedules.deleteAllInBatch();
 		results.deleteAllInBatch();
