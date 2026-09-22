@@ -189,6 +189,7 @@ curl -i -X POST localhost:8080/api/runs \
 
 - 저장되는 요청·응답 헤더 중 `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` 값은 `****`로 마스킹. 실제 전송 값은 원본 사용
 - 응답 본문은 64KB(UTF-8 기준) 초과 시 잘라서 저장, `bodyTruncated: true` 표시
+- 요청·응답 헤더와 본문은 보관기간(기본 30일) 경과 후 삭제 ("결과 원문 보관기간" 참고)
 - 요청 URL의 변수 값은 인코딩하지 않음. 공백 등 URL에 쓸 수 없는 문자는 `INVALID_REQUEST`
 
 ## 인증
@@ -319,6 +320,30 @@ docker compose logs sentinel-api | grep "completed:"
 | `sentinel.schedule.enabled` | `true` | 폴링 동작 여부 |
 | `sentinel.schedule.zone` | `Asia/Seoul` | cron 해석 시간대 |
 | `sentinel.schedule.poll-interval` | `60s` | 폴링 주기 |
+
+## 결과 원문 보관기간
+
+실행 이력은 계속 보관하고, 용량이 큰 요청·응답 원문만 보관기간이 지나면 비움
+
+| 비움 | 유지 |
+|------|------|
+| 요청·응답 헤더, 요청·응답 본문 | 실행(주체·시각·상태), 판정, 규칙별 결과, 오류 사유, 요청 메서드·URL, 상태 코드, 소요 시간 |
+
+- 매일 03:30(`sentinel.schedule.zone` 기준) 실행 시작 시각이 보관기간보다 오래된 실행 대상. 진행 중(`RUNNING`)인 실행 제외
+- 정리한 실행은 `raw_purged_at` 기록, 상세 응답의 `rawPurgedAt`으로 확인 (원문 보관 중이면 `null`)
+- 실행 단위로 나누어 트랜잭션 처리. 도중 실패 시 정리한 분은 유지되고 다음 날 나머지 이어서 정리
+- 정리 건수는 INFO 로그 1줄
+
+```
+Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-08-24T18:30:00Z
+```
+
+| 설정 | 기본값 | 설명 |
+|------|--------|------|
+| `sentinel.retention.enabled` | `true` | 정리 배치 동작 여부 |
+| `sentinel.retention.raw-retention` | `30d` | 원문 보관 기간. 0 이하이면 기동 실패 |
+| `sentinel.retention.cron` | `0 30 3 * * *` | 실행 시각 (Spring cron 6자리, 초 포함) |
+| `sentinel.retention.batch-size` | `500` | 한 트랜잭션에서 정리할 실행 수 |
 
 ## 실패 알림
 

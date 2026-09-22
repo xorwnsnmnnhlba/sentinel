@@ -2,13 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { RunCountBadges, StatusBadge, TriggerBadge, VerdictBadge } from "@/components/run-badges";
+import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiGetOrNotFound } from "@/lib/api/server";
-import type { Headers, RunDetail, RunResult } from "@/lib/api/types";
-import { formatDateTime, formatElapsed, formatRunDuration, prettyBody } from "@/lib/format";
+import type { RunDetail } from "@/lib/api/types";
+import { formatDateTime, formatElapsed, formatRunDuration } from "@/lib/format";
 
 export async function generateMetadata(props: PageProps<"/runs/[id]">) {
   const { id } = await props.params;
@@ -46,6 +44,13 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
         <RunCountBadges counts={run.summary} />
       </div>
 
+      {run.rawPurgedAt && (
+        <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+          보관기간이 지나 요청·응답 원문(헤더·본문)을 삭제한 실행입니다 ({formatDateTime(run.rawPurgedAt)} 삭제). 판정과
+          규칙별 결과는 그대로 확인할 수 있습니다
+        </p>
+      )}
+
       {run.results.length === 0 ? (
         <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
           실행된 케이스가 없습니다
@@ -66,7 +71,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
                 </div>
               </AccordionTrigger>
               <AccordionContent>
-                <ResultDetail result={result} />
+                <ResultDetail result={result} rawPurged={run.rawPurgedAt !== null} />
               </AccordionContent>
             </AccordionItem>
           ))}
@@ -81,104 +86,6 @@ function Meta({ label, value }: { label: string; value: string }) {
     <div className="flex gap-1.5">
       <dt>{label}</dt>
       <dd className="text-foreground">{value}</dd>
-    </div>
-  );
-}
-
-function ResultDetail({ result }: { result: RunResult }) {
-  return (
-    <div className="space-y-4">
-      <p className="font-mono text-xs break-all text-muted-foreground">
-        {result.request.method} {result.request.url ?? "(전송 전 실패)"}
-      </p>
-
-      {result.errorReason && (
-        <div className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
-          <span className="font-semibold">{result.errorReason}</span>
-          {result.errorMessage && <span className="ml-2 break-all">{result.errorMessage}</span>}
-        </div>
-      )}
-
-      {result.assertionResults.length > 0 && (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16">판정</TableHead>
-                <TableHead>규칙</TableHead>
-                <TableHead>실제 값</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {result.assertionResults.map((assertion, index) => (
-                <TableRow key={index}>
-                  <TableCell>
-                    <VerdictBadge verdict={assertion.passed ? "PASSED" : "FAILED"} />
-                  </TableCell>
-                  <TableCell className="font-mono text-xs whitespace-normal">{assertion.description}</TableCell>
-                  <TableCell className="font-mono text-xs break-all whitespace-normal">{assertion.message}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {result.request.url && (
-        <Tabs defaultValue={result.response ? "response" : "request"}>
-          <TabsList>
-            <TabsTrigger value="response" disabled={!result.response}>
-              응답
-            </TabsTrigger>
-            <TabsTrigger value="request">요청</TabsTrigger>
-          </TabsList>
-          <TabsContent value="response" className="space-y-3">
-            {result.response && (
-              <>
-                <HeaderTable headers={result.response.headers} />
-                <Body body={result.response.body} truncated={result.response.bodyTruncated} />
-              </>
-            )}
-          </TabsContent>
-          <TabsContent value="request" className="space-y-3">
-            <HeaderTable headers={result.request.headers} />
-            <Body body={result.request.body} />
-          </TabsContent>
-        </Tabs>
-      )}
-    </div>
-  );
-}
-
-function HeaderTable({ headers }: { headers: Headers | null }) {
-  const entries = Object.entries(headers ?? {});
-  if (entries.length === 0) {
-    return <p className="text-xs text-muted-foreground">헤더 없음</p>;
-  }
-  return (
-    <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 font-mono text-xs">
-      {entries.map(([name, values]) => (
-        <div key={name} className="contents">
-          <dt className="text-muted-foreground">{name}</dt>
-          <dd className="break-all">{values.join(", ")}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function Body({ body, truncated }: { body: string | null; truncated?: boolean }) {
-  if (!body) {
-    return <p className="text-xs text-muted-foreground">본문 없음</p>;
-  }
-  return (
-    <div className="space-y-1">
-      {truncated && (
-        <Badge variant="outline" className="text-amber-700 dark:text-amber-400">
-          64KB 초과로 잘림
-        </Badge>
-      )}
-      <pre className="max-h-96 overflow-auto rounded-md bg-muted p-3 font-mono text-xs">{prettyBody(body)}</pre>
     </div>
   );
 }

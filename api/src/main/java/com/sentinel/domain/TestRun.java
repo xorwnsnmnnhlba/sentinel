@@ -22,7 +22,8 @@ import lombok.NoArgsConstructor;
  * 실행 1회. 결과({@link TestResult})는 단방향 {@code @ManyToOne}으로만 참조, 리포지토리로 조회.
  */
 @Entity
-@Table(name = "test_run", indexes = @Index(name = "idx_run_suite_time", columnList = "suite_id, started_at DESC"))
+@Table(name = "test_run", indexes = { @Index(name = "idx_run_suite_time", columnList = "suite_id, started_at DESC"),
+		@Index(name = "idx_run_raw_purge", columnList = "raw_purged_at, started_at") })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TestRun extends BaseEntity {
@@ -62,6 +63,9 @@ public class TestRun extends BaseEntity {
 	/** 수동 실행을 시작한 사용자. 스케줄 실행은 null */
 	private Long triggeredBy;
 
+	/** 보관기간이 지나 결과의 요청·응답 원문을 비운 시각. null이면 원문 보관 중 */
+	private Instant rawPurgedAt;
+
 	private TestRun(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt, Long triggeredBy) {
 		this.suite = Objects.requireNonNull(suite, "suite");
 		this.environment = Objects.requireNonNull(environment, "environment");
@@ -89,6 +93,16 @@ public class TestRun extends BaseEntity {
 		}
 		this.status = Status.COMPLETED;
 		this.finishedAt = Objects.requireNonNull(finishedAt, "finishedAt");
+	}
+
+	/**
+	 * 결과 원문 정리 기록. 원문 자체는 {@code TestResultRepository#purgeRawByRunIds}가 일괄로 비움
+	 */
+	public void markRawPurged(Instant purgedAt) {
+		if (status == Status.RUNNING) {
+			throw new IllegalStateException("run " + getId() + " is still running");
+		}
+		this.rawPurgedAt = Objects.requireNonNull(purgedAt, "purgedAt");
 	}
 
 	public void abort(Instant abortedAt) {

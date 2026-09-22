@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.sentinel.domain.TestResult;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -24,6 +25,18 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 			group by r.run.id, r.verdict
 			""")
 	List<VerdictCount> countVerdictsByRunIds(@Param("runIds") Collection<Long> runIds);
+
+	/**
+	 * 요청·응답 헤더와 본문을 일괄로 비움. 판정·규칙별 결과·상태 코드·URL·소요 시간은 유지
+	 * @return 갱신한 결과 건수
+	 */
+	@Modifying
+	@Query("""
+			update TestResult r
+			set r.requestHeaders = null, r.requestBody = null, r.responseHeaders = null, r.responseBody = null
+			where r.run.id in :runIds
+			""")
+	int purgeRawByRunIds(@Param("runIds") Collection<Long> runIds);
 
 	interface VerdictCount {
 
