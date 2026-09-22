@@ -1,7 +1,7 @@
 package com.sentinel.application;
 
+import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -69,6 +69,8 @@ public class TestRunService {
 
 	private final SecretCipher secretCipher;
 
+	private final Clock clock;
+
 	/**
 	 * 케이스 1건 수동 실행. 응답 미수신·변수 누락도 실패 결과로 기록하며 예외로 전파하지 않음.
 	 * @return 생성된 실행 ID
@@ -130,7 +132,7 @@ public class TestRunService {
 			throw new InvalidRequestException("environment " + environment.getId()
 					+ " does not belong to the project of test suite " + suite.getId());
 		}
-		TestRun run = runs.save(TestRun.start(suite, environment, trigger, Instant.now(), triggeredBy));
+		TestRun run = runs.save(TestRun.start(suite, environment, trigger, clock.instant(), triggeredBy));
 		List<PreparedCase> preparedCases = cases.stream()
 			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment),
 					testCase.getAssertions()))
@@ -177,7 +179,7 @@ public class TestRunService {
 						.getVerdict());
 			counts.merge(verdict, 1, Integer::sum);
 		}
-		transactions.writeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(Instant.now()));
+		transactions.writeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(clock.instant()));
 		log.info("Run {} completed: trigger={} suite={} total={} passed={} failed={} errors={} elapsed={}ms",
 				prepared.runId(), prepared.trigger(), prepared.suiteId(), prepared.cases().size(),
 				counts.getOrDefault(TestResult.Verdict.PASSED, 0), counts.getOrDefault(TestResult.Verdict.FAILED, 0),

@@ -80,7 +80,7 @@ class DomainPersistenceTest {
 				WHERE success AND version IS NOT NULL ORDER BY installed_rank
 				""").getResultList();
 
-		assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6");
+		assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7");
 	}
 
 	@Test

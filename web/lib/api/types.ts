@@ -59,7 +59,8 @@ export interface RunResult {
   errorMessage: string | null;
   elapsedMs: number | null;
   request: { method: string; url: string | null; headers: Headers | null; body: string | null };
-  response: { statusCode: number; headers: Headers | null; body: string; bodyTruncated: boolean } | null;
+  /** 보관기간이 지나 원문을 삭제한 실행은 headers·body가 null */
+  response: { statusCode: number; headers: Headers | null; body: string | null; bodyTruncated: boolean } | null;
 }
 
 export interface RunDetail {
@@ -76,6 +77,8 @@ export interface RunDetail {
   results: RunResult[];
   /** 수동 실행을 시작한 사용자. 스케줄 실행·이전 기록은 null */
   triggeredBy: IdName | null;
+  /** 보관기간이 지나 요청·응답 원문(헤더·본문)을 삭제한 시각. null이면 원문 보관 중 */
+  rawPurgedAt: string | null;
 }
 
 export interface SuiteItem {

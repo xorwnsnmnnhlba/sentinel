@@ -12,9 +12,12 @@ import com.sentinel.domain.TestRun;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.AssertionResult;
 
+/**
+ * @param rawPurgedAt 보관기간이 지나 요청·응답 원문(헤더·본문)을 비운 시각. null이면 원문 보관 중
+ */
 public record TestRunDetail(long id, long suiteId, String suiteName, long environmentId, String environmentName,
 		TestRun.Trigger trigger, TestRun.Status status, Instant startedAt, Instant finishedAt, Summary summary,
-		List<Result> results, IdName triggeredBy) {
+		List<Result> results, IdName triggeredBy, Instant rawPurgedAt) {
 
 	/**
 	 * @param results 케이스가 함께 로딩된 결과. 트랜잭션 안에서 호출
@@ -24,7 +27,7 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 		List<Result> mapped = results.stream().map(Result::of).toList();
 		return new TestRunDetail(run.getId(), run.getSuite().getId(), run.getSuite().getName(),
 				run.getEnvironment().getId(), run.getEnvironment().getName(), run.getTrigger(), run.getStatus(),
-				run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped, triggeredBy);
+				run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped, triggeredBy, run.getRawPurgedAt());
 	}
 
 	/**
