@@ -36,6 +36,8 @@ export interface RunSummary {
   startedAt: string;
   finishedAt: string | null;
   summary: RunCounts;
+  /** 수동 실행을 시작한 사용자. 스케줄 실행·이전 기록은 null */
+  triggeredBy: IdName | null;
 }
 
 export interface AssertionResult {
@@ -72,6 +74,8 @@ export interface RunDetail {
   finishedAt: string | null;
   summary: RunCounts;
   results: RunResult[];
+  /** 수동 실행을 시작한 사용자. 스케줄 실행·이전 기록은 null */
+  triggeredBy: IdName | null;
 }
 
 export interface SuiteItem {

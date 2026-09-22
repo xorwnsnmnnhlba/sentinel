@@ -59,16 +59,28 @@ public class TestRun extends BaseEntity {
 
 	private Instant finishedAt;
 
-	private TestRun(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt) {
+	/** 수동 실행을 시작한 사용자. 스케줄 실행은 null */
+	private Long triggeredBy;
+
+	private TestRun(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt, Long triggeredBy) {
 		this.suite = Objects.requireNonNull(suite, "suite");
 		this.environment = Objects.requireNonNull(environment, "environment");
 		this.trigger = Objects.requireNonNull(trigger, "trigger");
 		this.startedAt = Objects.requireNonNull(startedAt, "startedAt");
 		this.status = Status.RUNNING;
+		this.triggeredBy = triggeredBy;
 	}
 
 	public static TestRun start(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt) {
-		return new TestRun(suite, environment, trigger, startedAt);
+		return new TestRun(suite, environment, trigger, startedAt, null);
+	}
+
+	/**
+	 * @param triggeredBy 수동 실행을 시작한 사용자. 스케줄 실행은 null
+	 */
+	public static TestRun start(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt,
+			Long triggeredBy) {
+		return new TestRun(suite, environment, trigger, startedAt, triggeredBy);
 	}
 
 	public void complete(Instant finishedAt) {

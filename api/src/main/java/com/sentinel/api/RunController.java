@@ -28,6 +28,8 @@ class RunController {
 
 	private final RunQueryService runQueryService;
 
+	private final CurrentUser currentUser;
+
 	/**
 	 * 최신순 실행 목록. size는 1~100으로 보정
 	 */
@@ -47,9 +49,11 @@ class RunController {
 	 */
 	@PostMapping
 	ResponseEntity<TestRunDetail> create(@Valid @RequestBody CreateRunRequest request) {
+		long triggeredBy = currentUser.get().id();
 		long runId = request.suiteId() != null
-				? testRunService.runSuite(request.suiteId(), request.environmentId(), TestRun.Trigger.MANUAL)
-				: testRunService.runTestCase(request.caseId(), request.environmentId());
+				? testRunService.runSuite(request.suiteId(), request.environmentId(), TestRun.Trigger.MANUAL,
+						triggeredBy)
+				: testRunService.runTestCase(request.caseId(), request.environmentId(), triggeredBy);
 		return ResponseEntity.created(URI.create("/api/runs/" + runId)).body(testRunService.getRun(runId));
 	}
 

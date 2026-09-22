@@ -53,6 +53,7 @@ class EnvironmentSecretsTest {
 	@AfterEach
 	void cleanUp() {
 		fixtures.deleteAll();
+		testerId = null;
 		executor.reset();
 	}
 
@@ -127,7 +128,7 @@ class EnvironmentSecretsTest {
 				"{\"token\": \"{{token}}\"}");
 		executor.respond(200, Map.of("X-Echo", List.of(TOKEN)), "echo " + TOKEN);
 
-		long runId = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL);
+		long runId = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 
 		// 실제 전송에는 원래 값 사용
 		assertThat(executor.requests()).singleElement().satisfies(request -> {
@@ -147,5 +148,16 @@ class EnvironmentSecretsTest {
 	private MvcTestResult patch(String uri, String body) {
 		return mvc.patch().uri(uri).contentType(MediaType.APPLICATION_JSON).content(body).exchange();
 	}
+
+
+	/** 수동 실행 주체. 실행마다 같은 계정을 사용하도록 한 번만 생성 */
+	private long tester() {
+		if (testerId == null) {
+			testerId = fixtures.user().getId();
+		}
+		return testerId;
+	}
+
+	private Long testerId;
 
 }

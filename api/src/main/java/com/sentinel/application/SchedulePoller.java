@@ -78,8 +78,9 @@ public class SchedulePoller {
 			try {
 				Trigger trigger = transactions.write(status -> claim(scheduleId, now));
 				if (trigger != null) {
+					// 스케줄 실행은 주체 없음
 					long runId = testRunService.runSuite(trigger.suiteId(), trigger.environmentId(),
-							TestRun.Trigger.SCHEDULED);
+							TestRun.Trigger.SCHEDULED, null);
 					runIds.add(runId);
 					notifyRunFailures(runId);
 				}

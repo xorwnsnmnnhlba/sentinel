@@ -39,6 +39,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
         </div>
         <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
           <Meta label="환경" value={run.environmentName} />
+          {run.triggeredBy && <Meta label="실행" value={run.triggeredBy.name} />}
           <Meta label="시작" value={formatDateTime(run.startedAt)} />
           <Meta label="소요" value={formatRunDuration(run.startedAt, run.finishedAt)} />
         </dl>
