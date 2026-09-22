@@ -133,3 +133,23 @@ export interface AuthenticatedUser {
   name: string;
   role: "ADMIN" | "MEMBER";
 }
+
+export interface UserSummary {
+  id: number;
+  email: string;
+  name: string;
+  role: "ADMIN" | "MEMBER";
+  createdAt: string;
+}
+
+/** 초대·재설정 링크 발급 결과. token은 발급 응답에서만 확인 가능 */
+export interface IssuedLink {
+  token: string;
+  expiresAt: string;
+}
+
+/** 링크 확인 결과 */
+export interface LinkInfo {
+  email: string;
+  expiresAt: string;
+}

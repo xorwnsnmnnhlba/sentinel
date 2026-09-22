@@ -5,7 +5,8 @@ import { SESSION_COOKIE } from "@/lib/api/session";
 
 /**
  * 세션 쿠키가 없으면 화면 렌더링 전에 로그인 화면으로 보냄 (Next.js 16에서 middleware → proxy로 변경).
- * 쿠키 유효성은 Spring이 판단하므로 여기서는 존재 여부만 확인
+ * 쿠키 유효성은 Spring이 판단하므로 여기서는 존재 여부만 확인.
+ * 초대·재설정 화면은 로그인 전에 열어야 하므로 제외 (링크의 토큰이 자격증명)
  */
 export function proxy(request: NextRequest) {
   if (request.cookies.has(SESSION_COOKIE)) {
@@ -20,6 +21,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // 로그인 화면과 정적 자원은 제외. /api/**(BFF 프록시)는 Spring이 401로 판단
-  matcher: ["/((?!login|api|_next/static|_next/image|favicon.ico).*)"],
+  // 로그인·초대·재설정 화면과 정적 자원은 제외. /api/**(BFF 프록시)는 Spring이 401로 판단
+  matcher: ["/((?!login|invites|password-resets|api|_next/static|_next/image|favicon.ico).*)"],
 };

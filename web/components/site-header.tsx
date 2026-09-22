@@ -29,11 +29,18 @@ export async function SiteHeader() {
                 {item.label}
               </Link>
             ))}
+            {user.role === "ADMIN" && (
+              <Link href="/users" className="transition-colors hover:text-foreground">
+                사용자
+              </Link>
+            )}
           </nav>
         )}
         {user && (
           <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{user.email}</span>
+            <Link href="/settings/password" className="transition-colors hover:text-foreground">
+              {user.email}
+            </Link>
             <LogoutButton />
           </div>
         )}
