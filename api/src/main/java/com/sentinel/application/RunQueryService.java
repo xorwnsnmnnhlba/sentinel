@@ -1,5 +1,6 @@
 package com.sentinel.application;
 
+import java.time.ZoneId;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -38,15 +39,18 @@ public class RunQueryService {
 
 	private final UserRepository users;
 
+	/** 기간 조건을 해석할 시간대. 스케줄 cron과 같은 기준 사용 */
+	private final ScheduleProperties scheduleProperties;
+
 	/**
-	 * @param suiteId null이면 전체 스위트
+	 * @param filter null인 조건은 무시. 기간은 스케줄 시간대(기본 Asia/Seoul) 기준
 	 * @param page 0부터 시작, 음수는 0으로 보정
 	 * @param size 1~{@link #MAX_PAGE_SIZE}로 보정
 	 */
 	@Transactional(readOnly = true)
-	public PageResponse<RunSummary> listRuns(Long suiteId, int page, int size) {
+	public PageResponse<RunSummary> listRuns(RunFilter filter, int page, int size) {
 		PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE), NEWEST_FIRST);
-		Page<TestRun> found = suiteId == null ? runs.findAllBy(pageable) : runs.findBySuiteId(suiteId, pageable);
+		Page<TestRun> found = runs.findAll(filter.toSpecification(scheduleProperties.zone()), pageable);
 
 		Map<Long, Map<Verdict, Long>> counts = new HashMap<>();
 		if (found.hasContent()) {
