@@ -160,6 +160,63 @@ function afterToday(): string {
   return new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+test("OpenAPI 문서에서 케이스 가져오기", async ({ page }) => {
+  await page.goto("/projects");
+  await page.getByRole("link", { name: project }).click();
+  await page.getByRole("link", { name: suite }).click();
+
+  await page.getByRole("button", { name: "OpenAPI 가져오기" }).click();
+  await page.getByLabel("문서", { exact: true }).fill(`openapi: 3.0.3
+info: { title: Sentinel, version: "1" }
+servers: [ { url: "http://e2e-api:8080" } ]
+paths:
+  /api/projects:
+    get: { summary: 프로젝트 목록 조회, responses: { "200": { description: ok } } }
+  /api/projects/{projectId}:
+    get: { summary: 프로젝트 조회, responses: { "200": { description: ok } } }
+  /api/suites:
+    post:
+      summary: 스위트 등록
+      requestBody:
+        content:
+          application/json: { example: { projectId: 1, name: smoke } }
+      responses: { "201": { description: created } }
+`);
+  await page.getByRole("button", { name: "미리보기" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("후보 3건")).toBeVisible();
+  // 스위트에 이미 있는 이름은 선택 해제 상태
+  await expect(dialog.getByRole("checkbox", { name: "GET /api/projects 가져오기" })).not.toBeChecked();
+  await dialog.getByRole("textbox", { name: "POST /api/suites 이름" }).fill("스위트 등록 (가져옴)");
+  await dialog.getByRole("button", { name: "2건 가져오기" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("row", { name: /프로젝트 조회/ })).toContainText("/api/projects/{{projectId}}");
+  await expect(page.getByRole("row", { name: /스위트 등록 \(가져옴\)/ })).toContainText("/api/suites");
+  // 기존 케이스는 그대로 한 건
+  await expect(page.getByRole("row", { name: /프로젝트 목록 조회/ })).toHaveCount(1);
+});
+
+test("1MB가 넘는 OpenAPI 문서도 미리보기", async ({ page }) => {
+  await page.goto("/projects");
+  await page.getByRole("link", { name: project }).click();
+  await page.getByRole("link", { name: suite }).click();
+
+  // Server Action 기본 본문 한도(1MB)를 넘는 문서. next.config의 bodySizeLimit으로 허용
+  const description = "x".repeat(2 * 1024 * 1024);
+  await page.getByRole("button", { name: "OpenAPI 가져오기" }).click();
+  await page.getByLabel("문서", { exact: true }).fill(`openapi: 3.0.3
+info: { title: Large, version: "1", description: "${description}" }
+paths:
+  /api/health:
+    get: { summary: 상태 확인, responses: { "200": { description: ok } } }
+`);
+  await page.getByRole("button", { name: "미리보기" }).click();
+
+  await expect(page.getByRole("dialog").getByText("후보 1건")).toBeVisible();
+});
+
 test("잘못된 경로는 저장 전에 막힘", async ({ page }) => {
   await page.goto("/projects");
   await page.getByRole("link", { name: project }).click();
