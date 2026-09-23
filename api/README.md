@@ -20,7 +20,7 @@ Sentinel 백엔드. 테스트 케이스 실행(러너), 스케줄 실행, 결과
 | PostgreSQL JDBC | 42.7.11 |
 | DB | PostgreSQL 18, 개발기 AWS RDS `sentinel` 스키마 |
 | Flyway | 12.4.0 |
-| SnakeYAML Engine | 3.0.1 (케이스 가져오기의 OpenAPI 문서 해석, Boot 미관리라 버전 명시) |
+| SnakeYAML Engine | 3.0.1 (케이스 가져오기의 문서 해석, Boot 미관리라 버전 명시) |
 | Testcontainers | 2.0.5 |
 | Lombok | 1.18.46 (`@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor(access = PROTECTED)`만 사용, `lombok.config`로 제한) |
 
@@ -275,21 +275,21 @@ curl -i -X POST localhost:8080/api/runs \
 | 스위트 | `{"projectId": 1, "name": "smoke", "description": null}` |
 | 케이스 | `{"suiteId": 1, "name": "결제 내역 조회", "request": {"method": "GET", "path": "/billing/v1/history?userId={{userId}}", "headers": {"Accept": ["application/json"]}, "body": null}, "assertions": [{"type": "statusCode", "anyOf": ["200"]}]}` |
 
-### 케이스 가져오기 (OpenAPI 3)
+### 케이스 가져오기 (OpenAPI 3, Postman)
 
 문서를 케이스 후보로 변환해 확인한 뒤, 고른 후보만 가져오는 2단계 방식
 
 | API | 설명 |
 |-----|------|
-| `POST /api/case-import-previews` | 변환만 하고 저장하지 않음. 본문 `{"suiteId": 1, "format": "OPENAPI_3", "content": "<JSON 또는 YAML 원문>"}` |
+| `POST /api/case-import-previews` | 변환만 하고 저장하지 않음. 본문 `{"suiteId": 1, "format": "OPENAPI_3", "content": "<문서 원문>"}`. `format`은 `OPENAPI_3`(JSON·YAML) 또는 `POSTMAN`(Collection v2.0·v2.1 JSON) |
 | `POST /api/case-imports` | 한 트랜잭션으로 등록. 본문 `{"suiteId": 1, "cases": [{"name": "...", "request": {...}, "assertions": [...]}]}`. 201 + `{"suiteId", "cases": [등록한 케이스]}` |
 
 - 미리보기 응답: `title`, `version`, `servers`(환경 기본 URL 설정 참고용), `cases`, `warnings`(문서 단위)
-  - 후보: `source`(예: `GET /pets/{petId}`), `name`, `request`, `assertions`, `warnings`(생략·대체한 내용), `conflict`(스위트에 같은 이름 있음)
+  - 후보: `source`(원본 위치. 예: `GET /pets/{petId}`, `GET {{baseUrl}}/orders`), `name`, `request`, `assertions`, `warnings`(생략·대체한 내용), `conflict`(스위트에 같은 이름 있음)
   - 후보를 그대로(또는 이름·요청을 고쳐) `cases`로 보내면 가져오기. `source`·`warnings`·`conflict`는 무시
 - 가져오기는 한 건이라도 실패하면 전부 미등록. 이름 중복(스위트 기존 케이스, 목록 안 중복)은 409, 잘못된 케이스는 400 (`cases[1] 'Broken': ...`처럼 위치 표시)
 - 문서는 5MB(문자 수)까지, 한 번에 가져오기는 500건까지
-- Swagger 2.0 등 OpenAPI 3이 아닌 문서, 해석할 수 없는 문서, 작업이 없는 문서는 400
+- Swagger 2.0 등 OpenAPI 3이 아닌 문서, Postman v1 컬렉션·환경 파일, 해석할 수 없는 문서, 작업·요청이 없는 문서는 400
 
 | OpenAPI | 케이스 |
 |---------|--------|
@@ -322,6 +322,22 @@ curl -i -X POST localhost:8080/api/runs \
 - `allOf`는 객체 병합, `oneOf`·`anyOf`는 첫 스키마. OpenAPI 3.1의 `type: [string, "null"]`은 null이 아닌 종류
 - 문자열은 `format`별 값(`date-time` → `2026-01-01T00:00:00Z`, `email` → `user@example.com`, `uuid` 등), 그 외 `"string"`. 숫자 0, 불리언 false
 - 중첩은 6단계까지, 자기 참조 스키마(트리 등)는 되풀이하지 않음
+
+| Postman | 케이스 |
+|---------|--------|
+| 요청 | 케이스 1건. 컬렉션 순서 유지. 폴더는 이름 앞에 `폴더 / 하위 폴더 / 요청`. 지원하지 않는 메서드(`COPY` 등)는 제외 (문서 경고) |
+| URL | 호스트(`{{baseUrl}}`, `https://...`)는 빼고 경로·query만. 호스트는 `servers`로 안내 (호스트가 컬렉션 변수 하나이고 값이 주소면 값도 표시). 꺼 둔 query는 생략 |
+| 경로 변수 `:orderId` | 컬렉션에 적힌 값, 없으면 변수 `{{orderId}}` |
+| 헤더 | 꺼 둔 헤더는 생략. `{{변수}}` 문법이 같아 그대로 유지 |
+| 본문 `raw` | 그대로. 언어가 json·xml·text면 `Content-Type` 추가 (직접 지정한 헤더 우선) |
+| 본문 `urlencoded` | `key=value&...`로 인코딩(`{{변수}}`는 그대로), `Content-Type: application/x-www-form-urlencoded` |
+| 본문 `graphql` | `{"query": ..., "variables": ...}` JSON |
+| 본문 `formdata`·`file` | 빈 본문으로 경고 |
+| 인증 | 요청 → 상위 폴더 → 컬렉션 순으로 상속, `noauth`는 상속 끊음. `bearer`·`oauth2` → `Authorization: Bearer`, `apikey` → 지정한 header·query, `basic` → 항상 `Authorization: Basic {{basicAuth}}` (Base64 인코딩 값을 시크릿으로), 그 밖(digest 등)은 경고 |
+| 평문 자격증명 | 인증 값, `Authorization`·`Proxy-Authorization`·`Cookie`·`X-Api-Key` 헤더 값이 `{{변수}}`가 아니면 변수(`{{bearerToken}}`, `{{apiKey}}`, `{{authorization}}` 등)로 바꾸고 경고. 값은 케이스·응답 어디에도 남기지 않음 |
+| 스크립트 (pre-request·test) | 미지원 경고. 내용 없는 스크립트는 무시 |
+| 판정 | 저장된 예시 응답의 2xx 코드, 없으면 `2xx` |
+| 컬렉션 변수 | 가져오지 않음. 값은 자격증명일 수 있어 이름만 안내 (`warnings`) |
 
 ### 환경 변수와 시크릿
 

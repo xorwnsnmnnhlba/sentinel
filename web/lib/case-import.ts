@@ -6,6 +6,21 @@ export const MAX_DOCUMENT_LENGTH = 5 * 1024 * 1024;
 /** 한 번에 가져올 수 있는 케이스 수. Spring 한도와 동일 */
 export const MAX_IMPORT_CASES = 500;
 
+/** 가져올 수 있는 문서 형식. Spring CaseImportService.Format과 같은 값 */
+export const IMPORT_FORMATS = {
+  OPENAPI_3: { label: "OpenAPI 3 (JSON·YAML)", placeholder: "openapi: 3.0.3\ninfo: ...\npaths: ..." },
+  POSTMAN: {
+    label: "Postman 컬렉션 v2 (JSON)",
+    placeholder: '{\n  "info": { "schema": "...collection/v2.1.0/..." },\n  "item": [...]\n}',
+  },
+} as const;
+
+export type ImportFormat = keyof typeof IMPORT_FORMATS;
+
+export function isImportFormat(value: unknown): value is ImportFormat {
+  return typeof value === "string" && Object.hasOwn(IMPORT_FORMATS, value);
+}
+
 /** 미리보기 화면의 후보 행. 이름은 고칠 수 있음 */
 export type CandidateRow = CaseImportCandidate & { selected: boolean };
 

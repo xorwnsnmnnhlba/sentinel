@@ -7,8 +7,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.sentinel.application.InvalidRequestException;
-import com.sentinel.application.importing.OpenApiConverter.CaseDraft;
-import com.sentinel.application.importing.OpenApiConverter.ConvertedDocument;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
 import org.junit.jupiter.api.Test;
@@ -305,9 +303,9 @@ class OpenApiConverterTest {
 			.hasMessage("document must not be empty");
 		assertThatThrownBy(() -> converter.convert("openapi: [3.0.0")).isInstanceOf(InvalidRequestException.class)
 			.hasMessageStartingWith("document is not valid JSON or YAML: ");
-		assertThatThrownBy(() -> converter.convert("x".repeat(OpenApiConverter.MAX_CONTENT_LENGTH + 1)))
+		assertThatThrownBy(() -> converter.convert("x".repeat(ImportDocuments.MAX_CONTENT_LENGTH + 1)))
 			.isInstanceOf(InvalidRequestException.class)
-			.hasMessage("document must be at most " + OpenApiConverter.MAX_CONTENT_LENGTH + " characters");
+			.hasMessage("document must be at most " + ImportDocuments.MAX_CONTENT_LENGTH + " characters");
 	}
 
 	@Test

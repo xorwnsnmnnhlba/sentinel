@@ -124,6 +124,38 @@ class CaseImportTest {
 	}
 
 	@Test
+	void previewsAndImportsAPostmanCollection() throws UnsupportedEncodingException {
+		String collection = """
+				{
+				  "info": {"name": "Shop", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+				  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "literal-token"}]},
+				  "item": [{"name": "Orders", "item": [
+				    {"name": "List", "request": {"method": "GET", "url": "{{baseUrl}}/orders?page=1"}}
+				  ]}]
+				}""";
+
+		MvcTestResult preview = post("/api/case-import-previews", json.writeValueAsString(
+				Map.of("suiteId", suite.getId(), "format", "POSTMAN", "content", collection)));
+
+		assertThat(preview).hasStatusOk();
+		var body = assertThat(preview).bodyJson();
+		body.extractingPath("$.title").isEqualTo("Shop");
+		body.extractingPath("$.cases[0].name").isEqualTo("Orders / List");
+		body.extractingPath("$.cases[0].request.path").isEqualTo("/orders?page=1");
+		// 평문 토큰은 변수로 바뀌고 응답 어디에도 없음
+		body.extractingPath("$.cases[0].request.headers.Authorization").isEqualTo(List.of("Bearer {{bearerToken}}"));
+		assertThat(preview.getResponse().getContentAsString()).doesNotContain("literal-token");
+
+		ArrayNode candidates = candidates(preview);
+		assertThat(post("/api/case-imports", """
+				{"suiteId": %d, "cases": %s}""".formatted(suite.getId(), json.writeValueAsString(candidates))))
+			.hasStatus(HttpStatus.CREATED);
+		assertThat(testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suite.getId())).singleElement()
+			.satisfies(saved -> assertThat(saved.getRequest().getHeaders())
+				.containsEntry("Authorization", List.of("Bearer {{bearerToken}}")));
+	}
+
+	@Test
 	void importsNothingWhenAnyCaseConflicts() {
 		fixtures.testCase(suite, HttpMethod.GET, "/orders", null, null);
 		String existingName = testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suite.getId()).getFirst().getName();
@@ -173,7 +205,7 @@ class CaseImportTest {
 			.isEqualTo("only OpenAPI 3 documents are supported (found swagger 2.0)");
 		assertThat(preview(999_999L, DOCUMENT)).hasStatus(HttpStatus.NOT_FOUND);
 		assertThat(post("/api/case-import-previews", """
-				{"suiteId": %d, "format": "POSTMAN", "content": "{}"}""".formatted(suite.getId())))
+				{"suiteId": %d, "format": "RAML", "content": "{}"}""".formatted(suite.getId())))
 			.hasStatus(HttpStatus.BAD_REQUEST);
 		assertThat(post("/api/case-imports", """
 				{"suiteId": %d, "cases": []}""".formatted(suite.getId()))).hasStatus(HttpStatus.BAD_REQUEST);
