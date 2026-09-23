@@ -16,16 +16,14 @@ import com.sentinel.domain.RequestSpec;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
-import org.snakeyaml.engine.v2.api.Load;
-import org.snakeyaml.engine.v2.api.LoadSettings;
-import org.snakeyaml.engine.v2.exceptions.YamlEngineException;
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.util.DefaultIndenter;
-import tools.jackson.core.util.DefaultPrettyPrinter;
-import tools.jackson.core.util.Separators;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
+
+import static com.sentinel.application.importing.ImportDocuments.format;
+import static com.sentinel.application.importing.ImportDocuments.parse;
+import static com.sentinel.application.importing.ImportDocuments.text;
+import static com.sentinel.application.importing.ImportDocuments.truncateName;
+import static com.sentinel.application.importing.ImportDocuments.uniqueName;
+import static com.sentinel.application.importing.ImportDocuments.variable;
 
 /**
  * OpenAPI 3 문서(JSON·YAML)를 케이스 초안으로 변환. 저장하지 않으며 상태 없음.
@@ -43,16 +41,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public final class OpenApiConverter {
 
-	/** 문서 최대 길이(문자 수). 대형 문서도 수용하되 메모리 사용 제한 */
-	public static final int MAX_CONTENT_LENGTH = 5 * 1024 * 1024;
-
-	/** YAML 별칭 확장 공격(billion laughs) 차단 */
-	private static final int MAX_YAML_ALIASES = 50;
-
 	/** 참조가 참조를 가리키는 경우의 최대 추적 횟수. 순환 참조 차단 */
 	private static final int MAX_REF_DEPTH = 10;
-
-	private static final int MAX_NAME_LENGTH = 200;
 
 	private static final List<String> METHODS = List.of("get", "put", "post", "delete", "options", "head", "patch",
 			"trace");
@@ -63,27 +53,6 @@ public final class OpenApiConverter {
 	private static final Pattern PATH_PARAMETER = Pattern.compile("\\{([^{}]+)}");
 
 	private static final Pattern RESPONSE_CODE = Pattern.compile("[1-5][0-9xX]{2}");
-
-	/** 변수 이름에 쓸 수 없는 문자. {@code VariableResolver} 규칙과 동일 */
-	private static final Pattern INVALID_VARIABLE_CHARACTER = Pattern.compile("[^A-Za-z0-9_.-]");
-
-	/**
-	 * 별칭 수를 제한하여 기하급수적 확장을 막고, 문서 길이 한도까지 읽도록 설정. 로더는 스레드 안전하지 않아 호출마다 생성
-	 */
-	private final LoadSettings yamlSettings = LoadSettings.builder()
-		.setMaxAliasesForCollections(MAX_YAML_ALIASES)
-		.setCodePointLimit(MAX_CONTENT_LENGTH)
-		.build();
-
-	private final ObjectMapper json = JsonMapper.builder().build();
-
-	/** 예시 본문 서식. 웹 편집기의 {@code JSON.stringify(value, null, 2)}와 같은 모양 */
-	private static final DefaultPrettyPrinter BODY_FORMAT = new DefaultPrettyPrinter(Separators.createDefaultInstance()
-		.withObjectNameValueSpacing(Separators.Spacing.AFTER)
-		.withObjectEmptySeparator("")
-		.withArrayEmptySeparator(""))
-		.withObjectIndenter(new DefaultIndenter("  ", "\n"))
-		.withArrayIndenter(new DefaultIndenter("  ", "\n"));
 
 	/**
 	 * @throws InvalidRequestException 해석할 수 없는 문서, OpenAPI 3이 아닌 문서, 작업이 없는 문서
@@ -136,29 +105,6 @@ public final class OpenApiConverter {
 			}
 		});
 		return new ConvertedDocument(text(info.get("title")), text(info.get("version")), servers, drafts, warnings);
-	}
-
-	private JsonNode parse(String content) {
-		if (content == null || content.isBlank()) {
-			throw new InvalidRequestException("document must not be empty");
-		}
-		if (content.length() > MAX_CONTENT_LENGTH) {
-			throw new InvalidRequestException("document must be at most " + MAX_CONTENT_LENGTH + " characters");
-		}
-		Object loaded;
-		try {
-			// YAML 1.2는 JSON을 포함하므로 두 형식 모두 YAML 파서로 해석. 별칭(*ref)은 펼쳐서 읽음
-			loaded = new Load(yamlSettings).loadFromString(content);
-		}
-		catch (YamlEngineException ex) {
-			throw new InvalidRequestException("document is not valid JSON or YAML: " + abbreviate(ex.getMessage()));
-		}
-		try {
-			return json.valueToTree(loaded);
-		}
-		catch (JacksonException ex) {
-			throw new InvalidRequestException("document could not be read: " + abbreviate(ex.getOriginalMessage()));
-		}
 	}
 
 	private static void requireOpenApi3(JsonNode root) {
@@ -330,7 +276,7 @@ public final class OpenApiConverter {
 			}
 			warnings.add("request body was generated from the schema; replace the placeholder values");
 		}
-		String body = example.isString() ? example.stringValue() : json.writer().with(BODY_FORMAT).writeValueAsString(example);
+		String body = format(example);
 		if (body.length() > RequestSpec.MAX_BODY_LENGTH) {
 			warnings.add("request body example exceeds " + RequestSpec.MAX_BODY_LENGTH + " characters; body left empty");
 			return null;
@@ -386,17 +332,6 @@ public final class OpenApiConverter {
 		return converted.toString();
 	}
 
-	/**
-	 * 파라미터 이름을 변수로. 변수 이름에 쓸 수 없는 문자는 {@code _}로 바꾸고 경고
-	 */
-	private static String variable(String name, List<String> warnings) {
-		String sanitized = INVALID_VARIABLE_CHARACTER.matcher(name.strip()).replaceAll("_");
-		if (!sanitized.equals(name)) {
-			warnings.add("parameter '" + name + "' is used as variable {{" + sanitized + "}}");
-		}
-		return "{{" + sanitized + "}}";
-	}
-
 	private static String name(JsonNode operation, String source) {
 		String name = text(operation.get("summary"));
 		if (name == null) {
@@ -405,19 +340,7 @@ public final class OpenApiConverter {
 		if (name == null) {
 			name = source;
 		}
-		return name.length() <= MAX_NAME_LENGTH ? name : name.substring(0, MAX_NAME_LENGTH);
-	}
-
-	/**
-	 * 문서 안에서 같은 이름이 반복되면 {@code (2)}, {@code (3)}을 붙임
-	 */
-	private static String uniqueName(String name, Set<String> used) {
-		String candidate = name;
-		for (int number = 2; !used.add(candidate); number++) {
-			String suffix = " (" + number + ")";
-			candidate = name.substring(0, Math.min(name.length(), MAX_NAME_LENGTH - suffix.length())) + suffix;
-		}
-		return candidate;
+		return truncateName(name);
 	}
 
 	/**
@@ -448,43 +371,6 @@ public final class OpenApiConverter {
 	private static boolean isJson(String mediaType) {
 		String type = mediaType.toLowerCase(Locale.ROOT).split(";")[0].strip();
 		return type.equals("application/json") || type.endsWith("+json");
-	}
-
-	private static String text(JsonNode node) {
-		if (node == null || node.isNull() || node.isContainer()) {
-			return null;
-		}
-		String value = node.asString().strip();
-		return value.isEmpty() ? null : value;
-	}
-
-	private static String abbreviate(String message) {
-		if (message == null) {
-			return "unknown error";
-		}
-		String line = message.lines().findFirst().orElse(message);
-		return line.length() <= 200 ? line : line.substring(0, 200) + "...";
-	}
-
-	/**
-	 * @param servers 문서의 서버 주소. 환경 기본 URL 설정 참고용
-	 * @param warnings 문서 단위 경고 (지원하지 않아 제외한 작업 등)
-	 */
-	public record ConvertedDocument(String title, String version, List<String> servers, List<CaseDraft> cases,
-			List<String> warnings) {
-	}
-
-	/**
-	 * @param source 원본 작업. 예: {@code GET /pets/{petId}}
-	 * @param warnings 변환하면서 생략·대체한 내용
-	 */
-	public record CaseDraft(String source, String name, Request request, List<Assertion> assertions,
-			List<String> warnings) {
-
-		CaseDraft withName(String name) {
-			return new CaseDraft(source, name, request, assertions, warnings);
-		}
-
 	}
 
 }

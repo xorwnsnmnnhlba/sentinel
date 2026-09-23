@@ -4,12 +4,18 @@ import { refresh } from "next/cache";
 
 import { apiSend, isApiError } from "@/lib/api/server";
 import type { CaseImportPreview, CaseItem } from "@/lib/api/types";
-import { isImportCase, MAX_DOCUMENT_LENGTH, MAX_IMPORT_CASES } from "@/lib/case-import";
+import {
+  type ImportFormat,
+  isImportCase,
+  isImportFormat,
+  MAX_DOCUMENT_LENGTH,
+  MAX_IMPORT_CASES,
+} from "@/lib/case-import";
 
 import type { ActionState } from "./catalog";
 
 /**
- * OpenAPI 문서에서 케이스 가져오기. 미리보기로 후보를 받아 화면에서 고른 뒤 가져오기.
+ * 문서(OpenAPI 3, Postman 컬렉션)에서 케이스 가져오기. 미리보기로 후보를 받아 화면에서 고른 뒤 가져오기.
  *
  * 문서가 커서 Server Action 본문 한도를 next.config의 serverActions.bodySizeLimit으로 늘려 둠.
  * 화면을 거치지 않고 호출될 수 있으므로 입력 형식을 확인하고, 값 검증은 Spring(400·404·409)에 맡김
@@ -18,12 +24,19 @@ import type { ActionState } from "./catalog";
 export type PreviewResult = { preview?: CaseImportPreview; error?: string };
 
 /**
- * @param document 문서 원문을 객체로 감싸 전달. React는 Server Action 인자 목록에 바로 놓인 문자열 길이를 배열 크기 한도(100만)에
+ * @param document 문서 원문과 형식. 원문을 객체로 감싸 전달. React는 Server Action 인자 목록에 바로 놓인 문자열 길이를 배열 크기 한도(100만)에
  * 합산하여 1MB 안팎의 문서도 거부하므로 ("Maximum array nesting exceeded"), 한도 계산에서 빠지는 객체 속성으로 보냄
  */
-export async function previewCaseImport(suiteId: number, document: { content: string }): Promise<PreviewResult> {
+export async function previewCaseImport(
+  suiteId: number,
+  document: { content: string; format: ImportFormat },
+): Promise<PreviewResult> {
   const suite = id(suiteId);
   const content = typeof document === "object" && document !== null ? document.content : undefined;
+  const format = typeof document === "object" && document !== null ? document.format : undefined;
+  if (!isImportFormat(format)) {
+    return { error: "문서 형식을 선택해 주세요" };
+  }
   if (typeof content !== "string" || content.trim() === "") {
     return { error: "문서를 붙여넣거나 파일을 선택해 주세요" };
   }
@@ -33,7 +46,7 @@ export async function previewCaseImport(suiteId: number, document: { content: st
   try {
     const preview = await apiSend<CaseImportPreview>("POST", "/api/case-import-previews", {
       suiteId: suite,
-      format: "OPENAPI_3",
+      format,
       content,
     });
     return { preview: preview! };

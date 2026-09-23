@@ -10,8 +10,6 @@ import com.sentinel.application.CatalogQueryService.CaseItem;
 import com.sentinel.application.CatalogQueryService.Request;
 import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.NotFoundException;
-import com.sentinel.application.importing.OpenApiConverter.CaseDraft;
-import com.sentinel.application.importing.OpenApiConverter.ConvertedDocument;
 import com.sentinel.domain.TestCase;
 import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
@@ -35,6 +33,8 @@ public class CaseImportService {
 
 	private final OpenApiConverter openApiConverter = new OpenApiConverter();
 
+	private final PostmanConverter postmanConverter = new PostmanConverter();
+
 	private final TestSuiteRepository suites;
 
 	private final TestCaseRepository testCases;
@@ -42,7 +42,10 @@ public class CaseImportService {
 	private final CatalogCommandService commands;
 
 	public enum Format {
-		OPENAPI_3
+		/** OpenAPI 3.0·3.1 (JSON·YAML) */
+		OPENAPI_3,
+		/** Postman Collection v2.0·v2.1 (JSON) */
+		POSTMAN
 	}
 
 	/**
@@ -54,6 +57,7 @@ public class CaseImportService {
 		suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
 		ConvertedDocument document = switch (format) {
 			case OPENAPI_3 -> openApiConverter.convert(content);
+			case POSTMAN -> postmanConverter.convert(content);
 		};
 		Set<String> existingNames = testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId)
 			.stream()

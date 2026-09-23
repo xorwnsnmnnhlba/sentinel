@@ -17,11 +17,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { importCases, previewCaseImport } from "@/lib/actions/case-import";
 import type { CaseImportPreview } from "@/lib/api/types";
 import {
   type CandidateRow,
+  IMPORT_FORMATS,
+  type ImportFormat,
+  isImportFormat,
   MAX_DOCUMENT_LENGTH,
   MAX_IMPORT_CASES,
   rowIssues,
@@ -30,7 +34,7 @@ import {
 } from "@/lib/case-import";
 
 /**
- * OpenAPI 3 문서에서 케이스 가져오기. 문서 입력 → 미리보기(후보 선택·이름 수정) → 가져오기.
+ * 문서(OpenAPI 3, Postman 컬렉션)에서 케이스 가져오기. 문서 입력 → 미리보기(후보 선택·이름 수정) → 가져오기.
  * 닫았다 다시 열면 처음 단계부터 시작하도록 내용을 새로 마운트
  */
 export function CaseImportDialog({ suiteId, existingNames }: { suiteId: number; existingNames: string[] }) {
@@ -39,14 +43,14 @@ export function CaseImportDialog({ suiteId, existingNames }: { suiteId: number; 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <FileUp /> OpenAPI 가져오기
+          <FileUp /> 문서 가져오기
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>OpenAPI 문서에서 케이스 가져오기</DialogTitle>
+          <DialogTitle>문서에서 케이스 가져오기</DialogTitle>
           <DialogDescription>
-            OpenAPI 3 문서(JSON·YAML)를 붙여넣거나 파일을 선택합니다. 미리보기에서 가져올 케이스를 고릅니다.
+            OpenAPI 3 문서나 Postman 컬렉션을 붙여넣거나 파일을 선택합니다. 미리보기에서 가져올 케이스를 고릅니다.
           </DialogDescription>
         </DialogHeader>
         {open && <ImportSteps suiteId={suiteId} existingNames={existingNames} onDone={() => setOpen(false)} />}
@@ -66,6 +70,7 @@ function ImportSteps({
 }) {
   // 문서는 미리보기 후 '문서 다시 선택'으로 돌아가도 유지
   const [content, setContent] = useState("");
+  const [format, setFormat] = useState<ImportFormat>("OPENAPI_3");
   const [preview, setPreview] = useState<CaseImportPreview | null>(null);
 
   return preview ? (
@@ -77,17 +82,28 @@ function ImportSteps({
       onDone={onDone}
     />
   ) : (
-    <DocumentStep suiteId={suiteId} content={content} onChange={setContent} onPreview={setPreview} />
+    <DocumentStep
+      suiteId={suiteId}
+      format={format}
+      onFormatChange={setFormat}
+      content={content}
+      onChange={setContent}
+      onPreview={setPreview}
+    />
   );
 }
 
 function DocumentStep({
   suiteId,
+  format,
+  onFormatChange,
   content,
   onChange,
   onPreview,
 }: {
   suiteId: number;
+  format: ImportFormat;
+  onFormatChange: (format: ImportFormat) => void;
   content: string;
   onChange: (content: string) => void;
   onPreview: (preview: CaseImportPreview) => void;
@@ -115,7 +131,7 @@ function DocumentStep({
       return;
     }
     startTransition(async () => {
-      const result = await send(() => previewCaseImport(suiteId, { content }));
+      const result = await send(() => previewCaseImport(suiteId, { content, format }));
       if (result.preview) {
         onPreview(result.preview);
       } else {
@@ -126,6 +142,20 @@ function DocumentStep({
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="import-format">형식</Label>
+        <NativeSelect
+          id="import-format"
+          value={format}
+          onChange={(event) => isImportFormat(event.target.value) && onFormatChange(event.target.value)}
+        >
+          {Object.entries(IMPORT_FORMATS).map(([value, { label }]) => (
+            <NativeSelectOption key={value} value={value}>
+              {label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </div>
       <div className="space-y-2">
         <Label htmlFor="import-file">파일</Label>
         <Input
@@ -141,7 +171,7 @@ function DocumentStep({
           id="import-content"
           value={content}
           onChange={(event) => onChange(event.target.value)}
-          placeholder={"openapi: 3.0.3\ninfo: ...\npaths: ..."}
+          placeholder={IMPORT_FORMATS[format].placeholder}
           className="h-64 font-mono text-xs"
           spellCheck={false}
         />
@@ -227,7 +257,8 @@ function CandidateStep({
         {rows.map((row, index) => {
           const issue = issues.get(index);
           return (
-            <li key={row.source} className="space-y-2 p-3">
+            // source는 Postman 컬렉션에서 겹칠 수 있어 순서로 구분 (행은 추가·삭제·정렬되지 않음)
+            <li key={index} className="space-y-2 p-3">
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"

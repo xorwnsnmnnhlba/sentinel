@@ -165,7 +165,7 @@ test("OpenAPI 문서에서 케이스 가져오기", async ({ page }) => {
   await page.getByRole("link", { name: project }).click();
   await page.getByRole("link", { name: suite }).click();
 
-  await page.getByRole("button", { name: "OpenAPI 가져오기" }).click();
+  await page.getByRole("button", { name: "문서 가져오기" }).click();
   await page.getByLabel("문서", { exact: true }).fill(`openapi: 3.0.3
 info: { title: Sentinel, version: "1" }
 servers: [ { url: "http://e2e-api:8080" } ]
@@ -198,6 +198,42 @@ paths:
   await expect(page.getByRole("row", { name: /프로젝트 목록 조회/ })).toHaveCount(1);
 });
 
+test("Postman 컬렉션에서 케이스 가져오기", async ({ page }) => {
+  await page.goto("/projects");
+  await page.getByRole("link", { name: project }).click();
+  await page.getByRole("link", { name: suite }).click();
+
+  await page.getByRole("button", { name: "문서 가져오기" }).click();
+  await page.getByLabel("형식").selectOption("POSTMAN");
+  await page.getByLabel("문서", { exact: true }).fill(
+    JSON.stringify({
+      info: { name: "Shop", schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+      auth: { type: "bearer", bearer: [{ key: "token", value: "literal-e2e-token" }] },
+      item: [
+        {
+          name: "주문",
+          item: [
+            { name: "목록", request: { method: "GET", url: "{{baseUrl}}/api/orders?page=1" } },
+            { name: "상세", request: { method: "GET", url: "{{baseUrl}}/api/orders/:orderId" } },
+          ],
+        },
+      ],
+    }),
+  );
+  await page.getByRole("button", { name: "미리보기" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("후보 2건")).toBeVisible();
+  // 평문 토큰은 변수로 바뀌었다는 안내만 표시되고 값은 화면에 없음
+  await expect(dialog.getByText("add {{bearerToken}} as a secret of the environment (bearer token)")).toBeVisible();
+  expect(await page.content()).not.toContain("literal-e2e-token");
+  await dialog.getByRole("button", { name: "2건 가져오기" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("row", { name: /주문 \/ 목록/ })).toContainText("/api/orders?page=1");
+  await expect(page.getByRole("row", { name: /주문 \/ 상세/ })).toContainText("/api/orders/{{orderId}}");
+});
+
 test("1MB가 넘는 OpenAPI 문서도 미리보기", async ({ page }) => {
   await page.goto("/projects");
   await page.getByRole("link", { name: project }).click();
@@ -205,7 +241,7 @@ test("1MB가 넘는 OpenAPI 문서도 미리보기", async ({ page }) => {
 
   // Server Action 기본 본문 한도(1MB)를 넘는 문서. next.config의 bodySizeLimit으로 허용
   const description = "x".repeat(2 * 1024 * 1024);
-  await page.getByRole("button", { name: "OpenAPI 가져오기" }).click();
+  await page.getByRole("button", { name: "문서 가져오기" }).click();
   await page.getByLabel("문서", { exact: true }).fill(`openapi: 3.0.3
 info: { title: Large, version: "1", description: "${description}" }
 paths:

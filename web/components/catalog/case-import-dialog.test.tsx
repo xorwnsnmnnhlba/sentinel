@@ -45,7 +45,7 @@ async function openWithPreview() {
   const user = userEvent.setup();
   vi.mocked(previewCaseImport).mockResolvedValue({ preview });
   render(<CaseImportDialog suiteId={3} existingNames={["List orders"]} />);
-  await user.click(screen.getByRole("button", { name: "OpenAPI 가져오기" }));
+  await user.click(screen.getByRole("button", { name: "문서 가져오기" }));
   await user.click(screen.getByLabelText("문서"));
   await user.paste("openapi: 3.0.3");
   await user.click(screen.getByRole("button", { name: "미리보기" }));
@@ -57,7 +57,7 @@ describe("CaseImportDialog", () => {
   it("previews the pasted document", async () => {
     await openWithPreview();
 
-    expect(previewCaseImport).toHaveBeenCalledWith(3, { content: "openapi: 3.0.3" });
+    expect(previewCaseImport).toHaveBeenCalledWith(3, { content: "openapi: 3.0.3", format: "OPENAPI_3" });
     expect(screen.getByText("Orders · 2.0")).toBeInTheDocument();
     expect(screen.getByText("https://orders.example.com/api")).toBeInTheDocument();
     expect(screen.getByText("TRACE /orders: TRACE is not supported and was skipped")).toBeInTheDocument();
@@ -68,10 +68,26 @@ describe("CaseImportDialog", () => {
     expect(screen.getByRole("button", { name: "2건 가져오기" })).toBeEnabled();
   });
 
+  it("previews a Postman collection when that format is chosen", async () => {
+    const user = userEvent.setup();
+    vi.mocked(previewCaseImport).mockResolvedValue({ preview });
+    render(<CaseImportDialog suiteId={3} existingNames={[]} />);
+    await user.click(screen.getByRole("button", { name: "문서 가져오기" }));
+
+    await user.selectOptions(screen.getByLabelText("형식"), "POSTMAN");
+    expect(screen.getByLabelText("문서")).toHaveAttribute("placeholder", expect.stringContaining('"item"'));
+    await user.click(screen.getByLabelText("문서"));
+    await user.paste('{"info": {}}');
+    await user.click(screen.getByRole("button", { name: "미리보기" }));
+
+    await screen.findByText("후보 3건");
+    expect(previewCaseImport).toHaveBeenCalledWith(3, { content: '{"info": {}}', format: "POSTMAN" });
+  });
+
   it("reads the document from a file", async () => {
     const user = userEvent.setup();
     render(<CaseImportDialog suiteId={3} existingNames={[]} />);
-    await user.click(screen.getByRole("button", { name: "OpenAPI 가져오기" }));
+    await user.click(screen.getByRole("button", { name: "문서 가져오기" }));
 
     await user.upload(screen.getByLabelText("파일"), new File(["openapi: 3.1.0\n"], "orders.yaml"));
 
@@ -82,7 +98,7 @@ describe("CaseImportDialog", () => {
     const user = userEvent.setup();
     vi.mocked(previewCaseImport).mockResolvedValue({ error: "문서를 읽지 못했습니다: document defines no paths" });
     render(<CaseImportDialog suiteId={3} existingNames={[]} />);
-    await user.click(screen.getByRole("button", { name: "OpenAPI 가져오기" }));
+    await user.click(screen.getByRole("button", { name: "문서 가져오기" }));
     await user.click(screen.getByLabelText("문서"));
     await user.paste("openapi: 3.0.3");
 
@@ -97,7 +113,7 @@ describe("CaseImportDialog", () => {
     const user = userEvent.setup();
     vi.mocked(previewCaseImport).mockRejectedValue(new Error("Body exceeded 6 MB limit."));
     render(<CaseImportDialog suiteId={3} existingNames={[]} />);
-    await user.click(screen.getByRole("button", { name: "OpenAPI 가져오기" }));
+    await user.click(screen.getByRole("button", { name: "문서 가져오기" }));
     await user.click(screen.getByLabelText("문서"));
     await user.paste("openapi: 3.0.3");
 

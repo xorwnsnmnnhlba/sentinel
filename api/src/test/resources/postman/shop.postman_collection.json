@@ -1,0 +1,146 @@
+{
+  "info": {
+    "_postman_id": "5f2b8a1e-0000-4000-8000-000000000000",
+    "name": "Shop API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://shop.example.com/api" },
+    { "key": "token", "value": "do-not-show-this-token" }
+  ],
+  "item": [
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "List orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Debug", "value": "1", "disabled": true }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders?status=paid&page=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders"],
+              "query": [
+                { "key": "status", "value": "paid" },
+                { "key": "page", "value": "1", "disabled": true }
+              ]
+            }
+          },
+          "response": [
+            { "name": "ok", "code": 200, "status": "OK" },
+            { "name": "unauthorized", "code": 401, "status": "Unauthorized" }
+          ]
+        },
+        {
+          "name": "Get order",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('ok', () => pm.response.to.have.status(200));"] } },
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [""] } }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/orders/:orderId/items/:itemId",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", ":orderId", "items", ":itemId"],
+              "variable": [{ "key": "orderId", "value": "42" }, { "key": "itemId", "value": "" }]
+            }
+          }
+        },
+        {
+          "name": "Create order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item\": \"{{itemId}}\",\n  \"quantity\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+          },
+          "response": [{ "name": "created", "code": 201 }]
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "auth": {
+        "type": "apikey",
+        "apikey": [
+          { "key": "key", "value": "X-Admin-Key" },
+          { "key": "value", "value": "literal-admin-key" },
+          { "key": "in", "value": "header" }
+        ]
+      },
+      "item": [
+        {
+          "name": "Reindex",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Cookie", "value": "SESSION=abc123" }],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "scope", "value": "all items" },
+                { "key": "requestedBy", "value": "{{user}}" },
+                { "key": "dryRun", "value": "true", "disabled": true }
+              ]
+            },
+            "url": "https://admin.example.com/reindex"
+          }
+        },
+        {
+          "name": "Public status",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [{ "key": "username", "value": "shop" }, { "key": "password", "value": "p4ss-w0rd-literal" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer should-be-overwritten" }],
+        "body": {
+          "mode": "graphql",
+          "graphql": { "query": "query { products { id } }", "variables": "{\"first\": 10}" }
+        },
+        "url": "{{baseUrl}}/graphql"
+      }
+    },
+    {
+      "name": "Upload",
+      "request": {
+        "auth": { "type": "digest", "digest": [] },
+        "method": "PUT",
+        "header": [{ "key": "Authorization", "value": "Token plain-token-value" }],
+        "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "a.png" }] },
+        "url": "{{baseUrl}}/files/"
+      }
+    },
+    {
+      "name": "Legacy",
+      "request": { "method": "COPY", "url": "{{baseUrl}}/legacy" }
+    },
+    {
+      "name": "List orders",
+      "request": "{{baseUrl}}/orders"
+    }
+  ]
+}

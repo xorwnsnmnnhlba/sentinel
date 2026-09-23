@@ -412,7 +412,7 @@ docker compose up -d --build --wait
 - baseline 갱신은 INFO만 자동, BREAKING·WARNING은 승인 후 반영
 
 ### 기타
-- OpenAPI / Postman 컬렉션 임포트를 통한 케이스 스켈레톤 자동 생성. OpenAPI 3 변환·가져오기 API와 스위트 화면의 가져오기 창 구현 (2026-09-23, `api/README.md` "케이스 가져오기"). 보안 스킴 → 인증 헤더 변수, 스키마 기반 본문 뼈대 포함. Postman은 후속
+- OpenAPI / Postman 컬렉션 임포트를 통한 케이스 스켈레톤 자동 생성. OpenAPI 3 변환·가져오기 API와 스위트 화면의 가져오기 창 구현 (2026-09-23, `api/README.md` "케이스 가져오기"). 보안 스킴 → 인증 헤더 변수, 스키마 기반 본문 뼈대 포함. Postman Collection v2.0·v2.1도 지원 (평문 자격증명은 변수로 바꿔 케이스에 남기지 않음)
 - 일 단위 집계 테이블(p50/p95) 기반 응답시간 추세 조회
 - 결과 데이터 보관기간 파기 배치 (2026-09-23 구현). 실행·결과 행은 유지, 요청·응답 헤더·본문만 30일 경과 후 삭제 (`api/README.md` "결과 원문 보관기간")
 
