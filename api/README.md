@@ -248,6 +248,8 @@ curl -i -X POST localhost:8080/api/runs \
 | 케이스 | `GET /api/cases?suiteId=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
 | 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs` | |
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
+| 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
+| 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
 
 - 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
 - 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
@@ -274,6 +276,27 @@ curl -i -X POST localhost:8080/api/runs \
 | 환경 | `{"projectId": 1, "name": "dev", "baseUrl": "https://gw.dev.internal", "variables": {"userId": "42"}, "secrets": {"token": "..."}}` |
 | 스위트 | `{"projectId": 1, "name": "smoke", "description": null}` |
 | 케이스 | `{"suiteId": 1, "name": "결제 내역 조회", "request": {"method": "GET", "path": "/billing/v1/history?userId={{userId}}", "headers": {"Accept": ["application/json"]}, "body": null}, "assertions": [{"type": "statusCode", "anyOf": ["200"]}]}` |
+
+### 응답시간 추세
+
+저장된 실행 결과에서 p50·p95·최대 응답시간을 바로 집계 (별도 집계 테이블 없음)
+
+| API | 설명 |
+|-----|------|
+| `GET /api/response-time-trends?caseId=&environmentId=` | 케이스 1건의 일별 값. 기간 생략 시 최근 30일 |
+| `GET /api/response-time-summaries?suiteId=&environmentId=` | 스위트의 케이스별 값 (기간 전체). 기간 생략 시 최근 7일 |
+
+```json
+{"caseId": 3, "environmentId": 1, "from": "2026-08-26", "to": "2026-09-24",
+ "points": [{"date": "2026-09-24", "samples": 144, "p50": 120, "p95": 340, "max": 910}]}
+```
+
+- 대상은 응답을 받은 결과(4xx·5xx·판정 실패 포함). 타임아웃·연결 실패 등 응답을 받지 못한 결과는 제외
+- 환경은 필수. 환경마다 응답시간이 달라 섞어서 집계하지 않음. 다른 프로젝트의 환경은 400
+- 기간 `from`·`to`는 `yyyy-MM-dd`, `sentinel.schedule.zone`(기본 `Asia/Seoul`) 기준 실행 시작 날짜, 종료일 포함, 최대 90일
+- 추세는 기간의 모든 날짜를 포함하고 결과가 없는 날은 `samples: 0`, 값 `null`. 요약은 스위트의 모든 케이스(보관 제외, 등록 순)를 포함
+- 백분위는 SQL 표준 `PERCENTILE_CONT`(연속 보간) 결과를 ms 단위로 반올림
+- 원문 보관기간 정리(`raw_purged_at`)는 소요 시간을 지우지 않으므로 오래된 실행도 집계 대상
 
 ### 케이스 가져오기 (OpenAPI 3, Postman)
 

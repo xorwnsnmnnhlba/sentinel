@@ -226,6 +226,8 @@ ANSI SQL 표준 준수 (2026-09-19). 마이그레이션, 샘플, 운영 쿼리 �
   - `CREATE INDEX`: 표준 미정의, 주요 DB 공통 구문
   - 계정·권한 관리(`CREATE USER`, 스키마 `GRANT`): DB 관리 명령
   - `DatabaseTimeoutTest`의 `pg_sleep`: PostgreSQL 드라이버 타임아웃 검증이 목적
+- 표준 집계·시간대 문법 사용: 백분위 `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ...)`, 날짜 변환 `CAST(... AT TIME ZONE ... AS DATE)`
+- 네이티브 쿼리의 테이블은 `{h-schema}`(Hibernate 기본 스키마 치환)로 한정. 네이티브 쿼리에는 `hibernate.default_schema`가 적용되지 않아 JDBC URL의 `currentSchema`에 의존하지 않도록 함
 
 ```sql
 CREATE SCHEMA sentinel;
@@ -413,7 +415,10 @@ docker compose up -d --build --wait
 
 ### 기타
 - OpenAPI / Postman 컬렉션 임포트를 통한 케이스 스켈레톤 자동 생성. OpenAPI 3 변환·가져오기 API와 스위트 화면의 가져오기 창 구현 (2026-09-23, `api/README.md` "케이스 가져오기"). 보안 스킴 → 인증 헤더 변수, 스키마 기반 본문 뼈대 포함. Postman Collection v2.0·v2.1도 지원 (평문 자격증명은 변수로 바꿔 케이스에 남기지 않음)
-- 일 단위 집계 테이블(p50/p95) 기반 응답시간 추세 조회
+- 응답시간 추세 조회 (2026-09-24 구현). 계획했던 일 단위 집계 테이블 대신 저장된 실행 결과에서 바로 집계
+  - 케이스별 추세는 `idx_result_case_time`, 스위트 요약은 `idx_run_suite_time` → `idx_result_run`으로 조회. 케이스 1건 90일은 수천 행 수준
+  - 원문 보관기간 정리가 소요 시간을 지우지 않아 원본이 남으므로 별도 테이블·집계 배치·재집계가 불필요
+  - 대시보드 등에서 전체 스위트를 자주 집계해 느려지면 그때 일 단위 집계 테이블 도입
 - 결과 데이터 보관기간 파기 배치 (2026-09-23 구현). 실행·결과 행은 유지, 요청·응답 헤더·본문만 30일 경과 후 삭제 (`api/README.md` "결과 원문 보관기간")
 
 ---
