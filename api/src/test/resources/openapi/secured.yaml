@@ -1,0 +1,103 @@
+# 보안 스킴 변환과 스키마 기반 본문 뼈대 확인용 문서
+openapi: 3.1.0
+info: { title: Secured, version: "1" }
+security:
+  - bearerAuth: []
+paths:
+  /me:
+    get: { summary: Me, responses: { "200": { description: ok } } }
+  /health:
+    get:
+      summary: Health
+      # 문서 공통 인증을 끔
+      security: []
+      responses: { "200": { description: ok } }
+  /reports:
+    get:
+      summary: Reports
+      # 대안이 여럿이면 첫 번째(헤더 키 + query 키 동시 사용)
+      security:
+        - apiKeyHeader: []
+          tenantKey: []
+        - bearerAuth: []
+      parameters:
+        # OpenAPI 규칙상 무시하는 헤더 파라미터
+        - { name: Authorization, in: header, required: true }
+        - { name: Accept, in: header, required: true }
+        - { name: from, in: query, required: true }
+      responses: { "200": { description: ok } }
+  /legacy:
+    get:
+      summary: Legacy
+      security: [ { basicAuth: [] } ]
+      responses: { "200": { description: ok } }
+  /oauth:
+    get:
+      summary: OAuth
+      security: [ { oauth: [read] } ]
+      responses: { "200": { description: ok } }
+  /unsupported:
+    get:
+      summary: Unsupported
+      security: [ { sessionCookie: [], digestAuth: [], ghost: [] } ]
+      responses: { "200": { description: ok } }
+  /users:
+    post:
+      summary: Create user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewUser" }
+      responses: { "201": { description: created } }
+  /nodes:
+    post:
+      summary: Create node
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Node" }
+      responses: { "201": { description: created } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+    basicAuth: { type: http, scheme: basic }
+    apiKeyHeader: { type: apiKey, in: header, name: X-API-Key }
+    tenantKey: { type: apiKey, in: query, name: tenant }
+    sessionCookie: { type: apiKey, in: cookie, name: SESSION }
+    oauth: { type: oauth2, flows: {} }
+    digestAuth: { type: http, scheme: digest }
+  schemas:
+    NewUser:
+      allOf:
+        - $ref: "#/components/schemas/Base"
+        - type: object
+          properties:
+            email: { type: string, format: email }
+            role: { type: string, enum: [ADMIN, MEMBER] }
+            age: { type: integer }
+            active: { type: boolean, default: true }
+            nickname: { type: [string, "null"] }
+            tags: { type: array, items: { type: string } }
+            address: { $ref: "#/components/schemas/Address" }
+            birthday: { type: string, format: date }
+            kind: { oneOf: [ { const: person }, { type: integer } ] }
+    Base:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        name: { type: string, example: Kim }
+    Id: { type: string, format: uuid, readOnly: true }
+    Address:
+      # type 생략. 속성으로 객체 추정
+      properties:
+        city: { type: string }
+        zip: { type: string }
+    Node:
+      type: object
+      properties:
+        name: { type: string }
+        children: { type: array, items: { $ref: "#/components/schemas/Node" } }
