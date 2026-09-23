@@ -26,6 +26,8 @@ import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
 import type { CaseItem, EnvironmentItem, ProjectItem, ScheduleDetail, SuiteItem } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 
+import { ResponseTimes } from "./response-times";
+
 export async function generateMetadata(props: PageProps<"/suites/[id]">) {
   const { id } = await props.params;
   return { title: `스위트 #${id} · Sentinel` };
@@ -36,6 +38,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
   if (!/^\d+$/.test(id)) {
     notFound();
   }
+  const searchParams = await props.searchParams;
   const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${id}`);
   const [project, environments, cases, schedules] = await Promise.all([
     apiGetOrNotFound<ProjectItem>(`/api/projects/${suite.projectId}`),
@@ -195,7 +198,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
           <Empty message="등록된 케이스가 없습니다" />
         ) : (
           <div className="rounded-lg border">
-            <Table>
+            <Table aria-label="케이스 목록">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">#</TableHead>
@@ -248,6 +251,13 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
           </div>
         )}
       </section>
+
+      <ResponseTimes
+        suiteId={suite.id}
+        environments={environments}
+        hasCases={cases.length > 0}
+        searchParams={searchParams}
+      />
     </div>
   );
 }

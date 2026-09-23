@@ -72,6 +72,9 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
+  /* 응답시간 차트 계열 색. dataviz 검증 팔레트(slot 1 blue, 2 orange), 배경 대비·색각 이상 구분 검증 완료 */
+  --chart-series-1: #2a78d6;
+  --chart-series-2: #eb6834;
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -107,6 +110,8 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
+  --chart-series-1: #3987e5;
+  --chart-series-2: #d95926;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);

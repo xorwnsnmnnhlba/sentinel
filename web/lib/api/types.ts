@@ -187,3 +187,40 @@ export interface CaseImportPreview {
 
 /** 가져오기 요청의 케이스 */
 export type ImportCase = Pick<CaseImportCandidate, "name" | "request" | "assertions">;
+
+/** 하루 응답시간. 응답을 받은 결과가 없으면 samples 0, 값 null */
+export interface ResponseTimePoint {
+  /** KST 날짜 (YYYY-MM-DD) */
+  date: string;
+  samples: number;
+  p50: number | null;
+  p95: number | null;
+  max: number | null;
+}
+
+/** 케이스 1건의 일별 응답시간 */
+export interface ResponseTimeTrend {
+  caseId: number;
+  environmentId: number;
+  from: string;
+  to: string;
+  points: ResponseTimePoint[];
+}
+
+/** 기간 전체의 케이스별 응답시간 */
+export interface CaseResponseTime {
+  caseId: number;
+  name: string;
+  samples: number;
+  p50: number | null;
+  p95: number | null;
+  max: number | null;
+}
+
+export interface ResponseTimeSummary {
+  suiteId: number;
+  environmentId: number;
+  from: string;
+  to: string;
+  cases: CaseResponseTime[];
+}
