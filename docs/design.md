@@ -354,9 +354,10 @@ sentinel-web   :3000   Next.js (standalone)
 루트 `docker-compose.yml`로 실행 (2026-09-19 구성, api와 web 컨테이너 2개)
 
 ```bash
-docker compose up -d --build
+docker compose up -d --build --wait
 ```
 
+- 헬스체크 (2026-09-23): api는 8080 포트 개방(TCP), web은 `/` 응답으로 기동 완료 판정. web은 api 기동 완료 후 시작. `--wait`는 둘 다 통과할 때까지 대기
 - 이미지: `api/Dockerfile` 멀티 스테이지 (eclipse-temurin 25 JDK 빌드 → 25 JRE 실행, 비root 사용자)
 - web 이미지: `web/Dockerfile` 멀티 스테이지 (node:24-alpine, Next.js standalone 출력, 비root 사용자). `INTERNAL_API_URL=http://sentinel-api:8080`
 - DB: 기본 로컬 PostgreSQL(`host.docker.internal:5432/sentinel`), RDS 전환은 `sentinel.env` 값 변경만으로 처리

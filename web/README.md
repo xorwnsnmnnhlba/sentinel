@@ -158,7 +158,7 @@ npm run dev
 | `npm run e2e` | E2E 테스트 실행 |
 | `npm run e2e:down` | E2E 스택 정리 (DB 데이터 삭제) |
 
-컨테이너 실행은 루트에서 `docker compose up -d --build` (api와 함께 기동)
+컨테이너 실행은 루트에서 `docker compose up -d --build --wait` (api 기동 완료 후 web 기동)
 
 ## shadcn/ui 컴포넌트 추가
 
