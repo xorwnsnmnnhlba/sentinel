@@ -34,7 +34,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <ul>
  * <li>경로 × 메서드마다 케이스 1건. {@code trace}는 미지원 메서드라 제외하고 경고</li>
  * <li>경로 파라미터 {@code {petId}}는 변수 {@code {{petId}}}로, 필수 query·header 파라미터는 변수로 채움. 선택 파라미터는 생략</li>
- * <li>JSON 요청 본문은 예시({@code example}, {@code examples})가 있을 때만 채움</li>
+ * <li>JSON 요청 본문은 예시({@code example}, {@code examples}), 없으면 스키마로 만든 뼈대({@link SchemaSkeleton})</li>
+ * <li>보안 스킴은 인증 헤더·query로 변환하고 값은 스킴 이름의 변수로 채움 (예: {@code Authorization: Bearer {{bearerAuth}}})</li>
  * <li>판정은 선언된 2xx 응답 코드({@code 2XX}는 {@code 2xx}). 없으면 {@code 2xx}</li>
  * <li>{@code #/...} 내부 참조만 해석. 외부 파일 참조는 경고 후 생략</li>
  * <li>{@code servers}는 기본 URL을 환경에서 관리하므로 케이스에 넣지 않고 참고용으로만 반환</li>
@@ -55,6 +56,9 @@ public final class OpenApiConverter {
 
 	private static final List<String> METHODS = List.of("get", "put", "post", "delete", "options", "head", "patch",
 			"trace");
+
+	/** OpenAPI 규칙상 header 파라미터로 정의해도 무시하는 이름. 본문 미디어 타입·보안 스킴으로 정해짐 */
+	private static final Set<String> IGNORED_HEADER_PARAMETERS = Set.of("accept", "content-type", "authorization");
 
 	private static final Pattern PATH_PARAMETER = Pattern.compile("\\{([^{}]+)}");
 
@@ -95,6 +99,8 @@ public final class OpenApiConverter {
 		List<String> warnings = new ArrayList<>();
 		List<CaseDraft> drafts = new ArrayList<>();
 		Set<String> usedNames = new HashSet<>();
+		// 보안 스킴별 안내. 작업마다 반복하지 않도록 문서 단위로 한 번씩
+		Map<String, String> securityNotes = new LinkedHashMap<>();
 		for (Map.Entry<String, JsonNode> pathEntry : paths.properties()) {
 			String path = pathEntry.getKey();
 			JsonNode pathItem = resolve(root, pathEntry.getValue(), path, warnings);
@@ -112,13 +118,14 @@ public final class OpenApiConverter {
 					continue;
 				}
 				CaseDraft draft = convertOperation(root, path, HttpMethod.valueOf(method.toUpperCase(Locale.ROOT)),
-						pathItem, operation, source);
+						pathItem, operation, source, securityNotes);
 				drafts.add(draft.withName(uniqueName(draft.name(), usedNames)));
 			}
 		}
 		if (drafts.isEmpty()) {
 			throw new InvalidRequestException("document defines no supported operations");
 		}
+		warnings.addAll(securityNotes.values());
 
 		JsonNode info = root.path("info");
 		List<String> servers = new ArrayList<>();
@@ -171,7 +178,7 @@ public final class OpenApiConverter {
 	}
 
 	private CaseDraft convertOperation(JsonNode root, String path, HttpMethod method, JsonNode pathItem,
-			JsonNode operation, String source) {
+			JsonNode operation, String source, Map<String, String> securityNotes) {
 		List<String> warnings = new ArrayList<>();
 		if (operation.path("deprecated").asBoolean(false)) {
 			warnings.add("operation is deprecated");
@@ -194,7 +201,11 @@ public final class OpenApiConverter {
 					.append(name)
 					.append('=')
 					.append(variable(name, warnings));
-				case "header" -> headers.put(name, List.of(variable(name, warnings)));
+				case "header" -> {
+					if (!IGNORED_HEADER_PARAMETERS.contains(name.toLowerCase(Locale.ROOT))) {
+						headers.put(name, List.of(variable(name, warnings)));
+					}
+				}
 				case "cookie" -> warnings.add("required cookie parameter '" + name + "' is not supported");
 				default -> {
 					// path 파라미터는 경로 치환에서 처리
@@ -202,6 +213,7 @@ public final class OpenApiConverter {
 			}
 		}
 
+		applySecurity(root, operation, headers, query, warnings, securityNotes);
 		String body = requestBody(root, operation, headers, warnings);
 		Request request = new Request(method, pathWithVariables(path, warnings) + query, headers, body);
 		List<Assertion> assertions = List.of(new StatusCodeAssertion(successCodes(operation, warnings)));
@@ -223,6 +235,67 @@ public final class OpenApiConverter {
 			}
 		}
 		return merged;
+	}
+
+	/**
+	 * 보안 스킴을 요청에 반영. 작업의 {@code security}, 없으면 문서의 {@code security} 사용. 대안이 여럿이면 첫 번째,
+	 * 빈 목록({@code security: []})은 인증 없음. 값은 스킴 이름의 변수로 채워 환경 시크릿으로 지정하도록 함
+	 */
+	private void applySecurity(JsonNode root, JsonNode operation, Map<String, List<String>> headers,
+			StringBuilder query, List<String> warnings, Map<String, String> securityNotes) {
+		JsonNode security = operation.has("security") ? operation.get("security") : root.get("security");
+		if (security == null || !security.isArray() || security.isEmpty()) {
+			return;
+		}
+		for (String schemeName : security.get(0).propertyNames()) {
+			JsonNode scheme = resolve(root, root.path("components").path("securitySchemes").get(schemeName),
+					"security scheme", warnings);
+			if (scheme == null || !scheme.isObject()) {
+				warnings.add("security scheme '" + schemeName + "' is not defined");
+				continue;
+			}
+			String variable = variable(schemeName, warnings);
+			String type = String.valueOf(text(scheme.get("type")));
+			String location = text(scheme.get("in"));
+			String keyName = text(scheme.get("name"));
+			String applied = switch (type) {
+				case "http" -> switch (String.valueOf(text(scheme.get("scheme"))).toLowerCase(Locale.ROOT)) {
+					case "bearer" -> authorization(headers, "Bearer " + variable);
+					case "basic" -> authorization(headers, "Basic " + variable);
+					default -> null;
+				};
+				case "oauth2", "openIdConnect" -> authorization(headers, "Bearer " + variable);
+				case "apiKey" -> {
+					if (keyName == null || "cookie".equals(location)) {
+						yield null;
+					}
+					if ("query".equals(location)) {
+						query.append(query.isEmpty() ? '?' : '&').append(keyName).append('=').append(variable);
+						yield "query " + keyName + "=" + variable;
+					}
+					headers.put(keyName, List.of(variable));
+					yield "'" + keyName + ": " + variable + "'";
+				}
+				default -> null;
+			};
+			if (applied == null) {
+				warnings.add("security scheme '" + schemeName + "' (" + describe(scheme) + ") is not supported");
+				continue;
+			}
+			securityNotes.putIfAbsent(schemeName, "security scheme '" + schemeName + "' is sent as " + applied
+					+ "; add " + variable + " as a secret of the environment");
+		}
+	}
+
+	private static String authorization(Map<String, List<String>> headers, String value) {
+		headers.put("Authorization", List.of(value));
+		return "'Authorization: " + value + "'";
+	}
+
+	private static String describe(JsonNode scheme) {
+		String type = String.valueOf(text(scheme.get("type")));
+		String detail = "http".equals(type) ? text(scheme.get("scheme")) : text(scheme.get("in"));
+		return detail == null ? type : type + " " + detail;
 	}
 
 	private String requestBody(JsonNode root, JsonNode operation, Map<String, List<String>> headers,
@@ -248,10 +321,14 @@ public final class OpenApiConverter {
 		}
 		JsonNode example = example(root, content.get(mediaType), warnings);
 		if (example == null) {
-			if (required) {
-				warnings.add("request body has no JSON example; body left empty");
+			example = new SchemaSkeleton(root).build(content.path(mediaType).get("schema"));
+			if (example == null) {
+				if (required) {
+					warnings.add("request body has no JSON example or schema; body left empty");
+				}
+				return null;
 			}
-			return null;
+			warnings.add("request body was generated from the schema; replace the placeholder values");
 		}
 		String body = example.isString() ? example.stringValue() : json.writer().with(BODY_FORMAT).writeValueAsString(example);
 		if (body.length() > RequestSpec.MAX_BODY_LENGTH) {

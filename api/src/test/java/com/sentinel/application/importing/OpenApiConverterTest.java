@@ -111,14 +111,94 @@ class OpenApiConverterTest {
 			assertThat(upload.warnings())
 				.containsExactly("request body media type [multipart/form-data] is not supported; body left empty");
 		});
-		assertThat(draft("POST /orders").warnings())
-			.containsExactly("request body has no JSON example; body left empty");
+		// 예시가 없으면 스키마로 뼈대 생성 (속성 없는 객체는 빈 객체)
+		assertThat(draft("POST /orders")).satisfies(order -> {
+			assertThat(order.request().body()).isEqualTo("{}");
+			assertThat(order.request().headers()).containsEntry("Content-Type", List.of("application/json"));
+			assertThat(order.warnings())
+				.containsExactly("request body was generated from the schema; replace the placeholder values");
+		});
 		assertThat(draft("GET /external").warnings())
 			.containsExactly("parameter: external reference 'common.yaml#/components/parameters/Tenant' is not supported");
 		assertThat(draft("PATCH /stores/{store[id]}")).satisfies(store -> {
 			assertThat(store.request().path()).isEqualTo("/stores/{{store_id_}}");
 			assertThat(store.warnings()).containsExactly("parameter 'store[id]' is used as variable {{store_id_}}");
 		});
+	}
+
+	@Test
+	void sendsCredentialsOfTheSecuritySchemeAsVariables() {
+		ConvertedDocument document = converter.convert(resource("openapi/secured.yaml"));
+
+		// 문서 공통 인증
+		assertThat(secured("GET /me").request().headers())
+			.containsExactly(Map.entry("Authorization", List.of("Bearer {{bearerAuth}}")));
+		// security: []는 인증 없음
+		assertThat(secured("GET /health").request().headers()).isEmpty();
+		// 첫 번째 대안의 스킴 모두 적용. 규칙상 무시하는 헤더 파라미터(Authorization·Accept)는 생략
+		assertThat(secured("GET /reports")).satisfies(reports -> {
+			assertThat(reports.request().path()).isEqualTo("/reports?from={{from}}&tenant={{tenantKey}}");
+			assertThat(reports.request().headers())
+				.containsExactly(Map.entry("X-API-Key", List.of("{{apiKeyHeader}}")));
+			assertThat(reports.warnings()).isEmpty();
+		});
+		assertThat(secured("GET /legacy").request().headers())
+			.containsExactly(Map.entry("Authorization", List.of("Basic {{basicAuth}}")));
+		assertThat(secured("GET /oauth").request().headers())
+			.containsExactly(Map.entry("Authorization", List.of("Bearer {{oauth}}")));
+		// 어떤 변수를 시크릿으로 등록해야 하는지 스킴마다 한 번 안내
+		assertThat(document.warnings()).containsExactly(
+				"security scheme 'bearerAuth' is sent as 'Authorization: Bearer {{bearerAuth}}'; add {{bearerAuth}} as a secret of the environment",
+				"security scheme 'apiKeyHeader' is sent as 'X-API-Key: {{apiKeyHeader}}'; add {{apiKeyHeader}} as a secret of the environment",
+				"security scheme 'tenantKey' is sent as query tenant={{tenantKey}}; add {{tenantKey}} as a secret of the environment",
+				"security scheme 'basicAuth' is sent as 'Authorization: Basic {{basicAuth}}'; add {{basicAuth}} as a secret of the environment",
+				"security scheme 'oauth' is sent as 'Authorization: Bearer {{oauth}}'; add {{oauth}} as a secret of the environment");
+	}
+
+	@Test
+	void warnsAboutSecuritySchemesItCannotSend() {
+		CaseDraft unsupported = secured("GET /unsupported");
+
+		assertThat(unsupported.request().headers()).isEmpty();
+		assertThat(unsupported.warnings()).containsExactly(
+				"security scheme 'sessionCookie' (apiKey cookie) is not supported",
+				"security scheme 'digestAuth' (http digest) is not supported",
+				"security scheme 'ghost' is not defined");
+	}
+
+	@Test
+	void buildsTheRequestBodyFromTheSchema() {
+		CaseDraft user = secured("POST /users");
+
+		// readOnly(id·createdAt) 제외, example·default·enum·const·format 반영, allOf 병합, type 생략 객체 추정
+		assertThat(user.request().body()).isEqualTo("""
+				{
+				  "name": "Kim",
+				  "email": "user@example.com",
+				  "role": "ADMIN",
+				  "age": 0,
+				  "active": true,
+				  "nickname": "string",
+				  "tags": [
+				    "string"
+				  ],
+				  "address": {
+				    "city": "string",
+				    "zip": "string"
+				  },
+				  "birthday": "2026-01-01",
+				  "kind": "person"
+				}""");
+		assertThat(user.request().headers()).containsExactly(Map.entry("Content-Type", List.of("application/json")));
+		assertThat(user.warnings())
+			.containsExactly("request body was generated from the schema; replace the placeholder values");
+
+		// 자기 참조 스키마는 되풀이하지 않음
+		assertThat(secured("POST /nodes").request().body()).isEqualTo("""
+				{
+				  "name": "string",
+				  "children": []
+				}""");
 	}
 
 	@Test
@@ -246,6 +326,15 @@ class OpenApiConverterTest {
 
 		assertThatThrownBy(() -> converter.convert(bomb.toString())).isInstanceOf(InvalidRequestException.class)
 			.hasMessageStartingWith("document is not valid JSON or YAML: ");
+	}
+
+	private CaseDraft secured(String source) {
+		return converter.convert(resource("openapi/secured.yaml"))
+			.cases()
+			.stream()
+			.filter(draft -> draft.source().equals(source))
+			.findFirst()
+			.orElseThrow();
 	}
 
 	private CaseDraft draft(String source) {

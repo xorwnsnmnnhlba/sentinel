@@ -296,14 +296,32 @@ curl -i -X POST localhost:8080/api/runs \
 | `paths` × 메서드 | 케이스 1건. 문서 순서 유지. `trace`는 미지원 메서드라 제외 (문서 경고) |
 | 이름 | `summary` → `operationId` → `GET /pets/{petId}` 순. 문서 안 중복은 ` (2)`, ` (3)` 추가 |
 | 경로 파라미터 `{petId}` | 변수 `{{petId}}`. 변수 이름에 쓸 수 없는 문자는 `_`로 바꾸고 경고 |
-| 필수 query·header 파라미터 | `?status={{status}}`, `X-Request-Id: {{X-Request-Id}}`. 선택 파라미터는 생략, cookie는 미지원 경고 |
+| 필수 query·header 파라미터 | `?status={{status}}`, `X-Request-Id: {{X-Request-Id}}`. 선택 파라미터는 생략, cookie는 미지원 경고. `Accept`·`Content-Type`·`Authorization` header 파라미터는 OpenAPI 규칙대로 무시 |
 | 경로 공통 `parameters` | 작업에 병합. 같은 이름·위치는 작업 쪽 우선 |
-| JSON 요청 본문 (`application/json`, `*+json`) | 미디어 타입 `example` → `examples`의 첫 값 → 스키마 `example` 순. 있으면 본문과 `Content-Type` 헤더, 없으면 빈 본문으로 경고 |
+| JSON 요청 본문 (`application/json`, `*+json`) | 미디어 타입 `example` → `examples`의 첫 값 → 스키마 `example` 순. 있으면 본문과 `Content-Type` 헤더 |
+| 예시 없는 JSON 요청 본문 | 스키마로 뼈대 생성 후 "자리 표시 값을 바꿔 주세요" 경고 (아래 규칙). 스키마도 없으면 빈 본문으로 경고 |
 | 그 밖의 요청 본문 (`multipart/form-data` 등) | 빈 본문으로 경고 |
 | 응답 코드 | 선언된 2xx(`200`, `201`, `2XX` → `2xx`)로 상태 코드 판정. 없으면 `2xx`로 경고 |
 | `$ref` | 문서 내부 참조(`#/...`)만 해석. 외부 파일 참조·순환 참조는 경고 후 생략 |
 | YAML 앵커·별칭 | 펼쳐서 해석. 별칭 폭증(billion laughs) 방지를 위해 별칭 50개까지 |
-| `servers`, 보안 스킴 | 케이스에 미반영. 기본 URL은 환경에서, 인증 헤더는 변수·시크릿으로 직접 지정 |
+| 보안 스킴 (`security`) | 작업의 `security`, 없으면 문서 공통. 대안이 여럿이면 첫 번째, `security: []`는 인증 없음. 값은 스킴 이름의 변수 (아래 표) |
+| `servers` | 케이스에 미반영. 기본 URL은 환경에서 지정 |
+
+| 보안 스킴 | 요청 |
+|-----------|------|
+| `http` `bearer`, `oauth2`, `openIdConnect` | `Authorization: Bearer {{스킴 이름}}`. 토큰 발급은 미지원이라 발급받은 토큰을 시크릿으로 등록 |
+| `http` `basic` | `Authorization: Basic {{스킴 이름}}`. 값은 `아이디:비밀번호`를 Base64로 인코딩한 문자열 |
+| `apiKey` header·query | `X-API-Key: {{스킴 이름}}`, `?tenant={{스킴 이름}}`처럼 지정한 이름·위치에 추가 |
+| `apiKey` cookie, 그 밖의 `http` 스킴(digest 등) | 미지원 경고 |
+
+- 사용한 스킴마다 "어떤 변수를 시크릿으로 등록해야 하는지" 문서 단위 안내 1건 (`warnings`)
+
+스키마 기반 본문 뼈대 (값은 자리 표시용)
+- 스키마의 `example` → `default` → `const` → `enum` 첫 값이 있으면 그대로 사용
+- 객체는 `readOnly`를 제외한 모든 속성, 배열은 항목 1개. `type` 생략 시 `properties`·`items`로 추정
+- `allOf`는 객체 병합, `oneOf`·`anyOf`는 첫 스키마. OpenAPI 3.1의 `type: [string, "null"]`은 null이 아닌 종류
+- 문자열은 `format`별 값(`date-time` → `2026-01-01T00:00:00Z`, `email` → `user@example.com`, `uuid` 등), 그 외 `"string"`. 숫자 0, 불리언 false
+- 중첩은 6단계까지, 자기 참조 스키마(트리 등)는 되풀이하지 않음
 
 ### 환경 변수와 시크릿
 
