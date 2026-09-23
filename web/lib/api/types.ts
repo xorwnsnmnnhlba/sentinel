@@ -160,3 +160,30 @@ export interface LinkInfo {
   email: string;
   expiresAt: string;
 }
+
+/** 가져오기 후보 케이스. name·request·assertions를 그대로(또는 고쳐) 가져오기에 사용 */
+export interface CaseImportCandidate {
+  /** 원본 작업. 예: GET /pets/{petId} */
+  source: string;
+  name: string;
+  request: CaseItem["request"];
+  assertions: Assertion[];
+  /** 변환하면서 생략·대체한 내용 */
+  warnings: string[];
+  /** 스위트에 같은 이름의 케이스가 있음 */
+  conflict: boolean;
+}
+
+/** OpenAPI 문서 미리보기. 저장되지 않음 */
+export interface CaseImportPreview {
+  title: string | null;
+  version: string | null;
+  /** 문서의 서버 주소. 환경 기본 URL 설정 참고용 */
+  servers: string[];
+  cases: CaseImportCandidate[];
+  /** 문서 단위 경고 (지원하지 않아 제외한 작업 등) */
+  warnings: string[];
+}
+
+/** 가져오기 요청의 케이스 */
+export type ImportCase = Pick<CaseImportCandidate, "name" | "request" | "assertions">;

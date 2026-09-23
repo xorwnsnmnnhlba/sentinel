@@ -2,6 +2,7 @@ import { History, Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CaseImportDialog } from "@/components/catalog/case-import-dialog";
 import { DeleteButton } from "@/components/catalog/delete-button";
 import { SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
@@ -180,11 +181,14 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
           title="케이스"
           description="요청 정의와 판정 규칙. 실행 순서는 등록 순"
           action={
-            <Button asChild size="sm">
-              <Link href={`/cases/new?suiteId=${suite.id}`}>
-                <Plus /> 케이스 추가
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <CaseImportDialog suiteId={suite.id} existingNames={cases.map((testCase) => testCase.name)} />
+              <Button asChild size="sm">
+                <Link href={`/cases/new?suiteId=${suite.id}`}>
+                  <Plus /> 케이스 추가
+                </Link>
+              </Button>
+            </div>
           }
         />
         {cases.length === 0 ? (

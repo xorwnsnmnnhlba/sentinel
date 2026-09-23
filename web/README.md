@@ -44,23 +44,25 @@ app/
  ├─ projects/
  │   ├─ page.tsx            프로젝트 목록·등록
  │   └─ [id]/               프로젝트 상세 (환경·스위트 등록·수정·삭제), 미존재 시 404
- ├─ suites/[id]/            스위트 상세 (즉시 실행, 케이스 목록·삭제), 미존재 시 404
+ ├─ suites/[id]/            스위트 상세 (즉시 실행, 케이스 목록·삭제·OpenAPI 가져오기), 미존재 시 404
  ├─ cases/
  │   ├─ new/                케이스 등록 (?suiteId=), 스위트 미존재 시 404
  │   └─ [id]/               케이스 수정, 미존재 시 404
  └─ api/[...path]/route.ts  브라우저용 BFF 프록시 (/api/** → Spring /api/**)
 components/
  ├─ ui/                     shadcn/ui 컴포넌트 (CLI로 추가, 직접 수정 가능)
- ├─ catalog/                등록·수정 다이얼로그, 삭제 확인, 변수·헤더·시크릿 편집기, 실행 폼, 케이스 편집기, 스케줄 입력·전환
+ ├─ catalog/                등록·수정 다이얼로그, 삭제 확인, 변수·헤더·시크릿 편집기, 실행 폼, 케이스 편집기, 스케줄 입력·전환, 케이스 가져오기 창
  ├─ runs/                   실행 이력 필터 (GET 폼, 조건이 주소에 남음), 결과 상세의 케이스별 내용
  ├─ run-badges.tsx          판정·상태·주체 배지
  └─ site-header.tsx
 test/                       테스트 공통 (MSW 서버, 환경 설정, redirect·notFound 확인)
 lib/
  ├─ actions/catalog.ts      Server Actions (등록·수정·삭제·실행 → Spring 호출 후 refresh·redirect)
+ ├─ actions/case-import.ts  Server Actions (OpenAPI 문서 미리보기, 케이스 가져오기)
  ├─ api/server.ts           Spring 호출 (서버 전용, server-only)
  ├─ api/types.ts            API 응답 타입
  ├─ case-draft.ts           케이스 폼 상태 ↔ API 요청 변환·검증 (화면과 Server Action 공용)
+ ├─ case-import.ts          가져오기 후보 선택·이름 검사, 요청 형식 확인 (화면과 Server Action 공용)
  ├─ format.ts               KST 시각·소요 시간·JSON 본문 표시
  └─ utils.ts
 ```
@@ -78,7 +80,7 @@ lib/
 | `/runs/{id}` | 결과 상세. 케이스별 판정(실패·오류는 펼침), 판정 규칙 결과, 요청·응답 헤더와 본문(JSON 정렬). 보관기간이 지나 원문을 삭제한 실행은 안내 문구 표시 |
 | `/projects` | 프로젝트 목록, 새 프로젝트 등록(등록 후 상세로 이동) |
 | `/projects/{id}` | 프로젝트 수정·삭제. 환경(기본 URL, 변수, 시크릿)과 스위트 추가·수정·삭제 |
-| `/suites/{id}` | 스위트 수정·삭제, 환경 선택 후 즉시 실행(완료 후 결과 상세로 이동), 스케줄·케이스 목록과 편집 |
+| `/suites/{id}` | 스위트 수정·삭제, 환경 선택 후 즉시 실행(완료 후 결과 상세로 이동), 스케줄·케이스 목록과 편집, OpenAPI 문서에서 케이스 가져오기 |
 | `/cases/new?suiteId={id}` | 케이스 등록. 요청 정의(메서드, 경로, 헤더, 본문)와 판정 규칙 5종, 저장 후 스위트 화면으로 이동 |
 | `/cases/{id}` | 케이스 수정. 저장 시 요청 정의·판정 규칙 전체 교체 |
 
@@ -97,6 +99,11 @@ lib/
   - 경로는 `/` 또는 `{{변수}}`로 시작 (변수는 실행 시 치환 결과가 `/`로 시작해야 함)
   - JsonPath 기대값은 JSON으로 해석: `1000`·`true`는 숫자·불리언, 문자열 숫자는 `"1000"`처럼 따옴표. 그 외 입력은 문자열
   - 수정 화면은 JSON으로 읽히는 문자열 기대값을 따옴표 포함으로 표시하여 저장해도 값 유지
+- 케이스 가져오기 (스위트 화면 `OpenAPI 가져오기`)
+  - OpenAPI 3 문서(JSON·YAML)를 붙여넣거나 파일 선택 → 미리보기 → 후보 선택·이름 수정 → 가져오기. 변환 규칙은 `api/README.md` "케이스 가져오기"
+  - 미리보기에 문서 제목·버전, 서버 주소(환경 기본 URL 참고용), 변환 경고 표시. 스위트에 이미 있는 이름의 후보는 선택 해제 상태로 시작
+  - 선택한 후보의 빈 이름·기존 이름·목록 안 중복은 화면에서 표시하고 가져오기 버튼을 막음. 가져오기는 전부 등록되거나 전부 등록되지 않음
+  - 문서는 5MB(문자 수)까지, 한 번에 500건까지 (Spring 한도와 동일)
 - 로딩 화면은 목록에만 적용(라우트 그룹 `(list)`). 상세까지 감싸면 `notFound()`가 200 스트리밍 이후 렌더링되어 404 상태 코드 유실
 
 ## 인증
@@ -121,6 +128,7 @@ lib/
 - Server Actions 사용 이유: Next.js 16 권장 방식. 변경과 화면 갱신이 한 번의 왕복으로 처리되고 Spring 주소가 서버에만 존재
 - Server Action은 화면 없이 직접 POST로도 호출 가능하므로 바인딩된 ID·변수 JSON 형식 재검사. 값 검증의 최종 판단은 Spring
 - Spring 오류는 화면용 문구로 변환: 400 입력값 확인(Spring 상세 포함), 404 대상 없음, 409 이름 중복, 그 외 고정 문구
+  - 케이스 가져오기는 어느 문서·케이스가 문제인지 알 수 있도록 409도 Spring 상세 포함
 - 폼은 `onSubmit`으로 제출. `action` prop 제출은 React가 제출 후 폼을 초기화하여 오류 시 입력값 유실
 
 - 캐시 미사용 (`cache: "no-store"`). 실행 결과는 항상 최신 조회
@@ -215,5 +223,7 @@ npm run e2e:up && npm run e2e && npm run e2e:down
 - Next.js 16은 이전 버전과 API·규칙 차이 존재. 코드 작성 전 `node_modules/next/dist/docs/` 가이드 확인 (AI 에이전트용 규칙은 [AGENTS.md](AGENTS.md))
 - 보안 릴리스 이슈로 Next.js 16.3.3 이상 유지
 - `cacheComponents` 미사용 (기존 캐싱 모델). 캐시가 필요해지면 도입 검토
+- Server Action 본문 한도를 `next.config.ts`의 `serverActions.bodySizeLimit`으로 6MB로 늘림 (기본 1MB, 케이스 가져오기의 문서 전송용). 모든 Server Action에 적용
+- Server Action 인자 목록에 긴 문자열을 바로 넣지 않음. React가 인자 목록 안 문자열 길이를 배열 크기 한도(100만)에 합산하여 1MB 안팎에서 `Maximum array nesting exceeded`로 거부. 긴 값은 객체 속성으로 전달 (예: `previewCaseImport(suiteId, { content })`)
 
 설계 배경은 [docs/design.md](../docs/design.md) 참고
