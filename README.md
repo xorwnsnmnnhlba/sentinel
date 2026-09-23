@@ -61,14 +61,16 @@ cp sentinel.env.example sentinel.env
 `sentinel.env`의 `DB_PASSWORD` 입력 후 실행. 값에 따옴표 사용 금지(`--env-file`은 따옴표까지 값으로 인식)
 
 ```bash
-docker compose up -d --build
+docker compose up -d --build --wait
 ```
+
+- `--wait`는 api·web 헬스체크 통과(기동 완료)까지 대기 후 종료. 기동 실패 시 오류로 종료
+- 기동 실패 시 원인은 로그로 확인. `docker ps`에 `Restarting` 또는 `unhealthy` 표시 시 설정 오류
 
 ```bash
 docker compose logs -f sentinel-api
 ```
 
-- 로그의 `Started SentinelApplication` 확인 후 사용. `docker ps`에 `Restarting` 표시 시 설정 오류
 - 화면: [http://localhost:3000](http://localhost:3000), API: `localhost:8080`
 - 컨테이너 안의 `localhost`는 컨테이너 자신이므로 호스트 PostgreSQL은 `host.docker.internal`로 접속 (템플릿 기본값)
 - RDS 사용 시 `sentinel.env`의 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 RDS 값으로 변경
