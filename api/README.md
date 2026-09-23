@@ -20,6 +20,7 @@ Sentinel 백엔드. 테스트 케이스 실행(러너), 스케줄 실행, 결과
 | PostgreSQL JDBC | 42.7.11 |
 | DB | PostgreSQL 18, 개발기 AWS RDS `sentinel` 스키마 |
 | Flyway | 12.4.0 |
+| SnakeYAML Engine | 3.0.1 (케이스 가져오기의 OpenAPI 문서 해석, Boot 미관리라 버전 명시) |
 | Testcontainers | 2.0.5 |
 | Lombok | 1.18.46 (`@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor(access = PROTECTED)`만 사용, `lombok.config`로 제한) |
 
@@ -273,6 +274,36 @@ curl -i -X POST localhost:8080/api/runs \
 | 환경 | `{"projectId": 1, "name": "dev", "baseUrl": "https://gw.dev.internal", "variables": {"userId": "42"}, "secrets": {"token": "..."}}` |
 | 스위트 | `{"projectId": 1, "name": "smoke", "description": null}` |
 | 케이스 | `{"suiteId": 1, "name": "결제 내역 조회", "request": {"method": "GET", "path": "/billing/v1/history?userId={{userId}}", "headers": {"Accept": ["application/json"]}, "body": null}, "assertions": [{"type": "statusCode", "anyOf": ["200"]}]}` |
+
+### 케이스 가져오기 (OpenAPI 3)
+
+문서를 케이스 후보로 변환해 확인한 뒤, 고른 후보만 가져오는 2단계 방식
+
+| API | 설명 |
+|-----|------|
+| `POST /api/case-import-previews` | 변환만 하고 저장하지 않음. 본문 `{"suiteId": 1, "format": "OPENAPI_3", "content": "<JSON 또는 YAML 원문>"}` |
+| `POST /api/case-imports` | 한 트랜잭션으로 등록. 본문 `{"suiteId": 1, "cases": [{"name": "...", "request": {...}, "assertions": [...]}]}`. 201 + `{"suiteId", "cases": [등록한 케이스]}` |
+
+- 미리보기 응답: `title`, `version`, `servers`(환경 기본 URL 설정 참고용), `cases`, `warnings`(문서 단위)
+  - 후보: `source`(예: `GET /pets/{petId}`), `name`, `request`, `assertions`, `warnings`(생략·대체한 내용), `conflict`(스위트에 같은 이름 있음)
+  - 후보를 그대로(또는 이름·요청을 고쳐) `cases`로 보내면 가져오기. `source`·`warnings`·`conflict`는 무시
+- 가져오기는 한 건이라도 실패하면 전부 미등록. 이름 중복(스위트 기존 케이스, 목록 안 중복)은 409, 잘못된 케이스는 400 (`cases[1] 'Broken': ...`처럼 위치 표시)
+- 문서는 5MB(문자 수)까지, 한 번에 가져오기는 500건까지
+- Swagger 2.0 등 OpenAPI 3이 아닌 문서, 해석할 수 없는 문서, 작업이 없는 문서는 400
+
+| OpenAPI | 케이스 |
+|---------|--------|
+| `paths` × 메서드 | 케이스 1건. 문서 순서 유지. `trace`는 미지원 메서드라 제외 (문서 경고) |
+| 이름 | `summary` → `operationId` → `GET /pets/{petId}` 순. 문서 안 중복은 ` (2)`, ` (3)` 추가 |
+| 경로 파라미터 `{petId}` | 변수 `{{petId}}`. 변수 이름에 쓸 수 없는 문자는 `_`로 바꾸고 경고 |
+| 필수 query·header 파라미터 | `?status={{status}}`, `X-Request-Id: {{X-Request-Id}}`. 선택 파라미터는 생략, cookie는 미지원 경고 |
+| 경로 공통 `parameters` | 작업에 병합. 같은 이름·위치는 작업 쪽 우선 |
+| JSON 요청 본문 (`application/json`, `*+json`) | 미디어 타입 `example` → `examples`의 첫 값 → 스키마 `example` 순. 있으면 본문과 `Content-Type` 헤더, 없으면 빈 본문으로 경고 |
+| 그 밖의 요청 본문 (`multipart/form-data` 등) | 빈 본문으로 경고 |
+| 응답 코드 | 선언된 2xx(`200`, `201`, `2XX` → `2xx`)로 상태 코드 판정. 없으면 `2xx`로 경고 |
+| `$ref` | 문서 내부 참조(`#/...`)만 해석. 외부 파일 참조·순환 참조는 경고 후 생략 |
+| YAML 앵커·별칭 | 펼쳐서 해석. 별칭 폭증(billion laughs) 방지를 위해 별칭 50개까지 |
+| `servers`, 보안 스킴 | 케이스에 미반영. 기본 URL은 환경에서, 인증 헤더는 변수·시크릿으로 직접 지정 |
 
 ### 환경 변수와 시크릿
 

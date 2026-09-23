@@ -22,6 +22,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'com.jayway.jsonpath:json-path'
+	// 케이스 가져오기의 OpenAPI 문서 해석. YAML 1.2는 JSON을 포함하므로 두 형식 모두 이 파서로 읽음
+	// Jackson YAML 모듈은 별칭(*ref)을 펼치지 않고 앵커 이름 문자열로 바꾸므로 미사용. Boot 미관리 의존성이라 버전 명시
+	implementation 'org.snakeyaml:snakeyaml-engine:3.0.1'
 	implementation 'org.springframework.boot:spring-boot-starter-flyway'
 	// BCrypt만 사용. 보안 스타터는 자동 설정이 전체 요청을 가로채므로 미사용 (인증은 직접 구현)
 	implementation 'org.springframework.security:spring-security-crypto'

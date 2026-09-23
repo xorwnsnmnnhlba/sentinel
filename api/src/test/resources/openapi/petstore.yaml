@@ -1,0 +1,125 @@
+# 변환 규칙 확인용 문서. 경로 공통 파라미터, 내부 참조, 예시 위치별 우선순위, 지원하지 않는 요소를 포함
+openapi: 3.0.3
+info:
+  title: Petstore
+  version: 1.2.0
+servers:
+  - url: https://petstore.example.com/v1
+  - url: https://staging.petstore.example.com/v1
+paths:
+  /pets:
+    get:
+      summary: List pets
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: ok }
+        default: { description: error }
+    post:
+      operationId: createPet
+      requestBody:
+        $ref: "#/components/requestBodies/NewPet"
+      responses:
+        "201": { description: created }
+        "400": { description: invalid }
+    trace:
+      responses:
+        "200": { description: ok }
+  /pets/{petId}:
+    parameters:
+      - $ref: "#/components/parameters/PetId"
+      - name: X-Request-Id
+        in: header
+        required: true
+        schema: { type: string }
+    get:
+      summary: Find pet
+      responses:
+        "200": { description: ok }
+        "404": { description: missing }
+    put:
+      summary: Update pet
+      parameters:
+        # 경로 공통 헤더를 작업에서 선택으로 재정의
+        - name: X-Request-Id
+          in: header
+          required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            examples:
+              renamed:
+                $ref: "#/components/examples/RenamedPet"
+      responses:
+        2XX: { description: ok }
+    delete:
+      deprecated: true
+      responses:
+        "404": { description: missing }
+  /pets/{petId}/photo:
+    post:
+      summary: Upload photo
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object }
+      responses:
+        "204": { description: uploaded }
+  /stores/{store[id]}:
+    patch:
+      summary: Update store
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: "#/components/schemas/Store"
+      responses:
+        "200": { description: ok }
+  /orders:
+    post:
+      summary: Create order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "201": { description: created }
+  /external:
+    get:
+      summary: External
+      parameters:
+        - $ref: "common.yaml#/components/parameters/Tenant"
+      responses:
+        "200": { description: ok }
+components:
+  parameters:
+    PetId:
+      name: petId
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBodies:
+    NewPet:
+      required: true
+      content:
+        application/json:
+          example:
+            name: Kitty
+            tags: [cat]
+  examples:
+    RenamedPet:
+      value: { name: Tom }
+  schemas:
+    Store:
+      type: object
+      example: { name: Main }
