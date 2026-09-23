@@ -1,5 +1,6 @@
 package com.sentinel.infra.persistence;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
@@ -37,6 +38,58 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 			where r.run.id in :runIds
 			""")
 	int purgeRawByRunIds(@Param("runIds") Collection<Long> runIds);
+
+	/**
+	 * 케이스 1건의 일별 응답시간 (응답을 받은 결과만). 일자는 {@code zone} 기준 실행 시작 날짜.
+	 * <p>
+	 * 네이티브 쿼리는 hibernate.default_schema가 적용되지 않으므로 테이블에 {@code {h-schema}}(기본 스키마)를 붙임.
+	 * 같은 시간대 식을 SELECT와 GROUP BY에 각각 바인딩하면 PostgreSQL이 다른 식으로 보므로 하위 쿼리에서 한 번만 계산.
+	 * 백분위는 SQL 표준 {@code PERCENTILE_CONT} (연속 보간)
+	 * @return [일자, 건수, p50, p95, 최대] 일자 순
+	 */
+	@Query(nativeQuery = true, value = """
+			SELECT d.day, COUNT(*),
+			       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY d.elapsed_ms),
+			       PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY d.elapsed_ms),
+			       MAX(d.elapsed_ms)
+			FROM (
+			    SELECT CAST(t.started_at AT TIME ZONE :zone AS DATE) AS day, r.elapsed_ms
+			    FROM {h-schema}test_result r
+			    JOIN {h-schema}test_run t ON t.id = r.run_id
+			    WHERE r.test_case_id = :caseId
+			      AND t.environment_id = :environmentId
+			      AND r.outcome = 'RESPONDED'
+			      AND r.elapsed_ms IS NOT NULL
+			      AND t.started_at >= :from
+			      AND t.started_at < :to
+			) d
+			GROUP BY d.day
+			ORDER BY d.day
+			""")
+	List<Object[]> dailyResponseTimes(@Param("caseId") long caseId, @Param("environmentId") long environmentId,
+			@Param("zone") String zone, @Param("from") Instant from, @Param("to") Instant to);
+
+	/**
+	 * 스위트의 케이스별 응답시간 (응답을 받은 결과만)
+	 * @return [케이스 ID, 건수, p50, p95, 최대]
+	 */
+	@Query(nativeQuery = true, value = """
+			SELECT r.test_case_id, COUNT(*),
+			       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.elapsed_ms),
+			       PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY r.elapsed_ms),
+			       MAX(r.elapsed_ms)
+			FROM {h-schema}test_result r
+			JOIN {h-schema}test_run t ON t.id = r.run_id
+			WHERE t.suite_id = :suiteId
+			  AND t.environment_id = :environmentId
+			  AND r.outcome = 'RESPONDED'
+			  AND r.elapsed_ms IS NOT NULL
+			  AND t.started_at >= :from
+			  AND t.started_at < :to
+			GROUP BY r.test_case_id
+			""")
+	List<Object[]> caseResponseTimes(@Param("suiteId") long suiteId, @Param("environmentId") long environmentId,
+			@Param("from") Instant from, @Param("to") Instant to);
 
 	interface VerdictCount {
 

@@ -34,6 +34,11 @@ public class FakeRequestExecutor implements RequestExecutor {
 		behavior = request -> new HttpExchange(request, statusCode, headers, body, Duration.ofMillis(12));
 	}
 
+	/** 200 응답을 요청별 소요 시간으로 반환. 응답시간 집계 검증용 */
+	public void respondIn(Function<ResolvedRequest, Duration> elapsed) {
+		behavior = request -> new HttpExchange(request, 200, Map.of(), "", elapsed.apply(request));
+	}
+
 	public void fail(RequestExecutionException.Reason reason) {
 		behavior = request -> {
 			throw new RequestExecutionException(reason, request, Duration.ofMillis(1000), null);
