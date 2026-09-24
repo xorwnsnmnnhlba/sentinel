@@ -27,6 +27,19 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 			""")
 	List<SuiteCount> countBySuite(@Param("from") Instant from, @Param("to") Instant to);
 
+	/** 기간 안에 시작한 실행 중 판정 실패·오류 결과가 있는 실행 수 (스위트별) */
+	@Query("""
+			select t.suite.id as suiteId, count(t) as count
+			from TestRun t
+			where t.startedAt >= :from and t.startedAt < :to
+			  and exists (
+			      select r.id from TestResult r
+			      where r.run = t
+			        and r.verdict in (com.sentinel.domain.TestResult.Verdict.FAILED, com.sentinel.domain.TestResult.Verdict.ERROR))
+			group by t.suite.id
+			""")
+	List<SuiteCount> countFailingBySuite(@Param("from") Instant from, @Param("to") Instant to);
+
 	/** 스위트별 가장 최근 실행. ID는 시작 순으로 증가하므로 최대 ID가 최근 실행 */
 	@Query("select t from TestRun t where t.id in (select max(latest.id) from TestRun latest group by latest.suite.id)")
 	List<TestRun> findLatestPerSuite();

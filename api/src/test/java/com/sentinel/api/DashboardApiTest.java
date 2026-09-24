@@ -62,6 +62,7 @@ class DashboardApiTest {
 		body.extractingPath("$.suites[0].suite.id").isEqualTo(suite.getId().intValue());
 		body.extractingPath("$.suites[0].project.name").isEqualTo(project.getName());
 		body.extractingPath("$.suites[0].runs").isEqualTo(1);
+		body.extractingPath("$.suites[0].failingRuns").isEqualTo(1);
 		body.extractingPath("$.suites[0].results.failed").isEqualTo(1);
 		body.extractingPath("$.suites[0].passRate").isEqualTo(0.5);
 		body.extractingPath("$.suites[0].lastRun.id").isEqualTo((int) run);
