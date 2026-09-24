@@ -308,8 +308,8 @@ curl -i -X POST localhost:8080/api/runs \
 `GET /api/suite-summaries?from=&to=`: 대시보드용 스위트별 요약. 기간 생략 시 최근 7일, 최대 90일
 
 - 보관되지 않은 모든 스위트 (프로젝트·스위트 이름 순), 실행한 적 없는 스위트도 포함
-- 항목: `suite`·`project`, 기간 안 실행 수 `runs`, 판정별 결과 수 `results`, 통과 결과 비율 `passRate`(0~1, 결과 없으면 `null`), 기간과 무관한 최근 실행 `lastRun`(없으면 `null`)
-- 스위트 수와 무관하게 쿼리 5회
+- 항목: `suite`·`project`, 기간 안 실행 수 `runs`, 그중 실패·오류가 있는 실행 수 `failingRuns`, 판정별 결과 수 `results`, 통과 결과 비율 `passRate`(0~1, 결과 없으면 `null`), 기간과 무관한 최근 실행 `lastRun`(없으면 `null`)
+- 스위트 수와 무관하게 쿼리 6회
 
 ### 케이스 가져오기 (OpenAPI 3, Postman)
 

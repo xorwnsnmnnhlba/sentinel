@@ -22,6 +22,7 @@ export default async function RunsPage(props: PageProps<"/runs">) {
     status: single(searchParams.status),
     from: single(searchParams.from),
     to: single(searchParams.to),
+    failing: single(searchParams.failing) === "true" ? "true" : undefined,
   };
 
   const hasFilter = Object.values(filters).some((value) => value);

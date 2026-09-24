@@ -74,6 +74,17 @@ describe("RunFilters", () => {
     expect(within(environmentGroups[1]).getByRole("option", { name: "staging" })).toHaveValue("200");
   });
 
+  it("narrows to runs with failures when checked", () => {
+    renderFilters({ failing: "true" });
+
+    const failing = screen.getByRole("checkbox", { name: "실패·오류만" });
+    expect(failing).toBeChecked();
+    const form = screen.getByRole("form", { name: "실행 이력 필터" }) as HTMLFormElement;
+    expect(new FormData(form).get("failing")).toBe("true");
+    // 조건이 있으므로 초기화 가능
+    expect(screen.getByRole("link", { name: "초기화" })).toBeInTheDocument();
+  });
+
   it("offers a reset link only while a condition is set", () => {
     const { rerender } = renderFilters();
     expect(screen.queryByRole("link", { name: "초기화" })).not.toBeInTheDocument();

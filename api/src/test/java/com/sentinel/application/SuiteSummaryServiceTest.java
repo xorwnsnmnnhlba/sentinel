@@ -91,6 +91,8 @@ class SuiteSummaryServiceTest {
 		SuiteSummaryService.SuiteSummary ordersSummary = summaries.suites().get(1);
 		assertThat(ordersSummary.project()).isEqualTo(new IdName(project.getId(), project.getName()));
 		assertThat(ordersSummary.runs()).isEqualTo(2);
+		// 두 실행 모두 실패 케이스가 있음
+		assertThat(ordersSummary.failingRuns()).isEqualTo(2);
 		// 실행 2회 × 케이스 2건 (통과 1, 실패 1)
 		assertThat(ordersSummary.results()).isEqualTo(new TestRunDetail.Summary(4, 2, 2, 0));
 		assertThat(ordersSummary.passRate()).isCloseTo(0.5, within(1e-9));
@@ -99,6 +101,7 @@ class SuiteSummaryServiceTest {
 
 		SuiteSummaryService.SuiteSummary idleSummary = summaries.suites().getFirst();
 		assertThat(idleSummary.runs()).isZero();
+		assertThat(idleSummary.failingRuns()).isZero();
 		assertThat(idleSummary.passRate()).isNull();
 		assertThat(idleSummary.lastRun().startedAt()).isEqualTo(SEPT_10.minus(Duration.ofDays(10)));
 	}
@@ -124,8 +127,8 @@ class SuiteSummaryServiceTest {
 
 		assertThat(suiteSummaries.summaries(null, null).suites()).hasSize(4);
 
-		// 스위트(프로젝트 함께), 실행 수, 판정 수, 최근 실행, 최근 실행의 판정 수
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(5);
+		// 스위트(프로젝트 함께), 실행 수, 실패 실행 수, 판정 수, 최근 실행, 최근 실행의 판정 수
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(6);
 	}
 
 	private TestSuite suite(String name, String... paths) {

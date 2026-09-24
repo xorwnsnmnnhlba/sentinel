@@ -154,6 +154,29 @@ test("스위트 화면에서 응답시간 확인", async ({ page }) => {
   await expect(section.getByRole("img", { name: /최근 30일/ })).toBeVisible();
 });
 
+test("홈 대시보드에서 실행 현황 확인", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "대시보드", level: 1 })).toBeVisible();
+  const tiles = page.getByRole("region", { name: "요약" });
+  await expect(tiles.getByText("통과율")).toBeVisible();
+  await expect(tiles.getByText("실패·오류가 있는 실행")).toBeVisible();
+  // 방금 실행한 스위트: 케이스 1건 통과
+  const row = page.getByRole("table", { name: "스위트별 통과율" }).getByRole("row", { name: new RegExp(suite) });
+  await expect(row).toContainText("100%");
+  await expect(row.getByRole("meter", { name: `${suite} 통과율` })).toHaveAttribute("aria-valuenow", "100");
+
+  // 기간은 주소에 남음
+  await page.getByRole("link", { name: "최근 30일" }).click();
+  await expect(page).toHaveURL(/\/\?days=30$/);
+  await expect(page.getByRole("link", { name: "최근 30일" })).toHaveAttribute("aria-current", "page");
+
+  // 실패 목록 전체는 실행 이력의 실패만 보기로 이동
+  await page.getByRole("link", { name: "모두 보기" }).click();
+  await expect(page).toHaveURL(/\/runs\?failing=true&from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}$/);
+  await expect(page.getByRole("checkbox", { name: "실패·오류만" })).toBeChecked();
+});
+
 test("실행 이력을 조건으로 좁히고 초기화", async ({ page }) => {
   await page.goto("/runs");
   const runRow = page.getByRole("row", { name: new RegExp(suite) });

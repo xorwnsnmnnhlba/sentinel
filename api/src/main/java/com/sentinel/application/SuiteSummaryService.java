@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 스위트별 실행 요약 (대시보드). 기간 안에 시작한 실행과 그 결과의 판정 수, 통과율, 기간과 무관한 가장 최근 실행.
  * <p>
- * 스위트 수와 무관하게 쿼리 5회 (스위트, 실행 수, 판정 수, 최근 실행, 최근 실행의 판정 수)
+ * 스위트 수와 무관하게 쿼리 6회 (스위트, 실행 수, 실패 실행 수, 판정 수, 최근 실행, 최근 실행의 판정 수)
  */
 @Service
 @RequiredArgsConstructor
@@ -52,6 +52,9 @@ public class SuiteSummaryService {
 		Map<Long, Long> runCounts = new HashMap<>();
 		runs.countBySuite(period.start(), period.end())
 			.forEach(count -> runCounts.put(count.getSuiteId(), count.getCount()));
+		Map<Long, Long> failingCounts = new HashMap<>();
+		runs.countFailingBySuite(period.start(), period.end())
+			.forEach(count -> failingCounts.put(count.getSuiteId(), count.getCount()));
 		Map<Long, Map<Verdict, Long>> verdicts = new HashMap<>();
 		results.countVerdictsBySuite(period.start(), period.end())
 			.stream()
@@ -74,7 +77,7 @@ public class SuiteSummaryService {
 			TestRun last = latest.get(suite.getId());
 			return SuiteSummary.of(new IdName(suite.getId(), suite.getName()),
 					new IdName(suite.getProject().getId(), suite.getProject().getName()),
-					runCounts.getOrDefault(suite.getId(), 0L),
+					runCounts.getOrDefault(suite.getId(), 0L), failingCounts.getOrDefault(suite.getId(), 0L),
 					counts(verdicts.getOrDefault(suite.getId(), Map.of())),
 					last == null ? null : LastRun.of(last, counts(latestVerdicts.getOrDefault(last.getId(), Map.of()))));
 		}).toList();
@@ -93,17 +96,18 @@ public class SuiteSummaryService {
 
 	/**
 	 * @param runs 기간 안에 시작한 실행 수
+	 * @param failingRuns 그중 판정 실패·오류 결과가 있는 실행 수
 	 * @param results 기간 안 실행의 판정별 결과 수
 	 * @param passRate 통과 결과 비율(0~1). 결과가 없으면 null
 	 * @param lastRun 기간과 무관한 가장 최근 실행. 실행한 적 없으면 null
 	 */
-	public record SuiteSummary(IdName suite, IdName project, long runs, TestRunDetail.Summary results, Double passRate,
-			LastRun lastRun) {
+	public record SuiteSummary(IdName suite, IdName project, long runs, long failingRuns,
+			TestRunDetail.Summary results, Double passRate, LastRun lastRun) {
 
-		static SuiteSummary of(IdName suite, IdName project, long runs, TestRunDetail.Summary results,
-				LastRun lastRun) {
+		static SuiteSummary of(IdName suite, IdName project, long runs, long failingRuns,
+				TestRunDetail.Summary results, LastRun lastRun) {
 			Double passRate = results.total() == 0 ? null : (double) results.passed() / results.total();
-			return new SuiteSummary(suite, project, runs, results, passRate, lastRun);
+			return new SuiteSummary(suite, project, runs, failingRuns, results, passRate, lastRun);
 		}
 
 	}
