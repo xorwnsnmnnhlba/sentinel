@@ -45,8 +45,10 @@ class RunController {
 			@RequestParam(required = false) TestRun.Status status,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-		return runQueryService.listRuns(new RunFilter(projectId, suiteId, environmentId, status, from, to), page, size);
+			@RequestParam(defaultValue = "false") boolean failing, @RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "20") int size) {
+		return runQueryService.listRuns(new RunFilter(projectId, suiteId, environmentId, status, from, to, failing),
+				page, size);
 	}
 
 	@GetMapping("/{runId}")

@@ -17,6 +17,10 @@ public interface TestSuiteRepository extends JpaRepository<TestSuite, Long> {
 
 	List<TestSuite> findByArchivedAtIsNullOrderByName();
 
+	/** 대시보드용 전체 스위트. 프로젝트 이름을 함께 로딩하여 스위트마다 추가 쿼리 방지 */
+	@Query("select s from TestSuite s join fetch s.project where s.archivedAt is null order by s.project.name, s.name")
+	List<TestSuite> findActiveWithProject();
+
 	Optional<TestSuite> findByIdAndArchivedAtIsNull(Long id);
 
 	Optional<TestSuite> findByProjectIdAndNameAndArchivedAtIsNull(Long projectId, String name);

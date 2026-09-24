@@ -27,6 +27,7 @@ import org.springframework.context.annotation.Primary;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 /**
  * 응답시간 집계. 백분위는 PostgreSQL PERCENTILE_CONT(연속 보간) 기준으로 손으로 계산한 값과 비교
@@ -179,6 +180,63 @@ class ResponseTimeServiceTest {
 			.isInstanceOf(NotFoundException.class);
 		assertThatThrownBy(() -> responseTimes.summary(suite.getId(), 999_999L, null, null))
 			.isInstanceOf(NotFoundException.class);
+	}
+
+	@Test
+	void ranksCasesByHowMuchSlowerTheyGot() {
+		TestCase payments = fixtures.testCase(suite, HttpMethod.GET, "/payments", null, null);
+		TestCase rare = fixtures.testCase(suite, HttpMethod.GET, "/rare", null, null);
+		// 이전 기간 9/1~9/7: orders 100ms, payments 400ms, rare 50ms
+		// 현재 기간 9/8~9/14: orders 150ms(+50%), payments 300ms(-25%), rare는 2건뿐이라 제외
+		for (int day = 0; day < 3; day++) {
+			runSuiteAt(SEPT_1_KST_MORNING.plus(Duration.ofDays(day)), Map.of("/orders", 100, "/payments", 400, "/rare", 50));
+			runSuiteAt(SEPT_1_KST_MORNING.plus(Duration.ofDays(7 + day)),
+					day < 2 ? Map.of("/orders", 150, "/payments", 300, "/rare", 900) : Map.of("/orders", 150, "/payments", 300));
+		}
+		// 다른 환경은 따로 비교 (결과가 한 기간에만 있어 제외)
+		runAt(SEPT_1_KST_MORNING.plus(Duration.ofDays(8)), staging, 5_000);
+
+		ResponseTimeService.Changes changes = responseTimes.changes(SEPT_1.plusDays(7), SEPT_1.plusDays(13), 5);
+
+		assertThat(changes.previousFrom()).isEqualTo(SEPT_1);
+		assertThat(changes.previousTo()).isEqualTo(SEPT_1.plusDays(6));
+		assertThat(changes.changes()).extracting(change -> change.testCase().id()).containsExactly(orders.getId(),
+				payments.getId());
+		ResponseTimeService.Change slower = changes.changes().getFirst();
+		assertThat(slower.previousP95()).isEqualTo(100);
+		assertThat(slower.currentP95()).isEqualTo(150);
+		assertThat(slower.change()).isCloseTo(0.5, within(1e-9));
+		assertThat(slower.environment().name()).isEqualTo("dev");
+		assertThat(slower.suite().id()).isEqualTo(suite.getId());
+		assertThat(changes.changes().get(1).change()).isCloseTo(-0.25, within(1e-9));
+		// 한도, 보관된 케이스 제외
+		assertThat(responseTimes.changes(SEPT_1.plusDays(7), SEPT_1.plusDays(13), 1).changes()).hasSize(1);
+		orders.archive(clock.instant());
+		testCases.save(orders);
+		assertThat(responseTimes.changes(SEPT_1.plusDays(7), SEPT_1.plusDays(13), 5).changes())
+			.extracting(change -> change.testCase().id())
+			.containsExactly(payments.getId());
+		assertThat(rare.getId()).isNotNull();
+	}
+
+	@Test
+	void rejectsAnInvalidLimit() {
+		assertThatThrownBy(() -> responseTimes.changes(null, null, 0)).isInstanceOf(InvalidRequestException.class);
+		assertThatThrownBy(() -> responseTimes.changes(null, null, 51)).isInstanceOf(InvalidRequestException.class)
+			.hasMessage("limit must be between 1 and 50");
+	}
+
+	private void runSuiteAt(Instant startedAt, Map<String, Integer> millisByPath) {
+		clock.set(startedAt);
+		// 지정하지 않은 경로는 응답 실패로 처리하여 집계에서 제외
+		executor.respondIn(request -> {
+			Integer millis = millisByPath.get(request.uri().getPath());
+			if (millis == null) {
+				throw new RequestExecutionException(RequestExecutionException.Reason.TIMEOUT, request, Duration.ofMillis(1), null);
+			}
+			return Duration.ofMillis(millis);
+		});
+		testRunService.runSuite(suite.getId(), dev.getId(), TestRun.Trigger.SCHEDULED, null);
 	}
 
 	private void runAt(Instant startedAt, Environment environment, long millis) {

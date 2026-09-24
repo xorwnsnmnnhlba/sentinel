@@ -97,6 +97,31 @@ class RunQueryServiceTest {
 	}
 
 	@Test
+	void filtersRunsWithFailuresOrErrors() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite passing = fixtures.suite(project);
+		fixtures.testCase(passing, HttpMethod.GET, "/ok", null, null);
+		TestSuite failing = fixtures.suite(project);
+		fixtures.testCase(failing, HttpMethod.GET, "/ok", null, null);
+		fixtures.testCase(failing, HttpMethod.GET, "/fail", null, null, List.of(new StatusCodeAssertion(List.of("201"))));
+		TestSuite unresolved = fixtures.suite(project);
+		fixtures.testCase(unresolved, HttpMethod.GET, "/{{missing}}", null, null);
+
+		testRunService.runSuite(passing.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
+		long failed = testRunService.runSuite(failing.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
+		long errored = testRunService.runSuite(unresolved.getId(), environment.getId(), TestRun.Trigger.MANUAL,
+				tester());
+
+		PageResponse<RunSummary> page = runQueries.listRuns(
+				new RunFilter(null, null, null, null, null, null, true), 0, 20);
+
+		// 실패 1건과 통과 1건이 섞인 실행도 한 번만 (결과 행 수만큼 중복되지 않음)
+		assertThat(page.content()).extracting(RunSummary::id).containsExactly(errored, failed);
+		assertThat(page.totalElements()).isEqualTo(2);
+	}
+
+	@Test
 	void listsRunsThatNobodyStartedByHand() {
 		// 스케줄 실행만 있는 페이지. 실행 주체가 하나도 없어도 목록 조회 가능
 		Project project = fixtures.project();
@@ -137,17 +162,17 @@ class RunQueryServiceTest {
 		long otherRun = testRunService.runSuite(otherSuite.getId(), otherEnvironment.getId(), TestRun.Trigger.MANUAL,
 				tester());
 
-		assertThat(ids(new RunFilter(project.getId(), null, null, null, null, null)))
+		assertThat(ids(new RunFilter(project.getId(), null, null, null, null, null, false)))
 			.containsExactly(stagingRun, devRun);
-		assertThat(ids(new RunFilter(null, null, dev.getId(), null, null, null))).containsExactly(devRun);
-		assertThat(ids(new RunFilter(null, otherSuite.getId(), null, null, null, null))).containsExactly(otherRun);
-		assertThat(ids(new RunFilter(null, null, null, TestRun.Status.COMPLETED, null, null)))
+		assertThat(ids(new RunFilter(null, null, dev.getId(), null, null, null, false))).containsExactly(devRun);
+		assertThat(ids(new RunFilter(null, otherSuite.getId(), null, null, null, null, false))).containsExactly(otherRun);
+		assertThat(ids(new RunFilter(null, null, null, TestRun.Status.COMPLETED, null, null, false)))
 			.containsExactly(otherRun, stagingRun, devRun);
-		assertThat(ids(new RunFilter(null, null, null, TestRun.Status.RUNNING, null, null))).isEmpty();
+		assertThat(ids(new RunFilter(null, null, null, TestRun.Status.RUNNING, null, null, false))).isEmpty();
 		// 조건을 함께 지정하면 모두 만족하는 실행만
-		assertThat(ids(new RunFilter(project.getId(), null, staging.getId(), null, null, null)))
+		assertThat(ids(new RunFilter(project.getId(), null, staging.getId(), null, null, null, false)))
 			.containsExactly(stagingRun);
-		assertThat(ids(new RunFilter(otherProject.getId(), null, dev.getId(), null, null, null))).isEmpty();
+		assertThat(ids(new RunFilter(otherProject.getId(), null, dev.getId(), null, null, null, false))).isEmpty();
 	}
 
 	@Test
@@ -159,9 +184,9 @@ class RunQueryServiceTest {
 		long run = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 		LocalDate today = LocalDate.ofInstant(Instant.now(), ZoneId.of("Asia/Seoul"));
 
-		assertThat(ids(new RunFilter(null, null, null, null, today, today))).contains(run);
-		assertThat(ids(new RunFilter(null, null, null, null, today.plusDays(1), null))).doesNotContain(run);
-		assertThat(ids(new RunFilter(null, null, null, null, null, today.minusDays(1)))).doesNotContain(run);
+		assertThat(ids(new RunFilter(null, null, null, null, today, today, false))).contains(run);
+		assertThat(ids(new RunFilter(null, null, null, null, today.plusDays(1), null, false))).doesNotContain(run);
+		assertThat(ids(new RunFilter(null, null, null, null, null, today.minusDays(1), false))).doesNotContain(run);
 	}
 
 	private List<Long> ids(RunFilter filter) {
@@ -197,7 +222,7 @@ class RunQueryServiceTest {
 
 
 	private static RunFilter suiteFilter(long suiteId) {
-		return new RunFilter(null, suiteId, null, null, null, null);
+		return new RunFilter(null, suiteId, null, null, null, null, false);
 	}
 
 	/** 수동 실행 주체. 실행마다 같은 계정을 사용하도록 한 번만 생성 */

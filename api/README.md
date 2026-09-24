@@ -246,10 +246,12 @@ curl -i -X POST localhost:8080/api/runs \
 | 환경 | `GET /api/environments?projectId=` | `GET /api/environments/{id}` | `POST /api/environments`, `PATCH /api/environments/{id}` | `DELETE /api/environments/{id}` |
 | 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | `POST /api/suites`, `PATCH /api/suites/{id}` | `DELETE /api/suites/{id}` |
 | 케이스 | `GET /api/cases?suiteId=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
-| 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs` | |
+| 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&failing=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs` | |
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
 | 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
+| 응답시간 변화 | `GET /api/response-time-changes?from=&to=&limit=5` | | | |
+| 스위트 요약 | `GET /api/suite-summaries?from=&to=` | | | |
 
 - 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
 - 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
@@ -257,7 +259,7 @@ curl -i -X POST localhost:8080/api/runs \
 - 실행 목록: 최신순, 페이지 응답 `{content, page, size, totalElements, totalPages}` (`page`는 0부터, `size`는 1~100으로 보정)
   - 행: 프로젝트·스위트·환경의 `{id, name}`, `trigger`, `status`, 시각, `summary`(전체·통과·실패·오류), `triggeredBy`
   - `triggeredBy`: 수동 실행을 시작한 사용자 `{id, name}`(이메일). 스케줄 실행과 이전 기록은 `null`
-  - 필터: `projectId`, `suiteId`, `environmentId`, `status`(`RUNNING`/`COMPLETED`/`ABORTED`), 시작 시각 기간 `from`·`to`. 여러 개를 함께 지정하면 모두 만족하는 실행만
+  - 필터: `projectId`, `suiteId`, `environmentId`, `status`(`RUNNING`/`COMPLETED`/`ABORTED`), 시작 시각 기간 `from`·`to`, `failing=true`(판정 실패·오류 결과가 하나 이상 있는 실행). 여러 개를 함께 지정하면 모두 만족하는 실행만
   - `from`·`to`는 `yyyy-MM-dd`이며 `sentinel.schedule.zone`(기본 `Asia/Seoul`) 기준. 시작일 00:00부터 종료일 다음 날 00:00 직전까지 (종료일 당일 포함)
   - 실행 건수와 무관하게 페이지당 쿼리 최대 4회 (이름 함께 로딩, 판정 건수 일괄 집계, 실행 주체 일괄 조회)
 - 실행 상세: 스위트·환경·케이스 이름과 케이스별 결과, 수동 실행이면 실행 주체 포함
@@ -285,6 +287,7 @@ curl -i -X POST localhost:8080/api/runs \
 |-----|------|
 | `GET /api/response-time-trends?caseId=&environmentId=` | 케이스 1건의 일별 값. 기간 생략 시 최근 30일 |
 | `GET /api/response-time-summaries?suiteId=&environmentId=` | 스위트의 케이스별 값 (기간 전체). 기간 생략 시 최근 7일 |
+| `GET /api/response-time-changes?limit=5` | 케이스·환경별 p95를 바로 앞의 같은 길이 기간과 비교, 가장 나빠진 순. 기간 생략 시 최근 7일, `limit` 1~50 |
 
 ```json
 {"caseId": 3, "environmentId": 1, "from": "2026-08-26", "to": "2026-09-24",
@@ -297,6 +300,16 @@ curl -i -X POST localhost:8080/api/runs \
 - 추세는 기간의 모든 날짜를 포함하고 결과가 없는 날은 `samples: 0`, 값 `null`. 요약은 스위트의 모든 케이스(보관 제외, 등록 순)를 포함
 - 백분위는 SQL 표준 `PERCENTILE_CONT`(연속 보간) 결과를 ms 단위로 반올림
 - 원문 보관기간 정리(`raw_purged_at`)는 소요 시간을 지우지 않으므로 오래된 실행도 집계 대상
+- 변화 비교: `change`는 이전 대비 p95 증가율(0.42는 42% 느려짐, 음수는 빨라짐). 두 기간 모두 결과 3건 이상인 케이스·환경만, 보관된 케이스·환경 제외
+  - 응답: `from`·`to`, 비교 기간 `previousFrom`·`previousTo`, `changes[]`(`testCase`·`suite`·`environment`, `previousP95`·`currentP95`, `change`, 기간별 건수)
+
+### 스위트 요약
+
+`GET /api/suite-summaries?from=&to=`: 대시보드용 스위트별 요약. 기간 생략 시 최근 7일, 최대 90일
+
+- 보관되지 않은 모든 스위트 (프로젝트·스위트 이름 순), 실행한 적 없는 스위트도 포함
+- 항목: `suite`·`project`, 기간 안 실행 수 `runs`, 판정별 결과 수 `results`, 통과 결과 비율 `passRate`(0~1, 결과 없으면 `null`), 기간과 무관한 최근 실행 `lastRun`(없으면 `null`)
+- 스위트 수와 무관하게 쿼리 5회
 
 ### 케이스 가져오기 (OpenAPI 3, Postman)
 
