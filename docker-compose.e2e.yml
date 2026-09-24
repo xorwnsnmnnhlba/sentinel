@@ -3,7 +3,7 @@
 #   docker compose -f docker-compose.e2e.yml up -d --build --wait
 #   docker compose -f docker-compose.e2e.yml down -v
 #
-# - 운영/개발 스택(docker-compose.yml)과 포트·볼륨이 겹치지 않도록 별도 포트 사용
+# - 운영/개발 스택(docker-compose.yml)과 포트·볼륨이 겹치지 않도록 별도 포트 사용 (HTTPS 13443, HTTP 13080, api 18080)
 # - DB는 컨테이너 내부 통신만 사용(호스트 포트 미개방). 데이터는 down -v로 매번 폐기
 # - 비밀번호는 이 일회용 컨테이너 전용. 실제 자격증명 아님
 name: sentinel-e2e
@@ -51,8 +51,9 @@ services:
     environment:
       INTERNAL_API_URL: http://e2e-api:8080
       TZ: Asia/Seoul
+    # 테스트는 HTTPS 앞단(e2e-proxy)을 거침. 직접 접속은 같은 PC에서 확인할 때만
     ports:
-      - "13000:3000"
+      - "127.0.0.1:13000:3000"
     depends_on:
       e2e-api:
         condition: service_healthy
@@ -61,3 +62,25 @@ services:
       interval: 3s
       timeout: 3s
       retries: 30
+
+  # HTTPS 앞단. 운영과 같은 Caddyfile로 실제 경로(TLS, Host 전달, Secure 쿠키, Server Action 출처 확인) 검증
+  e2e-proxy:
+    image: caddy:2.11.4-alpine
+    environment:
+      # 테스트 포트를 주소에 포함해야 HTTP→HTTPS 이동이 이 포트로 향함
+      SENTINEL_SITE_ADDRESS: localhost:13443
+      SENTINEL_UPSTREAM: e2e-web:3000
+      SENTINEL_TLS: internal
+    ports:
+      - "13443:13443"
+      - "13080:80"
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      e2e-web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8081/"]
+      interval: 2s
+      timeout: 3s
+      retries: 20

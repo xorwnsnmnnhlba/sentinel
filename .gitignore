@@ -2,3 +2,9 @@ sentinel.env
 .env.local
 .DS_Store
 .idea/
+# docker compose 변수 (HTTPS 앞단 접속 주소·인증서 방식). .env.example 참고
+.env
+# HTTPS 앞단에 쓰는 보유 인증서·키
+proxy/certs/
+# 내부 인증 기관 루트 인증서를 내보낸 파일 (README의 내보내기 명령 기준). PC별 신뢰 등록용이라 저장소에 두지 않음
+sentinel-root.crt

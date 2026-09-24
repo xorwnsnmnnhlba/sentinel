@@ -1,0 +1,34 @@
+# HTTPS 앞단. TLS를 종료하고 sentinel-web으로 전달 (Spring API는 web의 BFF 프록시를 거쳐서만 접근)
+#
+# SENTINEL_SITE_ADDRESS  접속 주소. 예: sentinel.example.com, localhost
+# SENTINEL_UPSTREAM      전달 대상 (기본 sentinel-web:3000, E2E 스택은 e2e-web:3000)
+# SENTINEL_TLS           인증서 방식
+#   internal                           Caddy 내부 인증 기관 (사내 주소용, 기본값). 루트 인증서를 PC마다 신뢰 등록
+#   admin@example.com                  Let's Encrypt 자동 발급 (공개 도메인, 80·443 포트가 인터넷에서 접근 가능해야 함)
+#   /certs/cert.pem /certs/key.pem     보유한 인증서 (proxy/certs에 두면 컨테이너의 /certs로 연결)
+{
+	# 관리 API는 사용하지 않음. 설정 변경은 컨테이너 재시작으로 반영
+	admin off
+}
+
+{$SENTINEL_SITE_ADDRESS} {
+	tls {$SENTINEL_TLS}
+
+	encode zstd gzip
+
+	header {
+		# 응답 형식 추측 금지, 다른 사이트에 주소 경로 미전달, 다른 사이트의 프레임 삽입 금지
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
+	}
+
+	# Host 헤더를 그대로 전달하므로 Next.js Server Action의 출처 확인(Origin과 Host 비교)이 그대로 동작
+	reverse_proxy {$SENTINEL_UPSTREAM:sentinel-web:3000}
+}
+
+# 컨테이너 안에서만 쓰는 상태 확인용 (포트 미공개)
+:8081 {
+	respond "ok"
+}

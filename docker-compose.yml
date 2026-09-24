@@ -7,8 +7,9 @@ services:
     env_file: ./sentinel.env
     environment:
       TZ: Asia/Seoul
+    # 같은 PC에서만 접근. 네트워크에서는 HTTPS 앞단(sentinel-proxy)과 web의 BFF 프록시를 거침
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     # 호스트의 PostgreSQL(localhost:5432) 접근용. Docker Desktop은 기본 제공, Linux용 명시
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -30,8 +31,9 @@ services:
       # 서버 전용 Spring 주소. 컨테이너 간 통신은 localhost가 아닌 서비스 이름 사용
       INTERNAL_API_URL: http://sentinel-api:8080
       TZ: Asia/Seoul
+    # 같은 PC에서만 접근. 다른 PC는 sentinel-proxy(HTTPS)로 접속
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     # api 기동 완료 후 시작. 첫 화면 요청이 api 기동 전에 실패하지 않도록 함
     depends_on:
       sentinel-api:
@@ -43,3 +45,36 @@ services:
       interval: 3s
       timeout: 3s
       retries: 30
+
+  # HTTPS 앞단. 설정은 proxy/Caddyfile, 접속 주소·인증서 방식은 루트 .env (.env.example 참고)
+  sentinel-proxy:
+    image: caddy:2.11.4-alpine
+    container_name: sentinel-proxy
+    environment:
+      SENTINEL_SITE_ADDRESS: ${SENTINEL_SITE_ADDRESS:-localhost}
+      SENTINEL_TLS: ${SENTINEL_TLS:-internal}
+    ports:
+      - "80:80"
+      - "443:443"
+      # HTTP/3
+      - "443:443/udp"
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # 보유한 인증서를 쓸 때만 사용 (SENTINEL_TLS=/certs/cert.pem /certs/key.pem)
+      - ./proxy/certs:/certs:ro
+      # 발급한 인증서와 내부 인증 기관 키. 지우면 내부 인증서가 새로 만들어져 PC마다 다시 신뢰 등록 필요
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      sentinel-web:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8081/"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  caddy_data:
+  caddy_config:

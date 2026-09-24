@@ -349,11 +349,21 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 
 ### 컨테이너 구성
 ```
-sentinel-api   :8080   Spring Boot
-sentinel-web   :3000   Next.js (standalone)
+sentinel-proxy :443    Caddy (HTTPS 앞단, 80은 443으로 이동)
+sentinel-web   :3000   Next.js (standalone, 127.0.0.1에만 공개)
+sentinel-api   :8080   Spring Boot (127.0.0.1에만 공개)
 ```
 
 루트 `docker-compose.yml`로 실행 (2026-09-19 구성, api와 web 컨테이너 2개)
+
+HTTPS 앞단 (2026-09-24)
+- Caddy 선택: 인증서 자동 발급·갱신, HTTP→HTTPS 이동이 기본 동작이라 설정 파일이 짧음. nginx는 인증서 발급·갱신을 별도로 구성해야 함
+- 인증서는 `SENTINEL_TLS`로 선택: 사내 주소는 내부 인증 기관(루트 인증서 PC별 신뢰 등록), 공개 도메인은 Let's Encrypt, 보유 인증서 파일도 가능
+- web·api는 `127.0.0.1`에만 공개하여 네트워크에서는 HTTPS 앞단만 접근. 평문 HTTP로 비밀번호·토큰이 오가는 경로 차단
+- Host 헤더를 그대로 전달하여 Next.js Server Action의 출처 확인(Origin과 Host 비교)이 추가 설정 없이 동작
+- 보안 헤더: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Server` 제거
+- HSTS 미적용: 내부 인증서를 신뢰 등록하지 않은 PC에서 경고를 넘길 수 없게 되므로, 인증서 운영 방식이 정해진 뒤 검토
+- E2E 스택도 같은 Caddyfile로 앞단을 두어 전체 시나리오를 HTTPS 경로로 검증
 
 ```bash
 docker compose up -d --build --wait

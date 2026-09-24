@@ -218,7 +218,9 @@ Vitest + MSW + React Testing Library. 설정은 `vitest.config.mts`
 npm run e2e:up && npm run e2e && npm run e2e:down
 ```
 
-- 스택은 `docker-compose.e2e.yml`. 개발/운영 스택과 분리 (web 13000, api 18080, DB는 컨테이너 내부 전용)
+- 스택은 `docker-compose.e2e.yml`. 개발/운영 스택과 분리 (HTTPS 앞단 13443·HTTP 13080, api 18080, DB는 컨테이너 내부 전용)
+  - 테스트는 운영과 같은 HTTPS 앞단(`proxy/Caddyfile`)을 거쳐 접속. 내부 인증서라 Playwright에서 신뢰 검사 생략(`ignoreHTTPSErrors`)
+  - `e2e/https.spec.ts`: HTTP→HTTPS 이동, 보안 헤더, 앞단을 거친 로그인과 Secure 쿠키
 - 흐름: 프로젝트·환경(시크릿 포함) 등록 → 스위트·케이스 등록 → 즉시 실행·결과 확인(시크릿 마스킹) → 스케줄 등록·전환·수정·삭제 → 프로젝트 삭제 후 이력 유지 확인, 404 확인
 - 케이스가 api 자신(`http://e2e-api:8080`)을 호출하므로 외부 서버 없이 실행 결과까지 검증
 - 스택을 내리지 않고 반복 실행해도 되도록 프로젝트·스위트 이름에 실행 시각 포함
