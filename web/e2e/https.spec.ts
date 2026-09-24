@@ -1,0 +1,37 @@
+import { expect, test } from "@playwright/test";
+
+/**
+ * HTTPS 앞단(Caddy). E2E 스택의 e2e-proxy가 운영과 같은 proxy/Caddyfile 사용
+ */
+const httpUrl = process.env.E2E_HTTP_URL ?? "http://localhost:13080";
+
+test("HTTP로 접속하면 HTTPS로 이동", async ({ request }) => {
+  const response = await request.get(`${httpUrl}/login?from=%2Fruns`, { maxRedirects: 0 });
+
+  expect(response.status()).toBe(308);
+  expect(response.headers()["location"]).toBe("https://localhost:13443/login?from=%2Fruns");
+});
+
+test("보안 헤더를 붙이고 서버 정보는 숨김", async ({ request }) => {
+  const response = await request.get("/login");
+
+  expect(response.status()).toBe(200);
+  const headers = response.headers();
+  expect(headers["x-content-type-options"]).toBe("nosniff");
+  expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+  expect(headers["x-frame-options"]).toBe("DENY");
+  expect(headers["server"]).toBeUndefined();
+});
+
+test("HTTPS 앞단을 거쳐 로그인하면 Secure 세션 쿠키 발급", async ({ page, context }) => {
+  await page.goto("/login");
+  await page.getByLabel("이메일").fill("admin@sentinel.test");
+  await page.getByLabel("비밀번호").fill("e2e-admin-password");
+  await page.getByRole("button", { name: "로그인" }).click();
+
+  // Server Action의 출처 확인(Origin과 Host 비교)이 앞단을 거쳐도 통과해야 로그인 완료
+  await expect(page.getByRole("banner").getByRole("link", { name: "프로젝트" })).toBeVisible();
+  expect(page.url()).toMatch(/^https:\/\/localhost:13443\//);
+  const session = (await context.cookies()).find((cookie) => cookie.name === "sentinel_session");
+  expect(session).toMatchObject({ secure: true, httpOnly: true, sameSite: "Lax" });
+});

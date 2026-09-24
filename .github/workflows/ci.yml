@@ -48,7 +48,7 @@ jobs:
         working-directory: web
       - run: npx playwright install --with-deps chromium
         working-directory: web
-      # PostgreSQL·api·web을 모두 띄운 실제 스택 대상 (web 13000, api 18080)
+      # PostgreSQL·api·web·HTTPS 앞단을 모두 띄운 실제 스택 대상 (HTTPS 13443, api 18080)
       - name: E2E 스택 기동
         run: docker compose -f docker-compose.e2e.yml up -d --build --wait
       - run: npm run e2e
