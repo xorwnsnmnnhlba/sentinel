@@ -75,6 +75,11 @@
   /* 응답시간 차트 계열 색. dataviz 검증 팔레트(slot 1 blue, 2 orange), 배경 대비·색각 이상 구분 검증 완료 */
   --chart-series-1: #2a78d6;
   --chart-series-2: #eb6834;
+  /* 대시보드 변화 표시(좋아짐·나빠짐). 흰 배경 대비 7.5:1·4.8:1, 항상 화살표·문구와 함께 사용 */
+  --delta-good: #006300;
+  --delta-bad: #d03b3b;
+  /* 통과율 막대의 빈 부분. 채움(--chart-series-1)과 같은 파랑 계열의 옅은 단계 */
+  --meter-track: #cde2fb;
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -112,6 +117,10 @@
   --chart-5: oklch(0.269 0 0);
   --chart-series-1: #3987e5;
   --chart-series-2: #d95926;
+  /* 어두운 배경 대비 5.9:1·6.1:1 (critical #d03b3b는 4.1:1이라 한 단계 밝은 빨강) */
+  --delta-good: #0ca30c;
+  --delta-bad: #e66767;
+  --meter-track: #184f95;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);

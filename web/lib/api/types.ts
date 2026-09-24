@@ -224,3 +224,46 @@ export interface ResponseTimeSummary {
   to: string;
   cases: CaseResponseTime[];
 }
+
+/** 스위트별 실행 요약 (대시보드) */
+export interface SuiteSummary {
+  suite: IdName;
+  project: IdName;
+  /** 기간 안에 시작한 실행 수 */
+  runs: number;
+  /** 그중 판정 실패·오류 결과가 있는 실행 수 */
+  failingRuns: number;
+  /** 기간 안 실행의 판정별 결과 수 */
+  results: RunCounts;
+  /** 통과 결과 비율(0~1). 결과가 없으면 null */
+  passRate: number | null;
+  /** 기간과 무관한 가장 최근 실행 */
+  lastRun: { id: number; startedAt: string; status: RunStatus; summary: RunCounts } | null;
+}
+
+export interface SuiteSummaries {
+  from: string;
+  to: string;
+  suites: SuiteSummary[];
+}
+
+/** 케이스·환경별 p95 변화 (이전 같은 길이 기간 대비) */
+export interface ResponseTimeChange {
+  testCase: IdName;
+  suite: IdName;
+  environment: IdName;
+  previousP95: number;
+  currentP95: number;
+  /** 증가율. 0.42는 42% 느려짐, 음수는 빨라짐 */
+  change: number;
+  previousSamples: number;
+  currentSamples: number;
+}
+
+export interface ResponseTimeChanges {
+  from: string;
+  to: string;
+  previousFrom: string;
+  previousTo: string;
+  changes: ResponseTimeChange[];
+}

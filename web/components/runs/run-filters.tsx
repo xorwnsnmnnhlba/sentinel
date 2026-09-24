@@ -13,6 +13,8 @@ export type RunFilterValues = {
   status?: string;
   from?: string;
   to?: string;
+  /** "true"면 판정 실패·오류가 있는 실행만 */
+  failing?: string;
 };
 
 const statusOptions: { value: RunStatus; label: string }[] = [
@@ -113,6 +115,17 @@ export function RunFilters({
       <Field label="종료일 (KST)" htmlFor="filter-to">
         <Input id="filter-to" name="to" type="date" defaultValue={values.to ?? ""} className="w-40" />
       </Field>
+
+      <label className="flex h-8 items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="failing"
+          value="true"
+          defaultChecked={values.failing === "true"}
+          className="size-4 accent-primary"
+        />
+        실패·오류만
+      </label>
 
       <div className="flex gap-2">
         <Button type="submit">조회</Button>
