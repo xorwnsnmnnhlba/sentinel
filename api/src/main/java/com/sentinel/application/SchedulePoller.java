@@ -8,8 +8,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.sentinel.application.notification.Notification;
+import com.sentinel.application.notification.NotificationFormat;
 import com.sentinel.application.notification.Notifier;
-import com.sentinel.application.notification.RunFailureNotifier;
+import com.sentinel.application.notification.RunResultNotifier;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSchedule;
 import com.sentinel.infra.persistence.TestScheduleRepository;
@@ -39,7 +40,7 @@ public class SchedulePoller {
 
 	private final TestRunService testRunService;
 
-	private final RunFailureNotifier runFailureNotifier;
+	private final RunResultNotifier runResultNotifier;
 
 	private final Notifier notifier;
 
@@ -82,7 +83,7 @@ public class SchedulePoller {
 					long runId = testRunService.runSuite(trigger.suiteId(), trigger.environmentId(),
 							TestRun.Trigger.SCHEDULED, null);
 					runIds.add(runId);
-					notifyRunFailures(runId);
+					notifyRunResult(runId);
 				}
 			}
 			catch (RuntimeException ex) {
@@ -123,12 +124,12 @@ public class SchedulePoller {
 						+ ")", "중단 기간 중 놓친 스케줄은 1회씩 실행됩니다")));
 	}
 
-	private void notifyRunFailures(long runId) {
+	private void notifyRunResult(long runId) {
 		try {
-			runFailureNotifier.notifyIfFailed(runId);
+			runResultNotifier.notifyResult(runId);
 		}
 		catch (RuntimeException ex) {
-			log.error("Failed to send failure notification for run {}", runId, ex);
+			log.error("Failed to send result notification for run {}", runId, ex);
 		}
 	}
 
@@ -146,13 +147,7 @@ public class SchedulePoller {
 	}
 
 	static String formatDuration(Duration duration) {
-		if (duration.toMinutes() < 1) {
-			return duration.toSeconds() + "초";
-		}
-		if (duration.toHours() < 1) {
-			return duration.toMinutes() + "분";
-		}
-		return duration.toHours() + "시간 " + duration.toMinutesPart() + "분";
+		return NotificationFormat.duration(duration);
 	}
 
 	private record Trigger(long suiteId, long environmentId) {
