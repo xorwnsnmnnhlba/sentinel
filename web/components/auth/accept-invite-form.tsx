@@ -14,7 +14,7 @@ export function AcceptInviteForm({ token }: { token: string }) {
   const [state, formAction, pending] = useActionState(acceptInvite.bind(null, token), undefined);
 
   return (
-    <form onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
+    <form method="post" onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="name">이름</Label>
         <Input id="name" name="name" maxLength={100} required autoFocus />

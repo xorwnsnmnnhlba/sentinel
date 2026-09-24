@@ -12,7 +12,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   const [state, formAction, pending] = useActionState(resetPassword.bind(null, token), undefined);
 
   return (
-    <form onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
+    <form method="post" onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
       <NewPasswordFields label="새 비밀번호" />
       <FormError message={state?.error} />
       <Button type="submit" className="w-full" disabled={pending}>

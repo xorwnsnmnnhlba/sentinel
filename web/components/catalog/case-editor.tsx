@@ -73,7 +73,7 @@ export function CaseEditor({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-8" noValidate>
+    <form method="post" onSubmit={submit} className="space-y-8" noValidate>
       <section className="space-y-2">
         <Label htmlFor="case-name">이름</Label>
         <Input

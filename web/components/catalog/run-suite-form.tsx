@@ -27,7 +27,7 @@ export function RunSuiteForm({
     return <p className="text-sm text-muted-foreground">실행하려면 프로젝트에 환경을 먼저 등록해 주세요</p>;
   }
   return (
-    <form onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-2">
+    <form method="post" onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <Select
           name="environmentId"
