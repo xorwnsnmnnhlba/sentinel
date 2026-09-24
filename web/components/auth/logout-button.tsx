@@ -17,7 +17,9 @@ export function LogoutButton() {
       onClick={() => startTransition(async () => logout())}
       aria-label="로그아웃"
     >
-      <LogOut /> 로그아웃
+      <LogOut />
+      {/* 좁은 화면에서는 아이콘만. 이름은 aria-label로 유지 */}
+      <span className="sr-only sm:not-sr-only">로그아웃</span>
     </Button>
   );
 }
