@@ -91,6 +91,50 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 	List<Object[]> caseResponseTimes(@Param("suiteId") long suiteId, @Param("environmentId") long environmentId,
 			@Param("from") Instant from, @Param("to") Instant to);
 
+	/**
+	 * 케이스·환경별 p95를 이전 기간과 현재 기간으로 나누어 집계 (응답을 받은 결과만)
+	 * @param from 이전 기간 시작
+	 * @param middle 현재 기간 시작 (이전 기간의 미포함 상한)
+	 * @param to 현재 기간의 미포함 상한
+	 * @return [케이스 ID, 환경 ID, 현재 기간 여부(1·0), 건수, p95]
+	 */
+	@Query(nativeQuery = true, value = """
+			SELECT w.test_case_id, w.environment_id, w.current_window, COUNT(*),
+			       PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY w.elapsed_ms)
+			FROM (
+			    SELECT r.test_case_id, t.environment_id, r.elapsed_ms,
+			           CASE WHEN t.started_at >= :middle THEN 1 ELSE 0 END AS current_window
+			    FROM {h-schema}test_result r
+			    JOIN {h-schema}test_run t ON t.id = r.run_id
+			    WHERE r.outcome = 'RESPONDED'
+			      AND r.elapsed_ms IS NOT NULL
+			      AND t.started_at >= :from
+			      AND t.started_at < :to
+			) w
+			GROUP BY w.test_case_id, w.environment_id, w.current_window
+			""")
+	List<Object[]> p95ByWindow(@Param("from") Instant from, @Param("middle") Instant middle, @Param("to") Instant to);
+
+	/** 기간 안에 시작한 실행의 판정별 결과 수 (스위트별) */
+	@Query("""
+			select t.suite.id as suiteId, r.verdict as verdict, count(r) as count
+			from TestResult r
+			join r.run t
+			where t.startedAt >= :from and t.startedAt < :to
+			group by t.suite.id, r.verdict
+			""")
+	List<SuiteVerdictCount> countVerdictsBySuite(@Param("from") Instant from, @Param("to") Instant to);
+
+	interface SuiteVerdictCount {
+
+		Long getSuiteId();
+
+		TestResult.Verdict getVerdict();
+
+		long getCount();
+
+	}
+
 	interface VerdictCount {
 
 		Long getRunId();

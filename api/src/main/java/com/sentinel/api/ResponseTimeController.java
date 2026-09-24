@@ -29,6 +29,17 @@ class ResponseTimeController {
 	}
 
 	/**
+	 * 케이스·환경별 p95를 바로 앞의 같은 길이 기간과 비교, 가장 나빠진 순. 기간 생략 시 최근 7일
+	 */
+	@GetMapping("/api/response-time-changes")
+	ResponseTimeService.Changes changes(
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+			@RequestParam(defaultValue = "5") int limit) {
+		return responseTimes.changes(from, to, limit);
+	}
+
+	/**
 	 * 스위트의 케이스별 p50·p95·최대. 기간 생략 시 최근 7일
 	 */
 	@GetMapping("/api/response-time-summaries")
