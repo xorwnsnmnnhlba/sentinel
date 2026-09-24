@@ -7,7 +7,7 @@ import java.util.List;
 
 import com.sentinel.application.notification.Notification;
 import com.sentinel.application.notification.RecordingNotifier;
-import com.sentinel.application.notification.RunFailureNotifier;
+import com.sentinel.application.notification.RunResultNotifier;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ class SchedulePollerDatabaseOutageTest {
 	void setUp() {
 		PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
 		when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-		poller = new SchedulePoller(schedules, mock(TestRunService.class), mock(RunFailureNotifier.class), notifier,
+		poller = new SchedulePoller(schedules, mock(TestRunService.class), mock(RunResultNotifier.class), notifier,
 				new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60)), clock,
 				new Transactions(transactionManager));
 	}
@@ -106,7 +106,7 @@ class SchedulePollerDatabaseOutageTest {
 		PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
 		when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
 		SchedulePoller failingNotifierPoller = new SchedulePoller(schedules, mock(TestRunService.class),
-				mock(RunFailureNotifier.class), notification -> {
+				mock(RunResultNotifier.class), notification -> {
 					throw new IllegalStateException("webhook down");
 				}, new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60)), clock,
 				new Transactions(transactionManager));

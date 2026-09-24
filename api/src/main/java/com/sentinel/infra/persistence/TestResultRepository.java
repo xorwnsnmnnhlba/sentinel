@@ -135,6 +135,20 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 
 	}
 
+	/** 실행별 케이스 판정. 연속 실패 계산용 */
+	@Query("select r.run.id as runId, r.testCase.id as caseId, r.verdict as verdict from TestResult r where r.run.id in :runIds")
+	List<CaseVerdict> findCaseVerdictsByRunIds(@Param("runIds") Collection<Long> runIds);
+
+	interface CaseVerdict {
+
+		Long getRunId();
+
+		Long getCaseId();
+
+		TestResult.Verdict getVerdict();
+
+	}
+
 	interface VerdictCount {
 
 		Long getRunId();

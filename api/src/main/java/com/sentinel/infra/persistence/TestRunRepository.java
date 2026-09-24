@@ -18,6 +18,12 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 
 	List<TestRun> findByStatus(TestRun.Status status);
 
+	/**
+	 * 같은 스위트·환경의 이전 스케줄 실행 (완료만), 최근 순. 실패 연속 여부·복구 판단용
+	 */
+	List<TestRun> findBySuiteIdAndEnvironmentIdAndTriggerAndStatusAndIdLessThanOrderByIdDesc(Long suiteId,
+			Long environmentId, TestRun.Trigger trigger, TestRun.Status status, Long id, Limit limit);
+
 	/** 기간 안에 시작한 실행 수 (스위트별) */
 	@Query("""
 			select t.suite.id as suiteId, count(t) as count

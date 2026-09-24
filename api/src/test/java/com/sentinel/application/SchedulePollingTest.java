@@ -142,9 +142,11 @@ class SchedulePollingTest {
 		List<Long> runIds = poller.poll();
 
 		assertThat(notifier.sent()).singleElement().satisfies(notification -> {
-			assertThat(notification.title()).startsWith("[Sentinel] dev suite-").endsWith(" - 2건 중 1건 실패");
-			assertThat(notification.lines()).containsExactly("POST   /billing/v1/charge → status in [201]: was 200",
-					"결과: http://sentinel.test/runs/" + runIds.getFirst());
+			assertThat(notification.title()).startsWith("[Sentinel] dev suite-").endsWith(" - 2건 중 1건 실패 (새로 실패 1건)");
+			assertThat(notification.lines()).hasSize(2);
+			assertThat(notification.lines().getFirst()).startsWith("[새로 실패] case-")
+				.endsWith(" · POST /billing/v1/charge → status in [201]: was 200");
+			assertThat(notification.lines().getLast()).isEqualTo("결과: http://sentinel.test/runs/" + runIds.getFirst());
 		});
 	}
 

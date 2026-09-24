@@ -448,21 +448,35 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 
 ## 실패 알림
 
-스케줄 실행에 판정 실패(`FAILED`)·오류(`ERROR`)가 있을 때만 발송. 성공·수동 실행은 미발송
+스케줄 실행 결과를 같은 스위트·환경의 이전 스케줄 실행과 비교하여 발송. 수동 실행은 발송·비교 대상 아님
 
 ```
-[Sentinel] dev 결제 - 12건 중 2건 실패
-POST   /billing/v1/charge → status in [2xx]: was 500
-GET    /billing/v1/history → response time <= 2000ms: was 3200ms
-결과: http://sentinel.example.com/runs/12
+[Sentinel] dev 결제 - 12건 중 2건 실패 (새로 실패 1건)
+[새로 실패] 결제 승인 · POST /billing/v1/charge → status in [2xx]: was 500
+[3회째 · 09-24 09:10부터] 결제 내역 · GET /billing/v1/history → response time <= 2000ms: was 3200ms
+결과: https://sentinel.example.com/runs/12
+```
+
+```
+[Sentinel] dev 결제 - 복구, 12건 모두 통과
+다시 통과: 결제 승인, 결제 내역
+실패 지속: 스케줄 실행 3회, 09-24 09:10부터 2시간 0분
+결과: https://sentinel.example.com/runs/15
 ```
 
 | 알림 | 발송 시점 |
 |------|-----------|
-| `[Sentinel] {환경} {스위트} - N건 중 M건 실패` | 스케줄 실행 결과에 실패·오류 존재 |
+| `[Sentinel] {환경} {스위트} - N건 중 M건 실패 (새로 실패 K건)` | 스케줄 실행 결과에 판정 실패(`FAILED`)·오류(`ERROR`) 존재. 모두 이전부터 실패하던 케이스면 `(계속 실패 중)` |
+| `[Sentinel] {환경} {스위트} - 복구, N건 모두 통과` | 모두 통과했고 직전 스케줄 실행에 실패가 있었을 때 1회 |
 | `[Sentinel] 스케줄 {id} 실행 오류` | 스케줄 실행 자체가 예외로 중단 |
 | `[Sentinel] DB 연결 실패 - 스케줄 실행 중단` | DB 접속 실패 첫 주기 1회 |
 | `[Sentinel] DB 연결 복구 - 스케줄 실행 재개` | 접속 복구 시 1회, 중단 기간 포함 |
+
+- 실패 케이스마다 `[새로 실패]` 또는 `[N회째 · 시작 시각부터]` 표시, 새로 실패한 케이스가 앞. 케이스 이름과 요청을 함께 표시
+- 연속 여부는 이전 스케줄 실행 20회까지 확인. 모두 실패였으면 `[21회 이상 · …]`
+- 복구 알림: 직전 실행에서 실패했다가 통과한 케이스 이름(최대 10개), 실패가 이어진 스케줄 실행 수와 기간
+- 수동 실행을 비교에서 빼는 이유: 수정 확인용으로 실행하는 경우가 많아, 넣으면 다음 스케줄 실행의 복구 알림이 누락될 수 있음
+- 계속 통과하면 발송하지 않음. 시각은 `sentinel.schedule.zone` 기준
 
 ### 발송 채널
 
