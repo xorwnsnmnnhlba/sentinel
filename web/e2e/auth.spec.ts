@@ -46,3 +46,19 @@ test("로그인 후 원래 가려던 화면으로 이동하고 로그아웃하�
   await page.goto("/runs");
   await expect(page).toHaveURL(/\/login\?from=%2Fruns$/);
 });
+
+test.describe("JavaScript 없이 제출", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test("스크립트가 동작하기 전에 제출해도 비밀번호가 주소에 남지 않음", async ({ page }) => {
+    await page.goto("/login");
+    await page.getByLabel("이메일").fill(email);
+    await page.getByLabel("비밀번호").fill(password);
+    await page.getByRole("button", { name: "로그인" }).click();
+    await page.waitForLoadState();
+
+    // method가 없던 폼은 브라우저 기본 GET 제출로 /login?email=...&password=... 로 이동했음
+    expect(page.url()).not.toContain(encodeURIComponent(password));
+    expect(page.url()).not.toContain("password=");
+  });
+});

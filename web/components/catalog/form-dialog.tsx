@@ -72,7 +72,7 @@ function DialogForm({
   }, undefined);
 
   return (
-    <form onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
+    <form method="post" onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
       <div className="space-y-4">{children}</div>
       <FormError message={state?.error} />
       <DialogFooter>

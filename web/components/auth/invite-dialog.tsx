@@ -39,7 +39,7 @@ export function InviteDialog({ baseUrl }: { baseUrl: string }) {
           <DialogTitle>사용자 초대</DialogTitle>
           <DialogDescription>초대 링크를 만들어 전달하면 상대가 이름과 비밀번호를 정합니다</DialogDescription>
         </DialogHeader>
-        <form onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
+        <form method="post" onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="invite-email">이메일</Label>
             <Input id="invite-email" name="email" type="email" required placeholder="member@example.com" />

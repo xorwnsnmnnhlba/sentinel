@@ -141,7 +141,7 @@ function DocumentStep({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form method="post" onSubmit={submit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="import-format">형식</Label>
         <NativeSelect

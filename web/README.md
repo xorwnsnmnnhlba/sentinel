@@ -225,6 +225,9 @@ npm run e2e:up && npm run e2e && npm run e2e:down
   - **Settings → Languages & Frameworks → JavaScript → Code Quality Tools → ESLint**: Automatic ESLint configuration, Run eslint --fix on save
 
 - 함수형만 사용. 클래스 선언·클래스 컴포넌트 금지 (ESLint `no-restricted-syntax`로 차단)
+- `<form>`에는 `method` 필수 (ESLint `no-restricted-syntax`로 차단). `onSubmit` 폼은 `method="post"`, 조회 폼은 `method="get"`
+  - `onSubmit`만 있는 폼은 JS 로드 전·실패 시 브라우저 기본 제출(GET)로 비밀번호 등 입력값이 주소(방문 기록·접속 로그·Referer)에 노출
+  - JS 없이 로그인 폼을 제출해도 비밀번호가 주소에 남지 않는지 E2E(`e2e/auth.spec.ts`)로 확인
 - 오류 객체는 팩토리 함수와 타입 가드로 처리: `apiError(status, detail)` 생성, `isApiError(error)` 판별 (`lib/api/server.ts`). `instanceof` 대신 타입 가드 사용
 
 ## 유의사항

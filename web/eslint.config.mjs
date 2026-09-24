@@ -13,6 +13,11 @@ const eslintConfig = defineConfig([
         "error",
         { selector: "ClassDeclaration", message: "클래스 대신 함수와 타입을 사용합니다" },
         { selector: "ClassExpression", message: "클래스 대신 함수와 타입을 사용합니다" },
+        {
+          // method가 없으면 JS 로드 전·실패 시 브라우저 기본 제출(GET)로 비밀번호 등 입력값이 주소에 노출
+          selector: 'JSXOpeningElement[name.name="form"]:not(:has(JSXAttribute[name.name="method"]))',
+          message: 'form에는 method를 지정합니다 (onSubmit 폼은 method="post", 조회 폼은 method="get")',
+        },
       ],
     },
   },

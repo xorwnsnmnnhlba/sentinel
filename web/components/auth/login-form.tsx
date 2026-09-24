@@ -15,7 +15,7 @@ export function LoginForm({ from }: { from?: string }) {
   const [state, formAction, pending] = useActionState(login, undefined);
 
   return (
-    <form onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
+    <form method="post" onSubmit={(event) => submitKeepingValues(event, formAction)} className="space-y-4">
       {from && <input type="hidden" name="from" value={from} />}
       <div className="space-y-2">
         <Label htmlFor="email">이메일</Label>
