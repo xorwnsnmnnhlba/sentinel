@@ -56,7 +56,7 @@ components/
  ├─ dashboard/              대시보드 요약 타일(이전 기간 대비 변화), 통과율 막대
  ├─ response-times/         응답시간 일별 추세 차트 (p50·p95 선, 툴팁, 표 보기)
  ├─ run-badges.tsx          판정·상태·주체 배지
- └─ site-header.tsx
+ └─ site-header.tsx         공통 머리말. 좁은 화면(640px 미만)은 1행 로고·계정 아이콘, 2행 메뉴(넘치면 가로 스크롤)
 test/                       테스트 공통 (MSW 서버, 환경 설정, redirect·notFound 확인)
 lib/
  ├─ actions/catalog.ts      Server Actions (등록·수정·삭제·실행 → Spring 호출 후 refresh·redirect)
