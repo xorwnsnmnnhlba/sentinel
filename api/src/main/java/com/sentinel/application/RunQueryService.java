@@ -65,7 +65,8 @@ public class RunQueryService {
 		Map<Long, IdName> triggeredBy = triggeredBy(found.getContent());
 		return PageResponse.of(found,
 				found.map(run -> summaryOf(run, counts.getOrDefault(run.getId(), Map.of()),
-						triggeredBy.get(run.getTriggeredBy())))
+						// 스케줄 실행은 주체가 null. 불변 Map은 null 키 조회 시 예외이므로 먼저 확인
+						run.getTriggeredBy() == null ? null : triggeredBy.get(run.getTriggeredBy())))
 					.getContent());
 	}
 

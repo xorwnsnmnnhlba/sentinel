@@ -97,6 +97,22 @@ class RunQueryServiceTest {
 	}
 
 	@Test
+	void listsRunsThatNobodyStartedByHand() {
+		// 스케줄 실행만 있는 페이지. 실행 주체가 하나도 없어도 목록 조회 가능
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		long scheduled = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
+
+		PageResponse<RunSummary> page = runQueries.listRuns(RunFilter.none(), 0, 20);
+
+		assertThat(page.content()).singleElement().satisfies(run -> {
+			assertThat(run.id()).isEqualTo(scheduled);
+			assertThat(run.triggeredBy()).isNull();
+		});
+	}
+
+	@Test
 	void clampsPageAndSize() {
 		PageResponse<RunSummary> page = runQueries.listRuns(RunFilter.none(), -5, 10_000);
 

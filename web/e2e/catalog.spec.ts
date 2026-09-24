@@ -38,6 +38,11 @@ async function totalRuns(page: Page): Promise<number> {
   return Number(summary.match(/전체 (\d+)건/)![1]);
 }
 
+/** 스위트 화면 케이스 목록의 행. 응답시간 표에도 같은 이름이 있어 표를 지정 */
+function caseRow(page: Page, name: RegExp) {
+  return page.getByRole("table", { name: "케이스 목록" }).getByRole("row", { name });
+}
+
 /** 화면의 오류 메시지. Next.js 라우트 알림(role=alert)은 제외 */
 function alertIn(page: Page) {
   return page.locator('[role="alert"]:not(#__next-route-announcer__)');
@@ -110,7 +115,7 @@ test("케이스 등록 후 실행하면 결과 표시", async ({ page }) => {
   await page.getByRole("button", { name: "등록" }).click();
 
   await expect(page).toHaveURL(/\/suites\/\d+$/);
-  await expect(page.getByRole("row", { name: /프로젝트 목록 조회/ })).toContainText("{{apiPrefix}}/projects");
+  await expect(caseRow(page, /프로젝트 목록 조회/)).toContainText("{{apiPrefix}}/projects");
 
   await page.getByRole("button", { name: "지금 실행" }).click();
 
@@ -124,6 +129,29 @@ test("케이스 등록 후 실행하면 결과 표시", async ({ page }) => {
   await page.getByRole("button", { name: /프로젝트 목록 조회/ }).click();
   await expect(page.getByText(/key=\*\*\*\*/)).toBeVisible();
   expect(await page.content()).not.toContain(secret);
+});
+
+test("스위트 화면에서 응답시간 확인", async ({ page }) => {
+  await page.goto("/projects");
+  await page.getByRole("link", { name: project }).click();
+  await page.getByRole("link", { name: suite }).click();
+
+  const section = page.locator("#response-times");
+  await expect(section.getByRole("heading", { name: "응답시간" })).toBeVisible();
+  // 방금 실행한 1건이 집계되고, 가장 느린 케이스의 일별 차트가 기본으로 표시
+  await expect(
+    section.getByRole("table", { name: "케이스별 응답시간" }).getByRole("row", { name: /프로젝트 목록 조회/ }),
+  ).toContainText("1");
+  await expect(section.getByRole("img", { name: /프로젝트 목록 조회 · self · 최근 7일/ })).toBeVisible();
+
+  await section.getByRole("button", { name: "표로 보기" }).click();
+  await expect(section.getByRole("row").filter({ hasText: /ms/ }).last()).toContainText("1");
+
+  // 조건은 주소에 남음
+  await section.getByLabel("기간").selectOption("30");
+  await section.getByRole("button", { name: "조회" }).click();
+  await expect(page).toHaveURL(/days=30&environmentId=\d+&caseId=\d+#response-times$/);
+  await expect(section.getByRole("img", { name: /최근 30일/ })).toBeVisible();
 });
 
 test("실행 이력을 조건으로 좁히고 초기화", async ({ page }) => {
@@ -192,10 +220,10 @@ paths:
   await dialog.getByRole("button", { name: "2건 가져오기" }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("row", { name: /프로젝트 조회/ })).toContainText("/api/projects/{{projectId}}");
-  await expect(page.getByRole("row", { name: /스위트 등록 \(가져옴\)/ })).toContainText("/api/suites");
+  await expect(caseRow(page, /프로젝트 조회/)).toContainText("/api/projects/{{projectId}}");
+  await expect(caseRow(page, /스위트 등록 \(가져옴\)/)).toContainText("/api/suites");
   // 기존 케이스는 그대로 한 건
-  await expect(page.getByRole("row", { name: /프로젝트 목록 조회/ })).toHaveCount(1);
+  await expect(caseRow(page, /프로젝트 목록 조회/)).toHaveCount(1);
 });
 
 test("Postman 컬렉션에서 케이스 가져오기", async ({ page }) => {
@@ -230,8 +258,8 @@ test("Postman 컬렉션에서 케이스 가져오기", async ({ page }) => {
   await dialog.getByRole("button", { name: "2건 가져오기" }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("row", { name: /주문 \/ 목록/ })).toContainText("/api/orders?page=1");
-  await expect(page.getByRole("row", { name: /주문 \/ 상세/ })).toContainText("/api/orders/{{orderId}}");
+  await expect(caseRow(page, /주문 \/ 목록/)).toContainText("/api/orders?page=1");
+  await expect(caseRow(page, /주문 \/ 상세/)).toContainText("/api/orders/{{orderId}}");
 });
 
 test("1MB가 넘는 OpenAPI 문서도 미리보기", async ({ page }) => {
