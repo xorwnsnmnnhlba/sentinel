@@ -35,3 +35,21 @@ test("HTTPS 앞단을 거쳐 로그인하면 Secure 세션 쿠키 발급", async
   const session = (await context.cookies()).find((cookie) => cookie.name === "sentinel_session");
   expect(session).toMatchObject({ secure: true, httpOnly: true, sameSite: "Lax" });
 });
+
+test("로그인 상태여도 BFF 프록시로는 쓰기 요청 불가 (쓰기는 Server Action만)", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("이메일").fill("admin@sentinel.test");
+  await page.getByLabel("비밀번호").fill("e2e-admin-password");
+  await page.getByRole("button", { name: "로그인" }).click();
+  await expect(page.getByRole("banner").getByRole("link", { name: "프로젝트" })).toBeVisible();
+
+  // 같은 브라우저 세션(쿠키)으로 보내도 조회만 전달
+  expect((await page.request.get("/api/projects")).status()).toBe(200);
+  const name = `bff-write-${Date.now()}`;
+  for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+    const response = await page.request.fetch("/api/projects", { method, data: { name } });
+    expect(response.status(), method).toBe(405);
+  }
+  const projects = (await (await page.request.get("/api/projects")).json()) as { name: string }[];
+  expect(projects.map((project) => project.name)).not.toContain(name);
+});

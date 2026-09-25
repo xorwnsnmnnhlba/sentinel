@@ -47,6 +47,24 @@ test("로그인 후 원래 가려던 화면으로 이동하고 로그아웃하�
   await expect(page).toHaveURL(/\/login\?from=%2Fruns$/);
 });
 
+test("로그인 후 이동 주소로 다른 사이트는 받지 않음", async ({ page }) => {
+  const external: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).hostname === "evil.example") {
+      external.push(request.url());
+    }
+  });
+  // 브라우저는 \\를 /로 바꿔 //evil.example로 해석. 예전 검사(/로 시작, //가 아님)는 통과시켰음
+  await page.goto(`/login?from=${encodeURIComponent("/\\evil.example/steal")}`);
+  await page.getByLabel("이메일").fill(email);
+  await page.getByLabel("비밀번호").fill(password);
+  await page.getByRole("button", { name: "로그인" }).click();
+
+  await expect(page.getByRole("heading", { name: "대시보드", level: 1 })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/");
+  expect(external).toEqual([]);
+});
+
 test.describe("JavaScript 없이 제출", () => {
   test.use({ javaScriptEnabled: false });
 

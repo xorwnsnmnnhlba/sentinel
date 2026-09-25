@@ -36,7 +36,14 @@ public class RestClientRequestExecutor implements RequestExecutor {
 
 	private final RestClient restClient;
 
+	private final DestinationGuard destinationGuard;
+
 	public RestClientRequestExecutor(Duration connectTimeout, Duration readTimeout) {
+		this(connectTimeout, readTimeout, DestinationGuard.system());
+	}
+
+	RestClientRequestExecutor(Duration connectTimeout, Duration readTimeout, DestinationGuard destinationGuard) {
+		this.destinationGuard = destinationGuard;
 		HttpClient httpClient = HttpClient.newBuilder()
 				// 기본값 HTTP/2는 http:// 요청에 h2c 업그레이드를 시도하여 서버에 따라 본문 전송 실패, 헤더명 소문자화 발생
 				.version(HttpClient.Version.HTTP_1_1)
@@ -50,6 +57,10 @@ public class RestClientRequestExecutor implements RequestExecutor {
 
 	@Override
 	public HttpExchange execute(ResolvedRequest request) {
+		// 리다이렉트는 따라가지 않으므로 요청 주소만 확인하면 됨
+		destinationGuard.blockedReason(request.uri()).ifPresent(reason -> {
+			throw new RequestExecutionException(Reason.BLOCKED_DESTINATION, request, reason);
+		});
 		long startedAt = System.nanoTime();
 		try {
 			RestClient.RequestBodySpec spec = restClient

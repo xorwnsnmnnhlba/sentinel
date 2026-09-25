@@ -186,12 +186,16 @@ curl -i -X POST localhost:8080/api/runs \
 | `verdict: FAILED` | 응답 수신 후 판정 규칙 실패. 규칙별 결과는 `assertionResults` (`description`, `passed`, `message`) |
 | `verdict: ERROR` | 응답 미수신 또는 전송 전 실패. 사유는 `errorReason` |
 | `outcome` | 응답 수신 여부. `RESPONDED`(4xx·5xx 포함) / `ERROR` |
-| `errorReason` | `UNRESOLVED_VARIABLE`(변수 누락, 미전송) / `INVALID_REQUEST`(잘못된 URL·헤더) / `TIMEOUT` / `CONNECTION_FAILED` / `IO_ERROR` / `UNEXPECTED` |
+| `errorReason` | `UNRESOLVED_VARIABLE`(변수 누락, 미전송) / `INVALID_REQUEST`(잘못된 URL·헤더) / `TIMEOUT` / `CONNECTION_FAILED` / `IO_ERROR` / `BLOCKED_DESTINATION`(링크 로컬·클라우드 메타데이터 주소, 미전송) / `UNEXPECTED` |
 
 - 저장되는 요청·응답 헤더 중 `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` 값은 `****`로 마스킹. 실제 전송 값은 원본 사용
 - 응답 본문은 64KB(UTF-8 기준) 초과 시 잘라서 저장, `bodyTruncated: true` 표시
 - 요청·응답 헤더와 본문은 보관기간(기본 30일) 경과 후 삭제 ("결과 원문 보관기간" 참고)
 - 요청 URL의 변수 값은 인코딩하지 않음. 공백 등 URL에 쓸 수 없는 문자는 `INVALID_REQUEST`
+- 링크 로컬(`169.254.0.0/16`, `fe80::/10`)과 클라우드 메타데이터 주소(`fd00:ec2::254`, `100.100.100.200`)로는 전송하지 않고 `BLOCKED_DESTINATION`
+  - 누구나 기본 URL을 정할 수 있고 응답 본문이 이력에 남으므로, 클라우드 인스턴스 자격증명을 읽는 통로 차단. 호스트 이름은 해석한 주소로 판단
+  - 사설망(10.x, 192.168.x 등)과 루프백은 내부 API 점검이 목적이라 허용
+  - 확인과 전송 사이에 DNS 응답이 바뀌는 경우(DNS rebinding)까지는 막지 못함
 
 ## 인증
 
@@ -205,6 +209,11 @@ curl -i -X POST localhost:8080/api/runs \
 - 브라우저는 Next.js(BFF)의 httpOnly 쿠키를 사용하고, Spring은 쿠키를 모름 (토큰만 헤더로 수신)
 - 비밀번호는 BCrypt 해시, 세션 토큰은 SHA-256 해시로만 저장. 로그인 실패 사유는 구분하지 않음(계정 존재 여부 비노출)
 - 세션 만료는 로그인 시점 기준 고정 (`sentinel.auth.session-validity`, 기본 12h). 사용해도 연장되지 않음
+- 로그인 실패 제한: 같은 이메일로 15분 안에 5회 실패하면 15분 동안 올바른 비밀번호로도 429 + `Retry-After`(초)
+  - 없는 계정도 같은 방식으로 세어 잠김 여부로 계정 존재를 알 수 없음. 성공하면 실패 횟수 초기화
+  - IP 기준은 미사용 (Spring에는 Next.js 서버 주소만 보임). 다른 사람이 특정 계정을 최대 15분 잠글 수 있음
+  - 메모리 보관이라 재시작하면 초기화 (단일 인스턴스 전제)
+- 로그인 없이 허용하는 링크 API(`/api/invites/`, `/api/password-resets/`)는 경로가 깨끗할 때만 예외. 점 세그먼트, `;`, 인코딩된 `.`·`/`·`\`, `//`가 있으면 인증 요구 (라우팅의 경로 정리 방식에 기대지 않음)
 ### 사용자 관리
 
 | API | 권한 | 설명 |

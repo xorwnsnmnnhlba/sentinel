@@ -117,4 +117,19 @@ class RestClientRequestExecutorTest {
 		return "http://" + wiremock.getHost() + ":" + wiremock.getMappedPort(8080) + path;
 	}
 
+
+	@Test
+	void refusesCloudMetadataAddressesWithoutSending() {
+		ResolvedRequest request = new ResolvedRequest(HttpMethod.GET,
+				URI.create("http://169.254.169.254/latest/meta-data/iam/security-credentials/"), Map.of(), null);
+
+		assertThatThrownBy(() -> executor.execute(request)).isInstanceOfSatisfying(RequestExecutionException.class,
+				ex -> {
+					assertThat(ex.reason()).isEqualTo(RequestExecutionException.Reason.BLOCKED_DESTINATION);
+					assertThat(ex.elapsed()).isZero();
+					assertThat(ex.getMessage()).isEqualTo(
+							"BLOCKED_DESTINATION: 169.254.169.254 resolves to 169.254.169.254, a link-local or cloud metadata address");
+				});
+	}
+
 }

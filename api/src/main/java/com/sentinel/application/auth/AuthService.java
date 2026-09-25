@@ -37,22 +37,30 @@ public class AuthService {
 
 	private final Clock clock;
 
+	private final LoginThrottle loginThrottle;
+
 	private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
 	/**
 	 * @return 세션 토큰 원문. 저장하지 않으며 응답 후 다시 조회 불가
 	 * @throws InvalidCredentialsException 계정 없음·보관됨·비밀번호 불일치
+	 * @throws TooManyLoginAttemptsException 반복된 실패로 잠긴 이메일 ({@link LoginThrottle})
 	 */
 	@Transactional
 	public Login login(String email, String password) {
-		User user = users.findByEmailAndArchivedAtIsNull(normalize(email)).orElse(null);
+		String normalized = normalize(email);
+		Instant now = clock.instant();
+		loginThrottle.checkAllowed(normalized, now);
+		User user = users.findByEmailAndArchivedAtIsNull(normalized).orElse(null);
 		if (user == null || password == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
 			// 존재하지 않는 계정도 같은 시간이 걸리도록 더미 해시와 비교
 			if (user == null && password != null) {
 				passwordEncoder.matches(password, "$2a$10$ijklmnopqrstuvwxyzABCDE.FGHIJKLMNOPQRSTUVWXYZabcdefghi");
 			}
+			loginThrottle.recordFailure(normalized, now);
 			throw new InvalidCredentialsException();
 		}
+		loginThrottle.recordSuccess(normalized);
 		String token = newToken();
 		sessions.save(new UserSession(hash(token), user.getId(), clock.instant(), properties.sessionValidity()));
 		return new Login(token, AuthenticatedUser.of(user));

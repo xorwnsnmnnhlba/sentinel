@@ -64,7 +64,9 @@ public class TestResult extends BaseEntity {
 	}
 
 	public enum ErrorReason {
-		UNRESOLVED_VARIABLE, INVALID_REQUEST, TIMEOUT, CONNECTION_FAILED, IO_ERROR, UNEXPECTED
+		UNRESOLVED_VARIABLE, INVALID_REQUEST, TIMEOUT, CONNECTION_FAILED, IO_ERROR,
+		/** 링크 로컬·클라우드 메타데이터 주소로의 전송 거부 */
+		BLOCKED_DESTINATION, UNEXPECTED
 	}
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)

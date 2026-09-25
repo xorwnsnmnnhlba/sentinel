@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { apiFetch, isApiError } from "@/lib/api/server";
 import { clearSessionCookie, setSessionCookie } from "@/lib/api/session";
 import type { AuthenticatedUser } from "@/lib/api/types";
+import { safeRedirectPath } from "@/lib/redirect-path";
 
 /**
  * 로그인·로그아웃. 세션 토큰은 httpOnly 쿠키로만 보관하고 브라우저 스크립트에서 읽을 수 없음.
@@ -30,6 +31,11 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
       // 계정 존재 여부를 알리지 않도록 서버와 같은 문구 유지
       return { error: "이메일 또는 비밀번호가 올바르지 않습니다" };
     }
+    if (response.status === 429) {
+      // 반복된 실패로 잠김. 서버가 알려준 대기 시간(초)을 분 단위로 안내
+      const minutes = Math.max(1, Math.ceil(Number(response.headers.get("retry-after") ?? "900") / 60));
+      return { error: `로그인 시도가 너무 많습니다. ${minutes}분 후 다시 시도해 주세요` };
+    }
     if (!response.ok) {
       return { error: "로그인하지 못했습니다. 잠시 후 다시 시도해 주세요" };
     }
@@ -40,8 +46,7 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   }
 
   await setSessionCookie(token);
-  const from = String(form.get("from") ?? "");
-  redirect(from.startsWith("/") && !from.startsWith("//") ? from : "/");
+  redirect(safeRedirectPath(form.get("from")));
 }
 
 export async function logout(): Promise<void> {
