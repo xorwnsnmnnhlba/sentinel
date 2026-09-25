@@ -36,16 +36,21 @@ describe("login", () => {
     ).resolves.toBe("/runs?page=2");
   });
 
-  it.each(["https://evil.example/steal", "//evil.example", "javascript:alert(1)"])(
-    "ignores an external redirect target %s",
-    async (from) => {
-      server.use(http.post(springUrl("/api/sessions"), () => HttpResponse.json({ token: "t" }, { status: 201 })));
+  it.each([
+    "https://evil.example/steal",
+    "//evil.example",
+    "javascript:alert(1)",
+    // 브라우저가 \를 /로, 탭·줄바꿈을 지워 //evil.example로 해석
+    "/\\evil.example/steal",
+    "/\t/evil.example",
+    "/\n/evil.example",
+  ])("ignores an external redirect target %s", async (from) => {
+    server.use(http.post(springUrl("/api/sessions"), () => HttpResponse.json({ token: "t" }, { status: 201 })));
 
-      await expect(
-        captureRedirect(() => login(undefined, form({ email: "a@b.c", password: "pw", from }))),
-      ).resolves.toBe("/");
-    },
-  );
+    await expect(captureRedirect(() => login(undefined, form({ email: "a@b.c", password: "pw", from })))).resolves.toBe(
+      "/",
+    );
+  });
 
   it("keeps the wording identical for wrong password and unknown account", async () => {
     server.use(http.post(springUrl("/api/sessions"), () => problem(401, "email or password is incorrect")));

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { apiFetch, isApiError } from "@/lib/api/server";
 import { clearSessionCookie, setSessionCookie } from "@/lib/api/session";
 import type { AuthenticatedUser } from "@/lib/api/types";
+import { safeRedirectPath } from "@/lib/redirect-path";
 
 /**
  * 로그인·로그아웃. 세션 토큰은 httpOnly 쿠키로만 보관하고 브라우저 스크립트에서 읽을 수 없음.
@@ -40,8 +41,7 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   }
 
   await setSessionCookie(token);
-  const from = String(form.get("from") ?? "");
-  redirect(from.startsWith("/") && !from.startsWith("//") ? from : "/");
+  redirect(safeRedirectPath(form.get("from")));
 }
 
 export async function logout(): Promise<void> {
