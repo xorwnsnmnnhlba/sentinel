@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import { server, springUrl } from "@/test/msw";
 
-import { DELETE, GET, PATCH, POST } from "./route";
+import * as route from "./route";
+import { GET } from "./route";
 
 function call(
   handler: typeof GET,
@@ -30,56 +31,37 @@ describe("BFF proxy", () => {
     await expect(response.json()).resolves.toEqual({ page: "2" });
   });
 
-  it("forwards body and Content-Type, returns only Content-Type and Location headers", async () => {
-    let received: unknown;
+  it("returns only Content-Type and Location headers", async () => {
     server.use(
-      http.post(springUrl("/api/projects"), async ({ request }) => {
-        received = await request.json();
-        return HttpResponse.json(
-          { id: 1 },
-          { status: 201, headers: { Location: "/api/projects/1", "X-Internal": "secret", "Set-Cookie": "a=b" } },
-        );
-      }),
+      http.get(springUrl("/api/projects"), () =>
+        HttpResponse.json([], { headers: { Location: "/api/projects", "X-Internal": "secret", "Set-Cookie": "a=b" } }),
+      ),
     );
 
-    const response = await call(POST, ["projects"], {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "billing" }),
-    });
+    const response = await call(GET, ["projects"]);
 
-    expect(received).toEqual({ name: "billing" });
-    expect(response.status).toBe(201);
-    expect(response.headers.get("location")).toBe("/api/projects/1");
     expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("location")).toBe("/api/projects");
     expect(response.headers.get("x-internal")).toBeNull();
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("passes through Spring error status and body", async () => {
     server.use(
-      http.patch(springUrl("/api/schedules/1"), () =>
-        HttpResponse.json({ status: 400, detail: "invalid cron" }, { status: 400 }),
+      http.get(springUrl("/api/runs/9"), () =>
+        HttpResponse.json({ status: 404, detail: "run 9 not found" }, { status: 404 }),
       ),
     );
 
-    const response = await call(PATCH, ["schedules", "1"], {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
+    const response = await call(GET, ["runs", "9"]);
 
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ detail: "invalid cron" });
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ detail: "run 9 not found" });
   });
 
-  it("forwards 204 without body", async () => {
-    server.use(http.delete(springUrl("/api/cases/5"), () => new HttpResponse(null, { status: 204 })));
-
-    const response = await call(DELETE, ["cases", "5"], { method: "DELETE" });
-
-    expect(response.status).toBe(204);
-    await expect(response.text()).resolves.toBe("");
+  it("is read-only: writes go through Server Actions, which check the request origin", () => {
+    // 내보내지 않은 메서드는 Next.js가 405로 응답
+    expect(Object.keys(route).sort()).toEqual(["GET"]);
   });
 
   it.each([[[".."]], [["runs", "..", "admin"]], [["."]]])("rejects dot segments %j", async (path) => {

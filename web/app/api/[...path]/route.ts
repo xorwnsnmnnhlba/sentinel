@@ -3,8 +3,10 @@ import type { NextRequest } from "next/server";
 import { apiFetch } from "@/lib/api/server";
 
 /**
- * 브라우저용 BFF 프록시. /api/** 요청을 Spring /api/**로 서버사이드 전달하여 브라우저에 Spring 주소 비노출.
+ * 브라우저용 BFF 프록시(조회 전용). /api/** GET 요청을 Spring /api/**로 서버사이드 전달하여 브라우저에 Spring 주소 비노출.
  * Server Component는 이 경로를 거치지 않고 lib/api/server로 Spring 직접 호출.
+ * 등록·수정·삭제는 출처 확인이 있는 Server Action으로만 처리하므로 쓰기 메서드는 열지 않음 (다른 메서드는 Next.js가 405 응답).
+ * 쿠키만으로 인증되는 쓰기 경로를 두지 않아, 같은 상위 도메인의 다른 사이트에서 보내는 요청(CSRF)을 원천 차단.
  * 응답 헤더는 Content-Type·Location만 전달
  */
 async function forward(request: NextRequest, ctx: RouteContext<"/api/[...path]">): Promise<Response> {
@@ -13,18 +15,12 @@ async function forward(request: NextRequest, ctx: RouteContext<"/api/[...path]">
     return Response.json({ title: "Bad Request", status: 400, detail: "invalid path" }, { status: 400 });
   }
 
-  const hasBody = request.method !== "GET" && request.method !== "HEAD";
   const headers = new Headers({ Accept: request.headers.get("accept") ?? "application/json" });
-  const contentType = request.headers.get("content-type");
-  if (hasBody && contentType) {
-    headers.set("Content-Type", contentType);
-  }
 
   try {
     const upstream = await apiFetch(`/api/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`, {
-      method: request.method,
+      method: "GET",
       headers,
-      body: hasBody ? await request.text() : undefined,
     });
     const responseHeaders = new Headers();
     for (const name of ["content-type", "location"]) {
@@ -40,4 +36,4 @@ async function forward(request: NextRequest, ctx: RouteContext<"/api/[...path]">
   }
 }
 
-export { forward as GET, forward as POST, forward as PUT, forward as PATCH, forward as DELETE };
+export { forward as GET };
