@@ -151,7 +151,10 @@ lib/
 - 폼은 `onSubmit`으로 제출. `action` prop 제출은 React가 제출 후 폼을 초기화하여 오류 시 입력값 유실
 
 - 캐시 미사용 (`cache: "no-store"`). 실행 결과는 항상 최신 조회
+- BFF 프록시는 조회(GET) 전용. 쓰기는 출처 확인이 있는 Server Action으로만 처리하여 쿠키만으로 인증되는 쓰기 경로를 두지 않음 (다른 메서드는 405)
 - BFF 프록시는 응답 헤더 중 `Content-Type`·`Location`만 전달, Spring 장애 시 내부 정보 없는 502 반환
+- 로그인 후 돌아갈 주소(`?from=`)는 같은 사이트 경로만 허용 (`lib/redirect-path.ts`). 브라우저가 `\`를 `/`로 바꾸고 탭·줄바꿈을 지워 해석하므로 문자열 앞부분이 아닌 실제 해석 결과로 판단
+- 로그인이 반복 실패로 잠기면(429) 서버의 `Retry-After`로 남은 분을 안내
 - `lib/api/server.ts`는 `server-only`로 보호. 클라이언트 컴포넌트에서 import 시 빌드 실패
 
 ## 환경변수
