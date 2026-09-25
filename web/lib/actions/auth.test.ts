@@ -52,6 +52,22 @@ describe("login", () => {
     );
   });
 
+  it("tells how long to wait after too many failures", async () => {
+    server.use(
+      http.post(springUrl("/api/sessions"), () =>
+        HttpResponse.json(
+          { status: 429, detail: "too many failed login attempts; try again later" },
+          { status: 429, headers: { "Retry-After": "610" } },
+        ),
+      ),
+    );
+
+    await expect(login(undefined, form({ email: "a@b.c", password: "pw" }))).resolves.toEqual({
+      error: "로그인 시도가 너무 많습니다. 11분 후 다시 시도해 주세요",
+    });
+    expect(testCookies.get("sentinel_session")).toBeUndefined();
+  });
+
   it("keeps the wording identical for wrong password and unknown account", async () => {
     server.use(http.post(springUrl("/api/sessions"), () => problem(401, "email or password is incorrect")));
 

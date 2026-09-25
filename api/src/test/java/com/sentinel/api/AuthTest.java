@@ -109,6 +109,27 @@ class AuthTest {
 	}
 
 	@Test
+	void locksAnEmailAfterRepeatedFailures() throws Exception {
+		String unknown = "nobody-" + UUID.randomUUID() + "@sentinel.test";
+		for (int i = 0; i < 5; i++) {
+			assertThat(login(email, "wrong-password")).hasStatus(HttpStatus.UNAUTHORIZED);
+			assertThat(login(unknown, "wrong-password")).hasStatus(HttpStatus.UNAUTHORIZED);
+		}
+
+		// 잠긴 동안에는 올바른 비밀번호도 거부, 다시 시도할 시점 안내
+		MvcTestResult locked = login(email, PASSWORD);
+		assertThat(locked).hasStatus(HttpStatus.TOO_MANY_REQUESTS)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("too many failed login attempts; try again later");
+		assertThat(Long.parseLong(locked.getResponse().getHeader("Retry-After"))).isBetween(1L, 900L);
+		// 없는 계정도 같은 응답이라 잠김으로 계정 존재를 알 수 없음
+		assertThat(login(unknown, PASSWORD).getResponse().getContentAsString())
+			.isEqualTo(locked.getResponse().getContentAsString());
+		assertThat(sessions.findAll()).isEmpty();
+	}
+
+	@Test
 	void storesOnlyHashesOfPasswordAndToken() {
 		String token = tokenOf(login(email, PASSWORD));
 
