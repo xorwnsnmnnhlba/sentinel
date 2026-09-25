@@ -34,7 +34,7 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 ```
 app/
  ├─ layout.tsx              공통 레이아웃 (헤더, TanStack Query Provider)
- ├─ providers.tsx           클라이언트 Provider
+ ├─ providers.tsx           클라이언트 Provider, 문서의 CSP nonce를 Radix 스타일 삽입에 전달
  ├─ page.tsx                홈 대시보드 (실행 현황 요약, 스위트별 통과율, 최근 실패, 응답시간 악화)
  ├─ error.tsx               오류 화면 (retry()로 재조회)
  ├─ runs/
@@ -68,7 +68,9 @@ lib/
  ├─ format.ts               KST 시각·소요 시간·JSON 본문 표시
  ├─ dashboard.ts            대시보드 합계·이전 기간·변화 표시 계산
  ├─ response-times.ts       응답시간 기간(KST)·눈금·선 경로 계산
+ ├─ csp.ts                  콘텐츠 보안 정책(CSP) 문자열, 요청별 nonce
  └─ utils.ts
+proxy.ts                    모든 화면 요청의 앞단 (로그인 확인, CSP 발급)
 ```
 
 ## 화면
@@ -128,13 +130,33 @@ lib/
 ## 인증
 
 - 세션 토큰은 Next.js가 httpOnly 쿠키(`sentinel_session`)로 보관. 브라우저 스크립트에서 읽을 수 없고 Spring에는 `Authorization: Bearer` 헤더로 전달
-- `proxy.ts`(Next.js 16에서 `middleware` 대체)가 쿠키 없는 요청을 로그인 화면으로 보냄. 토큰 유효성 판단은 Spring 몫
+- `proxy.ts`(Next.js 16에서 `middleware` 대체)가 쿠키 없는 요청을 로그인 화면으로 보냄. 토큰 유효성 판단은 Spring 몫. 로그인·초대·재설정 화면은 예외
 - 조회 중 401이면 오류 화면 대신 로그인 화면으로 이동 (세션 만료)
 - 로그인 실패 문구는 서버와 동일하게 사유를 구분하지 않음
 - 로그인 후 이동 주소(`from`)는 `/`로 시작하는 내부 경로만 허용 (외부 주소로 유도 방지)
 - 초대·재설정 링크는 발급 화면에서 한 번만 표시되며 복사해 직접 전달 (메일 발송 없음). 링크 주소는 요청 헤더의 호스트 기준
 - 링크 만료·사용·위조는 서버가 구분하지 않으므로 화면 문구도 하나로 유지
 - 관리자 메뉴(`사용자`)는 역할이 ADMIN일 때만 표시. 접근 통제는 화면이 아니라 Spring이 수행
+
+## 콘텐츠 보안 정책 (CSP)
+
+`proxy.ts`가 화면 요청마다 새 nonce(16바이트 난수)로 `Content-Security-Policy`를 만들어 요청·응답 헤더에 설정. Next.js가 요청 헤더에서 nonce를 읽어 프레임워크 스크립트·스타일에 부여 (모든 화면이 동적 렌더링이므로 가능)
+
+| 지시어 | 값 | 이유 |
+|--------|----|------|
+| `script-src` | `'self' 'nonce-…' 'strict-dynamic'` | nonce 없는 인라인 스크립트·이벤트 속성(`onerror=` 등) 차단. XSS가 생겨도 스크립트 실행 불가 |
+| `style-src-elem` | `'self' 'nonce-…'` | `<style>` 태그도 nonce 필요 |
+| `style-src-attr` | `'unsafe-inline'` | `style=""` 속성은 nonce로 허용할 수 없음. 통과율 막대·응답시간 차트·Radix 위치 계산이 사용 |
+| `img-src` | `'self' blob: data:` | |
+| `connect-src` | `'self'` | 브라우저는 같은 출처(BFF)만 호출 |
+| `object-src`·`frame-ancestors` | `'none'` | 플러그인 차단, 다른 사이트의 iframe 삽입 차단 |
+| `base-uri`·`form-action` | `'self'` | `<base>` 변조, 외부로 폼 전송 차단 |
+
+- 개발 서버(`next dev`)는 `script-src`에 `'unsafe-eval'`, 스타일에 `'unsafe-inline'`, `connect-src`에 `ws:`·`wss:`(HMR) 추가. 운영 빌드에는 없음
+- `upgrade-insecure-requests` 미사용: `http://localhost:3000` 직접 접속 시 자원 요청이 HTTPS로 바뀌어 화면이 깨짐. HTTPS 강제는 Caddy가 담당
+- Radix 대화상자의 스크롤 잠금이 넣는 `<style>`은 `get-nonce`로 nonce를 받음. 서버 렌더링마다 nonce가 바뀌므로(`router.refresh` 등) 처음 받은 문서의 스크립트에서 읽어 설정 (`app/providers.tsx`)
+- 링크 미리 불러오기(`next-router-prefetch`) 요청은 문서가 아니므로 CSP 생략. 로그인 확인은 동일하게 적용
+- 외부 스크립트·폰트·이미지를 추가하면 정책도 함께 수정. 위반은 E2E 공통 확인에서 실패로 드러남
 
 ## 데이터 조회 원칙
 
@@ -224,6 +246,8 @@ npm run e2e:up && npm run e2e && npm run e2e:down
 - 스택은 `docker-compose.e2e.yml`. 개발/운영 스택과 분리 (HTTPS 앞단 13443·HTTP 13080, api 18080, DB는 컨테이너 내부 전용)
   - 테스트는 운영과 같은 HTTPS 앞단(`proxy/Caddyfile`)을 거쳐 접속. 내부 인증서라 Playwright에서 신뢰 검사 생략(`ignoreHTTPSErrors`)
   - `e2e/https.spec.ts`: HTTP→HTTPS 이동, 보안 헤더, 앞단을 거친 로그인과 Secure 쿠키
+- 모든 테스트는 `e2e/fixtures.ts`의 `test`를 사용. 테스트 중 CSP 위반(`securitypolicyviolation`)이 1건이라도 있으면 실패
+  - `e2e/csp.spec.ts`: 요청별 nonce, 모든 스크립트의 nonce, 주입된 인라인 이벤트 속성 차단
 - 흐름: 프로젝트·환경(시크릿 포함) 등록 → 스위트·케이스 등록 → 즉시 실행·결과 확인(시크릿 마스킹) → 스케줄 등록·전환·수정·삭제 → 프로젝트 삭제 후 이력 유지 확인, 404 확인
 - 케이스가 api 자신(`http://e2e-api:8080`)을 호출하므로 외부 서버 없이 실행 결과까지 검증
 - 스택을 내리지 않고 반복 실행해도 되도록 프로젝트·스위트 이름에 실행 시각 포함

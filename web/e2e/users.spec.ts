@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * 초대 → 계정 생성 → 비밀번호 변경 → 관리자 재설정 링크 → 사용자 삭제

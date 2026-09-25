@@ -16,7 +16,7 @@ export default defineConfig({
         test: {
           name: "server",
           environment: "node",
-          include: ["lib/**/*.test.ts", "app/**/*.test.ts"],
+          include: ["lib/**/*.test.ts", "app/**/*.test.ts", "proxy.test.ts"],
           setupFiles: ["test/setup-server.ts"],
         },
       },

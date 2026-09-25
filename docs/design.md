@@ -366,10 +366,10 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 | 세션 쿠키 | `HttpOnly; Secure; SameSite=Lax`, 스크립트로 읽을 수 없음 | 유지 |
 | 로그인 응답 | 없는 계정도 같은 문구·같은 시간(더미 해시 비교) | 유지 |
 | XSS | `dangerouslySetInnerHTML` 미사용, 응답 본문은 텍스트로 표시 | 유지 |
+| CSP | 미적용 (XSS 발생 시 2차 방어 없음) | 요청별 nonce + `'strict-dynamic'` 정책 적용 (2026-09-25, `web/README.md` 콘텐츠 보안 정책) |
 | 시크릿 | AES-GCM 저장, 이름만 노출, 이력은 마스킹 | 유지 |
 
 후속 검토
-- CSP(Content-Security-Policy): Next.js 인라인 스크립트에 nonce가 필요해 별도 작업으로 검토
 - DNS rebinding: 목적지 확인 후 전송 전 DNS 응답이 바뀌는 경우는 막지 못함. 필요하면 해석한 주소로 직접 연결하는 방식 검토
 - 로그인 잠금은 메모리 보관. 여러 인스턴스로 늘리면 공유 저장소 필요
 
