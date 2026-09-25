@@ -3,6 +3,7 @@ package com.sentinel.infra.security;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import com.sentinel.application.auth.AuthService;
 import com.sentinel.application.auth.AuthenticatedUser;
@@ -34,6 +35,12 @@ public class AuthFilter extends OncePerRequestFilter {
 
 	private static final Set<String> OPEN_METHODS = Set.of("OPTIONS");
 
+	/**
+	 * 경로 해석에 따라 다른 API로 닿을 수 있는 표기. 점 세그먼트, 경로 매개변수(;), 인코딩된 . / \, 빈 세그먼트(//).
+	 * 이런 경로는 링크 API로 보지 않고 항상 인증 요구 (라우팅의 경로 정리 방식에 기대지 않음)
+	 */
+	private static final Pattern AMBIGUOUS_PATH = Pattern.compile("(^|/)\\.{1,2}(/|$)|;|%2[eEfF]|%5[cC]|//");
+
 	private final AuthService authService;
 
 	@Override
@@ -54,7 +61,7 @@ public class AuthFilter extends OncePerRequestFilter {
 		if (!path.startsWith("/api/") || OPEN_METHODS.contains(request.getMethod())) {
 			return false;
 		}
-		if (OPEN_PREFIXES.stream().anyMatch(path::startsWith)) {
+		if (OPEN_PREFIXES.stream().anyMatch(path::startsWith) && !AMBIGUOUS_PATH.matcher(path).find()) {
 			return false;
 		}
 		// 로그인 요청만 예외. 로그아웃은 토큰이 있어야 처리 가능
