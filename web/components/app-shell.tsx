@@ -3,9 +3,12 @@ import Link from "next/link";
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Brand, MobileNav, SidebarNav } from "@/components/sidebar-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { apiFetch } from "@/lib/api/server";
 import { sessionToken } from "@/lib/api/session";
 import type { AuthenticatedUser } from "@/lib/api/types";
+import type { Theme } from "@/lib/theme";
+import { themeFromCookie } from "@/lib/theme-cookie";
 
 /**
  * 화면 틀 (DESIGN.md "배치")
@@ -30,7 +33,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const isAdmin = user.role === "ADMIN";
-  const account = <AccountFooter email={user.email} />;
+  const account = <AccountFooter email={user.email} theme={await themeFromCookie()} />;
   return (
     <div className="flex flex-1">
       {/* 바탕 칸은 본문 길이만큼 늘어나고, 메뉴는 화면 높이에 고정 */}
@@ -55,19 +58,22 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** 사이드바 아래 계정 영역: 비밀번호 변경 화면으로 가는 계정 링크, 로그아웃 */
-function AccountFooter({ email }: { email: string }) {
+/** 사이드바 아래 계정 영역: 테마 선택, 비밀번호 변경 화면으로 가는 계정 링크, 로그아웃 */
+function AccountFooter({ email, theme }: { email: string; theme: Theme }) {
   return (
-    <div className="mx-3 space-y-0.5 border-t border-sidebar-border pt-3">
-      <Link
-        href="/settings/password"
-        title="비밀번호 변경"
-        className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-      >
-        <KeyRound aria-hidden className="size-4 shrink-0" />
-        <span className="truncate">{email}</span>
-      </Link>
-      <LogoutButton />
+    <div>
+      <ThemeToggle initial={theme} />
+      <div className="mx-3 space-y-0.5 border-t border-sidebar-border pt-3">
+        <Link
+          href="/settings/password"
+          title="비밀번호 변경"
+          className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          <KeyRound aria-hidden className="size-4 shrink-0" />
+          <span className="truncate">{email}</span>
+        </Link>
+        <LogoutButton />
+      </div>
     </div>
   );
 }

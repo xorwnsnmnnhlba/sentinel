@@ -2,7 +2,17 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* 다크 스타일(dark:)은 다크 테마 선택 시, 또는 system 테마에서 운영체제가 다크일 때 적용 */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where([data-theme="system"], [data-theme="system"] *) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -55,44 +65,52 @@
 }
 
 :root {
-  /* Sentry 참고 팔레트 (DESIGN.md "색"). 라이트 모드 전용 */
-  --background: #ffffff;
-  --foreground: #1f1633;
-  --card: #ffffff;
-  --card-foreground: #1f1633;
-  --popover: #ffffff;
-  --popover-foreground: #1f1633;
-  --primary: #150f23;
-  --primary-foreground: #ffffff;
+  /*
+   * Sentry 참고 팔레트 (DESIGN.md "색"). light-dark(라이트, 다크)로 한 번에 정의하고
+   * 테마는 <html data-theme>의 color-scheme으로 결정 (아래 "테마")
+   */
+  --background: light-dark(#ffffff, #110c1c);
+  --foreground: light-dark(#1f1633, #ece9f3);
+  --card: light-dark(#ffffff, #181226);
+  --card-foreground: light-dark(#1f1633, #ece9f3);
+  --popover: light-dark(#ffffff, #1f1832);
+  --popover-foreground: light-dark(#1f1633, #ece9f3);
+  /* 주 버튼. 다크는 Sentry처럼 반전 (밝은 바탕 + 짙은 글자) */
+  --primary: light-dark(#150f23, #f4f2fa);
+  --primary-foreground: light-dark(#ffffff, #150f23);
   /* 주 버튼에 붙는 보조 영역 (실행 버튼 옆 환경 선택) */
-  --primary-raised: #2a2140;
-  --secondary: #f1eef8;
-  --secondary-foreground: #1f1633;
-  --muted: #f6f5f9;
-  --muted-foreground: #6b6478;
-  --accent: #f1eef8;
-  --accent-foreground: #1f1633;
-  --destructive: #c3281b;
-  --border: #e5e7eb;
-  --input: #cfcfdb;
-  --ring: #3b82f6;
-  --brand-violet: #6a5fc1;
-  --brand-violet-soft: #ece9f5;
-  --brand-violet-deep: #422082;
+  --primary-raised: light-dark(#2a2140, #d6d0e4);
+  --secondary: light-dark(#f1eef8, #2a2140);
+  --secondary-foreground: light-dark(#1f1633, #ece9f3);
+  --muted: light-dark(#f6f5f9, #1a1428);
+  --muted-foreground: light-dark(#6b6478, #a39db1);
+  --accent: light-dark(#f1eef8, #2a2140);
+  --accent-foreground: light-dark(#1f1633, #ece9f3);
+  --destructive: light-dark(#c3281b, #f07167);
+  --border: light-dark(#e5e7eb, #2e2645);
+  --input: light-dark(#cfcfdb, #463d60);
+  --ring: light-dark(#3b82f6, #6ea8fe);
+  --brand-violet: light-dark(#6a5fc1, #a79ff0);
+  --brand-violet-soft: light-dark(#ece9f5, #2c2350);
+  --brand-violet-deep: light-dark(#422082, #d9d3fb);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   /* 응답시간 차트 계열 색. dataviz 검증 팔레트(slot 1 blue, 2 orange), 배경 대비·색각 이상 구분 검증 완료 */
-  --chart-series-1: #2a78d6;
-  --chart-series-2: #eb6834;
-  /* 대시보드 변화 표시(좋아짐·나빠짐). 흰 배경 대비 7.5:1·4.8:1, 항상 화살표·문구와 함께 사용 */
-  --delta-good: #006300;
-  --delta-bad: #d03b3b;
-  /* 통과율 막대의 빈 부분. 채움(--chart-series-1)과 같은 파랑 계열의 옅은 단계 */
-  --meter-track: #cde2fb;
+  --chart-series-1: light-dark(#2a78d6, #3987e5);
+  --chart-series-2: light-dark(#eb6834, #d95926);
+  /*
+   * 대시보드 변화 표시(좋아짐·나빠짐). 항상 화살표·문구와 함께 사용
+   * 라이트: 흰 배경 대비 7.5:1·4.8:1, 다크: 배경 대비 5.7:1·6.0:1 (critical #d03b3b는 어두운 배경에서 대비 부족)
+   */
+  --delta-good: light-dark(#006300, #0ca30c);
+  --delta-bad: light-dark(#d03b3b, #e66767);
+  /* 통과율 막대의 빈 부분. 채움(--chart-series-1)과 대비 3:1 이상 (라이트 3.3:1, 다크 3.4:1) */
+  --meter-track: light-dark(#cde2fb, #20335a);
   --radius: 0.5rem;
+  /* 사이드바는 두 테마 공통 (항상 짙은 보라) */
   --sidebar: #1f1633;
   --sidebar-foreground: rgb(255 255 255 / 72%);
   --sidebar-primary: #c2ef4e;
@@ -103,44 +121,21 @@
   --sidebar-ring: #9dc1f5;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --chart-series-1: #3987e5;
-  --chart-series-2: #d95926;
-  /* 어두운 배경 대비 5.9:1·6.1:1 (critical #d03b3b는 4.1:1이라 한 단계 밝은 빨강) */
-  --delta-good: #0ca30c;
-  --delta-bad: #e66767;
-  --meter-track: #184f95;
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/*
+ * 테마. 서버가 쿠키(sentinel_theme)로 <html data-theme>를 정해 렌더링하므로 깜빡임·인라인 스크립트 없음 (CSP 유지)
+ * system은 운영체제 설정을 따름. color-scheme은 light-dark() 토큰과 스크롤바·날짜 입력 같은 기본 컨트롤에 함께 적용
+ */
+:root,
+:root[data-theme="system"] {
+  color-scheme: light dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 @layer base {

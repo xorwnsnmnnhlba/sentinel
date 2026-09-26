@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
-import { cookieStore, testCookies } from "./cookies";
+import { cookieStore, testCookieOptions, testCookies } from "./cookies";
 import { server } from "./msw";
 
 // server-only는 React Server 환경 밖에서 import 시 예외. 테스트에서는 빈 모듈로 대체
@@ -9,7 +9,10 @@ vi.mock("server-only", () => ({}));
 // cookies()는 요청 범위 안에서만 동작. 테스트에서는 메모리 저장소로 대체
 vi.mock("next/headers", () => ({ cookies: async () => cookieStore }));
 
-afterEach(() => testCookies.clear());
+afterEach(() => {
+  testCookies.clear();
+  testCookieOptions.clear();
+});
 
 // 처리하지 않은 요청은 실패로 처리하여 의도하지 않은 Spring 호출 방지
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));

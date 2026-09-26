@@ -40,7 +40,7 @@ export function RunSuiteForm({
           required
         >
           <SelectTrigger
-            className="w-36 rounded-r-none border-r-0 border-primary bg-primary-raised text-primary-foreground data-placeholder:text-primary-foreground/70 [&_svg]:text-primary-foreground/70!"
+            className="w-36 rounded-r-none border-r-0 border-primary bg-primary-raised text-primary-foreground data-placeholder:text-primary-foreground/70 dark:bg-primary-raised dark:hover:bg-primary-raised [&_svg]:text-primary-foreground/70!"
             aria-label="실행 환경"
           >
             <SelectValue placeholder="환경 선택" />
