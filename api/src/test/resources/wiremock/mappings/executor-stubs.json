@@ -33,6 +33,14 @@
       "response": { "status": 200, "fixedDelayMilliseconds": 3000 }
     },
     {
+      "request": { "method": "GET", "urlPath": "/unavailable" },
+      "response": { "status": 503, "headers": { "Retry-After": "1" }, "body": "maintenance" }
+    },
+    {
+      "request": { "method": "GET", "url": "/set-cookie" },
+      "response": { "status": 200, "headers": { "Set-Cookie": "session=abc; Path=/" } }
+    },
+    {
       "request": { "method": "GET", "url": "/euc-kr" },
       "response": {
         "status": 200,
