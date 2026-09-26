@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 /**
  * 로그인 없이 접근 차단, 로그인·로그아웃. 스택의 최초 관리자 계정 사용

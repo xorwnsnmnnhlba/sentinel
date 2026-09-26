@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * 공통 머리말 배치. 좁은 화면에서 메뉴 글자가 한 글자씩 줄바꿈되던 문제 재발 방지

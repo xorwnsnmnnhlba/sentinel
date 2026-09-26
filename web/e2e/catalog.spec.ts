@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * 등록 → 실행 → 스케줄 → 삭제 한 흐름. 실제 스택(PostgreSQL·api·web) 대상

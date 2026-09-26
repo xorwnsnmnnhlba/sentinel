@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 /**
  * HTTPS 앞단(Caddy). E2E 스택의 e2e-proxy가 운영과 같은 proxy/Caddyfile 사용
