@@ -100,7 +100,7 @@ sentinel/
 | BE | Spring Boot 4.1 (Spring Framework 7.0.8 기반) |
 | ORM | JPA (heavy query 부재, 단순 스키마) |
 | DB | PostgreSQL — 개발기 AWS RDS의 sentinel 스키마 |
-| 실행기 | RestClient |
+| 실행기 | RestClient + Apache HttpClient 5 (2026-09-26 JDK HttpClient에서 전환, DNS rebinding 방어) |
 | 스케줄 | DB 폴링 (5장 참조) |
 | 스키마 관리 | Flyway + ddl-auto: validate (2026-09-19 배포 구성 시 전환) |
 | 코드 생성 | Lombok `@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor(access = PROTECTED)`만 사용 (2026-09-19, 아래 "Lombok 사용 규칙") |
@@ -358,7 +358,7 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 | 항목 | 결과 | 조치 |
 |------|------|------|
 | 로그인 후 이동 주소(`from`) | `/\evil.example`을 브라우저가 `//evil.example`로 해석해 다른 사이트로 이동 (확인) | URL로 해석해 같은 출처 경로만 허용 |
-| 실행기 목적지 | 클라우드 메타데이터(169.254.169.254) 접근 가능. 클라우드 배포 시 인스턴스 자격증명 노출 경로 | 링크 로컬·메타데이터 주소 전송 거부 (`BLOCKED_DESTINATION`) |
+| 실행기 목적지 | 클라우드 메타데이터(169.254.169.254) 접근 가능. 클라우드 배포 시 인스턴스 자격증명 노출 경로 | 링크 로컬·메타데이터 주소 전송 거부 (`BLOCKED_DESTINATION`). 2026-09-26 확인한 주소로만 연결하도록 보완 (DNS rebinding 차단) |
 | 로그인 반복 실패 | 제한 없음 (비밀번호 대입 가능) | 이메일별 15분 5회 실패 시 15분 잠금 (429) |
 | BFF 프록시 | 사용처가 없는데 쓰기 메서드까지 쿠키 인증으로 전달, 출처 확인 없음 | 조회 전용으로 제한 |
 | 인증 필터 경로 판단 | 우회 없음. 다만 라우팅이 점 세그먼트를 정리하지 않는 동작에 의존 | 모호한 경로는 링크 API 예외에서 제외, 실제 Tomcat 대상 회귀 테스트 |
@@ -370,7 +370,6 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 | 시크릿 | AES-GCM 저장, 이름만 노출, 이력은 마스킹 | 유지 |
 
 후속 검토
-- DNS rebinding: 목적지 확인 후 전송 전 DNS 응답이 바뀌는 경우는 막지 못함. 필요하면 해석한 주소로 직접 연결하는 방식 검토
 - 로그인 잠금은 메모리 보관. 여러 인스턴스로 늘리면 공유 저장소 필요
 
 ## 6. 실행 환경

@@ -195,7 +195,18 @@ curl -i -X POST localhost:8080/api/runs \
 - 링크 로컬(`169.254.0.0/16`, `fe80::/10`)과 클라우드 메타데이터 주소(`fd00:ec2::254`, `100.100.100.200`)로는 전송하지 않고 `BLOCKED_DESTINATION`
   - 누구나 기본 URL을 정할 수 있고 응답 본문이 이력에 남으므로, 클라우드 인스턴스 자격증명을 읽는 통로 차단. 호스트 이름은 해석한 주소로 판단
   - 사설망(10.x, 192.168.x 등)과 루프백은 내부 API 점검이 목적이라 허용
-  - 확인과 전송 사이에 DNS 응답이 바뀌는 경우(DNS rebinding)까지는 막지 못함
+  - 연결 직전에 한 번 해석한 주소를 확인하고 그 주소로만 연결. 확인과 연결 사이에 DNS 응답을 바꾸는 공격(DNS rebinding) 차단
+  - HTTPS 인증서 확인·SNI는 원래 호스트 이름 기준 (IP로 바꿔 연결하지 않음)
+
+### 전송 방식
+
+- HTTP 클라이언트는 Apache HttpClient 5.6 (`RestClient` + `HttpComponentsClientHttpRequestFactory`). 연결할 주소를 직접 해석·확인하는 해석기(`DnsResolver`)를 지정할 수 있어서 사용 (JDK HttpClient는 미지원)
+- 서버 응답을 그대로 기록하도록 클라이언트의 자동 처리 미사용
+  - 리다이렉트 미추적 (3xx 그대로 기록)
+  - 재시도 없음. 기본 설정은 429·503(`Retry-After`)과 일부 전송 오류를 다시 보내 첫 응답이 가려짐
+  - 압축 요청(`Accept-Encoding`) 없음, 쿠키 저장·자동 전송 없음 (케이스에 적은 헤더만 전송)
+- 연결 재사용. 1초 이상 쉰 연결은 사용 전 확인, 30초 이상 쉰 연결은 정리. 동시 연결 한도 200 (Tomcat 기본 요청 스레드 수)
+- 제한 시간: 연결 `sentinel.runner.http.connect-timeout`(기본 5초) 초과 시 `CONNECTION_FAILED`, 응답 대기 `read-timeout`(기본 30초) 초과 시 `TIMEOUT`
 
 ## 인증
 
