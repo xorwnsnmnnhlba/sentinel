@@ -1,8 +1,8 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 
+import { useMenuDialog } from "@/components/catalog/action-menu";
 import { FormError } from "@/components/catalog/form-dialog";
 import {
   AlertDialog,
@@ -12,29 +12,33 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import type { ActionState } from "@/lib/actions/catalog";
 
 /**
- * 삭제 확인 후 실행. 삭제는 소프트 삭제(보관)이며 하위 항목 연쇄 보관, 실행 이력 유지
+ * 삭제 확인 후 실행. "⋯" 메뉴의 삭제 항목(menuId)으로 열림 (DESIGN.md: 파괴적 동작은 메뉴 안쪽)
+ * 삭제는 소프트 삭제(보관)이며 하위 항목 연쇄 보관, 실행 이력 유지
  */
-export function DeleteButton({
+export function DeleteDialog({
+  menuId,
   title,
   description,
   action,
-  label,
 }: {
+  menuId: string;
   title: string;
   description: string;
   action: () => Promise<ActionState>;
-  /** 지정 시 텍스트 버튼, 미지정 시 아이콘 버튼 */
-  label?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const menu = useMenuDialog(menuId);
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
+
+  function setOpen(open: boolean) {
+    menu?.setOpen(open);
+    setError(undefined);
+  }
 
   function confirm() {
     startTransition(async () => {
@@ -48,25 +52,8 @@ export function DeleteButton({
   }
 
   return (
-    <AlertDialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        setError(undefined);
-      }}
-    >
-      <AlertDialogTrigger asChild>
-        {label ? (
-          <Button variant="destructive" size="sm">
-            {label}
-          </Button>
-        ) : (
-          <Button variant="ghost" size="icon-sm" aria-label={title}>
-            <Trash2 />
-          </Button>
-        )}
-      </AlertDialogTrigger>
-      <AlertDialogContent>
+    <AlertDialog open={menu?.open ?? false} onOpenChange={setOpen}>
+      <AlertDialogContent onCloseAutoFocus={menu?.returnFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

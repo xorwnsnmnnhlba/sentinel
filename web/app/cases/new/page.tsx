@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
 
 import { CaseEditor } from "@/components/catalog/case-editor";
@@ -19,12 +19,7 @@ export default async function NewCasePage(props: PageProps<"/cases/new">) {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="space-y-2">
-        <Link href={`/suites/${suite.id}`} className="text-sm text-muted-foreground hover:text-foreground">
-          ← {suite.name}
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">케이스 추가</h1>
-      </div>
+      <PageHeader back={{ href: `/suites/${suite.id}`, label: suite.name }} title="케이스 추가" />
       <CaseEditor
         initial={emptyDraft()}
         action={createCase.bind(null, suite.id)}

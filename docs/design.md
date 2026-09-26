@@ -105,6 +105,7 @@ sentinel/
 | 스키마 관리 | Flyway + ddl-auto: validate (2026-09-19 배포 구성 시 전환) |
 | 코드 생성 | Lombok `@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor(access = PROTECTED)`만 사용 (2026-09-19, 아래 "Lombok 사용 규칙") |
 | FE | Next.js 16.3.5 (Active LTS), App Router, TanStack Query, shadcn/ui (Radix UI) |
+| FE 디자인 | Sentry 제품 화면 참고 (짙은 보라 사이드바 + 흰 본문, 주 버튼 화면당 1개, 부수 동작은 "⋯" 메뉴), Pretendard. 규칙은 `web/DESIGN.md` (2026-09-26) |
 | 실행 환경 | 노트북 상시 실행, Docker 컨테이너 2개 |
 
 ### Spring Boot 4 관련 유의사항

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures";
+import { expect, test, type Page, chooseAction, mainMenu } from "./fixtures";
 
 /**
  * 등록 → 실행 → 스케줄 → 삭제 한 흐름. 실제 스택(PostgreSQL·api·web) 대상
@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel("비밀번호").fill("e2e-admin-password");
   await page.getByRole("button", { name: "로그인" }).click();
   // 머리말 메뉴가 보이면 로그인 완료 (홈 화면 카드 링크와 구분)
-  await expect(page.getByRole("banner").getByRole("link", { name: "프로젝트" })).toBeVisible();
+  await expect(mainMenu(page).getByRole("link", { name: "프로젝트" })).toBeVisible();
 });
 
 // 스택을 내리지 않고 반복 실행해도 충돌하지 않도록 매번 고유한 이름 사용
@@ -70,7 +70,7 @@ test("프로젝트·환경·스위트 등록", async ({ page }) => {
   await expect(environments).toContainText("apiPrefix");
 
   // 시크릿 추가: 이름만 목록에 표시되고 값은 어디에도 남지 않음
-  await environments.getByRole("button", { name: /환경 self 수정/ }).click();
+  await chooseAction(page, "환경 self 작업", "수정");
   await page.getByRole("button", { name: "시크릿 추가" }).click();
   await page.getByLabel("새 시크릿 1 이름").fill("token");
   await page.getByLabel("새 시크릿 1 값").fill(secret);
@@ -335,7 +335,7 @@ test("스케줄 등록·전환·수정·삭제", async ({ page }) => {
   await expect(row.getByRole("switch")).not.toBeChecked();
   await expect(row).toContainText("비활성");
 
-  await row.getByRole("button", { name: /수정/ }).click();
+  await chooseAction(page, "스케줄 10 9 * * 1-5 작업", "수정");
   await page.getByLabel("cron").fill("0 0 30 2 *");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(alertIn(page)).toContainText("입력값을 확인해 주세요");
@@ -344,7 +344,7 @@ test("스케줄 등록·전환·수정·삭제", async ({ page }) => {
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("row", { name: /30 17 \* \* 1-5/ })).toBeVisible();
 
-  await page.getByRole("button", { name: /스케줄 "30 17 \* \* 1-5" 삭제/ }).click();
+  await chooseAction(page, "스케줄 30 17 * * 1-5 작업", "삭제");
   await page.getByRole("alertdialog").getByRole("button", { name: "삭제" }).click();
   await expect(page.getByText("등록된 스케줄이 없습니다")).toBeVisible();
 });
@@ -357,8 +357,8 @@ test("프로젝트 삭제 시 하위 항목도 사라지고 실행 이력은 유
 
   await page.goto("/projects");
   await page.getByRole("link", { name: project }).click();
-  // 환경·스위트 행의 삭제 버튼과 구분 (프로젝트 삭제는 머리말의 텍스트 버튼)
-  await page.getByRole("button", { name: "삭제", exact: true }).click();
+  // 프로젝트 삭제는 화면 머리의 "⋯" 메뉴 (행 메뉴와 이름으로 구분)
+  await chooseAction(page, `프로젝트 ${project} 작업`, "삭제");
   await page.getByRole("alertdialog").getByRole("button", { name: "삭제" }).click();
 
   await expect(page).toHaveURL(/\/projects$/);

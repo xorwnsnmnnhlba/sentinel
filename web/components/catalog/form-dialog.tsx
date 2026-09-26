@@ -2,9 +2,11 @@
 
 import { startTransition, useActionState, useState } from "react";
 
+import { useMenuDialog } from "@/components/catalog/action-menu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -17,27 +19,34 @@ import type { ActionState } from "@/lib/actions/catalog";
 /**
  * 등록·수정 폼 다이얼로그. 성공 시 닫고, 실패 시 열린 채로 Spring 오류 메시지 표시.
  * 닫았다 다시 열면 입력값을 초기값으로 되돌리기 위해 폼을 새로 마운트
+ *
+ * 여는 방법: trigger(버튼) 또는 menuId("⋯" 메뉴 항목, {@link ActionMenu} 안에서만)
  */
 export function FormDialog({
   trigger,
+  menuId,
   title,
   description,
   submitLabel,
   action,
   children,
 }: {
-  trigger: React.ReactNode;
+  trigger?: React.ReactNode;
+  menuId?: string;
   title: string;
   description?: string;
   submitLabel: string;
   action: (state: ActionState, form: FormData) => Promise<ActionState>;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const menu = useMenuDialog(menuId);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = menu ? menu.open : ownOpen;
+  const setOpen = menu ? menu.setOpen : setOwnOpen;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
+      <DialogContent onCloseAutoFocus={menu?.returnFocus}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
@@ -76,6 +85,11 @@ function DialogForm({
       <div className="space-y-4">{children}</div>
       <FormError message={state?.error} />
       <DialogFooter>
+        <DialogClose asChild>
+          <Button type="button" variant="outline" disabled={pending}>
+            취소
+          </Button>
+        </DialogClose>
         <Button type="submit" disabled={pending}>
           {pending ? "저장 중…" : submitLabel}
         </Button>

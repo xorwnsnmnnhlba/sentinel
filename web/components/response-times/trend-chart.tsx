@@ -45,7 +45,7 @@ export function TrendChart({ points, title }: { points: ResponseTimePoint[]; tit
         )}
       </figcaption>
       {!hasData ? (
-        <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+        <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
           이 기간에 응답을 받은 실행이 없습니다
         </p>
       ) : view === "chart" ? (
@@ -275,7 +275,7 @@ function rows(point: ResponseTimePoint) {
 /** 차트와 같은 값을 표로. 툴팁 없이도 모든 값을 읽을 수 있도록 함 */
 function TrendTable({ points }: { points: ResponseTimePoint[] }) {
   return (
-    <div className="max-h-80 overflow-y-auto rounded-lg border">
+    <div className="max-h-80 overflow-y-auto rounded-xl border">
       <Table>
         <TableHeader>
           <TableRow>

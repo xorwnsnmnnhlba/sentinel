@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
 
 import { CaseEditor } from "@/components/catalog/case-editor";
@@ -22,15 +22,11 @@ export default async function CasePage(props: PageProps<"/cases/[id]">) {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="space-y-2">
-        <Link href={`/suites/${suite.id}`} className="text-sm text-muted-foreground hover:text-foreground">
-          ← {suite.name}
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">케이스 수정</h1>
-        <p className="text-sm text-muted-foreground">
-          저장하면 요청 정의와 판정 규칙이 통째로 바뀝니다. 이전 실행 이력은 그대로 유지됩니다.
-        </p>
-      </div>
+      <PageHeader
+        back={{ href: `/suites/${suite.id}`, label: suite.name }}
+        title="케이스 수정"
+        description="저장하면 요청 정의와 판정 규칙이 통째로 바뀝니다. 이전 실행 이력은 그대로 유지됩니다."
+      />
       <CaseEditor
         initial={toDraft(testCase)}
         action={updateCase.bind(null, testCase.id, suite.id)}

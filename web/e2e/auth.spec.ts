@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, mainMenu, sidebar } from "./fixtures";
 
 /**
  * 로그인 없이 접근 차단, 로그인·로그아웃. 스택의 최초 관리자 계정 사용
@@ -12,7 +12,7 @@ test("로그인하지 않으면 로그인 화면으로 이동", async ({ page })
   await expect(page).toHaveURL(/\/login\?from=%2Fprojects$/);
   await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible();
   // 로그인 전에는 메뉴 미표시
-  await expect(page.getByRole("banner").getByRole("link", { name: "실행 이력" })).toHaveCount(0);
+  await expect(mainMenu(page).getByRole("link", { name: "실행 이력" })).toHaveCount(0);
 });
 
 test("잘못된 비밀번호는 같은 문구로 거부", async ({ page }) => {
@@ -38,7 +38,7 @@ test("로그인 후 원래 가려던 화면으로 이동하고 로그아웃하�
 
   await expect(page).toHaveURL(/\/runs$/);
   // 실행 이력에도 같은 이메일이 나올 수 있으므로 머리말로 한정
-  await expect(page.getByRole("banner").getByText(email)).toBeVisible();
+  await expect(sidebar(page).getByText(email)).toBeVisible();
 
   await page.getByRole("button", { name: "로그아웃" }).click();
 

@@ -1,11 +1,14 @@
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { DeleteButton } from "@/components/catalog/delete-button";
+import { ActionMenu } from "@/components/catalog/action-menu";
+import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { EnvironmentFields, ProjectFields, SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
-import { Empty, RowActions, SectionHeader } from "@/components/catalog/section";
+import { EDIT_DELETE } from "@/components/catalog/menu-items";
+import { Empty, SectionHeader, TableFrame } from "@/components/catalog/section";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -38,47 +41,40 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
   ]);
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <Link href="/projects" className="text-sm text-muted-foreground hover:text-foreground">
-          ← 프로젝트
-        </Link>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
-            {project.description && <p className="text-sm text-muted-foreground">{project.description}</p>}
-          </div>
-          <div className="flex gap-2">
+    <div className="space-y-10">
+      <PageHeader
+        back={{ href: "/projects", label: "프로젝트" }}
+        title={project.name}
+        description={project.description}
+        actions={
+          <ActionMenu label={`프로젝트 ${project.name} 작업`} items={EDIT_DELETE} size="page">
             <FormDialog
-              trigger={
-                <Button variant="outline" size="sm">
-                  <Pencil /> 수정
-                </Button>
-              }
+              menuId="edit"
               title="프로젝트 수정"
               submitLabel="저장"
               action={updateProject.bind(null, project.id)}
             >
               <ProjectFields project={project} />
             </FormDialog>
-            <DeleteButton
-              label="삭제"
+            <DeleteDialog
+              menuId="delete"
               title={`프로젝트 "${project.name}" 삭제`}
               description="환경·스위트·케이스·스케줄을 함께 삭제합니다. 실행 이력은 유지됩니다."
               action={deleteProject.bind(null, project.id)}
             />
-          </div>
-        </div>
-      </div>
+          </ActionMenu>
+        }
+      />
 
       <section className="space-y-3">
         <SectionHeader
           title="환경"
+          count={environments.length}
           description="GW 단위 실행 대상. 기본 URL과 변수"
           action={
             <FormDialog
               trigger={
-                <Button size="sm">
+                <Button variant="outline" size="sm">
                   <Plus /> 환경 추가
                 </Button>
               }
@@ -93,7 +89,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
         {environments.length === 0 ? (
           <Empty message="등록된 환경이 없습니다" />
         ) : (
-          <div className="rounded-lg border">
+          <TableFrame>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -101,7 +97,9 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                   <TableHead>기본 URL</TableHead>
                   <TableHead>변수</TableHead>
                   <TableHead>시크릿</TableHead>
-                  <TableHead className="w-24" />
+                  <TableHead className="w-12">
+                    <span className="sr-only">작업</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -115,43 +113,41 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                     <TableCell className="font-mono text-xs whitespace-normal text-muted-foreground">
                       {environment.secretNames.join(", ") || "-"}
                     </TableCell>
-                    <TableCell>
-                      <RowActions>
+                    <TableCell className="text-right">
+                      <ActionMenu label={`환경 ${environment.name} 작업`} items={EDIT_DELETE}>
                         <FormDialog
-                          trigger={
-                            <Button variant="ghost" size="icon-sm" aria-label={`환경 ${environment.name} 수정`}>
-                              <Pencil />
-                            </Button>
-                          }
+                          menuId="edit"
                           title="환경 수정"
                           submitLabel="저장"
                           action={updateEnvironment.bind(null, environment.id)}
                         >
                           <EnvironmentFields environment={environment} />
                         </FormDialog>
-                        <DeleteButton
+                        <DeleteDialog
+                          menuId="delete"
                           title={`환경 "${environment.name}" 삭제`}
                           description="이 환경을 쓰는 스케줄도 함께 삭제합니다. 실행 이력은 유지됩니다."
                           action={deleteEnvironment.bind(null, environment.id)}
                         />
-                      </RowActions>
+                      </ActionMenu>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableFrame>
         )}
       </section>
 
       <section className="space-y-3">
         <SectionHeader
           title="스위트"
+          count={suites.length}
           description="함께 실행하는 케이스 묶음"
           action={
             <FormDialog
               trigger={
-                <Button size="sm">
+                <Button variant="outline" size="sm">
                   <Plus /> 스위트 추가
                 </Button>
               }
@@ -166,14 +162,16 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
         {suites.length === 0 ? (
           <Empty message="등록된 스위트가 없습니다" />
         ) : (
-          <div className="rounded-lg border">
+          <TableFrame>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>이름</TableHead>
                   <TableHead>설명</TableHead>
                   <TableHead className="text-right">케이스</TableHead>
-                  <TableHead className="w-24" />
+                  <TableHead className="w-12">
+                    <span className="sr-only">작업</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -187,33 +185,30 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                     <TableCell className="whitespace-normal text-muted-foreground">
                       {suite.description ?? "-"}
                     </TableCell>
-                    <TableCell className="text-right">{suite.caseCount}</TableCell>
-                    <TableCell>
-                      <RowActions>
+                    <TableCell className="text-right tabular-nums">{suite.caseCount}</TableCell>
+                    <TableCell className="text-right">
+                      <ActionMenu label={`스위트 ${suite.name} 작업`} items={EDIT_DELETE}>
                         <FormDialog
-                          trigger={
-                            <Button variant="ghost" size="icon-sm" aria-label={`스위트 ${suite.name} 수정`}>
-                              <Pencil />
-                            </Button>
-                          }
+                          menuId="edit"
                           title="스위트 수정"
                           submitLabel="저장"
                           action={updateSuite.bind(null, suite.id)}
                         >
                           <SuiteFields suite={suite} />
                         </FormDialog>
-                        <DeleteButton
+                        <DeleteDialog
+                          menuId="delete"
                           title={`스위트 "${suite.name}" 삭제`}
                           description={`케이스 ${suite.caseCount}건과 스케줄을 함께 삭제합니다. 실행 이력은 유지됩니다.`}
                           action={deleteSuite.bind(null, suite.id, undefined)}
                         />
-                      </RowActions>
+                      </ActionMenu>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableFrame>
         )}
       </section>
     </div>

@@ -1,26 +1,29 @@
 "use client";
 
-import { KeyRound } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { IssuedLinkBox } from "@/components/auth/issued-link";
+import { useMenuDialog } from "@/components/catalog/action-menu";
 import { FormError } from "@/components/catalog/form-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createPasswordReset, type LinkState } from "@/lib/actions/users";
 
 /**
- * 비밀번호 재설정 링크 발급. 관리자가 새 비밀번호를 정하지 않고 사용자가 직접 입력
+ * 비밀번호 재설정 링크 발급. 사용자 행의 "⋯" 메뉴(menuId)로 열림. 관리자가 새 비밀번호를 정하지 않고 사용자가 직접 입력
  */
-export function ResetLinkButton({ userId, email, baseUrl }: { userId: number; email: string; baseUrl: string }) {
-  const [open, setOpen] = useState(false);
+export function ResetLinkDialog({
+  menuId,
+  userId,
+  email,
+  baseUrl,
+}: {
+  menuId: string;
+  userId: number;
+  email: string;
+  baseUrl: string;
+}) {
+  const menu = useMenuDialog(menuId);
   const [state, setState] = useState<LinkState>();
   const [pending, startTransition] = useTransition();
 
@@ -30,18 +33,13 @@ export function ResetLinkButton({ userId, email, baseUrl }: { userId: number; em
 
   return (
     <Dialog
-      open={open}
+      open={menu?.open ?? false}
       onOpenChange={(next) => {
-        setOpen(next);
+        menu?.setOpen(next);
         setState(undefined);
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={`${email} 비밀번호 재설정 링크`}>
-          <KeyRound />
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={menu?.returnFocus}>
         <DialogHeader>
           <DialogTitle>비밀번호 재설정 링크</DialogTitle>
           <DialogDescription>
@@ -52,7 +50,7 @@ export function ResetLinkButton({ userId, email, baseUrl }: { userId: number; em
         {state?.link ? (
           <IssuedLinkBox link={state.link} expiresAt={state.expiresAt} />
         ) : (
-          <Button type="button" onClick={issue} disabled={pending}>
+          <Button type="button" onClick={issue} disabled={pending} className="self-end">
             {pending ? "발급 중…" : "링크 발급"}
           </Button>
         )}

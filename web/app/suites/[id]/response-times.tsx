@@ -62,7 +62,7 @@ export async function ResponseTimes({
         caseId={selected?.caseId}
       />
 
-      <div className="rounded-lg border">
+      <div className="rounded-xl border">
         <Table aria-label="케이스별 응답시간">
           <TableHeader>
             <TableRow>

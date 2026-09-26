@@ -29,7 +29,7 @@ export function StatTile({
 }) {
   const Icon = delta?.direction === "up" ? ArrowUp : delta?.direction === "down" ? ArrowDown : Minus;
   return (
-    <div className="space-y-1 rounded-lg border p-4">
+    <div className="space-y-1 rounded-xl border p-4">
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="text-3xl font-semibold tracking-tight">{value}</p>
       {delta ? (

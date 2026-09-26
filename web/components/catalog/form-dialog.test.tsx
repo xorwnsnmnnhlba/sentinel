@@ -87,4 +87,17 @@ describe("FormDialog", () => {
 
     expect(screen.getByLabelText("이름")).toHaveValue("");
   });
+
+  it("closes without submitting when cancelled", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => ({}));
+    renderDialog(action);
+
+    await user.click(screen.getByRole("button", { name: "새 프로젝트" }));
+    await user.type(screen.getByLabelText("이름"), "billing");
+    await user.click(screen.getByRole("button", { name: "취소" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(action).not.toHaveBeenCalled();
+  });
 });

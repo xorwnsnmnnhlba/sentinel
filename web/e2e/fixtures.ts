@@ -1,4 +1,4 @@
-import { expect, test as base } from "@playwright/test";
+import { expect, type Page, test as base } from "@playwright/test";
 
 /**
  * 모든 E2E 테스트 공통 확인: 콘텐츠 보안 정책(CSP) 위반 0건
@@ -31,3 +31,19 @@ export const test = base.extend<{ cspViolations: string[] }>({
 
 export { expect };
 export type { Page } from "@playwright/test";
+
+/** 사이드바 주요 메뉴 (넓은 화면) */
+export function mainMenu(page: Page) {
+  return page.getByRole("navigation", { name: "주요 메뉴" });
+}
+
+/** 사이드바. 아래쪽 계정 영역 포함 */
+export function sidebar(page: Page) {
+  return page.getByRole("complementary", { name: "사이드바" });
+}
+
+/** "⋯" 메뉴(접근 이름: "<대상> 작업")를 열고 항목 선택 */
+export async function chooseAction(page: Page, menu: string | RegExp, item: string) {
+  await page.getByRole("button", { name: menu }).click();
+  await page.getByRole("menuitem", { name: item, exact: true }).click();
+}

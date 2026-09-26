@@ -1,7 +1,7 @@
-import { expect, test, type Page } from "./fixtures";
+import { expect, mainMenu, sidebar, test } from "./fixtures";
 
 /**
- * 공통 머리말 배치. 좁은 화면에서 메뉴 글자가 한 글자씩 줄바꿈되던 문제 재발 방지
+ * 화면 틀 (DESIGN.md "배치"). 넓은 화면은 왼쪽 사이드바, 좁은 화면은 위쪽 막대의 메뉴 서랍
  */
 const email = "admin@sentinel.test";
 
@@ -10,44 +10,51 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel("이메일").fill(email);
   await page.getByLabel("비밀번호").fill("e2e-admin-password");
   await page.getByRole("button", { name: "로그인" }).click();
-  await expect(page.getByRole("banner").getByRole("link", { name: "프로젝트" })).toBeVisible();
+  await expect(mainMenu(page).getByRole("link", { name: "프로젝트" })).toBeVisible();
 });
 
-/** 한 줄 글자 높이(약 20px)보다 크면 줄바꿈된 것 */
-async function expectSingleLine(page: Page) {
-  const links = page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link");
-  for (const link of await links.all()) {
-    const box = (await link.boundingBox())!;
-    expect(box.height, await link.innerText()).toBeLessThan(28);
-  }
-}
+test("넓은 화면에서는 왼쪽 사이드바에 메뉴와 계정을 표시하고 현재 화면을 강조", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/runs");
 
-test("좁은 화면에서는 메뉴를 다음 줄에 한 줄로 표시하고 가로 스크롤 없음", async ({ page }) => {
+  const aside = (await sidebar(page).boundingBox())!;
+  const main = (await page.getByRole("main").boundingBox())!;
+  expect(aside.x).toBe(0);
+  expect(aside.height).toBeGreaterThanOrEqual(800);
+  expect(main.x).toBeGreaterThanOrEqual(aside.x + aside.width);
+
+  await expect(mainMenu(page).getByRole("link", { name: "실행 이력" })).toHaveAttribute("aria-current", "page");
+  await expect(mainMenu(page).getByRole("link", { name: "홈" })).not.toHaveAttribute("aria-current");
+  await expect(sidebar(page).getByRole("link", { name: email })).toBeVisible();
+  await expect(sidebar(page).getByRole("button", { name: "로그아웃" })).toBeVisible();
+  // 좁은 화면용 메뉴 버튼은 숨김
+  await expect(page.getByRole("button", { name: "메뉴 열기" })).toBeHidden();
+});
+
+test("좁은 화면에서는 메뉴 서랍으로 이동하고 가로 스크롤 없음", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await expectSingleLine(page);
+  await expect(sidebar(page)).toBeHidden();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
-  // 메뉴는 로고 아래 줄
-  const brand = (await page.getByRole("banner").getByRole("link", { name: "Sentinel", exact: true }).boundingBox())!;
-  const menu = (await page.getByRole("navigation", { name: "주요 메뉴" }).boundingBox())!;
-  expect(menu.y).toBeGreaterThanOrEqual(brand.y + brand.height);
-  // 계정·로그아웃은 아이콘이지만 이름은 유지
-  await expect(page.getByRole("banner").getByRole("link", { name: email })).toBeVisible();
-  await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+
+  await page.getByRole("button", { name: "메뉴 열기" }).click();
+  const drawer = page.getByRole("dialog", { name: "메뉴" });
+  await expect(drawer.getByRole("link", { name: email })).toBeVisible();
+  await drawer.getByRole("link", { name: "실행 이력" }).click();
+
+  await expect(page).toHaveURL(/\/runs$/);
+  await expect(drawer).toBeHidden();
+  await expect(page.getByRole("heading", { name: "실행 이력", level: 1 })).toBeVisible();
 });
 
-test("넓은 화면에서는 로고·메뉴·계정을 한 줄로 표시", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto("/");
+test("로그인 전 화면에는 사이드바·메뉴가 없음", async ({ page, context }) => {
+  await context.clearCookies();
+  await page.goto("/login");
 
-  await expectSingleLine(page);
-  const brand = (await page.getByRole("banner").getByRole("link", { name: "Sentinel", exact: true }).boundingBox())!;
-  const menu = (await page.getByRole("navigation", { name: "주요 메뉴" }).boundingBox())!;
-  const account = (await page.getByRole("banner").getByRole("link", { name: email }).boundingBox())!;
-  for (const box of [menu, account]) {
-    expect(Math.abs(box.y + box.height / 2 - (brand.y + brand.height / 2))).toBeLessThan(6);
-  }
-  await expect(page.getByRole("banner").getByText(email)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible();
+  await expect(sidebar(page)).toHaveCount(0);
+  await expect(mainMenu(page)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "메뉴 열기" })).toHaveCount(0);
 });

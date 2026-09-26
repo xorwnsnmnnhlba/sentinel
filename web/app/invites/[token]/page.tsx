@@ -17,7 +17,7 @@ export default async function AcceptInvitePage(props: PageProps<"/invites/[token
   }
 
   return (
-    <div className="mx-auto max-w-sm space-y-6 py-12">
+    <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">계정 만들기</h1>
         <p className="text-sm text-muted-foreground">

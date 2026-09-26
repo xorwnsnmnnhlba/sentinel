@@ -45,7 +45,7 @@ export function RunFilters({
       method="get"
       action="/runs"
       aria-label="실행 이력 필터"
-      className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+      className="flex flex-wrap items-end gap-3 rounded-xl border p-4"
     >
       <Field label="프로젝트" htmlFor="filter-project">
         <NativeSelect id="filter-project" name="projectId" defaultValue={values.projectId ?? ""} className="w-40">

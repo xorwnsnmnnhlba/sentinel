@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures";
+import { expect, test, type Page, chooseAction, mainMenu, sidebar } from "./fixtures";
 
 /**
  * 초대 → 계정 생성 → 비밀번호 변경 → 관리자 재설정 링크 → 사용자 삭제
@@ -33,7 +33,7 @@ async function submitLogin(page: Page, email: string, password: string) {
 
 test("관리자가 초대 링크를 발급", async ({ page }) => {
   await login(page, admin.email, admin.password);
-  await page.getByRole("banner").getByRole("link", { name: "사용자" }).click();
+  await mainMenu(page).getByRole("link", { name: "사용자" }).click();
 
   await expect(page.getByRole("heading", { name: "사용자" })).toBeVisible();
   await page.getByRole("button", { name: "사용자 초대" }).click();
@@ -56,9 +56,9 @@ test("초대 링크로 계정을 만들면 바로 로그인 상태", async ({ pa
   await page.getByRole("button", { name: "계정 만들기" }).click();
 
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("banner").getByText(member.email)).toBeVisible();
+  await expect(sidebar(page).getByText(member.email)).toBeVisible();
   // 구성원에게는 사용자 메뉴 미표시
-  await expect(page.getByRole("banner").getByRole("link", { name: "사용자" })).toHaveCount(0);
+  await expect(mainMenu(page).getByRole("link", { name: "사용자" })).toHaveCount(0);
 });
 
 test("사용한 초대 링크는 다시 쓸 수 없음", async ({ page }) => {
@@ -69,7 +69,7 @@ test("사용한 초대 링크는 다시 쓸 수 없음", async ({ page }) => {
 
 test("본인이 비밀번호를 바꾸면 다시 로그인해야 함", async ({ page }) => {
   await login(page, member.email, member.password);
-  await page.getByRole("banner").getByRole("link", { name: member.email }).click();
+  await sidebar(page).getByRole("link", { name: member.email }).click();
 
   await page.getByLabel("현재 비밀번호").fill(member.password);
   await page.getByLabel("새 비밀번호", { exact: true }).fill(member.changed);
@@ -80,13 +80,13 @@ test("본인이 비밀번호를 바꾸면 다시 로그인해야 함", async ({ 
   await expect(page.getByText("비밀번호를 변경했습니다. 새 비밀번호로 로그인해 주세요")).toBeVisible();
 
   await login(page, member.email, member.changed);
-  await expect(page.getByRole("banner").getByText(member.email)).toBeVisible();
+  await expect(sidebar(page).getByText(member.email)).toBeVisible();
 });
 
 test("관리자가 발급한 재설정 링크로 비밀번호를 다시 설정", async ({ page }) => {
   await login(page, admin.email, admin.password);
   await page.goto("/users");
-  await page.getByRole("button", { name: `${member.email} 비밀번호 재설정 링크` }).click();
+  await chooseAction(page, `${member.email} 작업`, "비밀번호 재설정 링크");
   await page.getByRole("button", { name: "링크 발급" }).click();
   const resetLink = String(await page.getByLabel("발급된 링크").inputValue());
 
@@ -97,13 +97,13 @@ test("관리자가 발급한 재설정 링크로 비밀번호를 다시 설정",
 
   await expect(page).toHaveURL(/\/login\?changed=1$/);
   await login(page, member.email, member.reset);
-  await expect(page.getByRole("banner").getByText(member.email)).toBeVisible();
+  await expect(sidebar(page).getByText(member.email)).toBeVisible();
 });
 
 test("관리자가 사용자를 삭제하면 로그인할 수 없음", async ({ page }) => {
   await login(page, admin.email, admin.password);
   await page.goto("/users");
-  await page.getByRole("button", { name: `사용자 "${member.email}" 삭제` }).click();
+  await chooseAction(page, `${member.email} 작업`, "삭제");
   await page.getByRole("alertdialog").getByRole("button", { name: "삭제" }).click();
 
   await expect(page.getByRole("row", { name: new RegExp(member.email) })).toHaveCount(0);
