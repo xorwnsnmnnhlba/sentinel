@@ -7,7 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo",
+    "Noto Sans KR", sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -18,6 +20,10 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-primary-raised: var(--primary-raised);
+  --color-brand-violet: var(--brand-violet);
+  --color-brand-violet-soft: var(--brand-violet-soft);
+  --color-brand-violet-deep: var(--brand-violet-deep);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -49,24 +55,30 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Sentry 참고 팔레트 (DESIGN.md "색"). 라이트 모드 전용 */
+  --background: #ffffff;
+  --foreground: #1f1633;
+  --card: #ffffff;
+  --card-foreground: #1f1633;
+  --popover: #ffffff;
+  --popover-foreground: #1f1633;
+  --primary: #150f23;
+  --primary-foreground: #ffffff;
+  /* 주 버튼에 붙는 보조 영역 (실행 버튼 옆 환경 선택) */
+  --primary-raised: #2a2140;
+  --secondary: #f1eef8;
+  --secondary-foreground: #1f1633;
+  --muted: #f6f5f9;
+  --muted-foreground: #6b6478;
+  --accent: #f1eef8;
+  --accent-foreground: #1f1633;
+  --destructive: #c3281b;
+  --border: #e5e7eb;
+  --input: #cfcfdb;
+  --ring: #3b82f6;
+  --brand-violet: #6a5fc1;
+  --brand-violet-soft: #ece9f5;
+  --brand-violet-deep: #422082;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -80,15 +92,15 @@
   --delta-bad: #d03b3b;
   /* 통과율 막대의 빈 부분. 채움(--chart-series-1)과 같은 파랑 계열의 옅은 단계 */
   --meter-track: #cde2fb;
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.5rem;
+  --sidebar: #1f1633;
+  --sidebar-foreground: rgb(255 255 255 / 72%);
+  --sidebar-primary: #c2ef4e;
+  --sidebar-primary-foreground: #150f23;
+  --sidebar-accent: rgb(255 255 255 / 10%);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #362d59;
+  --sidebar-ring: #9dc1f5;
 }
 
 .dark {

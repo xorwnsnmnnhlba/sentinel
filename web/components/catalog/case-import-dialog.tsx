@@ -42,7 +42,7 @@ export function CaseImportDialog({ suiteId, existingNames }: { suiteId: number; 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="ghost" size="sm">
           <FileUp /> 문서 가져오기
         </Button>
       </DialogTrigger>
@@ -253,7 +253,7 @@ function CandidateStep({
         <span className="text-muted-foreground">{selectedCount}건 선택</span>
       </div>
 
-      <ul className="max-h-[45vh] divide-y overflow-y-auto rounded-lg border">
+      <ul className="max-h-[45vh] divide-y overflow-y-auto rounded-xl border">
         {rows.map((row, index) => {
           const issue = issues.get(index);
           return (

@@ -13,7 +13,12 @@ export function VerdictBadge({ verdict }: { verdict: Verdict | null }) {
     return <Badge variant="outline">판정 없음</Badge>;
   }
   const style = verdictStyle[verdict];
-  return <Badge className={style.className}>{style.label}</Badge>;
+  return (
+    <Badge className={style.className}>
+      <span aria-hidden className="size-1.5 rounded-full bg-current" />
+      {style.label}
+    </Badge>
+  );
 }
 
 export function TriggerBadge({ trigger }: { trigger: Trigger }) {

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
 
 import { RunCountBadges, StatusBadge, TriggerBadge, VerdictBadge } from "@/components/run-badges";
@@ -24,17 +24,19 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Link href="/runs" className="text-sm text-muted-foreground hover:text-foreground">
-          ← 실행 이력
-        </Link>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            #{run.id} {run.suiteName}
-          </h1>
-          <TriggerBadge trigger={run.trigger} />
-          <StatusBadge status={run.status} />
-        </div>
+      <div className="space-y-3">
+        <PageHeader
+          back={{ href: "/runs", label: "실행 이력" }}
+          title={
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <span>
+                <span className="text-muted-foreground">#{run.id}</span> {run.suiteName}
+              </span>
+              <TriggerBadge trigger={run.trigger} />
+              <StatusBadge status={run.status} />
+            </span>
+          }
+        />
         <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
           <Meta label="환경" value={run.environmentName} />
           {run.triggeredBy && <Meta label="실행" value={run.triggeredBy.name} />}
@@ -52,11 +54,11 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
       )}
 
       {run.results.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+        <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
           실행된 케이스가 없습니다
         </p>
       ) : (
-        <Accordion type="multiple" defaultValue={openByDefault} className="rounded-lg border px-4">
+        <Accordion type="multiple" defaultValue={openByDefault} className="rounded-xl border px-4">
           {run.results.map((result) => (
             <AccordionItem key={result.id} value={String(result.id)}>
               <AccordionTrigger className="hover:no-underline">

@@ -17,6 +17,7 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 | Tailwind CSS | 4.3.3 (`@tailwindcss/postcss` 4.3.3, `tw-animate-css` 1.4.0) |
 | shadcn/ui | CLI 4.21.0, 스타일 `radix-nova` (Radix UI 기반, `radix-ui` 1.6.7) |
 | 아이콘 | lucide-react 1.47.0 |
+| 글꼴 | Pretendard 1.3.9 (동적 서브셋 자체 배포), Geist Mono (`next/font`) |
 | 클래스 유틸 | `cn` 0.3.0 (shadcn 공식, clsx + tailwind-merge 대체), class-variance-authority 0.7.1 |
 | TanStack Query | 5.103.1 |
 | ESLint | 9.39.5 (`eslint-config-next` 16.3.5, `eslint-config-prettier` 10.1.8) |
@@ -29,11 +30,15 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 
 `package-lock.json` 설치 버전 기준
 
+## 디자인
+
+색·글꼴·배치·버튼 배치 규칙은 [DESIGN.md](DESIGN.md). Sentry 제품 화면 참고, 라이트 모드 전용 (다크 모드는 별도 작업)
+
 ## 구조
 
 ```
 app/
- ├─ layout.tsx              공통 레이아웃 (헤더, TanStack Query Provider)
+ ├─ layout.tsx              공통 레이아웃 (화면 틀, TanStack Query Provider)
  ├─ providers.tsx           클라이언트 Provider, 문서의 CSP nonce를 Radix 스타일 삽입에 전달
  ├─ page.tsx                홈 대시보드 (실행 현황 요약, 스위트별 통과율, 최근 실패, 응답시간 악화)
  ├─ error.tsx               오류 화면 (retry()로 재조회)
@@ -51,13 +56,15 @@ app/
  └─ api/[...path]/route.ts  브라우저용 BFF 프록시 (/api/** → Spring /api/**)
 components/
  ├─ ui/                     shadcn/ui 컴포넌트 (CLI로 추가, 직접 수정 가능)
- ├─ catalog/                등록·수정 다이얼로그, 삭제 확인, 변수·헤더·시크릿 편집기, 실행 폼, 케이스 편집기, 스케줄 입력·전환, 케이스 가져오기 창
+ ├─ catalog/                "⋯" 메뉴(action-menu), 등록·수정 다이얼로그, 삭제 확인, 변수·헤더·시크릿 편집기, 실행 폼, 케이스 편집기, 스케줄 입력·전환, 케이스 가져오기 창
  ├─ runs/                   실행 이력 필터 (GET 폼, 조건이 주소에 남음), 결과 상세의 케이스별 내용
  ├─ dashboard/              대시보드 요약 타일(이전 기간 대비 변화), 통과율 막대
  ├─ response-times/         응답시간 일별 추세 차트 (p50·p95 선, 툴팁, 표 보기)
  ├─ run-badges.tsx          판정·상태·주체 배지
- └─ site-header.tsx         공통 머리말. 좁은 화면(640px 미만)은 1행 로고·계정 아이콘, 2행 메뉴(넘치면 가로 스크롤)
-test/                       테스트 공통 (MSW 서버, 환경 설정, redirect·notFound 확인)
+ ├─ app-shell.tsx           화면 틀. 로그인 상태는 사이드바 + 본문, 로그인 전은 짙은 바탕 가운데 카드
+ ├─ sidebar-nav.tsx         사이드바 메뉴(현재 화면 강조), 좁은 화면(768px 미만)의 메뉴 서랍
+ └─ page-header.tsx         화면 머리 (상위 화면 링크·제목·설명, 오른쪽 버튼 영역)
+test/                       테스트 공통 (MSW 서버, 환경 설정, redirect·notFound 확인, "⋯" 메뉴 열기)
 lib/
  ├─ actions/catalog.ts      Server Actions (등록·수정·삭제·실행 → Spring 호출 후 refresh·redirect)
  ├─ actions/case-import.ts  Server Actions (문서 미리보기, 케이스 가져오기)
@@ -234,6 +241,7 @@ Vitest + MSW + React Testing Library. 설정은 `vitest.config.mts`
 - `redirect()`·`notFound()`는 throw된 오류의 digest로 확인 (`test/next.ts`)
 - async Server Component 화면(`page.tsx`)은 Vitest 미지원(Next.js 문서)으로 제외. 추후 E2E로 검증
 - Radix UI 목록(Select 등)은 jsdom에 레이아웃이 없어 접근성 트리에서 숨김으로 판정. 키보드로 열고 목록 안 텍스트로 선택
+- "⋯" 메뉴(Radix DropdownMenu)는 jsdom에서 포인터 클릭으로 테스트 파일의 두 번째 테스트부터 열리지 않음. `test/menu.ts`의 `openMenu`(키보드)로 열기
 
 ### E2E (Playwright)
 
@@ -248,6 +256,8 @@ npm run e2e:up && npm run e2e && npm run e2e:down
   - `e2e/https.spec.ts`: HTTP→HTTPS 이동, 보안 헤더, 앞단을 거친 로그인과 Secure 쿠키
 - 모든 테스트는 `e2e/fixtures.ts`의 `test`를 사용. 테스트 중 CSP 위반(`securitypolicyviolation`)이 1건이라도 있으면 실패
   - `e2e/csp.spec.ts`: 요청별 nonce, 모든 스크립트의 nonce, 주입된 인라인 이벤트 속성 차단
+  - 공통 위치 지정: `mainMenu`(사이드바 주요 메뉴), `sidebar`(계정 영역 포함), `chooseAction`("⋯" 메뉴 열고 항목 선택)
+- `e2e/layout.spec.ts`: 넓은 화면 사이드바·현재 메뉴 강조, 좁은 화면 메뉴 서랍·가로 스크롤 없음, 로그인 전 화면
 - 흐름: 프로젝트·환경(시크릿 포함) 등록 → 스위트·케이스 등록 → 즉시 실행·결과 확인(시크릿 마스킹) → 스케줄 등록·전환·수정·삭제 → 프로젝트 삭제 후 이력 유지 확인, 404 확인
 - 케이스가 api 자신(`http://e2e-api:8080`)을 호출하므로 외부 서버 없이 실행 결과까지 검증
 - 스택을 내리지 않고 반복 실행해도 되도록 프로젝트·스위트 이름에 실행 시각 포함

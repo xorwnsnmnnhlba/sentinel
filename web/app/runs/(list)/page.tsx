@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PageHeader } from "@/components/page-header";
 import { RunCountBadges, StatusBadge, TriggerBadge } from "@/components/run-badges";
 import { RunFilters, type RunFilterValues } from "@/components/runs/run-filters";
 import { Button } from "@/components/ui/button";
@@ -38,21 +39,19 @@ export default async function RunsPage(props: PageProps<"/runs">) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">실행 이력</h1>
-        <p className="text-sm text-muted-foreground">
-          최신순. {hasFilter ? "조건에 맞는 실행" : "전체"} {runs.totalElements}건
-        </p>
-      </div>
+      <PageHeader
+        title="실행 이력"
+        description={`최신순. ${hasFilter ? "조건에 맞는 실행" : "전체"} ${runs.totalElements}건`}
+      />
 
       <RunFilters projects={projects} suites={suites} environments={environments} values={filters} />
 
       {runs.content.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+        <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
           {hasFilter ? "조건에 맞는 실행 이력이 없습니다" : "실행 이력이 없습니다"}
         </p>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-xl border">
           <Table>
             <TableHeader>
               <TableRow>

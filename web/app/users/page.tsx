@@ -1,9 +1,11 @@
 import { headers } from "next/headers";
 
 import { InviteDialog } from "@/components/auth/invite-dialog";
-import { ResetLinkButton } from "@/components/auth/reset-link-button";
-import { DeleteButton } from "@/components/catalog/delete-button";
-import { Empty, RowActions } from "@/components/catalog/section";
+import { ResetLinkDialog } from "@/components/auth/reset-link-dialog";
+import { ActionMenu, type ActionMenuItem } from "@/components/catalog/action-menu";
+import { DeleteDialog } from "@/components/catalog/delete-dialog";
+import { Empty, TableFrame } from "@/components/catalog/section";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deleteUser } from "@/lib/actions/users";
@@ -23,18 +25,16 @@ export default async function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">사용자</h1>
-          <p className="text-sm text-muted-foreground">가입은 초대 링크로만 가능합니다</p>
-        </div>
-        <InviteDialog baseUrl={baseUrl} />
-      </div>
+      <PageHeader
+        title="사용자"
+        description="가입은 초대 링크로만 가능합니다"
+        actions={<InviteDialog baseUrl={baseUrl} />}
+      />
 
       {users.length === 0 ? (
         <Empty message="사용자가 없습니다" />
       ) : (
-        <div className="rounded-lg border">
+        <TableFrame>
           <Table>
             <TableHeader>
               <TableRow>
@@ -42,7 +42,9 @@ export default async function UsersPage() {
                 <TableHead>이름</TableHead>
                 <TableHead>역할</TableHead>
                 <TableHead>등록 (KST)</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-12">
+                  <span className="sr-only">작업</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -61,23 +63,24 @@ export default async function UsersPage() {
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {formatDateTime(user.createdAt)}
                   </TableCell>
-                  <TableCell>
-                    <RowActions>
-                      <ResetLinkButton userId={user.id} email={user.email} baseUrl={baseUrl} />
+                  <TableCell className="text-right">
+                    <ActionMenu label={`${user.email} 작업`} items={userMenu(user.id !== me.id)}>
+                      <ResetLinkDialog menuId="reset" userId={user.id} email={user.email} baseUrl={baseUrl} />
                       {user.id !== me.id && (
-                        <DeleteButton
+                        <DeleteDialog
+                          menuId="delete"
                           title={`사용자 "${user.email}" 삭제`}
                           description="로그인할 수 없게 되고 사용 중인 세션도 모두 종료됩니다. 실행 이력은 유지됩니다."
                           action={deleteUser.bind(null, user.id)}
                         />
                       )}
-                    </RowActions>
+                    </ActionMenu>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableFrame>
       )}
     </div>
   );
@@ -89,4 +92,10 @@ async function siteUrl(): Promise<string> {
   const host = header.get("x-forwarded-host") ?? header.get("host") ?? "localhost:3000";
   const protocol = header.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   return `${protocol}://${host}`;
+}
+
+/** 본인 계정은 삭제 불가 */
+function userMenu(deletable: boolean): ActionMenuItem[] {
+  const reset: ActionMenuItem = { id: "reset", label: "비밀번호 재설정 링크", icon: "key" };
+  return deletable ? [reset, { id: "delete", label: "삭제", icon: "delete", destructive: true }] : [reset];
 }

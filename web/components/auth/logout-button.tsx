@@ -3,23 +3,21 @@
 import { LogOut } from "lucide-react";
 import { useTransition } from "react";
 
-import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/actions/auth";
 
+/** 사이드바 계정 영역의 로그아웃. 메뉴 항목과 같은 모양 */
 export function LogoutButton() {
   const [pending, startTransition] = useTransition();
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
+    <button
+      type="button"
       disabled={pending}
       onClick={() => startTransition(async () => logout())}
-      aria-label="로그아웃"
+      className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-60"
     >
-      <LogOut />
-      {/* 좁은 화면에서는 아이콘만. 이름은 aria-label로 유지 */}
-      <span className="sr-only sm:not-sr-only">로그아웃</span>
-    </Button>
+      <LogOut aria-hidden className="size-4" />
+      로그아웃
+    </button>
   );
 }

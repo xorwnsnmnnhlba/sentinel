@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PageHeader } from "@/components/page-header";
 import { PassRateMeter } from "@/components/dashboard/pass-rate-meter";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { RunCountBadges, StatusBadge } from "@/components/run-badges";
@@ -50,15 +51,11 @@ export default async function Dashboard(props: PageProps<"/">) {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">대시보드</h1>
-          <p className="text-sm text-muted-foreground">
-            {current.from} ~ {current.to} (KST) 실행 현황
-          </p>
-        </div>
-        <PeriodLinks days={days} />
-      </div>
+      <PageHeader
+        title="대시보드"
+        description={`${current.from} ~ ${current.to} (KST) 실행 현황`}
+        actions={<PeriodLinks days={days} />}
+      />
 
       <section aria-label="요약" className="grid gap-4 sm:grid-cols-3">
         <StatTile
@@ -90,7 +87,7 @@ export default async function Dashboard(props: PageProps<"/">) {
         {summaries.suites.length === 0 ? (
           <Empty message="등록된 스위트가 없습니다" href="/projects" link="프로젝트로 이동" />
         ) : (
-          <div className="rounded-lg border">
+          <div className="rounded-xl border">
             <Table aria-label="스위트별 통과율">
               <TableHeader>
                 <TableRow>
@@ -150,7 +147,7 @@ export default async function Dashboard(props: PageProps<"/">) {
           {failingRuns.content.length === 0 ? (
             <Empty message="기간 안에 실패·오류가 있는 실행이 없습니다" />
           ) : (
-            <ul className="divide-y rounded-lg border" aria-label="최근 실패·오류 실행">
+            <ul className="divide-y rounded-xl border" aria-label="최근 실패·오류 실행">
               {failingRuns.content.map((run) => (
                 <li key={run.id}>
                   <Link href={`/runs/${run.id}`} className="block space-y-1 p-3 hover:bg-muted/50">
@@ -178,7 +175,7 @@ export default async function Dashboard(props: PageProps<"/">) {
           {slower.length === 0 ? (
             <Empty message="이전 기간보다 느려진 케이스가 없습니다" />
           ) : (
-            <div className="rounded-lg border">
+            <div className="rounded-xl border">
               <Table aria-label="응답시간이 나빠진 케이스">
                 <TableHeader>
                   <TableRow>
@@ -224,7 +221,7 @@ export default async function Dashboard(props: PageProps<"/">) {
 /** 기간 선택. 한 줄로 화면 전체에 적용 */
 function PeriodLinks({ days }: { days: DashboardPeriod }) {
   return (
-    <nav aria-label="기간" className="flex gap-1 rounded-lg border p-1">
+    <nav aria-label="기간" className="flex gap-1 rounded-lg bg-muted p-1">
       {DASHBOARD_PERIODS.map((period) => (
         <Link
           key={period}
@@ -232,7 +229,9 @@ function PeriodLinks({ days }: { days: DashboardPeriod }) {
           aria-current={period === days ? "page" : undefined}
           className={cn(
             "rounded-md px-3 py-1 text-sm",
-            period === days ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+            period === days
+              ? "bg-background font-medium text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           최근 {period}일
@@ -264,7 +263,7 @@ function SectionTitle({
 
 function Empty({ message, href, link }: { message: string; href?: string; link?: string }) {
   return (
-    <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+    <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
       {message}
       {href && link && (
         <>
