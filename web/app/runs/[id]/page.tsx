@@ -1,6 +1,7 @@
-import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
 
+import { Empty, SectionHeader } from "@/components/catalog/section";
+import { PageHeader } from "@/components/page-header";
 import { RunCountBadges, StatusBadge, TriggerBadge, VerdictBadge } from "@/components/run-badges";
 import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -53,32 +54,38 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
         </p>
       )}
 
-      {run.results.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-          실행된 케이스가 없습니다
-        </p>
-      ) : (
-        <Accordion type="multiple" defaultValue={openByDefault} className="rounded-xl border px-4">
-          {run.results.map((result) => (
-            <AccordionItem key={result.id} value={String(result.id)}>
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <VerdictBadge verdict={result.verdict} />
-                  <span className="truncate font-medium">{result.testCaseName}</span>
-                  <span className="ml-auto flex shrink-0 items-center gap-3 font-mono text-xs text-muted-foreground">
-                    <span>{result.request.method}</span>
-                    {result.response && <span>{result.response.statusCode}</span>}
-                    <span>{formatElapsed(result.elapsedMs)}</span>
-                  </span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent>
-                <ResultDetail result={result} rawPurged={run.rawPurgedAt !== null} />
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      )}
+      <section className="space-y-3">
+        {/* 케이스 이름(h3, 펼침 버튼)의 상위 제목. 없으면 h1 다음이 h3라 제목 순서가 끊김 */}
+        <SectionHeader
+          title="케이스별 결과"
+          count={run.results.length}
+          description="실행 순서대로 표시. 실패·오류 케이스는 펼친 상태"
+        />
+        {run.results.length === 0 ? (
+          <Empty message="실행된 케이스가 없습니다" />
+        ) : (
+          <Accordion type="multiple" defaultValue={openByDefault} className="rounded-xl border px-4">
+            {run.results.map((result) => (
+              <AccordionItem key={result.id} value={String(result.id)}>
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <VerdictBadge verdict={result.verdict} />
+                    <span className="truncate font-medium">{result.testCaseName}</span>
+                    <span className="ml-auto flex shrink-0 items-center gap-3 font-mono text-xs text-muted-foreground">
+                      <span>{result.request.method}</span>
+                      {result.response && <span>{result.response.statusCode}</span>}
+                      <span>{formatElapsed(result.elapsedMs)}</span>
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <ResultDetail result={result} rawPurged={run.rawPurgedAt !== null} />
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
+      </section>
     </div>
   );
 }
