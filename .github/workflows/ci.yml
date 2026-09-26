@@ -1,4 +1,4 @@
-# PR과 main 푸시마다 web·api 검증. 두 작업은 병렬 실행
+# PR과 main 푸시마다 web·api·E2E·배포 스크립트 검증. 작업은 병렬 실행
 name: CI
 
 on:
@@ -67,6 +67,15 @@ jobs:
       - name: E2E 스택 정리
         if: always()
         run: docker compose -f docker-compose.e2e.yml down -v
+
+  scripts:
+    name: scripts (preflight)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # 배포 전 점검 스크립트. 러너에 기본 설치된 shellcheck·OpenSSL 사용
+      - run: shellcheck scripts/*.sh
+      - run: bash scripts/preflight.test.sh
 
   api:
     name: api (test)

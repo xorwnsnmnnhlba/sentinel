@@ -90,6 +90,7 @@ cp .env.example .env
 |------|--------|------|
 | `SENTINEL_SITE_ADDRESS` | `localhost` | 접속 주소. 다른 PC가 쓰는 이름 또는 IP (사내 DNS·hosts에 등록된 이름). 쉼표로 여러 개 지정 가능 (예: `localhost, sentinel.team.internal`) |
 | `SENTINEL_TLS` | `internal` | 인증서 방식. 아래 표 |
+| `SENTINEL_HSTS_MAX_AGE` | `0` | HSTS 유지 시간(초). 0이면 미사용. 팀원 PC가 이미 신뢰하는 인증서(회사·Let's Encrypt)일 때만 사용. localhost에는 보내지 않음 |
 
 | `SENTINEL_TLS` | 용도 | 준비 |
 |------|------|------|
@@ -104,23 +105,15 @@ docker compose cp sentinel-proxy:/data/caddy/pki/authorities/local/root.crt ./se
 ```
 
 - 받은 `sentinel-root.crt`를 접속하는 PC의 신뢰할 수 있는 루트 인증 기관에 등록 (macOS 키체인 접근 → 시스템 → 항상 신뢰, Windows 인증서 관리 → 신뢰할 수 있는 루트 인증 기관)
+- 전달한 루트 인증서는 받는 쪽에서 SHA-256 지문을 비교해 변조 여부 확인 (`openssl x509 -in sentinel-root.crt -noout -fingerprint -sha256`)
 - 등록 전에는 브라우저에 인증서 경고 표시. 경고를 넘기면 접속은 되나 매번 확인 필요
 - 루트 인증서는 `caddy_data` 볼륨에 보관. `docker compose down -v`로 볼륨을 지우면 새로 만들어져 PC마다 다시 등록해야 함
 - 세션 쿠키는 `Secure`라 HTTPS로만 전달. `http://<IP>:3000` 같은 평문 접속은 막혀 있고, 열더라도 로그인이 유지되지 않음
 - `sentinel.env`의 `SENTINEL_WEB_URL`(실패 알림의 결과 링크)도 `https://<접속 주소>`로 지정
 
-#### 배포 체크리스트
+#### 팀 배포
 
-다른 PC(팀원)가 접속하도록 배포할 때 확인
-
-- [ ] **접속 이름**: 사내 DNS 이름 결정 후 `.env`의 `SENTINEL_SITE_ADDRESS`에 추가 (예: `localhost, sentinel.team.internal`)
-  - IP만 쓰면 DHCP로 주소가 바뀔 때 인증서와 어긋남. IP를 쓰더라도 이름과 함께 지정
-- [ ] **인증서 방식**: 사내 인증서(와일드카드 등)가 있으면 `/certs/cert.pem /certs/key.pem` 우선 (팀원 PC가 이미 신뢰하므로 배포 불필요). 없으면 `internal` 후 루트 인증서를 팀원에게 전달·신뢰 등록
-  - 전달한 루트 인증서는 받는 쪽에서 SHA-256 지문 비교로 변조 여부 확인 (`openssl x509 -in sentinel-root.crt -noout -fingerprint -sha256`)
-- [ ] **방화벽**: 서버의 443(HTTP→HTTPS 이동을 쓰면 80도)만 허용. web 3000·api 8080은 `127.0.0.1`에만 열려 있어 추가 조치 불필요
-- [ ] **`caddy_data` 볼륨 보관**: `internal` 방식이면 내부 인증 기관 키 보관 위치. 삭제(`docker compose down -v`) 시 루트 인증서가 바뀌어 모든 PC에서 다시 신뢰 등록 필요
-- [ ] **알림 링크**: `sentinel.env`의 `SENTINEL_WEB_URL`을 팀원이 여는 `https://<접속 이름>`으로 지정
-- [ ] **확인**: 다른 PC 브라우저에서 `https://<접속 이름>` 접속 시 인증서 경고 없음, 로그인 유지, `http://`는 `https://`로 이동
+서버 준비, 회사 인증서 배치, 배포 전 점검(`scripts/preflight.sh`), 업데이트·되돌리기, 인증서 교체, 백업은 [docs/deploy.md](docs/deploy.md)
 
 ### 3. 샘플 케이스 등록·실행
 

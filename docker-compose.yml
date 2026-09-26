@@ -1,8 +1,16 @@
+# 컨테이너 로그 보관 한도. 기본(json-file)은 무제한이라 오래 켜 두면 디스크를 채움. 서비스당 최대 10MB × 5개
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
 services:
   sentinel-api:
     build: ./api
     image: sentinel-api:latest
     container_name: sentinel-api
+    logging: *logging
     # DB 접속 정보. sentinel.env.example 복사 후 작성
     env_file: ./sentinel.env
     environment:
@@ -27,6 +35,7 @@ services:
     build: ./web
     image: sentinel-web:latest
     container_name: sentinel-web
+    logging: *logging
     environment:
       # 서버 전용 Spring 주소. 컨테이너 간 통신은 localhost가 아닌 서비스 이름 사용
       INTERNAL_API_URL: http://sentinel-api:8080
@@ -50,9 +59,11 @@ services:
   sentinel-proxy:
     image: caddy:2.11.4-alpine
     container_name: sentinel-proxy
+    logging: *logging
     environment:
       SENTINEL_SITE_ADDRESS: ${SENTINEL_SITE_ADDRESS:-localhost}
       SENTINEL_TLS: ${SENTINEL_TLS:-internal}
+      SENTINEL_HSTS_MAX_AGE: ${SENTINEL_HSTS_MAX_AGE:-0}
     ports:
       - "80:80"
       - "443:443"
