@@ -13,6 +13,7 @@ import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.runner.HttpMethod;
+import com.sentinel.runner.schema.ResponseSchema;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,6 +111,9 @@ class RawResultRetentionTest {
 		assertThat(result.request().url()).isEqualTo("https://gw.dev.internal/orders");
 		assertThat(result.response().statusCode()).isEqualTo(200);
 		assertThat(result.elapsedMs()).isEqualTo(12);
+		// 구조 지문은 원문과 달리 영구 보관 (드리프트 감지의 기준)
+		assertThat(result.responseSchema()).isEqualTo(new ResponseSchema(
+				Map.of("$", List.of("object"), "$.orderId", List.of("number")), true));
 
 		TestRunDetail untouched = testRunService.getRun(recent);
 		assertThat(untouched.rawPurgedAt()).isNull();

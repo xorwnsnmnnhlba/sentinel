@@ -192,6 +192,13 @@ curl -i -X POST localhost:8080/api/runs \
 
 - 저장되는 요청·응답 헤더 중 `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` 값은 `****`로 마스킹. 실제 전송 값은 원본 사용
 - 응답 본문은 64KB(UTF-8 기준) 초과 시 잘라서 저장, `bodyTruncated: true` 표시
+- `responseSchema`: 응답 JSON의 구조 지문 `{fields: {경로: [타입]}, complete}`. 스키마 드리프트 감지의 기준 데이터
+  - 예: `{"$": ["object"], "$.items": ["array"], "$.items[]": ["object"], "$.items[].id": ["number"], "$.items[].tag": ["null", "string"]}`
+  - 값은 남기지 않음. 타입은 object·array·string·number·boolean·null, 한 경로에 여러 타입이 관측되면 모두 기록
+  - 배열은 모든 요소를 `[]` 하나로 합침. 동적 키(형제 키 50개 초과, 또는 2개 이상이면서 모두 숫자·UUID·날짜 형태)는 `*`로 축약. 식별자가 아닌 키는 `$['a.b']`
+  - 잘라서 저장하는 본문과 달리 전체 본문(최대 5MB)으로 계산. 깊이 20·경로 1,000개 한도를 넘으면 `complete: false`
+  - Content-Type이 JSON(`application/json`, `+json`)이거나 없을 때 본문이 `{`·`[`로 시작하면 대상. 그 외·해석 실패·응답 없음은 `null`
+  - 원문 보관기간(30일)이 지나도 삭제하지 않음
 - 요청·응답 헤더와 본문은 보관기간(기본 30일) 경과 후 삭제 ("결과 원문 보관기간" 참고)
 - 요청 URL의 변수 값은 인코딩하지 않음. 공백 등 URL에 쓸 수 없는 문자는 `INVALID_REQUEST`
 - 링크 로컬(`169.254.0.0/16`, `fe80::/10`)과 클라우드 메타데이터 주소(`fd00:ec2::254`, `100.100.100.200`)로는 전송하지 않고 `BLOCKED_DESTINATION`

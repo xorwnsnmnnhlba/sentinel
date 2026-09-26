@@ -11,6 +11,7 @@ import com.sentinel.domain.TestResult.Verdict;
 import com.sentinel.domain.TestRun;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.AssertionResult;
+import com.sentinel.runner.schema.ResponseSchema;
 
 /**
  * @param rawPurgedAt 보관기간이 지나 요청·응답 원문(헤더·본문)을 비운 시각. null이면 원문 보관 중
@@ -51,9 +52,12 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 
 	}
 
+	/**
+	 * @param responseSchema 응답 JSON의 구조 지문. 원문 보관기간이 지나도 유지. JSON이 아닌 응답·응답 없음은 null
+	 */
 	public record Result(long id, long testCaseId, String testCaseName, Verdict verdict, Outcome outcome,
 			List<AssertionResult> assertionResults, ErrorReason errorReason, String errorMessage, Long elapsedMs,
-			Request request, Response response) {
+			Request request, Response response, ResponseSchema responseSchema) {
 
 		static Result of(TestResult result) {
 			Response response = result.getOutcome() == Outcome.RESPONDED
@@ -65,7 +69,7 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 					result.getAssertionResults(), result.getErrorReason(), result.getErrorMessage(), result.getElapsedMs(),
 					new Request(result.getRequestMethod(), result.getRequestUrl(), result.getRequestHeaders(),
 							result.getRequestBody()),
-					response);
+					response, result.getResponseSchema());
 		}
 
 	}

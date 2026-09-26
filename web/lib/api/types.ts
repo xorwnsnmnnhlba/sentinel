@@ -63,6 +63,17 @@ export interface RunResult {
   request: { method: string; url: string | null; headers: Headers | null; body: string | null };
   /** 보관기간이 지나 원문을 삭제한 실행은 headers·body가 null */
   response: { statusCode: number; headers: Headers | null; body: string | null; bodyTruncated: boolean } | null;
+  /** 응답 JSON의 구조 지문. 원문 보관기간이 지나도 유지. JSON이 아닌 응답·응답 없음은 null */
+  responseSchema: ResponseSchema | null;
+}
+
+/**
+ * 응답 구조 지문. 경로($.items[].id) → 관측 타입(object·array·string·number·boolean·null)
+ * complete가 false면 깊이(20)·경로 수(1,000) 한도로 일부만 기록
+ */
+export interface ResponseSchema {
+  fields: Record<string, string[]>;
+  complete: boolean;
 }
 
 export interface RunDetail {

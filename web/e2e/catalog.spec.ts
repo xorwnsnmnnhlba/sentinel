@@ -129,6 +129,13 @@ test("케이스 등록 후 실행하면 결과 표시", async ({ page }) => {
   await page.getByRole("button", { name: /프로젝트 목록 조회/ }).click();
   await expect(page.getByText(/key=\*\*\*\*/)).toBeVisible();
   expect(await page.content()).not.toContain(secret);
+
+  // 응답 JSON의 구조 지문 (값 없이 경로·타입만). 프로젝트 목록은 객체 배열
+  await page.getByRole("tab", { name: "구조" }).click();
+  const schema = page.getByRole("table", { name: "응답 구조" });
+  await expect(schema.getByRole("row", { name: "$ array" })).toBeVisible();
+  await expect(schema.getByRole("row", { name: "$[].name string" })).toBeVisible();
+  await expect(schema).not.toContainText(project);
 });
 
 test("스위트 화면에서 응답시간 확인", async ({ page }) => {
