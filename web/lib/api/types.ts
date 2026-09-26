@@ -38,6 +38,8 @@ export interface RunSummary {
   summary: RunCounts;
   /** 수동 실행을 시작한 사용자. 스케줄 실행·이전 기록은 null */
   triggeredBy: IdName | null;
+  /** 케이스 단건 실행의 대상. 스위트 전체 실행은 null */
+  testCase: IdName | null;
 }
 
 export interface AssertionResult {
@@ -77,6 +79,8 @@ export interface RunDetail {
   results: RunResult[];
   /** 수동 실행을 시작한 사용자. 스케줄 실행·이전 기록은 null */
   triggeredBy: IdName | null;
+  /** 케이스 단건 실행의 대상. 스위트 전체 실행은 null */
+  testCase: IdName | null;
   /** 보관기간이 지나 요청·응답 원문(헤더·본문)을 삭제한 시각. null이면 원문 보관 중 */
   rawPurgedAt: string | null;
 }

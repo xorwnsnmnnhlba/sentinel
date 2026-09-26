@@ -1,7 +1,7 @@
-import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
 
 import { CaseEditor } from "@/components/catalog/case-editor";
+import { PageHeader } from "@/components/page-header";
 import { createCase } from "@/lib/actions/catalog";
 import { apiGetOrNotFound } from "@/lib/api/server";
 import type { SuiteItem } from "@/lib/api/types";

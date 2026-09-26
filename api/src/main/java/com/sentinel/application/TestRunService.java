@@ -83,7 +83,7 @@ public class TestRunService {
 			TestCase testCase = testCases.findByIdAndArchivedAtIsNull(testCaseId)
 				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
 			return start(testCase.getSuite(), findEnvironment(environmentId), List.of(testCase),
-					TestRun.Trigger.MANUAL, triggeredBy);
+					TestRun.Trigger.MANUAL, triggeredBy, testCase);
 		});
 		return executeAndRecord(prepared);
 	}
@@ -99,7 +99,7 @@ public class TestRunService {
 		Prepared prepared = transactions.write(status -> {
 			TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
 			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId), trigger,
-					triggeredBy);
+					triggeredBy, null);
 		});
 		return executeAndRecord(prepared);
 	}
@@ -107,8 +107,18 @@ public class TestRunService {
 	public TestRunDetail getRun(long runId) {
 		return transactions.readOnly(status -> {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
-			return TestRunDetail.of(run, results.findWithTestCaseByRunId(runId), triggeredBy(run));
+			return TestRunDetail.of(run, results.findWithTestCaseByRunId(runId), triggeredBy(run), testCase(run));
 		});
+	}
+
+	/** 단건 실행의 대상 케이스. 스위트 전체 실행은 null, 삭제(보관)된 케이스도 이력 표시를 위해 조회 */
+	private IdName testCase(TestRun run) {
+		if (!run.isSingleCase()) {
+			return null;
+		}
+		return testCases.findById(run.getTestCaseId())
+			.map(testCase -> new IdName(testCase.getId(), testCase.getName()))
+			.orElse(null);
 	}
 
 	/** 실행 주체 이름. 스케줄 실행은 null, 삭제(보관)된 사용자도 이력 표시를 위해 조회 */
@@ -126,13 +136,17 @@ public class TestRunService {
 			.orElseThrow(() -> new NotFoundException("environment", environmentId));
 	}
 
+	/**
+	 * @param target 케이스 단건 실행의 대상. 스위트 전체 실행은 null
+	 */
 	private Prepared start(TestSuite suite, Environment environment, List<TestCase> cases, TestRun.Trigger trigger,
-			Long triggeredBy) {
+			Long triggeredBy, TestCase target) {
 		if (!BaseEntity.same(suite.getProject(), environment.getProject())) {
 			throw new InvalidRequestException("environment " + environment.getId()
 					+ " does not belong to the project of test suite " + suite.getId());
 		}
-		TestRun run = runs.save(TestRun.start(suite, environment, trigger, clock.instant(), triggeredBy));
+		TestRun run = runs.save(target == null ? TestRun.start(suite, environment, trigger, clock.instant(), triggeredBy)
+				: TestRun.startCase(target, environment, trigger, clock.instant(), triggeredBy));
 		List<PreparedCase> preparedCases = cases.stream()
 			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment),
 					testCase.getAssertions()))

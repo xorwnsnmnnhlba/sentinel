@@ -63,20 +63,25 @@ public class TestRun extends BaseEntity {
 	/** 수동 실행을 시작한 사용자. 스케줄 실행은 null */
 	private Long triggeredBy;
 
+	/** 케이스 단건 실행의 대상. 스위트 전체 실행은 null */
+	private Long testCaseId;
+
 	/** 보관기간이 지나 결과의 요청·응답 원문을 비운 시각. null이면 원문 보관 중 */
 	private Instant rawPurgedAt;
 
-	private TestRun(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt, Long triggeredBy) {
+	private TestRun(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt, Long triggeredBy,
+			Long testCaseId) {
 		this.suite = Objects.requireNonNull(suite, "suite");
 		this.environment = Objects.requireNonNull(environment, "environment");
 		this.trigger = Objects.requireNonNull(trigger, "trigger");
 		this.startedAt = Objects.requireNonNull(startedAt, "startedAt");
 		this.status = Status.RUNNING;
 		this.triggeredBy = triggeredBy;
+		this.testCaseId = testCaseId;
 	}
 
 	public static TestRun start(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt) {
-		return new TestRun(suite, environment, trigger, startedAt, null);
+		return new TestRun(suite, environment, trigger, startedAt, null, null);
 	}
 
 	/**
@@ -84,7 +89,22 @@ public class TestRun extends BaseEntity {
 	 */
 	public static TestRun start(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt,
 			Long triggeredBy) {
-		return new TestRun(suite, environment, trigger, startedAt, triggeredBy);
+		return new TestRun(suite, environment, trigger, startedAt, triggeredBy, null);
+	}
+
+	/**
+	 * 케이스 단건 실행. 케이스가 속한 스위트의 실행으로 기록하되 대상 케이스를 남겨 스위트 전체 실행과 구분
+	 * @param triggeredBy 실행을 시작한 사용자
+	 */
+	public static TestRun startCase(TestCase testCase, Environment environment, Trigger trigger, Instant startedAt,
+			Long triggeredBy) {
+		return new TestRun(testCase.getSuite(), environment, trigger, startedAt, triggeredBy,
+				Objects.requireNonNull(testCase.getId(), "testCase.id"));
+	}
+
+	/** 케이스 단건 실행 여부 */
+	public boolean isSingleCase() {
+		return testCaseId != null;
 	}
 
 	public void complete(Instant finishedAt) {

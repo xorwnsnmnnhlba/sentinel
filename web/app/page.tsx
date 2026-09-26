@@ -154,6 +154,9 @@ export default async function Dashboard(props: PageProps<"/">) {
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium">
                         #{run.id} {run.suite.name}
+                        {run.testCase && (
+                          <span className="font-normal text-muted-foreground"> · {run.testCase.name}</span>
+                        )}
                       </span>
                       <RunCountBadges counts={run.summary} />
                     </div>

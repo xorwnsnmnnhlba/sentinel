@@ -9,9 +9,10 @@ export const EDIT_DELETE: ActionMenuItem[] = [
   { id: "delete", label: "삭제", icon: "delete", destructive: true },
 ];
 
-/** 수정은 별도 화면인 경우 (케이스) */
-export function editLinkDelete(href: string): ActionMenuItem[] {
+/** 수정은 별도 화면인 경우 (케이스). runnable이면 맨 앞에 단건 실행 */
+export function editLinkDelete(href: string, runnable = false): ActionMenuItem[] {
   return [
+    ...(runnable ? [{ id: "run", label: "실행", icon: "run" } as const] : []),
     { id: "edit", label: "수정", icon: "edit", href },
     { id: "delete", label: "삭제", icon: "delete", destructive: true },
   ];

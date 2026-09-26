@@ -14,6 +14,7 @@ import com.sentinel.domain.TestResult.Verdict;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.domain.User;
+import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.RequestExecutionException;
@@ -50,6 +51,9 @@ class TestRunServiceTest {
 
 	@Autowired
 	private UserRepository users;
+
+	@Autowired
+	private TestCaseRepository testCases;
 
 	@AfterEach
 	void cleanUp() {
@@ -147,6 +151,31 @@ class TestRunServiceTest {
 		assertThat(run.triggeredBy()).isNotNull();
 		assertThat(run.triggeredBy().id()).isEqualTo(user.getId());
 		assertThat(run.triggeredBy().name()).isEqualTo(user.getEmail());
+	}
+
+	@Test
+	void recordsTheTargetCaseOfASingleCaseRun() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestCase target = fixtures.testCase(project, HttpMethod.GET, "/a", null, null);
+		fixtures.testCase(target.getSuite(), HttpMethod.GET, "/b", null, null);
+
+		TestRunDetail single = service.getRun(service.runTestCase(target.getId(), environment.getId(), tester()));
+		TestRunDetail whole = service.getRun(service.runSuite(target.getSuite().getId(), environment.getId(),
+				TestRun.Trigger.MANUAL, tester()));
+
+		assertThat(single.testCase()).isEqualTo(new IdName(target.getId(), target.getName()));
+		assertThat(single.results()).singleElement()
+			.satisfies(result -> assertThat(result.testCaseId()).isEqualTo(target.getId()));
+		// 같은 스위트의 실행이지만 스위트 전체 실행은 대상 케이스 없음
+		assertThat(single.suiteId()).isEqualTo(whole.suiteId());
+		assertThat(whole.testCase()).isNull();
+		assertThat(whole.results()).hasSize(2);
+
+		// 케이스를 삭제(보관)해도 이력에는 이름 유지
+		target.archive(Instant.now());
+		testCases.saveAndFlush(target);
+		assertThat(service.getRun(single.id()).testCase().name()).isEqualTo(target.getName());
 	}
 
 	@Test

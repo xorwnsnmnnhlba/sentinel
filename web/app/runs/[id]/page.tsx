@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { Empty, SectionHeader } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
-import { RunCountBadges, StatusBadge, TriggerBadge, VerdictBadge } from "@/components/run-badges";
+import { RunCountBadges, SingleCaseBadge, StatusBadge, TriggerBadge, VerdictBadge } from "@/components/run-badges";
 import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { apiGetOrNotFound } from "@/lib/api/server";
@@ -34,11 +34,13 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
                 <span className="text-muted-foreground">#{run.id}</span> {run.suiteName}
               </span>
               <TriggerBadge trigger={run.trigger} />
+              {run.testCase && <SingleCaseBadge />}
               <StatusBadge status={run.status} />
             </span>
           }
         />
         <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+          {run.testCase && <Meta label="케이스" value={run.testCase.name} />}
           <Meta label="환경" value={run.environmentName} />
           {run.triggeredBy && <Meta label="실행" value={run.triggeredBy.name} />}
           <Meta label="시작" value={formatDateTime(run.startedAt)} />

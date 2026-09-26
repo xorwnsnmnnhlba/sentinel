@@ -185,13 +185,23 @@ export async function deleteSchedule(scheduleId: number): Promise<ActionState> {
  * 스위트 즉시 실행. 실행 완료까지 대기 후 결과 상세로 이동
  */
 export async function runSuite(suiteId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  return startRun({ suiteId: id(suiteId) }, form);
+}
+
+/** 케이스 단건 실행. 저장된 케이스 기준이며 스위트의 다른 케이스는 실행하지 않음 */
+export async function runCase(caseId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  return startRun({ caseId: id(caseId) }, form);
+}
+
+/** 실행이 끝나면 결과 상세로 이동 */
+async function startRun(target: { suiteId: number } | { caseId: number }, form: FormData): Promise<ActionState> {
   const environmentId = Number(form.get("environmentId"));
   if (!Number.isSafeInteger(environmentId) || environmentId <= 0) {
     return { error: "실행할 환경을 선택해 주세요" };
   }
   let run: RunDetail | null;
   try {
-    run = await apiSend<RunDetail>("POST", "/api/runs", { suiteId: id(suiteId), environmentId });
+    run = await apiSend<RunDetail>("POST", "/api/runs", { ...target, environmentId });
   } catch (error) {
     return failure(error);
   }

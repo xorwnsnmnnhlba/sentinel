@@ -14,20 +14,23 @@ import com.sentinel.runner.assertion.AssertionResult;
 
 /**
  * @param rawPurgedAt 보관기간이 지나 요청·응답 원문(헤더·본문)을 비운 시각. null이면 원문 보관 중
+ * @param testCase 케이스 단건 실행의 대상. 스위트 전체 실행은 null
  */
 public record TestRunDetail(long id, long suiteId, String suiteName, long environmentId, String environmentName,
 		TestRun.Trigger trigger, TestRun.Status status, Instant startedAt, Instant finishedAt, Summary summary,
-		List<Result> results, IdName triggeredBy, Instant rawPurgedAt) {
+		List<Result> results, IdName triggeredBy, Instant rawPurgedAt, IdName testCase) {
 
 	/**
 	 * @param results 케이스가 함께 로딩된 결과. 트랜잭션 안에서 호출
 	 * @param triggeredBy 수동 실행을 시작한 사용자. 스케줄 실행·이전 기록은 null
+	 * @param testCase 케이스 단건 실행의 대상. 스위트 전체 실행은 null
 	 */
-	static TestRunDetail of(TestRun run, List<TestResult> results, IdName triggeredBy) {
+	static TestRunDetail of(TestRun run, List<TestResult> results, IdName triggeredBy, IdName testCase) {
 		List<Result> mapped = results.stream().map(Result::of).toList();
 		return new TestRunDetail(run.getId(), run.getSuite().getId(), run.getSuite().getName(),
 				run.getEnvironment().getId(), run.getEnvironment().getName(), run.getTrigger(), run.getStatus(),
-				run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped, triggeredBy, run.getRawPurgedAt());
+				run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped, triggeredBy, run.getRawPurgedAt(),
+				testCase);
 	}
 
 	/**

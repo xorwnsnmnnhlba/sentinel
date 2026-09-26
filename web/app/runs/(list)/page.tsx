@@ -77,7 +77,10 @@ export default async function RunsPage(props: PageProps<"/runs">) {
                   <TableCell className="font-mono text-xs">{formatDateTime(run.startedAt)}</TableCell>
                   <TableCell>
                     <div className="font-medium">{run.suite.name}</div>
-                    <div className="text-xs text-muted-foreground">{run.project.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {run.project.name}
+                      {run.testCase && <> · 케이스 단건: {run.testCase.name}</>}
+                    </div>
                   </TableCell>
                   <TableCell>{run.environment.name}</TableCell>
                   <TableCell>
