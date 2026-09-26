@@ -177,6 +177,8 @@ curl -i -X POST localhost:8080/api/runs \
 - 본문 `suiteId`(스위트 전체)와 `caseId`(케이스 1건) 중 정확히 하나 지정. 둘 다 없거나 둘 다 있으면 400
 - 201 + `Location: /api/runs/{id}`, 본문은 실행 결과
 - 스위트 실행은 케이스 ID 순 순차 실행, 실패 케이스가 있어도 나머지 계속 실행
+- 케이스 단건 실행은 케이스가 속한 스위트의 실행으로 기록하고 대상 케이스를 `testCase`(`{id, name}`)로 표시. 스위트 전체 실행은 `null`
+  - 케이스 수정 확인용이므로 스위트 단위 집계(스위트 요약의 실행 수·통과율·최근 실행)에서 제외. 실행 이력·응답시간 추세에는 포함
 
 ### 결과 해석
 
@@ -279,6 +281,7 @@ curl -i -X POST localhost:8080/api/runs \
 - 실행 목록: 최신순, 페이지 응답 `{content, page, size, totalElements, totalPages}` (`page`는 0부터, `size`는 1~100으로 보정)
   - 행: 프로젝트·스위트·환경의 `{id, name}`, `trigger`, `status`, 시각, `summary`(전체·통과·실패·오류), `triggeredBy`
   - `triggeredBy`: 수동 실행을 시작한 사용자 `{id, name}`(이메일). 스케줄 실행과 이전 기록은 `null`
+  - `testCase`: 케이스 단건 실행의 대상 `{id, name}`. 스위트 전체 실행은 `null`. 삭제(보관)된 케이스도 이름 표시
   - 필터: `projectId`, `suiteId`, `environmentId`, `status`(`RUNNING`/`COMPLETED`/`ABORTED`), 시작 시각 기간 `from`·`to`, `failing=true`(판정 실패·오류 결과가 하나 이상 있는 실행). 여러 개를 함께 지정하면 모두 만족하는 실행만
   - `from`·`to`는 `yyyy-MM-dd`이며 `sentinel.schedule.zone`(기본 `Asia/Seoul`) 기준. 시작일 00:00부터 종료일 다음 날 00:00 직전까지 (종료일 당일 포함)
   - 실행 건수와 무관하게 페이지당 쿼리 최대 4회 (이름 함께 로딩, 판정 건수 일괄 집계, 실행 주체 일괄 조회)
@@ -329,6 +332,7 @@ curl -i -X POST localhost:8080/api/runs \
 
 - 보관되지 않은 모든 스위트 (프로젝트·스위트 이름 순), 실행한 적 없는 스위트도 포함
 - 항목: `suite`·`project`, 기간 안 실행 수 `runs`, 그중 실패·오류가 있는 실행 수 `failingRuns`, 판정별 결과 수 `results`, 통과 결과 비율 `passRate`(0~1, 결과 없으면 `null`), 기간과 무관한 최근 실행 `lastRun`(없으면 `null`)
+- 모든 값은 스위트 전체 실행 기준. 케이스 단건 실행은 제외 (한 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
 - 스위트 수와 무관하게 쿼리 6회
 
 ### 케이스 가져오기 (OpenAPI 3, Postman)

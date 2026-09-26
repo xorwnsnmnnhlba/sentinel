@@ -8,9 +8,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestResult.Verdict;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.User;
+import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.UserRepository;
@@ -22,8 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 실행 이력 조회. 실행 건수와 무관하게 페이지당 쿼리 최대 4회(실행+이름, 전체 건수, 판정 집계, 실행 주체).
- * 결과가 한 페이지에 모두 들어가면 Spring Data가 전체 건수 쿼리를 생략하고, 수동 실행이 없으면 주체 조회도 생략.
+ * 실행 이력 조회. 실행 건수와 무관하게 페이지당 쿼리 최대 5회(실행+이름, 전체 건수, 판정 집계, 실행 주체, 단건 실행 대상).
+ * 결과가 한 페이지에 모두 들어가면 Spring Data가 전체 건수 쿼리를 생략하고, 수동 실행·단건 실행이 없으면 해당 조회도 생략.
  */
 @Service
 @RequiredArgsConstructor
@@ -38,6 +40,8 @@ public class RunQueryService {
 	private final TestResultRepository results;
 
 	private final UserRepository users;
+
+	private final TestCaseRepository testCases;
 
 	/** 기간 조건을 해석할 시간대. 스케줄 cron과 같은 기준 사용 */
 	private final ScheduleProperties scheduleProperties;
@@ -63,11 +67,24 @@ public class RunQueryService {
 			}
 		}
 		Map<Long, IdName> triggeredBy = triggeredBy(found.getContent());
+		Map<Long, IdName> targetCases = targetCases(found.getContent());
 		return PageResponse.of(found,
 				found.map(run -> summaryOf(run, counts.getOrDefault(run.getId(), Map.of()),
-						// 스케줄 실행은 주체가 null. 불변 Map은 null 키 조회 시 예외이므로 먼저 확인
-						run.getTriggeredBy() == null ? null : triggeredBy.get(run.getTriggeredBy())))
+						// 스케줄 실행은 주체가, 스위트 전체 실행은 대상 케이스가 null. 불변 Map은 null 키 조회 시 예외이므로 먼저 확인
+						run.getTriggeredBy() == null ? null : triggeredBy.get(run.getTriggeredBy()),
+						run.isSingleCase() ? targetCases.get(run.getTestCaseId()) : null))
 					.getContent());
+	}
+
+	/** 단건 실행의 대상 케이스 이름. 삭제(보관)된 케이스도 이력 표시를 위해 조회 */
+	private Map<Long, IdName> targetCases(List<TestRun> found) {
+		List<Long> caseIds = found.stream().map(TestRun::getTestCaseId).filter(Objects::nonNull).distinct().toList();
+		if (caseIds.isEmpty()) {
+			return Map.of();
+		}
+		return testCases.findAllById(caseIds)
+			.stream()
+			.collect(Collectors.toMap(TestCase::getId, testCase -> new IdName(testCase.getId(), testCase.getName())));
 	}
 
 	/** 실행 주체 이름. 삭제(보관)된 사용자도 이력 표시를 위해 조회 */
@@ -81,7 +98,7 @@ public class RunQueryService {
 			.collect(Collectors.toMap(User::getId, user -> new IdName(user.getId(), user.getEmail())));
 	}
 
-	private static RunSummary summaryOf(TestRun run, Map<Verdict, Long> counts, IdName triggeredBy) {
+	private static RunSummary summaryOf(TestRun run, Map<Verdict, Long> counts, IdName triggeredBy, IdName testCase) {
 		int passed = counts.getOrDefault(Verdict.PASSED, 0L).intValue();
 		int failed = counts.getOrDefault(Verdict.FAILED, 0L).intValue();
 		int errors = counts.getOrDefault(Verdict.ERROR, 0L).intValue();
@@ -90,7 +107,7 @@ public class RunQueryService {
 				new IdName(run.getSuite().getId(), run.getSuite().getName()),
 				new IdName(run.getEnvironment().getId(), run.getEnvironment().getName()), run.getTrigger(),
 				run.getStatus(), run.getStartedAt(), run.getFinishedAt(),
-				new TestRunDetail.Summary(passed + failed + errors, passed, failed, errors), triggeredBy);
+				new TestRunDetail.Summary(passed + failed + errors, passed, failed, errors), triggeredBy, testCase);
 	}
 
 }

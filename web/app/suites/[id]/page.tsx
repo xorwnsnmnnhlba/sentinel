@@ -8,6 +8,7 @@ import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
 import { EDIT_DELETE, editLinkDelete } from "@/components/catalog/menu-items";
+import { RunCaseFields } from "@/components/catalog/run-case-fields";
 import { RunSuiteForm } from "@/components/catalog/run-suite-form";
 import { ScheduleFields } from "@/components/catalog/schedule-fields";
 import { ScheduleToggle } from "@/components/catalog/schedule-toggle";
@@ -21,6 +22,7 @@ import {
   deleteCase,
   deleteSchedule,
   deleteSuite,
+  runCase,
   runSuite,
   updateSchedule,
   updateSuite,
@@ -148,8 +150,19 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                     <TableCell className="text-right">
                       <ActionMenu
                         label={`케이스 ${testCase.name} 작업`}
-                        items={editLinkDelete(`/cases/${testCase.id}`)}
+                        items={editLinkDelete(`/cases/${testCase.id}`, environments.length > 0)}
                       >
+                        {environments.length > 0 && (
+                          <FormDialog
+                            menuId="run"
+                            title={`케이스 "${testCase.name}" 실행`}
+                            description="이 케이스만 실행합니다. 완료 후 결과 화면으로 이동합니다."
+                            submitLabel="실행"
+                            action={runCase.bind(null, testCase.id)}
+                          >
+                            <RunCaseFields environments={environments} />
+                          </FormDialog>
+                        )}
                         <DeleteDialog
                           menuId="delete"
                           title={`케이스 "${testCase.name}" 삭제`}

@@ -24,20 +24,22 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 	List<TestRun> findBySuiteIdAndEnvironmentIdAndTriggerAndStatusAndIdLessThanOrderByIdDesc(Long suiteId,
 			Long environmentId, TestRun.Trigger trigger, TestRun.Status status, Long id, Limit limit);
 
-	/** 기간 안에 시작한 실행 수 (스위트별) */
+	/** 기간 안에 시작한 스위트 전체 실행 수 (스위트별, 케이스 단건 실행 제외) */
 	@Query("""
 			select t.suite.id as suiteId, count(t) as count
 			from TestRun t
 			where t.startedAt >= :from and t.startedAt < :to
+			  and t.testCaseId is null
 			group by t.suite.id
 			""")
 	List<SuiteCount> countBySuite(@Param("from") Instant from, @Param("to") Instant to);
 
-	/** 기간 안에 시작한 실행 중 판정 실패·오류 결과가 있는 실행 수 (스위트별) */
+	/** 기간 안에 시작한 스위트 전체 실행 중 판정 실패·오류 결과가 있는 실행 수 (스위트별, 케이스 단건 실행 제외) */
 	@Query("""
 			select t.suite.id as suiteId, count(t) as count
 			from TestRun t
 			where t.startedAt >= :from and t.startedAt < :to
+			  and t.testCaseId is null
 			  and exists (
 			      select r.id from TestResult r
 			      where r.run = t
@@ -46,8 +48,14 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 			""")
 	List<SuiteCount> countFailingBySuite(@Param("from") Instant from, @Param("to") Instant to);
 
-	/** 스위트별 가장 최근 실행. ID는 시작 순으로 증가하므로 최대 ID가 최근 실행 */
-	@Query("select t from TestRun t where t.id in (select max(latest.id) from TestRun latest group by latest.suite.id)")
+	/**
+	 * 스위트별 가장 최근 스위트 전체 실행. ID는 시작 순으로 증가하므로 최대 ID가 최근 실행
+	 * 케이스 단건 실행은 제외 (한 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
+	 */
+	@Query("""
+			select t from TestRun t
+			where t.id in (select max(latest.id) from TestRun latest where latest.testCaseId is null group by latest.suite.id)
+			""")
 	List<TestRun> findLatestPerSuite();
 
 	interface SuiteCount {

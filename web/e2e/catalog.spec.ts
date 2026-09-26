@@ -349,10 +349,51 @@ test("스케줄 등록·전환·수정·삭제", async ({ page }) => {
   await expect(page.getByText("등록된 스케줄이 없습니다")).toBeVisible();
 });
 
+test("케이스만 따로 실행하면 단건 실행으로 기록", async ({ page }) => {
+  await page.goto("/projects");
+  await page.getByRole("link", { name: project }).click();
+  await page.getByRole("link", { name: suite }).click();
+
+  // 스위트 화면: 케이스 행의 "⋯" 메뉴 → 실행
+  await chooseAction(page, "케이스 프로젝트 목록 조회 작업", "실행");
+  const dialog = page.getByRole("dialog", { name: '케이스 "프로젝트 목록 조회" 실행' });
+  // 환경이 하나뿐이면 선택된 상태
+  await expect(dialog.getByLabel("실행 환경")).toHaveText("self");
+  await dialog.getByRole("button", { name: "실행", exact: true }).click();
+
+  await expect(page).toHaveURL(/\/runs\/\d+$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("케이스 단건");
+  await expect(page.getByRole("heading", { name: /케이스별 결과\s*1/ })).toBeVisible();
+  await expect(page.getByText("통과 1")).toBeVisible();
+  const runUrl = page.url();
+
+  // 실행 이력에는 스위트 실행과 구분하여 표시
+  await page.goto("/runs");
+  await expect(page.getByRole("row", { name: /케이스 단건: 프로젝트 목록 조회/ }).first()).toBeVisible();
+
+  // 케이스 수정 화면에서도 실행 (저장된 내용 기준)
+  await page.goto("/projects");
+  await page.getByRole("link", { name: project }).click();
+  await page.getByRole("link", { name: suite }).click();
+  await page.getByRole("table", { name: "케이스 목록" }).getByRole("link", { name: "프로젝트 목록 조회" }).click();
+  // 화면 전환 전에 누르면 스위트 화면의 "지금 실행"이 눌리므로 케이스 화면 도착 확인 후 정확한 이름으로 선택
+  await expect(page.getByRole("heading", { name: "케이스 수정", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "실행", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: '케이스 "프로젝트 목록 조회" 실행' })
+    .getByRole("button", { name: "실행", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/runs\/\d+$/);
+  expect(page.url()).not.toBe(runUrl);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("케이스 단건");
+});
+
 test("프로젝트 삭제 시 하위 항목도 사라지고 실행 이력은 유지", async ({ page }) => {
   await page.goto("/runs");
-  const runRow = page.getByRole("row", { name: new RegExp(suite) });
-  await expect(runRow).toHaveCount(1);
+  // 스위트 전체 실행과 케이스 단건 실행
+  const runRows = page.getByRole("row", { name: new RegExp(suite) });
+  await expect(runRows.first()).toBeVisible();
+  const rowsBefore = await runRows.count();
   const totalBefore = await totalRuns(page);
 
   await page.goto("/projects");
@@ -367,7 +408,7 @@ test("프로젝트 삭제 시 하위 항목도 사라지고 실행 이력은 유
   await page.goto("/runs");
   // 스위트가 삭제되어도 이력 건수와 스위트 이름은 그대로
   expect(await totalRuns(page)).toBe(totalBefore);
-  await expect(runRow).toHaveCount(1);
+  await expect(runRows).toHaveCount(rowsBefore);
 });
 
 test("없는 주소는 404", async ({ page }) => {

@@ -24,6 +24,11 @@ export function TriggerBadge({ trigger }: { trigger: Trigger }) {
   return <Badge variant="outline">{trigger === "SCHEDULED" ? "스케줄" : "수동"}</Badge>;
 }
 
+/** 케이스 하나만 실행한 기록. 스위트 전체 실행과 구분 */
+export function SingleCaseBadge() {
+  return <Badge variant="outline">케이스 단건</Badge>;
+}
+
 const statusLabel: Record<RunStatus, string> = { RUNNING: "실행 중", COMPLETED: "완료", ABORTED: "중단" };
 
 export function StatusBadge({ status }: { status: RunStatus }) {

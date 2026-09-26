@@ -15,6 +15,7 @@ import {
   deleteCase,
   deleteProject,
   deleteSuite,
+  runCase,
   runSuite,
   deleteSchedule,
   setScheduleEnabled,
@@ -222,6 +223,30 @@ describe("runSuite", () => {
 
     await expect(captureRedirect(() => runSuite(1, undefined, form({ environmentId: "3" })))).resolves.toBe("/runs/42");
     expect(bodies).toEqual([{ suiteId: 1, environmentId: 3 }]);
+  });
+});
+
+describe("runCase", () => {
+  it("requires an environment", async () => {
+    await expect(runCase(7, undefined, form({ environmentId: "0" }))).resolves.toEqual({
+      error: "실행할 환경을 선택해 주세요",
+    });
+  });
+
+  it("runs only the case and opens its result", async () => {
+    const bodies = capture("post", "/api/runs", () => HttpResponse.json({ id: 43 }, { status: 201 }));
+
+    await expect(captureRedirect(() => runCase(7, undefined, form({ environmentId: "3" })))).resolves.toBe("/runs/43");
+    // 스위트 대신 케이스만 지정 (API는 둘 중 하나만 허용)
+    expect(bodies).toEqual([{ caseId: 7, environmentId: 3 }]);
+  });
+
+  it("tells when the case was deleted meanwhile", async () => {
+    capture("post", "/api/runs", () => problem(404, "test case 7 not found"));
+
+    await expect(runCase(7, undefined, form({ environmentId: "3" }))).resolves.toEqual({
+      error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다",
+    });
   });
 });
 

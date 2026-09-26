@@ -9,6 +9,7 @@ import java.util.Map;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
+import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.runner.HttpMethod;
@@ -74,6 +75,27 @@ class RunQueryServiceTest {
 		assertThat(billingRun.trigger()).isEqualTo(TestRun.Trigger.SCHEDULED);
 		assertThat(billingRun.summary()).isEqualTo(new TestRunDetail.Summary(3, 1, 1, 1));
 		assertThat(page.content().getFirst().summary()).isEqualTo(new TestRunDetail.Summary(0, 0, 0, 0));
+	}
+
+	@Test
+	void marksSingleCaseRunsWithTheirCase() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite billing = fixtures.suite(project);
+		TestCase target = fixtures.testCase(billing, HttpMethod.GET, "/ok", null, null);
+		fixtures.testCase(billing, HttpMethod.GET, "/other", null, null);
+
+		long whole = testRunService.runSuite(billing.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
+		long single = testRunService.runTestCase(target.getId(), environment.getId(), tester());
+
+		List<RunSummary> content = runQueries.listRuns(RunFilter.none(), 0, 20).content();
+
+		assertThat(content).extracting(RunSummary::id).containsExactly(single, whole);
+		assertThat(content.getFirst().testCase()).isEqualTo(new IdName(target.getId(), target.getName()));
+		assertThat(content.getFirst().summary()).isEqualTo(new TestRunDetail.Summary(1, 1, 0, 0));
+		assertThat(content.get(1).testCase()).isNull();
+		// 스위트 조건으로 좁혀도 단건 실행 포함 (실행 이력은 모든 실행)
+		assertThat(ids(suiteFilter(billing.getId()))).containsExactly(single, whole);
 	}
 
 	@Test
@@ -217,6 +239,24 @@ class RunQueryServiceTest {
 
 		assertThat(firstOfMany.totalPages()).isEqualTo(3);
 		// 실행+이름(fetch), 전체 건수, 판정 집계, 실행 주체
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
+	}
+
+	@Test
+	void looksUpTargetCasesOfSingleCaseRunsInOneQuery() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		for (int i = 0; i < 4; i++) {
+			TestCase testCase = fixtures.testCase(suite, HttpMethod.GET, "/case-" + i, null, null);
+			testRunService.runTestCase(testCase.getId(), environment.getId(), tester());
+		}
+		Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+		statistics.clear();
+
+		assertThat(runQueries.listRuns(RunFilter.none(), 0, 20).content()).allSatisfy(
+				run -> assertThat(run.testCase()).isNotNull());
+		// 실행+이름(fetch), 판정 집계, 실행 주체, 대상 케이스
 		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
 	}
 

@@ -56,6 +56,20 @@ describe("ActionMenu", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "프로젝트 billing 작업" })).toHaveFocus());
   });
 
+  it("puts running a single case first when it can run", async () => {
+    const user = userEvent.setup();
+    render(<ActionMenu label="케이스 조회 작업" items={editLinkDelete("/cases/7", true)} />);
+
+    await openMenu(user, "케이스 조회 작업");
+
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["실행", "수정", "삭제"]);
+  });
+
   it("navigates for link items instead of opening a dialog", async () => {
     const user = userEvent.setup();
     render(<ActionMenu label="케이스 조회 작업" items={editLinkDelete("/cases/7")} />);

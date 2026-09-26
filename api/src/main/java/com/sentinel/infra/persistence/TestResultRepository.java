@@ -115,12 +115,13 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 			""")
 	List<Object[]> p95ByWindow(@Param("from") Instant from, @Param("middle") Instant middle, @Param("to") Instant to);
 
-	/** 기간 안에 시작한 실행의 판정별 결과 수 (스위트별) */
+	/** 기간 안에 시작한 스위트 전체 실행의 판정별 결과 수 (스위트별, 케이스 단건 실행 제외) */
 	@Query("""
 			select t.suite.id as suiteId, r.verdict as verdict, count(r) as count
 			from TestResult r
 			join r.run t
 			where t.startedAt >= :from and t.startedAt < :to
+			  and t.testCaseId is null
 			group by t.suite.id, r.verdict
 			""")
 	List<SuiteVerdictCount> countVerdictsBySuite(@Param("from") Instant from, @Param("to") Instant to);
