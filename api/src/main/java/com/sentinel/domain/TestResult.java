@@ -16,6 +16,7 @@ import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.ResolvedRequest;
 import com.sentinel.runner.assertion.AssertionResult;
+import com.sentinel.runner.schema.ResponseSchema;
 import jakarta.persistence.Column;
 import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
@@ -126,6 +127,14 @@ public class TestResult extends BaseEntity {
 	@Column(nullable = false)
 	private boolean responseBodyTruncated;
 
+	/**
+	 * 응답 JSON의 구조 지문. 잘라서 저장하는 본문과 달리 전체 본문으로 계산하며 보관기간이 지나도 유지.
+	 * JSON이 아닌 응답과 응답 없는 결과는 null
+	 */
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "json")
+	private ResponseSchema responseSchema;
+
 	private Long elapsedMs;
 
 	private TestResult(TestRun run, TestCase testCase, Outcome outcome, HttpMethod requestMethod) {
@@ -152,6 +161,7 @@ public class TestResult extends BaseEntity {
 		result.statusCode = exchange.statusCode();
 		result.responseHeaders = SecretValues.mask(SensitiveHeaders.mask(exchange.headers()), secretValues);
 		String body = SecretValues.mask(exchange.body(), secretValues);
+		result.responseSchema = ResponseSchema.of(contentType(exchange), body).orElse(null);
 		result.responseBody = truncateUtf8(body, MAX_BODY_BYTES);
 		result.responseBodyTruncated = result.responseBody.length() < body.length();
 		result.elapsedMs = exchange.elapsed().toMillis();
@@ -189,6 +199,11 @@ public class TestResult extends BaseEntity {
 		this.requestHeaders = SecretValues.mask(SensitiveHeaders.mask(request.headers()), secretValues);
 		this.requestBody = request.body() == null ? null
 				: truncateChars(SecretValues.mask(request.body(), secretValues), RequestSpec.MAX_BODY_LENGTH);
+	}
+
+	private static String contentType(HttpExchange exchange) {
+		List<String> values = exchange.headers().get("Content-Type");
+		return values == null || values.isEmpty() ? null : values.getFirst();
 	}
 
 	private static String truncateChars(String value, int maxLength) {

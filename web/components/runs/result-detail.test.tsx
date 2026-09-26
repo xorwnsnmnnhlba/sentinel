@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import type { RunResult } from "@/lib/api/types";
@@ -27,6 +28,7 @@ const responded: RunResult = {
     body: '{"orderId":7}',
     bodyTruncated: false,
   },
+  responseSchema: { fields: { $: ["object"], "$.orderId": ["number"] }, complete: true },
 };
 
 /** 보관기간 경과 후 API가 돌려주는 형태. 헤더·본문만 null */
@@ -37,6 +39,25 @@ const purged: RunResult = {
 };
 
 describe("ResultDetail", () => {
+  it("shows the response structure in its own tab", async () => {
+    const user = userEvent.setup();
+    render(
+      <ResultDetail result={{ ...responded, responseSchema: { ...responded.responseSchema!, complete: false } }} />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "구조" }));
+
+    const table = screen.getByRole("table", { name: "응답 구조" });
+    expect(within(table).getByRole("row", { name: "$.orderId number" })).toBeInTheDocument();
+    expect(screen.getByText(/일부만 기록했습니다/)).toBeInTheDocument();
+  });
+
+  it("offers no structure tab when the response was not JSON", () => {
+    render(<ResultDetail result={{ ...responded, responseSchema: null }} />);
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["응답", "요청"]);
+  });
+
   it("shows the raw response while it is kept", () => {
     render(<ResultDetail result={responded} />);
 
@@ -58,6 +79,9 @@ describe("ResultDetail", () => {
     // 요청 주소와 판정 규칙 결과는 유지
     expect(screen.getByText("POST https://gw.dev.internal/orders")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "status in [200]" })).toBeInTheDocument();
+    // 구조 지문은 원문과 달리 보관기간이 지나도 표시
+    expect(screen.getByRole("heading", { name: "응답 구조" })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: "$.orderId number" })).toBeInTheDocument();
   });
 
   it("shows only the error for a request that was never sent", () => {
@@ -70,6 +94,7 @@ describe("ResultDetail", () => {
       errorMessage: "missing variable: token",
       request: { method: "GET", url: null, headers: null, body: null },
       response: null,
+      responseSchema: null,
     };
     render(<ResultDetail result={unsent} rawPurged />);
 

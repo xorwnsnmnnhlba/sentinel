@@ -2,12 +2,12 @@ import { VerdictBadge } from "@/components/run-badges";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Headers, RunResult } from "@/lib/api/types";
+import type { Headers, ResponseSchema, RunResult } from "@/lib/api/types";
 import { prettyBody } from "@/lib/format";
 
 /**
- * 케이스 1건의 결과. 오류 사유, 판정 규칙별 결과, 요청·응답 원문
- * 보관기간이 지나 원문을 삭제한 실행(rawPurged)은 원문 대신 안내 문구 표시
+ * 케이스 1건의 결과. 오류 사유, 판정 규칙별 결과, 요청·응답 원문, 응답 구조
+ * 보관기간이 지나 원문을 삭제한 실행(rawPurged)은 원문 대신 안내 문구 표시. 응답 구조는 원문과 달리 계속 표시
  */
 export function ResultDetail({ result, rawPurged = false }: { result: RunResult; rawPurged?: boolean }) {
   return (
@@ -52,12 +52,20 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
         <p className="text-xs text-muted-foreground">보관기간이 지나 요청·응답 헤더와 본문을 삭제했습니다</p>
       )}
 
+      {rawPurged && result.responseSchema && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">응답 구조</h4>
+          <SchemaTable schema={result.responseSchema} />
+        </div>
+      )}
+
       {result.request.url && !rawPurged && (
         <Tabs defaultValue={result.response ? "response" : "request"}>
           <TabsList>
             <TabsTrigger value="response" disabled={!result.response}>
               응답
             </TabsTrigger>
+            {result.responseSchema && <TabsTrigger value="schema">구조</TabsTrigger>}
             <TabsTrigger value="request">요청</TabsTrigger>
           </TabsList>
           <TabsContent value="response" className="space-y-3">
@@ -68,12 +76,51 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
               </>
             )}
           </TabsContent>
+          {result.responseSchema && (
+            <TabsContent value="schema">
+              <SchemaTable schema={result.responseSchema} />
+            </TabsContent>
+          )}
           <TabsContent value="request" className="space-y-3">
             <HeaderTable headers={result.request.headers} />
             <Body body={result.request.body} />
           </TabsContent>
         </Tabs>
       )}
+    </div>
+  );
+}
+
+/** 응답 JSON의 경로별 타입. 값은 남기지 않으므로 원문 보관기간과 무관 */
+function SchemaTable({ schema }: { schema: ResponseSchema }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">
+        값 없이 경로와 타입만 기록합니다. 배열 요소는 []로 합치고, ID·날짜 같은 동적 키는 *로 줄입니다
+      </p>
+      {!schema.complete && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          구조가 깊거나 경로가 많아 일부만 기록했습니다 (깊이 20, 경로 1,000개까지)
+        </p>
+      )}
+      <div className="max-h-96 overflow-auto rounded-md border">
+        <Table aria-label="응답 구조">
+          <TableHeader>
+            <TableRow>
+              <TableHead>경로</TableHead>
+              <TableHead>타입</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Object.entries(schema.fields).map(([path, types]) => (
+              <TableRow key={path}>
+                <TableCell className="font-mono text-xs break-all whitespace-normal">{path}</TableCell>
+                <TableCell className="font-mono text-xs">{types.join(" | ")}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

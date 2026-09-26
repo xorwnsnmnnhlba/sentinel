@@ -8,6 +8,7 @@ import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestCase;
+import com.sentinel.domain.TestResult;
 import com.sentinel.domain.TestResult.ErrorReason;
 import com.sentinel.domain.TestResult.Outcome;
 import com.sentinel.domain.TestResult.Verdict;
@@ -151,6 +152,45 @@ class TestRunServiceTest {
 		assertThat(run.triggeredBy()).isNotNull();
 		assertThat(run.triggeredBy().id()).isEqualTo(user.getId());
 		assertThat(run.triggeredBy().name()).isEqualTo(user.getEmail());
+	}
+
+	@Test
+	void fingerprintsTheWholeJsonBodyEvenWhenTheStoredBodyIsTruncated() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/orders", null, null);
+		// 저장 한도(64KB)를 넘겨 본문은 잘리지만 뒤쪽 필드까지 지문에 포함
+		String padding = "x".repeat(TestResult.MAX_BODY_BYTES);
+		executor.respond(200, Map.of("content-type", List.of("application/json; charset=UTF-8")),
+				"{\"padding\": \"" + padding + "\", \"tail\": {\"id\": 1, \"tags\": [\"a\", null]}}");
+
+		TestRunDetail.Result result = service.getRun(service.runTestCase(testCase.getId(), environment.getId(), tester()))
+			.results()
+			.getFirst();
+
+		assertThat(result.response().bodyTruncated()).isTrue();
+		assertThat(result.response().body()).doesNotContain("tail");
+		assertThat(result.responseSchema().fields()).containsExactly(Map.entry("$", List.of("object")),
+				Map.entry("$.padding", List.of("string")), Map.entry("$.tail", List.of("object")),
+				Map.entry("$.tail.id", List.of("number")), Map.entry("$.tail.tags", List.of("array")),
+				Map.entry("$.tail.tags[]", List.of("null", "string")));
+		assertThat(result.responseSchema().complete()).isTrue();
+	}
+
+	@Test
+	void keepsNoFingerprintForNonJsonResponsesOrMissingResponses() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestCase html = fixtures.testCase(project, HttpMethod.GET, "/page", null, null);
+		TestCase unresolved = fixtures.testCase(html.getSuite(), HttpMethod.GET, "/{{missing}}", null, null);
+		executor.respond(200, Map.of("Content-Type", List.of("text/html")), "<html>{}</html>");
+
+		TestRunDetail run = service.getRun(service.runSuite(html.getSuite().getId(), environment.getId(),
+				TestRun.Trigger.MANUAL, tester()));
+
+		assertThat(run.results()).extracting(TestRunDetail.Result::testCaseId)
+			.containsExactly(html.getId(), unresolved.getId());
+		assertThat(run.results()).allSatisfy(result -> assertThat(result.responseSchema()).isNull());
 	}
 
 	@Test
