@@ -359,7 +359,7 @@ test("케이스만 따로 실행하면 단건 실행으로 기록", async ({ pag
   const dialog = page.getByRole("dialog", { name: '케이스 "프로젝트 목록 조회" 실행' });
   // 환경이 하나뿐이면 선택된 상태
   await expect(dialog.getByLabel("실행 환경")).toHaveText("self");
-  await dialog.getByRole("button", { name: "실행" }).click();
+  await dialog.getByRole("button", { name: "실행", exact: true }).click();
 
   await expect(page).toHaveURL(/\/runs\/\d+$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("케이스 단건");
@@ -376,8 +376,13 @@ test("케이스만 따로 실행하면 단건 실행으로 기록", async ({ pag
   await page.getByRole("link", { name: project }).click();
   await page.getByRole("link", { name: suite }).click();
   await page.getByRole("table", { name: "케이스 목록" }).getByRole("link", { name: "프로젝트 목록 조회" }).click();
-  await page.getByRole("button", { name: "실행" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "실행" }).click();
+  // 화면 전환 전에 누르면 스위트 화면의 "지금 실행"이 눌리므로 케이스 화면 도착 확인 후 정확한 이름으로 선택
+  await expect(page.getByRole("heading", { name: "케이스 수정", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "실행", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: '케이스 "프로젝트 목록 조회" 실행' })
+    .getByRole("button", { name: "실행", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/runs\/\d+$/);
   expect(page.url()).not.toBe(runUrl);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("케이스 단건");
