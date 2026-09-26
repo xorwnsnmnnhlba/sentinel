@@ -390,7 +390,12 @@ HTTPS 앞단 (2026-09-24)
 - web·api는 `127.0.0.1`에만 공개하여 네트워크에서는 HTTPS 앞단만 접근. 평문 HTTP로 비밀번호·토큰이 오가는 경로 차단
 - Host 헤더를 그대로 전달하여 Next.js Server Action의 출처 확인(Origin과 Host 비교)이 추가 설정 없이 동작
 - 보안 헤더: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Server` 제거
-- HSTS 미적용: 내부 인증서를 신뢰 등록하지 않은 PC에서 경고를 넘길 수 없게 되므로, 인증서 운영 방식이 정해진 뒤 검토
+- HSTS (2026-09-26): 회사 인증서로 결정되어 적용. `SENTINEL_HSTS_MAX_AGE`로 켜며 기본 0(미사용)
+  - 내부 인증서와 함께 쓰면 신뢰 등록하지 않은 PC가 경고를 넘길 수 없으므로 신뢰된 인증서일 때만 사용
+  - localhost 제외: HSTS는 포트와 무관하게 호스트 전체에 적용되어 같은 PC의 `http://localhost:3000` 개발 서버까지 막힘
+  - `includeSubDomains` 미사용: 회사 도메인의 다른 서비스까지 HTTPS를 강제하지 않도록 함
+- 컨테이너 로그 순환 (2026-09-26): 서비스당 10MB × 5개. 기본 json-file 드라이버는 무제한이라 상시 운영 시 디스크를 채움
+- 배포·운영 절차는 [deploy.md](deploy.md): 개발기 RDS(`sslmode=require`), 사내 DNS 이름 + 회사 인증서, 서버에서 `git pull` 후 빌드. 배포 전 점검 `scripts/preflight.sh`
 - E2E 스택도 같은 Caddyfile로 앞단을 두어 전체 시나리오를 HTTPS 경로로 검증
 
 ```bash
