@@ -1,6 +1,5 @@
 import { Badge } from "@/components/ui/badge";
 import type { RunCounts, RunStatus, Trigger, Verdict } from "@/lib/api/types";
-import { cn } from "@/lib/utils";
 
 const verdictStyle: Record<Verdict, { label: string; className: string }> = {
   PASSED: { label: "통과", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
@@ -31,7 +30,7 @@ export function StatusBadge({ status }: { status: RunStatus }) {
   return <Badge variant={status === "COMPLETED" ? "secondary" : "outline"}>{statusLabel[status]}</Badge>;
 }
 
-/** 0건인 항목은 흐리게 표시해 실패·오류가 눈에 띄도록 함 */
+/** 0건인 항목은 회색으로 낮춰 실패·오류가 눈에 띄도록 함. 투명도로 흐리게 하면 글자 대비가 기준(4.5:1) 미달 */
 export function RunCountBadges({ counts }: { counts: RunCounts }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -46,7 +45,7 @@ export function RunCountBadges({ counts }: { counts: RunCounts }) {
 function CountBadge({ verdict, count }: { verdict: Verdict; count: number }) {
   const style = verdictStyle[verdict];
   return (
-    <Badge className={cn(style.className, count === 0 && "opacity-40")}>
+    <Badge className={count === 0 ? "bg-muted text-muted-foreground" : style.className}>
       {style.label} {count}
     </Badge>
   );

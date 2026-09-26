@@ -24,7 +24,7 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 | Prettier | 3.9.8 (`prettier-plugin-tailwindcss` 0.8.1) |
 | Vitest | 5.0.1 (Vite 8.3.0, jsdom 30.1.0) |
 | MSW | 2.15.0 |
-| Playwright | 1.63.0 (chromium) |
+| Playwright | 1.63.0 (chromium), 접근성 검사 `@axe-core/playwright` 4.13.0 |
 | Testing Library | React 16.3.3, DOM 10.4.2, user-event 14.6.7, jest-dom 7.0.1 |
 | Node.js | 로컬 24.21.0, Docker `node:24-alpine` (Next.js 요구사항 20.9.0 이상) |
 
@@ -263,6 +263,7 @@ npm run e2e:up && npm run e2e && npm run e2e:down
   - `e2e/csp.spec.ts`: 요청별 nonce, 모든 스크립트의 nonce, 주입된 인라인 이벤트 속성 차단
   - 공통 위치 지정: `mainMenu`(사이드바 주요 메뉴), `sidebar`(계정 영역 포함), `chooseAction`("⋯" 메뉴 열고 항목 선택)
 - `e2e/layout.spec.ts`: 넓은 화면 사이드바·현재 메뉴 강조, 좁은 화면 메뉴 서랍·가로 스크롤 없음, 로그인 전 화면
+- `e2e/contrast.spec.ts`: 글자 색 대비(axe-core, WCAG 2 AA)를 라이트·다크 모두에서 주요 화면·열린 메뉴·대화상자 대상으로 검사. 통과·실패·오류가 섞인 실행을 API로 만들어 배지·차트까지 포함
 - `e2e/theme.spec.ts`: 운영체제 설정 따르기, 고른 테마 우선·새로 고침 후 유지(서버 렌더링), 다크에서 실행 환경 선택 글자 대비
 - 흐름: 프로젝트·환경(시크릿 포함) 등록 → 스위트·케이스 등록 → 즉시 실행·결과 확인(시크릿 마스킹) → 스케줄 등록·전환·수정·삭제 → 프로젝트 삭제 후 이력 유지 확인, 404 확인
 - 케이스가 api 자신(`http://e2e-api:8080`)을 호출하므로 외부 서버 없이 실행 결과까지 검증
