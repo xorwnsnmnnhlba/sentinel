@@ -87,7 +87,7 @@ test("관리자가 발급한 재설정 링크로 비밀번호를 다시 설정",
   await login(page, admin.email, admin.password);
   await page.goto("/users");
   await chooseAction(page, `${member.email} 작업`, "비밀번호 재설정 링크");
-  await page.getByRole("button", { name: "링크 발급" }).click();
+  await page.getByRole("button", { name: "링크 발급", exact: true }).click();
   const resetLink = String(await page.getByLabel("발급된 링크").inputValue());
 
   await page.goto(resetLink);

@@ -8,8 +8,13 @@ import { defineConfig, devices } from "@playwright/test";
  * 운영과 같은 HTTPS 앞단(Caddy)을 거쳐 접속. 개발/운영 스택과 포트가 겹치지 않도록 HTTPS 13443, api 18080 사용
  * 인증서는 Caddy 내부 인증 기관이 발급하므로 신뢰 검사 생략
  */
+/** 느린 모드(E2E_SLOW_MS)는 요청마다 지연이 붙으므로 제한 시간도 늘림 */
+const slow = Number(process.env.E2E_SLOW_MS ?? 0) > 0;
+
 export default defineConfig({
   testDir: "./e2e",
+  timeout: slow ? 120_000 : 30_000,
+  expect: { timeout: slow ? 15_000 : 5_000 },
   // 같은 DB를 공유하므로 순차 실행. 테스트마다 고유 이름으로 데이터 생성
   workers: 1,
   fullyParallel: false,
