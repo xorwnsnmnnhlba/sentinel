@@ -32,7 +32,9 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 
 ## 디자인
 
-색·글꼴·배치·버튼 배치 규칙은 [DESIGN.md](DESIGN.md). Sentry 제품 화면 참고, 라이트 모드 전용 (다크 모드는 별도 작업)
+색·글꼴·배치·버튼 배치·테마 규칙은 [DESIGN.md](DESIGN.md). Sentry 제품 화면 참고
+
+- 테마: 시스템 설정(기본)·라이트·다크. 사이드바 아래 버튼으로 고르며 쿠키(`sentinel_theme`)로 유지, 서버가 `<html data-theme>`로 렌더링
 
 ## 구조
 
@@ -63,11 +65,13 @@ components/
  ├─ run-badges.tsx          판정·상태·주체 배지
  ├─ app-shell.tsx           화면 틀. 로그인 상태는 사이드바 + 본문, 로그인 전은 짙은 바탕 가운데 카드
  ├─ sidebar-nav.tsx         사이드바 메뉴(현재 화면 강조), 좁은 화면(768px 미만)의 메뉴 서랍
+ ├─ theme-toggle.tsx        테마 선택 (시스템 설정·라이트·다크)
  └─ page-header.tsx         화면 머리 (상위 화면 링크·제목·설명, 오른쪽 버튼 영역)
 test/                       테스트 공통 (MSW 서버, 환경 설정, redirect·notFound 확인, "⋯" 메뉴 열기)
 lib/
  ├─ actions/catalog.ts      Server Actions (등록·수정·삭제·실행 → Spring 호출 후 refresh·redirect)
  ├─ actions/case-import.ts  Server Actions (문서 미리보기, 케이스 가져오기)
+ ├─ actions/theme.ts        Server Action (테마 쿠키 저장)
  ├─ api/server.ts           Spring 호출 (서버 전용, server-only)
  ├─ api/types.ts            API 응답 타입
  ├─ case-draft.ts           케이스 폼 상태 ↔ API 요청 변환·검증 (화면과 Server Action 공용)
@@ -76,6 +80,7 @@ lib/
  ├─ dashboard.ts            대시보드 합계·이전 기간·변화 표시 계산
  ├─ response-times.ts       응답시간 기간(KST)·눈금·선 경로 계산
  ├─ csp.ts                  콘텐츠 보안 정책(CSP) 문자열, 요청별 nonce
+ ├─ theme.ts                테마 값 해석 (알 수 없는 값은 system), theme-cookie.ts는 요청 쿠키 읽기 (서버 전용)
  └─ utils.ts
 proxy.ts                    모든 화면 요청의 앞단 (로그인 확인, CSP 발급)
 ```
@@ -258,6 +263,7 @@ npm run e2e:up && npm run e2e && npm run e2e:down
   - `e2e/csp.spec.ts`: 요청별 nonce, 모든 스크립트의 nonce, 주입된 인라인 이벤트 속성 차단
   - 공통 위치 지정: `mainMenu`(사이드바 주요 메뉴), `sidebar`(계정 영역 포함), `chooseAction`("⋯" 메뉴 열고 항목 선택)
 - `e2e/layout.spec.ts`: 넓은 화면 사이드바·현재 메뉴 강조, 좁은 화면 메뉴 서랍·가로 스크롤 없음, 로그인 전 화면
+- `e2e/theme.spec.ts`: 운영체제 설정 따르기, 고른 테마 우선·새로 고침 후 유지(서버 렌더링), 다크에서 실행 환경 선택 글자 대비
 - 흐름: 프로젝트·환경(시크릿 포함) 등록 → 스위트·케이스 등록 → 즉시 실행·결과 확인(시크릿 마스킹) → 스케줄 등록·전환·수정·삭제 → 프로젝트 삭제 후 이력 유지 확인, 404 확인
 - 케이스가 api 자신(`http://e2e-api:8080`)을 호출하므로 외부 서버 없이 실행 결과까지 검증
 - 스택을 내리지 않고 반복 실행해도 되도록 프로젝트·스위트 이름에 실행 시각 포함
