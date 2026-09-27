@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestRun;
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 실행 이력 조회. 실행 건수와 무관하게 페이지당 쿼리 최대 4회(실행+이름, 전체 건수, 실행 주체, 단건 실행 대상).
+ * 실행 이력 조회. 실행 건수와 무관하게 페이지당 쿼리 최대 4회(실행+이름, 전체 건수, 실행 주체, 단건·여기까지 실행 대상).
  * 판정 수는 실행 행에 보관한 값(V10)이라 결과 테이블을 읽지 않음.
  * 결과가 한 페이지에 모두 들어가면 Spring Data가 전체 건수 쿼리를 생략하고, 수동 실행·단건 실행이 없으면 해당 조회도 생략.
  */
@@ -56,13 +57,18 @@ public class RunQueryService {
 				found.map(run -> summaryOf(run,
 						// 스케줄 실행은 주체가, 스위트 전체 실행은 대상 케이스가 null. 불변 Map은 null 키 조회 시 예외이므로 먼저 확인
 						run.getTriggeredBy() == null ? null : triggeredBy.get(run.getTriggeredBy()),
-						run.isSingleCase() ? targetCases.get(run.getTestCaseId()) : null))
+						run.isSingleCase() ? targetCases.get(run.getTestCaseId()) : null,
+						run.isThroughCase() ? targetCases.get(run.getThroughCaseId()) : null))
 					.getContent());
 	}
 
-	/** 단건 실행의 대상 케이스 이름. 삭제(보관)된 케이스도 이력 표시를 위해 조회 */
+	/** 단건 실행·여기까지 실행의 대상 케이스 이름. 삭제(보관)된 케이스도 이력 표시를 위해 조회 */
 	private Map<Long, IdName> targetCases(List<TestRun> found) {
-		List<Long> caseIds = found.stream().map(TestRun::getTestCaseId).filter(Objects::nonNull).distinct().toList();
+		List<Long> caseIds = found.stream()
+			.flatMap(run -> Stream.of(run.getTestCaseId(), run.getThroughCaseId()))
+			.filter(Objects::nonNull)
+			.distinct()
+			.toList();
 		if (caseIds.isEmpty()) {
 			return Map.of();
 		}
@@ -82,7 +88,7 @@ public class RunQueryService {
 			.collect(Collectors.toMap(User::getId, user -> new IdName(user.getId(), user.getEmail())));
 	}
 
-	private static RunSummary summaryOf(TestRun run, IdName triggeredBy, IdName testCase) {
+	private static RunSummary summaryOf(TestRun run, IdName triggeredBy, IdName testCase, IdName throughCase) {
 		int passed = run.getPassedCount();
 		int failed = run.getFailedCount();
 		int errors = run.getErrorCount();
@@ -91,7 +97,8 @@ public class RunQueryService {
 				new IdName(run.getSuite().getId(), run.getSuite().getName()),
 				new IdName(run.getEnvironment().getId(), run.getEnvironment().getName()), run.getTrigger(),
 				run.getStatus(), run.getStartedAt(), run.getFinishedAt(),
-				new TestRunDetail.Summary(passed + failed + errors, passed, failed, errors), triggeredBy, testCase);
+				new TestRunDetail.Summary(passed + failed + errors, passed, failed, errors), triggeredBy, testCase,
+				throughCase);
 	}
 
 }

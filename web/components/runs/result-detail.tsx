@@ -9,9 +9,19 @@ import { prettyBody } from "@/lib/format";
 
 /**
  * 케이스 1건의 결과. 오류 사유, 판정 규칙별 결과, 응답 값 추출 결과, 요청·응답 원문, 응답 구조
+ * 다른 케이스가 추출하는 변수가 비어 전송하지 못했으면 해결 방법 안내 (단건 실행은 "여기까지 실행", 그 외는 실행 순서 확인)
  * 보관기간이 지나 원문을 삭제한 실행(rawPurged)은 원문 대신 안내 문구 표시. 응답 구조는 원문과 달리 계속 표시
  */
-export function ResultDetail({ result, rawPurged = false }: { result: RunResult; rawPurged?: boolean }) {
+export function ResultDetail({
+  result,
+  rawPurged = false,
+  singleCase = false,
+}: {
+  result: RunResult;
+  rawPurged?: boolean;
+  /** 케이스 단건 실행의 결과 */
+  singleCase?: boolean;
+}) {
   const { assertions, extractions } = splitExtractions(result.assertionResults);
   return (
     <div className="space-y-4">
@@ -23,6 +33,13 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
         <div className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
           <span className="font-semibold">{result.errorReason}</span>
           {result.errorMessage && <span className="ml-2 break-all">{result.errorMessage}</span>}
+          {missesExtractedValue(result) && (
+            <p className="mt-2">
+              {singleCase
+                ? '앞 케이스가 응답에서 추출하는 값입니다. 스위트 화면의 케이스 "⋯" 메뉴에서 "여기까지 실행"으로 앞 케이스와 함께 실행해 주세요'
+                : "값을 추출하는 케이스가 이 케이스보다 뒤에 있거나 추출에 실패했습니다. 실행 순서와 앞 케이스의 값 추출 결과를 확인해 주세요"}
+            </p>
+          )}
         </div>
       )}
 
@@ -95,6 +112,14 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
         </Tabs>
       )}
     </div>
+  );
+}
+
+/** Spring 미해결 변수 메시지에 다른 케이스가 추출하는 변수라는 안내가 붙은 경우 (api/README.md "응답 값 추출") */
+function missesExtractedValue(result: RunResult): boolean {
+  return (
+    result.errorReason === "UNRESOLVED_VARIABLE" &&
+    (result.errorMessage ?? "").includes("Extracted by a case in this suite")
   );
 }
 

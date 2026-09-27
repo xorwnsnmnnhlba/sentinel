@@ -8,7 +8,7 @@ import { type CaseDraft, emptyDraft } from "@/lib/case-draft";
 
 import { CaseEditor } from "./case-editor";
 
-type Action = (draft: CaseDraft, runIn?: number) => Promise<CaseActionState>;
+type Action = (draft: CaseDraft, runIn?: number, through?: boolean) => Promise<CaseActionState>;
 
 function renderEditor(action: Action, initial: CaseDraft = emptyDraft(), environments: EnvironmentItem[] = []) {
   render(
@@ -240,6 +240,32 @@ describe("CaseEditor", () => {
 
     await waitFor(() => expect(action).toHaveBeenCalledOnce());
     expect(action.mock.calls[0][1]).toBe(5);
+  });
+
+  it("saves and runs from the start of the suite through this case", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => undefined);
+    render(
+      <CaseEditor
+        initial={valid}
+        action={action}
+        cancelHref="/suites/1"
+        submitLabel="저장"
+        environments={[environment(3, "dev")]}
+        runThrough
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "저장 후 여기까지 실행" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(action.mock.calls[0]).toEqual([valid, 3, true]);
+  });
+
+  it("offers run through only when asked", () => {
+    renderEditor(vi.fn<Action>(), valid, [environment(3, "dev")]);
+
+    expect(screen.queryByRole("button", { name: /여기까지 실행/ })).not.toBeInTheDocument();
   });
 
   it("offers no run button without environments", () => {

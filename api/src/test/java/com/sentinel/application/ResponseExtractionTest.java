@@ -162,7 +162,38 @@ class ResponseExtractionTest {
 		assertThat(result.errorReason()).isEqualTo(ErrorReason.UNRESOLVED_VARIABLE);
 		// 다른 케이스가 추출하는 변수만 안내 (userId는 어디서도 추출하지 않음)
 		assertThat(result.errorMessage()).isEqualTo("Unresolved variables: userId, token. "
-				+ "Extracted by a case in this suite: token (set only in a whole-suite run, after the extracting case succeeds)");
+				+ "Extracted by a case in this suite: token (set only when the extracting case runs earlier in the"
+				+ " same run: run the whole suite or run through this case)");
+	}
+
+	@Test
+	void runsTheSuiteThroughTheChosenCaseWithValuesFromEarlierCases() {
+		Environment environment = fixtures.environment(suite.getProject(), Map.of());
+		caseOf(HttpMethod.POST, "/login", Map.of(), List.of(TOKEN_FROM_LOGIN));
+		TestCase me = caseOf(HttpMethod.GET, "/me", Map.of("X-Token", List.of("{{token}}")), List.of());
+		caseOf(HttpMethod.DELETE, "/orders", Map.of(), List.of());
+
+		TestRunDetail run = service.getRun(service.runThroughCase(me.getId(), environment.getId(), tester));
+
+		// 뒤 케이스(주문 삭제)는 보내지 않음
+		assertThat(executor.requests()).extracting(request -> request.uri().getPath()).containsExactly("/login", "/me");
+		assertThat(executor.requests().get(1).headers().get("X-Token")).containsExactly(TOKEN);
+		assertThat(run.results()).extracting(TestRunDetail.Result::verdict).containsOnly(Verdict.PASSED);
+		assertThat(run.throughCase()).isEqualTo(new IdName(me.getId(), me.getName()));
+		assertThat(run.testCase()).isNull();
+		assertThat(run.trigger()).isEqualTo(TestRun.Trigger.MANUAL);
+		assertThat(run.triggeredBy().id()).isEqualTo(tester);
+	}
+
+	@Test
+	void runsOnlyTheFirstCaseWhenItIsTheChosenOne() {
+		Environment environment = fixtures.environment(suite.getProject(), Map.of());
+		TestCase login = caseOf(HttpMethod.POST, "/login", Map.of(), List.of(TOKEN_FROM_LOGIN));
+		caseOf(HttpMethod.GET, "/me", Map.of(), List.of());
+
+		service.runThroughCase(login.getId(), environment.getId(), tester);
+
+		assertThat(executor.requests()).extracting(request -> request.uri().getPath()).containsExactly("/login");
 	}
 
 	@Test

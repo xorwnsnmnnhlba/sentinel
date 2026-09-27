@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import com.sentinel.application.drift.SchemaDriftService;
 import com.sentinel.domain.BaseEntity;
@@ -95,7 +96,31 @@ public class TestRunService {
 			TestCase testCase = testCases.findByIdAndArchivedAtIsNull(testCaseId)
 				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
 			return start(testCase.getSuite(), findEnvironment(environmentId), List.of(testCase),
-					TestRun.Trigger.MANUAL, triggeredBy, testCase);
+					TestRun.Trigger.MANUAL, triggeredBy, testCase, null);
+		});
+		return executeAndRecord(prepared);
+	}
+
+	/**
+	 * 여기까지 실행. 케이스가 속한 스위트의 처음부터 이 케이스까지 실행 순서대로 수동 실행.
+	 * 앞 케이스가 추출하는 값을 쓰는 케이스를 스위트 전체 실행 없이 확인하기 위함 (뒤 케이스는 실행하지 않음)
+	 * @return 생성된 실행 ID
+	 * @throws NotFoundException 케이스 또는 환경 미존재
+	 * @throws InvalidRequestException 케이스와 환경의 프로젝트 불일치
+	 * @param triggeredBy 실행을 시작한 사용자
+	 */
+	public long runThroughCase(long testCaseId, long environmentId, long triggeredBy) {
+		Prepared prepared = transactions.write(status -> {
+			TestCase through = testCases.findByIdAndArchivedAtIsNull(testCaseId)
+				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
+			List<TestCase> suiteCases = testCases
+				.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(through.getSuite().getId());
+			int last = IntStream.range(0, suiteCases.size())
+				.filter(index -> BaseEntity.same(suiteCases.get(index), through))
+				.findFirst()
+				.orElseThrow();
+			return start(through.getSuite(), findEnvironment(environmentId), suiteCases.subList(0, last + 1),
+					TestRun.Trigger.MANUAL, triggeredBy, null, through);
 		});
 		return executeAndRecord(prepared);
 	}
@@ -111,7 +136,7 @@ public class TestRunService {
 		Prepared prepared = transactions.write(status -> {
 			TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
 			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId), trigger,
-					triggeredBy, null);
+					triggeredBy, null, null);
 		});
 		return executeAndRecord(prepared);
 	}
@@ -120,17 +145,17 @@ public class TestRunService {
 		return transactions.readOnly(status -> {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
 			List<TestResult> runResults = results.findWithTestCaseByRunId(runId);
-			return TestRunDetail.of(run, runResults, triggeredBy(run), testCase(run),
-					schemaDrift.driftOf(run, runResults));
+			return TestRunDetail.of(run, runResults, triggeredBy(run), caseName(run.getTestCaseId()),
+					caseName(run.getThroughCaseId()), schemaDrift.driftOf(run, runResults));
 		});
 	}
 
-	/** 단건 실행의 대상 케이스. 스위트 전체 실행은 null, 삭제(보관)된 케이스도 이력 표시를 위해 조회 */
-	private IdName testCase(TestRun run) {
-		if (!run.isSingleCase()) {
+	/** 단건 실행·여기까지 실행의 대상 케이스. 해당 없으면 null, 삭제(보관)된 케이스도 이력 표시를 위해 조회 */
+	private IdName caseName(Long caseId) {
+		if (caseId == null) {
 			return null;
 		}
-		return testCases.findById(run.getTestCaseId())
+		return testCases.findById(caseId)
 			.map(testCase -> new IdName(testCase.getId(), testCase.getName()))
 			.orElse(null);
 	}
@@ -151,22 +176,24 @@ public class TestRunService {
 	}
 
 	/**
-	 * @param target 케이스 단건 실행의 대상. 스위트 전체 실행은 null
+	 * @param target 케이스 단건 실행의 대상. 그 외 실행은 null
+	 * @param through 여기까지 실행의 마지막 케이스. 그 외 실행은 null
 	 */
 	private Prepared start(TestSuite suite, Environment environment, List<TestCase> cases, TestRun.Trigger trigger,
-			Long triggeredBy, TestCase target) {
+			Long triggeredBy, TestCase target, TestCase through) {
 		if (!BaseEntity.same(suite.getProject(), environment.getProject())) {
 			throw new InvalidRequestException("environment " + environment.getId()
 					+ " does not belong to the project of test suite " + suite.getId());
 		}
-		TestRun run = runs.save(target == null ? TestRun.start(suite, environment, trigger, clock.instant(), triggeredBy)
-				: TestRun.startCase(target, environment, trigger, clock.instant(), triggeredBy));
+		TestRun run = runs.save(target != null ? TestRun.startCase(target, environment, trigger, clock.instant(), triggeredBy)
+				: through != null ? TestRun.startThrough(through, environment, trigger, clock.instant(), triggeredBy)
+						: TestRun.start(suite, environment, trigger, clock.instant(), triggeredBy));
 		List<PreparedCase> preparedCases = cases.stream()
 			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment),
 					testCase.getAssertions(), testCase.getExtractors()))
 			.toList();
-		// 단건 실행에서 앞 케이스가 추출하는 변수를 쓰면 미해결 변수 메시지로 안내하기 위해 스위트 전체의 추출 변수 이름 수집
-		List<TestCase> suiteCases = target == null ? cases
+		// 단건 실행 등에서 다른 케이스가 추출하는 변수를 쓰면 미해결 변수 메시지로 안내하기 위해 스위트 전체의 추출 변수 이름 수집
+		List<TestCase> suiteCases = target == null && through == null ? cases
 				: testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId());
 		Set<String> extractedInSuite = suiteCases.stream()
 			.flatMap(testCase -> testCase.getExtractors().stream())
@@ -302,14 +329,15 @@ public class TestRunService {
 		};
 	}
 
-	/** 다른 케이스가 추출하는 변수가 빠졌으면 스위트 전체 실행에서만 채워진다는 안내 추가 */
+	/** 다른 케이스가 추출하는 변수가 빠졌으면 추출하는 케이스를 앞에서 함께 실행해야 한다는 안내 추가 */
 	private static String unresolvedMessage(UnresolvedVariableException ex, Set<String> extractedInSuite) {
 		List<String> extracted = ex.names().stream().filter(extractedInSuite::contains).sorted().toList();
 		if (extracted.isEmpty()) {
 			return ex.getMessage();
 		}
 		return ex.getMessage() + ". Extracted by a case in this suite: " + String.join(", ", extracted)
-				+ " (set only in a whole-suite run, after the extracting case succeeds)";
+				+ " (set only when the extracting case runs earlier in the same run: run the whole suite or run through"
+				+ " this case)";
 	}
 
 	private static String messageOf(Throwable ex) {

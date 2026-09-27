@@ -154,14 +154,16 @@ export async function createCase(suiteId: number, draft: CaseDraft, runIn?: numb
 /**
  * 케이스 수정. 요청 정의·판정 규칙은 전체 교체, 성공 시 스위트 화면으로 이동
  * @param runIn 지정 시 저장 후 그 환경에서 이 케이스만 실행하고 결과 화면으로 이동
+ * @param through runIn과 함께 true면 스위트 처음부터 이 케이스까지 실행
  */
 export async function updateCase(
   caseId: number,
   suiteId: number,
   draft: CaseDraft,
   runIn?: number,
+  through?: boolean,
 ): Promise<CaseActionState> {
-  return saveCase("PATCH", `/api/cases/${id(caseId)}`, id(suiteId), draft, {}, runIn);
+  return saveCase("PATCH", `/api/cases/${id(caseId)}`, id(suiteId), draft, {}, runIn, through === true);
 }
 
 async function saveCase(
@@ -171,6 +173,7 @@ async function saveCase(
   draft: unknown,
   extra: Record<string, number>,
   runIn: unknown,
+  through = false,
 ): Promise<CaseActionState> {
   if (!isCaseDraft(draft)) {
     return { errors: ["요청 형식이 올바르지 않습니다"] };
@@ -196,7 +199,8 @@ async function saveCase(
 
   let run: RunDetail | null;
   try {
-    run = await apiSend<RunDetail>("POST", "/api/runs", { caseId: saved!.id, environmentId: runIn });
+    const target = through ? { throughCaseId: saved!.id } : { caseId: saved!.id };
+    run = await apiSend<RunDetail>("POST", "/api/runs", { ...target, environmentId: runIn });
   } catch (error) {
     const reason = failure(error)?.error ?? "";
     if (method === "POST") {
@@ -282,8 +286,16 @@ export async function runCase(caseId: number, _: ActionState, form: FormData): P
   return startRun({ caseId: id(caseId) }, form);
 }
 
+/** 스위트 처음부터 이 케이스까지 실행 순서대로 실행 (앞 케이스가 추출하는 값을 쓰는 케이스 확인용) */
+export async function runThroughCase(caseId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  return startRun({ throughCaseId: id(caseId) }, form);
+}
+
 /** 실행이 끝나면 결과 상세로 이동 */
-async function startRun(target: { suiteId: number } | { caseId: number }, form: FormData): Promise<ActionState> {
+async function startRun(
+  target: { suiteId: number } | { caseId: number } | { throughCaseId: number },
+  form: FormData,
+): Promise<ActionState> {
   const environmentId = Number(form.get("environmentId"));
   if (!Number.isSafeInteger(environmentId) || environmentId <= 0) {
     return { error: "실행할 환경을 선택해 주세요" };

@@ -40,6 +40,8 @@ export interface RunSummary {
   triggeredBy: IdName | null;
   /** 케이스 단건 실행의 대상. 스위트 전체 실행은 null */
   testCase: IdName | null;
+  /** 여기까지 실행(스위트 처음부터 이 케이스까지)의 마지막 케이스. 그 외 실행은 null */
+  throughCase: IdName | null;
 }
 
 export interface AssertionResult {
@@ -112,6 +114,8 @@ export interface RunDetail {
   triggeredBy: IdName | null;
   /** 케이스 단건 실행의 대상. 스위트 전체 실행은 null */
   testCase: IdName | null;
+  /** 여기까지 실행(스위트 처음부터 이 케이스까지)의 마지막 케이스. 그 외 실행은 null */
+  throughCase: IdName | null;
   /** 보관기간이 지나 요청·응답 원문(헤더·본문)을 삭제한 시각. null이면 원문 보관 중 */
   rawPurgedAt: string | null;
 }

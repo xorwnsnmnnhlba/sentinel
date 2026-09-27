@@ -191,7 +191,7 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 - 추출 실패(경로·헤더 없음, `null`, 객체·배열, JSON 아닌 본문)는 해당 규칙 실패로 기록하여 케이스 `FAILED`
 - 추출한 값은 환경 변수의 같은 이름보다 우선. 추출에 실패하거나 응답을 받지 못하면 그 변수를 비워, 뒤 케이스는 환경 변수 값으로 조용히 실행되지 않고 `UNRESOLVED_VARIABLE`
 - 실행 범위: 같은 스위트 실행 안에서만. 스위트의 실행 순서상 뒤 케이스만 사용 가능
-  - 케이스 단건 실행은 앞 케이스를 실행하지 않으므로 추출 변수가 비어 `UNRESOLVED_VARIABLE`. 메시지에 스위트의 다른 케이스가 추출하는 변수임을 안내
+  - 케이스 단건 실행은 앞 케이스를 실행하지 않으므로 추출 변수가 비어 `UNRESOLVED_VARIABLE`. 메시지에 스위트의 다른 케이스가 추출하는 변수임을 안내. 앞 케이스와 함께 확인하려면 여기까지 실행(`throughCaseId`)
 - `secret: true` 값은 이후 저장하는 요청(URL·헤더·본문)·응답(헤더·본문)·판정 메시지에서 `****`로 가림 (추출한 케이스의 응답 포함). 결과 메시지는 `extracted (hidden)`. 3자 이하 값은 시크릿과 같이 가리지 않음
 
 ### 2. 실행 (API)
@@ -201,12 +201,15 @@ curl -i -X POST localhost:8080/api/runs \
   -H 'Content-Type: application/json' -d '{"caseId": 1, "environmentId": 1}'
 ```
 
-- 본문 `suiteId`(스위트 전체)와 `caseId`(케이스 1건) 중 정확히 하나 지정. 둘 다 없거나 둘 다 있으면 400
+- 본문 `suiteId`(스위트 전체), `caseId`(케이스 1건), `throughCaseId`(여기까지 실행) 중 정확히 하나 지정. 없거나 둘 이상이면 400
 - 201 + `Location: /api/runs/{id}`, 본문은 실행 결과
 - 스위트 실행은 케이스 실행 순서대로 순차 실행, 실패 케이스가 있어도 나머지 계속 실행
   - 실행 순서: 케이스 목록(`GET /api/cases?suiteId=`) 순서와 같음. 새 케이스는 마지막. 스위트 `PATCH`의 `caseOrder`로 변경 ("REST API" 참고)
 - 케이스 단건 실행은 케이스가 속한 스위트의 실행으로 기록하고 대상 케이스를 `testCase`(`{id, name}`)로 표시. 스위트 전체 실행은 `null`
   - 케이스 수정 확인용이므로 스위트 단위 집계(스위트 요약의 실행 수·통과율·최근 실행)에서 제외. 실행 이력·응답시간 추세에는 포함
+- 여기까지 실행(`throughCaseId`)은 스위트의 처음부터 그 케이스까지 실행 순서대로 실행하고 뒤 케이스는 보내지 않음. 마지막 케이스를 `throughCase`(`{id, name}`)로 표시, 그 외 실행은 `null`
+  - 앞 케이스가 추출하는 값을 쓰는 케이스를 스위트 전체 실행 없이 확인하는 용도 (뒤의 등록·삭제 요청 방지)
+  - 일부 케이스만 실행하므로 단건 실행과 같이 스위트 단위 집계에서 제외
 
 ### 결과 해석
 
@@ -332,6 +335,7 @@ curl -i -X POST localhost:8080/api/runs \
   - 행: 프로젝트·스위트·환경의 `{id, name}`, `trigger`, `status`, 시각, `summary`(전체·통과·실패·오류), `triggeredBy`
   - `triggeredBy`: 수동 실행을 시작한 사용자 `{id, name}`(이메일). 스케줄 실행과 이전 기록은 `null`
   - `testCase`: 케이스 단건 실행의 대상 `{id, name}`. 스위트 전체 실행은 `null`. 삭제(보관)된 케이스도 이름 표시
+  - `throughCase`: 여기까지 실행의 마지막 케이스 `{id, name}`. 그 외 실행은 `null`
   - 필터: `projectId`, `suiteId`, `environmentId`, `status`(`RUNNING`/`COMPLETED`/`ABORTED`), 시작 시각 기간 `from`·`to`, `failing=true`(판정 실패·오류 결과가 하나 이상 있는 실행). 여러 개를 함께 지정하면 모두 만족하는 실행만
   - `from`·`to`는 `yyyy-MM-dd`이며 `sentinel.schedule.zone`(기본 `Asia/Seoul`) 기준. 시작일 00:00부터 종료일 다음 날 00:00 직전까지 (종료일 당일 포함)
   - 실행 건수와 무관하게 페이지당 쿼리 최대 4회 (이름 함께 로딩, 전체 건수, 실행 주체 일괄 조회, 단건 실행 대상 일괄 조회). 판정 건수와 `failing` 조건은 실행 행에 보관한 판정 수(V10)를 사용하여 결과 테이블을 읽지 않음
@@ -384,7 +388,7 @@ curl -i -X POST localhost:8080/api/runs \
 
 - 보관되지 않은 모든 스위트 (프로젝트·스위트 이름 순), 실행한 적 없는 스위트도 포함
 - 항목: `suite`·`project`, 기간 안 실행 수 `runs`, 그중 실패·오류가 있는 실행 수 `failingRuns`, 판정별 결과 수 `results`, 통과 결과 비율 `passRate`(0~1, 결과 없으면 `null`), 기간과 무관한 최근 실행 `lastRun`(없으면 `null`)
-- 모든 값은 스위트 전체 실행 기준. 케이스 단건 실행은 제외 (한 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
+- 모든 값은 스위트 전체 실행 기준. 케이스 단건 실행·여기까지 실행은 제외 (일부 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
 - 스위트 수와 무관하게 쿼리 3회. 실행 행의 판정 수(V10)를 합산하여 결과 테이블을 읽지 않음
 
 ### 케이스 가져오기 (OpenAPI 3, Postman)

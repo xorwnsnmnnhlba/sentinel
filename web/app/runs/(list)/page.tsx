@@ -80,6 +80,7 @@ export default async function RunsPage(props: PageProps<"/runs">) {
                     <div className="text-xs text-muted-foreground">
                       {run.project.name}
                       {run.testCase && <> · 케이스 단건: {run.testCase.name}</>}
+                      {run.throughCase && <> · {run.throughCase.name}까지</>}
                     </div>
                   </TableCell>
                   <TableCell>{run.environment.name}</TableCell>

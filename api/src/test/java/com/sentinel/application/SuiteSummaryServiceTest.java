@@ -118,15 +118,18 @@ class SuiteSummaryServiceTest {
 		// 이후 케이스를 하나씩 따로 실행 (케이스 수정 확인 등). 통과 1건, 실패 1건
 		clock.set(SEPT_10);
 		long tester = fixtures.user().getId();
-		for (TestCase testCase : testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(orders.getId())) {
+		List<TestCase> cases = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(orders.getId());
+		for (TestCase testCase : cases) {
 			testRunService.runTestCase(testCase.getId(), environment.getId(), tester);
 		}
+		// 첫 케이스(통과)까지만 실행한 기록도 스위트 결과가 아님
+		testRunService.runThroughCase(cases.getFirst().getId(), environment.getId(), tester);
 
 		SuiteSummaryService.SuiteSummary summary = suiteSummaries.summaries(LocalDate.of(2026, 9, 10), null)
 			.suites()
 			.getFirst();
 
-		// 단건 실행은 스위트의 실행 수·통과율·최근 실행에 넣지 않음. 최근 실행은 여전히 실패가 있는 스위트 전체 실행
+		// 단건 실행·여기까지 실행은 스위트의 실행 수·통과율·최근 실행에 넣지 않음. 최근 실행은 여전히 실패가 있는 스위트 전체 실행
 		assertThat(summary.runs()).isEqualTo(1);
 		assertThat(summary.failingRuns()).isEqualTo(1);
 		assertThat(summary.results()).isEqualTo(new TestRunDetail.Summary(2, 1, 1, 0));

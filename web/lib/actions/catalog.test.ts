@@ -17,6 +17,7 @@ import {
   deleteSuite,
   runCase,
   runSuite,
+  runThroughCase,
   deleteSchedule,
   duplicateCase,
   reorderCases,
@@ -230,6 +231,23 @@ describe("runSuite", () => {
   });
 });
 
+describe("runThroughCase", () => {
+  it("runs the suite from the start through the case and opens the result", async () => {
+    const bodies = capture("post", "/api/runs", () => HttpResponse.json({ id: 44 }, { status: 201 }));
+
+    await expect(captureRedirect(() => runThroughCase(7, undefined, form({ environmentId: "3" })))).resolves.toBe(
+      "/runs/44",
+    );
+    expect(bodies).toEqual([{ throughCaseId: 7, environmentId: 3 }]);
+  });
+
+  it("requires an environment", async () => {
+    await expect(runThroughCase(7, undefined, form({ environmentId: "" }))).resolves.toEqual({
+      error: "실행할 환경을 선택해 주세요",
+    });
+  });
+});
+
 describe("runCase", () => {
   it("requires an environment", async () => {
     await expect(runCase(7, undefined, form({ environmentId: "0" }))).resolves.toEqual({
@@ -304,6 +322,14 @@ describe("cases", () => {
     await expect(captureRedirect(() => updateCase(9, 4, draft, 3))).resolves.toBe("/runs/77");
     expect(saved).toHaveLength(1);
     expect(runs).toEqual([{ caseId: 9, environmentId: 3 }]);
+  });
+
+  it("saves and then runs from the start of the suite through this case", async () => {
+    capture("patch", "/api/cases/9", () => HttpResponse.json({ id: 9 }));
+    const runs = capture("post", "/api/runs", () => HttpResponse.json({ id: 78 }, { status: 201 }));
+
+    await expect(captureRedirect(() => updateCase(9, 4, draft, 3, true))).resolves.toBe("/runs/78");
+    expect(runs).toEqual([{ throughCaseId: 9, environmentId: 3 }]);
   });
 
   it("runs a newly created case by the id Spring gave it", async () => {

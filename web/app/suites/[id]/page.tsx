@@ -27,6 +27,7 @@ import {
   reorderCases,
   runCase,
   runSuite,
+  runThroughCase,
   updateSchedule,
   updateSuite,
 } from "@/lib/actions/catalog";
@@ -192,6 +193,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                         items={withHistory(
                           caseMenu(testCase.id, {
                             runnable: environments.length > 0,
+                            first: index === 0,
                             duplicate: duplicateCase.bind(null, testCase.id),
                           }),
                           historyHref("CASE", testCase.id),
@@ -204,6 +206,17 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                             description="이 케이스만 실행합니다. 완료 후 결과 화면으로 이동합니다."
                             submitLabel="실행"
                             action={runCase.bind(null, testCase.id)}
+                          >
+                            <RunCaseFields environments={environments} />
+                          </FormDialog>
+                        )}
+                        {environments.length > 0 && index > 0 && (
+                          <FormDialog
+                            menuId="run-through"
+                            title={`케이스 "${testCase.name}"까지 실행`}
+                            description={`스위트의 처음부터 이 케이스까지 ${index + 1}건을 실행 순서대로 실행합니다. 앞 케이스가 추출한 값을 이 케이스에서 쓸 수 있습니다. 완료 후 결과 화면으로 이동합니다.`}
+                            submitLabel="실행"
+                            action={runThroughCase.bind(null, testCase.id)}
                           >
                             <RunCaseFields environments={environments} />
                           </FormDialog>
