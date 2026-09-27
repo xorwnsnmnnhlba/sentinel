@@ -80,7 +80,7 @@ class DomainPersistenceTest {
 				WHERE success AND version IS NOT NULL ORDER BY installed_rank
 				""").getResultList();
 
-		assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
+		assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
 	}
 
 	@Test
@@ -130,7 +130,7 @@ class DomainPersistenceTest {
 		testCases.save(new TestCase(suite, "금액 누락", new RequestSpec(HttpMethod.POST, "/billing/v1/charge", null, "{}")));
 		flushAndClear();
 
-		List<TestCase> found = testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suite.getId());
+		List<TestCase> found = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId());
 
 		assertThat(found).extracting(TestCase::getName).containsExactly("정상 결제", "금액 누락");
 		assertThat(found.getFirst().getRequest()).isEqualTo(request);

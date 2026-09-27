@@ -19,6 +19,7 @@ import {
   runSuite,
   deleteSchedule,
   duplicateCase,
+  reorderCases,
   setScheduleEnabled,
   updateCase,
   updateEnvironment,
@@ -418,6 +419,40 @@ describe("schedules", () => {
 
     await expect(deleteSchedule(5)).resolves.toEqual({});
     expect(refresh).toHaveBeenCalledOnce();
+  });
+});
+
+describe("reorderCases", () => {
+  function order(...caseIds: string[]) {
+    const data = new FormData();
+    caseIds.forEach((caseId) => data.append("caseId", caseId));
+    return data;
+  }
+
+  it("saves the submitted order as the suite's case order", async () => {
+    const bodies = capture("patch", "/api/suites/4", () => HttpResponse.json({ id: 4 }));
+
+    await expect(reorderCases(4, undefined, order("13", "11", "12"))).resolves.toEqual({});
+    expect(bodies).toEqual([{ caseOrder: [13, 11, 12] }]);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("explains a list that changed meanwhile and reloads the page", async () => {
+    capture("patch", "/api/suites/4", () => problem(409, "the cases of test suite 4 have changed"));
+
+    await expect(reorderCases(4, undefined, order("11"))).resolves.toEqual({
+      error: "그사이 케이스가 추가되거나 삭제되었습니다. 창을 닫고 다시 열어 순서를 정해 주세요",
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it.each([[[]], [["11", "abc"]], [["0"]]])("rejects malformed ids %j without calling Spring", async (caseIds) => {
+    const bodies = capture("patch", "/api/suites/4", () => HttpResponse.json({ id: 4 }));
+
+    await expect(reorderCases(4, undefined, order(...caseIds))).resolves.toEqual({
+      error: "요청 형식이 올바르지 않습니다",
+    });
+    expect(bodies).toEqual([]);
   });
 });
 

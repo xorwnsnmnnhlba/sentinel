@@ -102,6 +102,28 @@ export async function updateSuite(suiteId: number, _: ActionState, form: FormDat
 }
 
 /**
+ * 케이스 실행 순서 변경. 폼의 caseId를 적힌 순서대로 스위트의 실행 순서로 저장 (Spring이 스위트의 현재 케이스 전체인지 확인)
+ */
+export async function reorderCases(suiteId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  const caseOrder = form.getAll("caseId").map(Number);
+  if (caseOrder.length === 0 || !caseOrder.every((caseId) => Number.isSafeInteger(caseId) && caseId > 0)) {
+    return { error: "요청 형식이 올바르지 않습니다" };
+  }
+  try {
+    await apiSend<SuiteItem>("PATCH", `/api/suites/${id(suiteId)}`, { caseOrder });
+  } catch (error) {
+    // 이름 중복이 아닌, 창을 연 뒤 다른 곳에서 케이스가 추가·삭제된 경우. 다시 열면 최신 목록이 보이도록 화면 재조회
+    if (isApiError(error) && error.status === 409) {
+      refresh();
+      return { error: "그사이 케이스가 추가되거나 삭제되었습니다. 창을 닫고 다시 열어 순서를 정해 주세요" };
+    }
+    return failure(error);
+  }
+  refresh();
+  return {};
+}
+
+/**
  * @param projectId 지정 시 삭제 후 프로젝트 화면으로 이동(스위트 화면에서 삭제). 미지정 시 현재 화면 재조회
  */
 export async function deleteSuite(suiteId: number, projectId?: number): Promise<ActionState> {

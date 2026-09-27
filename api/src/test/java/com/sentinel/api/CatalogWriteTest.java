@@ -1,5 +1,6 @@
 package com.sentinel.api;
 
+import java.util.List;
 import java.util.Map;
 
 import com.sentinel.TestAuthConfiguration;
@@ -260,6 +261,66 @@ class CatalogWriteTest {
 	}
 
 	@Test
+	void reordersCasesAndRunsThemInThatOrder() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		long a = createCase(suite, "a");
+		long b = createCase(suite, "b");
+		long c = createCase(suite, "c");
+
+		assertThat(patch("/api/suites/" + suite.getId(), """
+				{"caseOrder": [%d, %d, %d]}""".formatted(c, a, b))).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.caseCount")
+			.isEqualTo(3);
+		// 새 케이스는 마지막
+		long d = createCase(suite, "d");
+
+		assertThat(mvc.get().uri("/api/cases?suiteId={id}", suite.getId())).bodyJson()
+			.extractingPath("$[*].id")
+			.isEqualTo(List.of((int) c, (int) a, (int) b, (int) d));
+		post("/api/runs", """
+				{"suiteId": %d, "environmentId": %d}""".formatted(suite.getId(), environment.getId()));
+		assertThat(executor.requests()).extracting(request -> request.uri().getPath())
+			.containsExactly("/c", "/a", "/b", "/d");
+	}
+
+	@Test
+	void rejectsCaseOrdersThatDoNotMatchTheCurrentCases() {
+		Project project = fixtures.project();
+		TestSuite suite = fixtures.suite(project);
+		long a = createCase(suite, "a");
+		long b = createCase(suite, "b");
+		long other = createCase(fixtures.suite(project), "other");
+		long archived = createCase(suite, "archived");
+		mvc.delete().uri("/api/cases/{id}", archived).exchange();
+		String uri = "/api/suites/" + suite.getId();
+
+		// 그사이 추가·삭제된 케이스 (빠짐, 다른 스위트, 삭제된 케이스)
+		for (String order : List.of("[%d]".formatted(a), "[%d, %d, %d]".formatted(a, b, other),
+				"[%d, %d, %d]".formatted(a, b, archived))) {
+			assertThat(patch(uri, "{\"caseOrder\": " + order + "}")).hasStatus(HttpStatus.CONFLICT)
+				.bodyJson()
+				.extractingPath("$.detail")
+				.asString()
+				.contains("reload");
+		}
+		// 중복·null
+		assertThat(patch(uri, """
+				{"caseOrder": [%d, %d, %d]}""".formatted(a, b, a))).hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(patch(uri, """
+				{"caseOrder": [%d, null]}""".formatted(a))).hasStatus(HttpStatus.BAD_REQUEST);
+		// 거부되면 함께 보낸 이름 변경도 반영하지 않음
+		assertThat(patch(uri, """
+				{"name": "renamed", "caseOrder": [%d]}""".formatted(b))).hasStatus(HttpStatus.CONFLICT);
+		assertThat(mvc.get().uri(uri)).bodyJson().extractingPath("$.name").isEqualTo(suite.getName());
+		assertThat(mvc.get().uri("/api/cases?suiteId={id}", suite.getId())).bodyJson()
+			.extractingPath("$[*].id")
+			.isEqualTo(List.of((int) a, (int) b));
+	}
+
+	@Test
 	void rejectsInvalidCaseDefinitions() {
 		TestSuite suite = fixtures.suite(fixtures.project());
 
@@ -363,6 +424,12 @@ class CatalogWriteTest {
 		return """
 				{"suiteId": %d, "name": "%s", "request": %s, "extractors": %s}""".formatted(suiteId, name, request,
 				extractors);
+	}
+
+	private long createCase(TestSuite suite, String name) {
+		String location = post("/api/cases", caseJson(suite.getId(), name, """
+				{"method": "GET", "path": "/%s"}""".formatted(name))).getResponse().getHeader("Location");
+		return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
 	}
 
 }

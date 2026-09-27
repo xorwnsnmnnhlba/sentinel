@@ -2,9 +2,13 @@ package com.sentinel.application;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -135,8 +139,16 @@ public class CatalogCommandService {
 		return SuiteItem.of(suites.save(valid(() -> new TestSuite(project, name, description))), 0);
 	}
 
-	public SuiteItem updateSuite(long suiteId, String name, String description) {
+	/**
+	 * @param caseOrder 지정 시 케이스 실행 순서 전체 교체. 스위트의 사용 중인 케이스 ID를 빠짐없이 한 번씩
+	 * @throws ConflictException caseOrder의 케이스가 스위트의 현재 케이스와 다름 (그사이 추가·삭제됨)
+	 * @throws InvalidRequestException caseOrder에 null·중복 ID
+	 */
+	public SuiteItem updateSuite(long suiteId, String name, String description, List<Long> caseOrder) {
 		TestSuite suite = findSuite(suiteId);
+		if (caseOrder != null) {
+			reorderCases(suiteId, caseOrder);
+		}
 		long projectId = suite.getProject().getId();
 		if (name != null) {
 			requireUnusedName("test suite", name, suiteId,
@@ -149,7 +161,24 @@ public class CatalogCommandService {
 		return SuiteItem.of(suite, (int) testCases.countBySuiteIdAndArchivedAtIsNull(suiteId));
 	}
 
+	/** 목록 순서대로 실행 순서 1, 2, 3 … 지정 */
+	private void reorderCases(long suiteId, List<Long> caseOrder) {
+		if (caseOrder.stream().anyMatch(Objects::isNull) || new HashSet<>(caseOrder).size() != caseOrder.size()) {
+			throw new InvalidRequestException("caseOrder must list each case once");
+		}
+		List<TestCase> cases = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId);
+		Map<Long, TestCase> byId = cases.stream().collect(Collectors.toMap(TestCase::getId, testCase -> testCase));
+		if (!byId.keySet().equals(Set.copyOf(caseOrder))) {
+			throw new ConflictException(
+					"the cases of test suite " + suiteId + " have changed; reload and order all current cases");
+		}
+		for (int i = 0; i < caseOrder.size(); i++) {
+			byId.get(caseOrder.get(i)).placeAt(i + 1);
+		}
+	}
+
 	/**
+	 * 새 케이스는 스위트의 마지막 실행 순서
 	 * @param assertions null 또는 빈 목록이면 기본 판정(status in [2xx])
 	 * @param extractors 응답 값 추출 규칙. null이면 없음
 	 */
@@ -158,7 +187,9 @@ public class CatalogCommandService {
 		TestSuite suite = findSuite(suiteId);
 		requireUnusedName("test case", name, null,
 				unique -> testCases.findBySuiteIdAndNameAndArchivedAtIsNull(suiteId, unique));
-		return CaseItem.of(testCases.save(valid(() -> new TestCase(suite, name, specOf(request), assertions, extractors))));
+		TestCase testCase = valid(() -> new TestCase(suite, name, specOf(request), assertions, extractors));
+		testCase.placeAt(testCases.findMaxRunOrder(suiteId) + 1);
+		return CaseItem.of(testCases.save(testCase));
 	}
 
 	/**
@@ -239,7 +270,7 @@ public class CatalogCommandService {
 	}
 
 	private void archive(TestSuite suite, Instant now) {
-		testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suite.getId()).forEach(testCase -> testCase.archive(now));
+		testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId()).forEach(testCase -> testCase.archive(now));
 		// 프로젝트 연쇄 보관 시 환경 쪽에서 먼저 보관된 스케줄은 조회 시점 자동 flush로 제외됨
 		schedules.findBySuiteIdAndArchivedAtIsNullOrderById(suite.getId()).forEach(schedule -> schedule.archive(now));
 		suite.archive(now);

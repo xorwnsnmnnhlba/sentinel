@@ -20,7 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * V10 마이그레이션의 기존 실행 판정 수 채우기. 별도 스키마에 V9까지 적용하고 이력을 넣은 뒤 V10 적용
+ * 기존 데이터를 채우는 마이그레이션 확인. 별도 스키마에 이전 버전까지 적용하고 데이터를 넣은 뒤 대상 버전 적용
+ * <ul>
+ * <li>V10: 실행별 판정 수</li>
+ * <li>V12: 케이스 실행 순서</li>
+ * </ul>
  * <p>
  * Flyway는 자체 연결을 쓰므로 넣은 이력이 보이도록 테스트 트랜잭션 없이 실행
  */
@@ -28,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(TestcontainersConfiguration.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class VerdictCountBackfillTest {
+class MigrationBackfillTest {
 
 	private static final String SCHEMA = "backfill_check";
 
@@ -59,6 +63,34 @@ class VerdictCountBackfillTest {
 				Map.<String, Object>of("id", mixed, "passed", 2, "failed", 1, "errors", 1),
 				Map.<String, Object>of("id", empty, "passed", 0, "failed", 0, "errors", 0),
 				Map.<String, Object>of("id", other, "passed", 0, "failed", 1, "errors", 0));
+	}
+
+	@Test
+	void fillsTheRunOrderOfExistingCasesInIdOrderPerSuite() {
+		migrateTo("11");
+		JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+		// 스위트 1: 4번 케이스는 보관됨. 스위트 2: 케이스 1건. 스위트마다 1부터 ID 순
+		insertCase(jdbc, 1, 1, null);
+		insertCase(jdbc, 2, 2, null);
+		insertCase(jdbc, 3, 1, null);
+		insertCase(jdbc, 4, 1, "CURRENT_TIMESTAMP");
+		insertCase(jdbc, 5, 1, null);
+
+		migrateTo("12");
+
+		assertThat(jdbc.queryForList("SELECT id, run_order FROM %s.test_case ORDER BY id".formatted(SCHEMA)))
+			.containsExactly(Map.<String, Object>of("id", 1L, "run_order", 1),
+					Map.<String, Object>of("id", 2L, "run_order", 1), Map.<String, Object>of("id", 3L, "run_order", 2),
+					Map.<String, Object>of("id", 4L, "run_order", 3), Map.<String, Object>of("id", 5L, "run_order", 4));
+	}
+
+	private static void insertCase(JdbcTemplate jdbc, long id, long suiteId, String archivedAt) {
+		jdbc.update("""
+				INSERT INTO %s.test_case (id, suite_id, name, http_method, path, headers, archived_at, archive_key,
+				                          created_at, updated_at)
+				VALUES (?, ?, ?, 'GET', '/a', '{}', %s, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+				""".formatted(SCHEMA, archivedAt == null ? "NULL" : archivedAt), id, suiteId, "case-" + id,
+				archivedAt == null ? 0 : id);
 	}
 
 	private void migrateTo(String version) {
