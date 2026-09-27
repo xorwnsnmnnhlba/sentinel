@@ -65,6 +65,26 @@ export interface RunResult {
   response: { statusCode: number; headers: Headers | null; body: string | null; bodyTruncated: boolean } | null;
   /** 응답 JSON의 구조 지문. 원문 보관기간이 지나도 유지. JSON이 아닌 응답·응답 없음은 null */
   responseSchema: ResponseSchema | null;
+  /** 같은 케이스·환경의 이전 실행 대비 구조 변화. 지문이 없으면 null */
+  drift: ResultDrift | null;
+}
+
+export type DriftLevel = "BREAKING" | "WARNING" | "INFO";
+
+export interface DriftChange {
+  level: DriftLevel;
+  /** REMOVED 필수 필드 없음, TYPE_CHANGED null 외 타입 변경, NULLABLE null 등장, ADDED 새 필드 */
+  kind: "REMOVED" | "TYPE_CHANGED" | "NULLABLE" | "ADDED";
+  path: string;
+  expected: string[];
+  actual: string[];
+}
+
+/** COLLECTING이면 이전 실행이 적어 비교하지 않음 (changes 빈 목록) */
+export interface ResultDrift {
+  status: "COMPARED" | "COLLECTING";
+  observations: number;
+  changes: DriftChange[];
 }
 
 /**

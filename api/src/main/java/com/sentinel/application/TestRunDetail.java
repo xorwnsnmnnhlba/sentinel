@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import com.sentinel.application.drift.ResultDrift;
+import com.sentinel.application.drift.SchemaDriftService;
 import com.sentinel.domain.TestResult;
 import com.sentinel.domain.TestResult.ErrorReason;
 import com.sentinel.domain.TestResult.Outcome;
@@ -27,7 +29,15 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 	 * @param testCase 케이스 단건 실행의 대상. 스위트 전체 실행은 null
 	 */
 	static TestRunDetail of(TestRun run, List<TestResult> results, IdName triggeredBy, IdName testCase) {
-		List<Result> mapped = results.stream().map(Result::of).toList();
+		return of(run, results, triggeredBy, testCase, Map.of());
+	}
+
+	/**
+	 * @param drifts 결과 ID별 구조 변화 ({@link SchemaDriftService})
+	 */
+	static TestRunDetail of(TestRun run, List<TestResult> results, IdName triggeredBy, IdName testCase,
+			Map<Long, ResultDrift> drifts) {
+		List<Result> mapped = results.stream().map(result -> Result.of(result, drifts.get(result.getId()))).toList();
 		return new TestRunDetail(run.getId(), run.getSuite().getId(), run.getSuite().getName(),
 				run.getEnvironment().getId(), run.getEnvironment().getName(), run.getTrigger(), run.getStatus(),
 				run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped, triggeredBy, run.getRawPurgedAt(),
@@ -54,12 +64,13 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 
 	/**
 	 * @param responseSchema 응답 JSON의 구조 지문. 원문 보관기간이 지나도 유지. JSON이 아닌 응답·응답 없음은 null
+	 * @param drift 이전 실행 대비 구조 변화. 지문이 없으면 null
 	 */
 	public record Result(long id, long testCaseId, String testCaseName, Verdict verdict, Outcome outcome,
 			List<AssertionResult> assertionResults, ErrorReason errorReason, String errorMessage, Long elapsedMs,
-			Request request, Response response, ResponseSchema responseSchema) {
+			Request request, Response response, ResponseSchema responseSchema, ResultDrift drift) {
 
-		static Result of(TestResult result) {
+		static Result of(TestResult result, ResultDrift drift) {
 			Response response = result.getOutcome() == Outcome.RESPONDED
 					? new Response(result.getStatusCode(), result.getResponseHeaders(), result.getResponseBody(),
 							result.isResponseBodyTruncated())
@@ -69,7 +80,7 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 					result.getAssertionResults(), result.getErrorReason(), result.getErrorMessage(), result.getElapsedMs(),
 					new Request(result.getRequestMethod(), result.getRequestUrl(), result.getRequestHeaders(),
 							result.getRequestBody()),
-					response, result.getResponseSchema());
+					response, result.getResponseSchema(), drift);
 		}
 
 	}

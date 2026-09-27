@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Empty, SectionHeader } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
 import { RunCountBadges, SingleCaseBadge, StatusBadge, TriggerBadge, VerdictBadge } from "@/components/run-badges";
+import { DriftBadge, highestLevel } from "@/components/runs/drift";
 import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { apiGetOrNotFound } from "@/lib/api/server";
@@ -20,8 +21,10 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
     notFound();
   }
   const run = await apiGetOrNotFound<RunDetail>(`/api/runs/${id}`);
-  // 실패·오류 케이스는 펼친 상태로 표시
-  const openByDefault = run.results.filter((result) => result.verdict !== "PASSED").map((result) => String(result.id));
+  // 실패·오류 케이스와 호환이 깨지는 구조 변화가 있는 케이스는 펼친 상태로 표시
+  const openByDefault = run.results
+    .filter((result) => result.verdict !== "PASSED" || highestLevel(result.drift) === "BREAKING")
+    .map((result) => String(result.id));
 
   return (
     <div className="space-y-6">
@@ -73,6 +76,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <VerdictBadge verdict={result.verdict} />
                     <span className="truncate font-medium">{result.testCaseName}</span>
+                    <DriftBadge drift={result.drift} />
                     <span className="ml-auto flex shrink-0 items-center gap-3 font-mono text-xs text-muted-foreground">
                       <span>{result.request.method}</span>
                       {result.response && <span>{result.response.statusCode}</span>}

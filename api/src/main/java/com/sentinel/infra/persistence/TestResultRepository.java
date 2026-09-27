@@ -115,6 +115,30 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 			""")
 	List<Object[]> p95ByWindow(@Param("from") Instant from, @Param("middle") Instant middle, @Param("to") Instant to);
 
+	/**
+	 * 케이스별 이전 구조 지문 최근 {@code window}건 (같은 환경, {@code runId}보다 앞선 실행). 구조 변화 판정의 기준선
+	 * <p>
+	 * 케이스별 건수 제한은 SQL 표준 창 함수 {@code ROW_NUMBER}. JSON 열은 문자열로 변환하여 반환
+	 * @return [케이스 ID, 지문 JSON] 케이스 순, 최근 순
+	 */
+	@Query(nativeQuery = true, value = """
+			SELECT w.test_case_id, w.schema_json
+			FROM (
+			    SELECT r.test_case_id, CAST(r.response_schema AS VARCHAR) AS schema_json,
+			           ROW_NUMBER() OVER (PARTITION BY r.test_case_id ORDER BY r.id DESC) AS rn
+			    FROM {h-schema}test_result r
+			    JOIN {h-schema}test_run t ON t.id = r.run_id
+			    WHERE t.environment_id = :environmentId
+			      AND r.test_case_id IN (:caseIds)
+			      AND t.id < :runId
+			      AND r.response_schema IS NOT NULL
+			) w
+			WHERE w.rn <= :window
+			ORDER BY w.test_case_id, w.rn
+			""")
+	List<Object[]> findRecentSchemas(@Param("environmentId") long environmentId,
+			@Param("caseIds") Collection<Long> caseIds, @Param("runId") long runId, @Param("window") int window);
+
 	/** 기간 안에 시작한 스위트 전체 실행의 판정별 결과 수 (스위트별, 케이스 단건 실행 제외) */
 	@Query("""
 			select t.suite.id as suiteId, r.verdict as verdict, count(r) as count

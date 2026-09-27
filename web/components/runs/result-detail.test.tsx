@@ -29,6 +29,7 @@ const responded: RunResult = {
     bodyTruncated: false,
   },
   responseSchema: { fields: { $: ["object"], "$.orderId": ["number"] }, complete: true },
+  drift: { status: "COMPARED", observations: 3, changes: [] },
 };
 
 /** 보관기간 경과 후 API가 돌려주는 형태. 헤더·본문만 null */
@@ -47,6 +48,7 @@ describe("ResultDetail", () => {
 
     await user.click(screen.getByRole("tab", { name: "구조" }));
 
+    expect(screen.getByText("이전 실행 3회와 구조가 같습니다")).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "응답 구조" });
     expect(within(table).getByRole("row", { name: "$.orderId number" })).toBeInTheDocument();
     expect(screen.getByText(/일부만 기록했습니다/)).toBeInTheDocument();
@@ -95,6 +97,7 @@ describe("ResultDetail", () => {
       request: { method: "GET", url: null, headers: null, body: null },
       response: null,
       responseSchema: null,
+      drift: null,
     };
     render(<ResultDetail result={unsent} rawPurged />);
 
