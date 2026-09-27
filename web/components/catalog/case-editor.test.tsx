@@ -3,14 +3,29 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { CaseActionState } from "@/lib/actions/catalog";
+import type { EnvironmentItem } from "@/lib/api/types";
 import { type CaseDraft, emptyDraft } from "@/lib/case-draft";
 
 import { CaseEditor } from "./case-editor";
 
-type Action = (draft: CaseDraft) => Promise<CaseActionState>;
+type Action = (draft: CaseDraft, runIn?: number) => Promise<CaseActionState>;
 
-function renderEditor(action: Action, initial: CaseDraft = emptyDraft()) {
-  render(<CaseEditor initial={initial} action={action} cancelHref="/suites/1" submitLabel="등록" />);
+function renderEditor(action: Action, initial: CaseDraft = emptyDraft(), environments: EnvironmentItem[] = []) {
+  render(
+    <CaseEditor
+      initial={initial}
+      action={action}
+      cancelHref="/suites/1"
+      submitLabel="등록"
+      environments={environments}
+    />,
+  );
+}
+
+const valid: CaseDraft = { ...emptyDraft(), name: "health", path: "/health" };
+
+function environment(id: number, name: string): EnvironmentItem {
+  return { id, projectId: 1, name, baseUrl: "http://gw", variables: {}, secretNames: [] };
 }
 
 describe("CaseEditor", () => {
@@ -120,5 +135,59 @@ describe("CaseEditor", () => {
     renderEditor(vi.fn<Action>());
 
     expect(screen.getByRole("link", { name: "취소" })).toHaveAttribute("href", "/suites/1");
+  });
+
+  it("saves only, without running, from the main button", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => undefined);
+    renderEditor(action, valid, [environment(3, "dev")]);
+
+    await user.click(screen.getByRole("button", { name: "등록" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(action.mock.calls[0][1]).toBeUndefined();
+  });
+
+  it("saves and runs in the only environment", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => undefined);
+    renderEditor(action, valid, [environment(3, "dev")]);
+
+    // 환경이 하나면 고를 필요 없음
+    expect(screen.queryByRole("combobox", { name: "실행 환경" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "등록 후 실행" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(action.mock.calls[0]).toEqual([valid, 3]);
+  });
+
+  it("runs in the chosen environment when there are several", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => undefined);
+    renderEditor(action, valid, [environment(3, "dev"), environment(5, "staging")]);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "실행 환경" }), "staging");
+    await user.click(screen.getByRole("button", { name: "등록 후 실행" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(action.mock.calls[0][1]).toBe(5);
+  });
+
+  it("offers no run button without environments", () => {
+    renderEditor(vi.fn<Action>(), valid, []);
+
+    expect(screen.queryByRole("button", { name: /후 실행/ })).not.toBeInTheDocument();
+  });
+
+  it("shows why it could not run and keeps the form", async () => {
+    const user = userEvent.setup();
+    renderEditor(async () => ({ errors: ["저장했지만 실행하지 못했습니다. 대상을 찾을 수 없습니다"] }), valid, [
+      environment(3, "dev"),
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "등록 후 실행" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("저장했지만 실행하지 못했습니다");
+    expect(screen.getByLabelText("이름")).toHaveValue("health");
   });
 });

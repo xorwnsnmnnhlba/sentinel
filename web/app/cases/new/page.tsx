@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { CaseEditor } from "@/components/catalog/case-editor";
 import { PageHeader } from "@/components/page-header";
 import { createCase } from "@/lib/actions/catalog";
-import { apiGetOrNotFound } from "@/lib/api/server";
-import type { SuiteItem } from "@/lib/api/types";
+import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
+import type { EnvironmentItem, SuiteItem } from "@/lib/api/types";
 import { emptyDraft } from "@/lib/case-draft";
 
 export const metadata = { title: "케이스 추가 · Sentinel" };
@@ -16,6 +16,7 @@ export default async function NewCasePage(props: PageProps<"/cases/new">) {
     notFound();
   }
   const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${suiteId}`);
+  const environments = await apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -25,6 +26,7 @@ export default async function NewCasePage(props: PageProps<"/cases/new">) {
         action={createCase.bind(null, suite.id)}
         cancelHref={`/suites/${suite.id}`}
         submitLabel="등록"
+        environments={environments}
       />
     </div>
   );

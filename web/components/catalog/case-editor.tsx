@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Play, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import type { CaseActionState } from "@/lib/actions/catalog";
-import type { HttpMethod } from "@/lib/api/types";
+import type { EnvironmentItem, HttpMethod } from "@/lib/api/types";
 import {
   ASSERTION_LABELS,
   ASSERTION_TYPES,
@@ -31,22 +31,28 @@ import { prettyBody } from "@/lib/format";
 
 /**
  * 케이스 등록·수정 폼. 저장 전 화면에서 먼저 검증하고, Server Action이 같은 규칙으로 재검사한 뒤 Spring에 저장
+ * environments가 있으면 "{submitLabel} 후 실행"으로 저장하고 바로 이 케이스만 실행 (환경이 여럿이면 선택)
  */
 export function CaseEditor({
   initial,
   action,
   cancelHref,
   submitLabel,
+  environments = [],
 }: {
   initial: CaseDraft;
-  action: (draft: CaseDraft) => Promise<CaseActionState>;
+  /** @param runIn 지정 시 저장 후 그 환경에서 실행 */
+  action: (draft: CaseDraft, runIn?: number) => Promise<CaseActionState>;
   cancelHref: string;
   submitLabel: string;
+  environments?: EnvironmentItem[];
 }) {
   const [draft, setDraft] = useState(initial);
   const [errors, setErrors] = useState<string[]>([]);
   const [newType, setNewType] = useState<AssertionType>("statusCode");
   const [pending, startTransition] = useTransition();
+  const [running, setRunning] = useState(false);
+  const [environmentId, setEnvironmentId] = useState(environments[0]?.id);
 
   function update(patch: Partial<CaseDraft>) {
     setDraft((current) => ({ ...current, ...patch }));
@@ -64,8 +70,11 @@ export function CaseEditor({
       return;
     }
     setErrors([]);
+    // 누른 버튼으로 저장만 할지, 저장 후 실행할지 구분
+    const run = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "run";
+    setRunning(run);
     startTransition(async () => {
-      const result = await action(draft);
+      const result = await action(draft, run ? environmentId : undefined);
       if (result?.errors?.length) {
         setErrors(result.errors);
       }
@@ -209,11 +218,32 @@ export function CaseEditor({
         </ul>
       )}
 
-      <div className="flex gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "저장 중…" : submitLabel}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" name="intent" value="save" disabled={pending}>
+          {pending && !running ? "저장 중…" : submitLabel}
         </Button>
-        <Button asChild variant="outline">
+        {environments.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            {environments.length > 1 && (
+              <NativeSelect
+                aria-label="실행 환경"
+                value={environmentId}
+                onChange={(event) => setEnvironmentId(Number(event.target.value))}
+              >
+                {environments.map((environment) => (
+                  <NativeSelectOption key={environment.id} value={environment.id}>
+                    {environment.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            )}
+            <Button type="submit" name="intent" value="run" variant="outline" disabled={pending}>
+              <Play />
+              {pending && running ? "실행 중…" : `${submitLabel} 후 실행`}
+            </Button>
+          </div>
+        )}
+        <Button asChild variant="ghost">
           <Link href={cancelHref}>취소</Link>
         </Button>
       </div>

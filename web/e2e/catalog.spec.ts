@@ -112,7 +112,7 @@ test("케이스 등록 후 실행하면 결과 표시", async ({ page }) => {
   await page.getByLabel("추가할 판정 규칙").selectOption("bodyContains");
   await page.getByRole("button", { name: "규칙 추가" }).click();
   await page.getByLabel("판정 규칙 1 포함할 문자열").fill(project);
-  await page.getByRole("button", { name: "등록" }).click();
+  await page.getByRole("button", { name: "등록", exact: true }).click();
 
   await expect(page).toHaveURL(/\/suites\/\d+$/);
   await expect(caseRow(page, /프로젝트 목록 조회/)).toContainText("{{apiPrefix}}/projects");
@@ -319,7 +319,7 @@ test("잘못된 경로는 저장 전에 막힘", async ({ page }) => {
 
   await page.getByLabel("이름", { exact: true }).fill("잘못된 경로");
   await page.getByLabel("경로").fill("api/projects");
-  await page.getByRole("button", { name: "등록" }).click();
+  await page.getByRole("button", { name: "등록", exact: true }).click();
 
   await expect(alertIn(page)).toContainText("경로는 / 또는 {{변수}}로 시작해야 합니다");
   await expect(page).toHaveURL(/\/cases\/new/);
@@ -378,21 +378,37 @@ test("케이스만 따로 실행하면 단건 실행으로 기록", async ({ pag
   await page.goto("/runs");
   await expect(page.getByRole("row", { name: /케이스 단건: 프로젝트 목록 조회/ }).first()).toBeVisible();
 
-  // 케이스 수정 화면에서도 실행 (저장된 내용 기준)
+  // 케이스 수정 화면: 저장 후 바로 실행
   await page.goto("/projects");
   await page.getByRole("link", { name: project }).click();
   await page.getByRole("link", { name: suite }).click();
   await page.getByRole("table", { name: "케이스 목록" }).getByRole("link", { name: "프로젝트 목록 조회" }).click();
-  // 화면 전환 전에 누르면 스위트 화면의 "지금 실행"이 눌리므로 케이스 화면 도착 확인 후 정확한 이름으로 선택
+  // 화면 전환 전에 누르지 않도록 케이스 화면 도착 확인
   await expect(page.getByRole("heading", { name: "케이스 수정", level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: "실행", exact: true }).click();
-  await page
-    .getByRole("dialog", { name: '케이스 "프로젝트 목록 조회" 실행' })
-    .getByRole("button", { name: "실행", exact: true })
-    .click();
+  // 등록 후 실행에서 실행만 실패하면 이 화면으로 옮겨 안내 (같은 케이스 중복 등록 방지)
+  const caseUrl = page.url();
+  await page.goto(`${caseUrl}?notice=run-failed`);
+  await expect(page.getByRole("status")).toContainText("케이스를 등록했지만 실행하지 못했습니다");
+  await page.goto(caseUrl);
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await page.getByRole("button", { name: "저장 후 실행" }).click();
   await expect(page).toHaveURL(/\/runs\/\d+$/);
   expect(page.url()).not.toBe(runUrl);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("케이스 단건");
+  await expect(page.getByText("통과 1")).toBeVisible();
+
+  // 케이스 추가 화면: 등록 후 바로 실행 (없는 초대 조회는 404라 기본 판정(2xx)에서 실패)
+  await page.goto("/projects");
+  await page.getByRole("link", { name: project }).click();
+  await page.getByRole("link", { name: suite }).click();
+  await page.getByRole("link", { name: "케이스 추가" }).click();
+  await expect(page.getByRole("heading", { name: "케이스 추가", level: 1 })).toBeVisible();
+  await page.getByLabel("이름", { exact: true }).fill("없는 초대 조회");
+  await page.getByLabel("경로").fill("{{apiPrefix}}/invites/unknown");
+  await page.getByRole("button", { name: "등록 후 실행" }).click();
+  await expect(page).toHaveURL(/\/runs\/\d+$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("케이스 단건");
+  await expect(page.getByText("실패 1")).toBeVisible();
 });
 
 test("프로젝트 삭제 시 하위 항목도 사라지고 실행 이력은 유지", async ({ page }) => {
