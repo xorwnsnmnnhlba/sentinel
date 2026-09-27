@@ -9,6 +9,13 @@ export const EDIT_DELETE: ActionMenuItem[] = [
   { id: "delete", label: "삭제", icon: "delete", destructive: true },
 ];
 
+/** 환경 행 메뉴: 수정 · 복제(원본 값을 채운 등록 대화상자) · 삭제 */
+export const EDIT_DUPLICATE_DELETE: ActionMenuItem[] = [
+  { id: "edit", label: "수정", icon: "edit" },
+  { id: "duplicate", label: "복제", icon: "copy" },
+  { id: "delete", label: "삭제", icon: "delete", destructive: true },
+];
+
 /**
  * 케이스 행 메뉴: 실행(환경이 있을 때) · 수정(별도 화면) · 복제 · 삭제
  * @param duplicate 복제 Server Action (대화상자 없이 바로 실행)

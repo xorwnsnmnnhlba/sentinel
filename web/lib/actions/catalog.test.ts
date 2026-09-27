@@ -147,6 +147,8 @@ describe("environments", () => {
     ["not json", "시크릿 형식이 올바르지 않습니다"],
     ["[1]", "시크릿 형식이 올바르지 않습니다"],
     ['{"token": 42}', "시크릿 값은 문자열이어야 합니다"],
+    // 복제 시 이름만 채운 행을 비운 채 저장하면 빈 시크릿이 되므로 거부. 값은 메시지에 넣지 않음
+    ['{"apiKey": "k", "token": ""}', "시크릿 token의 값을 입력하거나 그 행을 지워 주세요"],
   ])("rejects secrets %s without calling Spring", async (secrets, message) => {
     await expect(
       createEnvironment(2, undefined, form({ name: "dev", baseUrl: "https://gw", secrets })),
