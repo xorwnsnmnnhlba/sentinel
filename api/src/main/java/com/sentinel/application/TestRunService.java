@@ -2,11 +2,14 @@ package com.sentinel.application;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.sentinel.application.drift.SchemaDriftService;
 import com.sentinel.domain.BaseEntity;
@@ -35,6 +38,8 @@ import com.sentinel.application.secret.SecretCipher;
 import com.sentinel.application.secret.SecretDecryptionException;
 import com.sentinel.application.secret.SecretKeyMissingException;
 import com.sentinel.runner.assertion.AssertionResult;
+import com.sentinel.runner.extract.Extractor;
+import com.sentinel.runner.extract.Extractor.Extraction;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +50,10 @@ import org.springframework.stereotype.Service;
  * <p>
  * HTTP 호출 동안 DB 커넥션을 점유하지 않기 위해 전송 구간을 트랜잭션에서 분리. 커넥션 풀 크기 5 전제.
  * 스위트 내 케이스는 ID 순서로 순차 실행하여 GW 동시 호출 없음.
+ * <p>
+ * 응답 값 추출: 케이스의 추출 규칙으로 얻은 값은 같은 실행에서 뒤에 실행하는 케이스의 변수가 됨 (환경 변수보다 우선).
+ * 추출에 실패하거나 응답을 받지 못하면 그 변수를 비워 뒤 케이스가 환경 변수의 같은 이름 값으로 조용히 실행되지 않고
+ * 미해결 변수 오류가 됨. 가림 지정 값은 이후 이력에서 시크릿처럼 가림.
  */
 @Service
 @RequiredArgsConstructor
@@ -154,13 +163,20 @@ public class TestRunService {
 				: TestRun.startCase(target, environment, trigger, clock.instant(), triggeredBy));
 		List<PreparedCase> preparedCases = cases.stream()
 			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment),
-					testCase.getAssertions()))
+					testCase.getAssertions(), testCase.getExtractors()))
 			.toList();
+		// 단건 실행에서 앞 케이스가 추출하는 변수를 쓰면 미해결 변수 메시지로 안내하기 위해 스위트 전체의 추출 변수 이름 수집
+		List<TestCase> suiteCases = target == null ? cases
+				: testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suite.getId());
+		Set<String> extractedInSuite = suiteCases.stream()
+			.flatMap(testCase -> testCase.getExtractors().stream())
+			.map(Extractor::name)
+			.collect(Collectors.toUnmodifiableSet());
 		Map<String, String> secrets = decrypt(environment);
 		Map<String, String> values = new LinkedHashMap<>(environment.getVariables());
 		values.putAll(secrets);
 		return new Prepared(run.getId(), suite.getId(), trigger, preparedCases, Map.copyOf(values),
-				Set.copyOf(secrets.values()));
+				Set.copyOf(secrets.values()), extractedInSuite);
 	}
 
 	/**
@@ -191,11 +207,15 @@ public class TestRunService {
 	private long executeAndRecord(Prepared prepared) {
 		long startedAt = System.nanoTime();
 		Map<TestResult.Verdict, Integer> counts = new EnumMap<>(TestResult.Verdict.class);
+		// 추출한 값이 더해지는 실행 범위의 변수와 가릴 값
+		Map<String, String> variables = new LinkedHashMap<>(prepared.variables());
+		Set<String> secretValues = new HashSet<>(prepared.secretValues());
 		for (PreparedCase preparedCase : prepared.cases()) {
-			Execution execution = execute(preparedCase, prepared.variables());
+			Execution execution = extract(preparedCase,
+					execute(preparedCase, variables, prepared.extractedInSuite()), variables, secretValues);
+			Set<String> masked = Set.copyOf(secretValues);
 			TestResult.Verdict verdict = transactions.write(status -> {
-				TestResult.Verdict saved = results
-					.save(resultOf(prepared.runId(), preparedCase, execution, prepared.secretValues()))
+				TestResult.Verdict saved = results.save(resultOf(prepared.runId(), preparedCase, execution, masked))
 					.getVerdict();
 				// 실행의 판정 수도 같은 트랜잭션에서 올려 결과와 어긋나지 않음 (중단된 실행도 저장된 결과 기준)
 				runs.findById(prepared.runId()).orElseThrow().countVerdict(saved);
@@ -211,13 +231,43 @@ public class TestRunService {
 		return prepared.runId();
 	}
 
-	private Execution execute(PreparedCase preparedCase, Map<String, String> variables) {
+	/**
+	 * 응답에서 값을 추출해 {@code variables}·{@code secretValues}에 반영하고 추출 결과를 판정 결과 뒤에 덧붙임.
+	 * 실패한 추출과 응답을 받지 못한 케이스의 추출 변수는 비움
+	 */
+	private static Execution extract(PreparedCase preparedCase, Execution execution, Map<String, String> variables,
+			Set<String> secretValues) {
+		if (preparedCase.extractors().isEmpty()) {
+			return execution;
+		}
+		if (!(execution instanceof Responded responded)) {
+			preparedCase.extractors().forEach(extractor -> variables.remove(extractor.name()));
+			return execution;
+		}
+		List<AssertionResult> assertionResults = new ArrayList<>(responded.assertionResults());
+		for (Extractor extractor : preparedCase.extractors()) {
+			Extraction extraction = extractor.extract(responded.exchange());
+			if (extraction.succeeded()) {
+				variables.put(extractor.name(), extraction.value());
+				if (extractor.secret()) {
+					secretValues.add(extraction.value());
+				}
+			}
+			else {
+				variables.remove(extractor.name());
+			}
+			assertionResults.add(new AssertionResult(extractor.describe(), extraction.succeeded(), extraction.message()));
+		}
+		return new Responded(responded.exchange(), assertionResults);
+	}
+
+	private Execution execute(PreparedCase preparedCase, Map<String, String> variables, Set<String> extractedInSuite) {
 		ResolvedRequest request;
 		try {
 			request = preparedCase.template().resolve(variables);
 		}
 		catch (UnresolvedVariableException ex) {
-			return new Failed(ErrorReason.UNRESOLVED_VARIABLE, ex.getMessage(), null, null);
+			return new Failed(ErrorReason.UNRESOLVED_VARIABLE, unresolvedMessage(ex, extractedInSuite), null, null);
 		}
 		catch (IllegalArgumentException ex) {
 			return new Failed(ErrorReason.INVALID_REQUEST, ex.getMessage(), null, null);
@@ -252,6 +302,16 @@ public class TestRunService {
 		};
 	}
 
+	/** 다른 케이스가 추출하는 변수가 빠졌으면 스위트 전체 실행에서만 채워진다는 안내 추가 */
+	private static String unresolvedMessage(UnresolvedVariableException ex, Set<String> extractedInSuite) {
+		List<String> extracted = ex.names().stream().filter(extractedInSuite::contains).sorted().toList();
+		if (extracted.isEmpty()) {
+			return ex.getMessage();
+		}
+		return ex.getMessage() + ". Extracted by a case in this suite: " + String.join(", ", extracted)
+				+ " (set only in a whole-suite run, after the extracting case succeeds)";
+	}
+
 	private static String messageOf(Throwable ex) {
 		Throwable root = ex;
 		while (root.getCause() != null) {
@@ -263,12 +323,14 @@ public class TestRunService {
 	/**
 	 * @param variables 변수와 복호화한 시크릿
 	 * @param secretValues 이력 저장 시 가릴 시크릿 값
+	 * @param extractedInSuite 스위트의 케이스들이 추출하는 변수 이름
 	 */
 	private record Prepared(long runId, long suiteId, TestRun.Trigger trigger, List<PreparedCase> cases,
-			Map<String, String> variables, Set<String> secretValues) {
+			Map<String, String> variables, Set<String> secretValues, Set<String> extractedInSuite) {
 	}
 
-	private record PreparedCase(long testCaseId, RequestTemplate template, List<Assertion> assertions) {
+	private record PreparedCase(long testCaseId, RequestTemplate template, List<Assertion> assertions,
+			List<Extractor> extractors) {
 	}
 
 	private sealed interface Execution permits Responded, Failed {

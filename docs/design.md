@@ -189,6 +189,7 @@ Project ─ Environment (baseUrl, 변수셋, 시크릿)
 - 규칙 미지정 시 기본 판정 `status in [2xx]`. 미적용 시 5xx 응답도 통과 처리되는 문제 방지
 - 결과는 test_result.verdict(PASSED/FAILED/ERROR) + assertion_results JSON(규칙별 설명·통과 여부·실제 값)
 - 판정 단위 SQL 조회(예: 응답 시간 규칙 보유 케이스 검색)는 불편. 현재 요구사항에 없음
+- 응답 값 추출 규칙도 같은 방식으로 test_case.extractors JSON 단일 컬럼 (V11, 2026-09-27)
 
 ### 엔티티 유의사항
 - TestRun에 TestResult 양방향 @OneToMany 금지. 단방향 @ManyToOne만 두고 리포지토리 조회
@@ -253,7 +254,9 @@ CREATE INDEX idx_run_time         ON test_run(started_at DESC, id DESC);
 com.xxx.apitest
  ├─ domain/          엔티티, 도메인 서비스
  ├─ runner/          RequestExecutor, VariableResolver
- │   └─ assertion/   AssertionEvaluator + 구현체
+ │   ├─ assertion/   AssertionEvaluator + 구현체
+ │   ├─ extract/     Extractor (응답 값 추출)
+ │   └─ schema/      ResponseSchema, SchemaBaseline, SchemaDrift (구조 지문·변화)
  ├─ application/     TestRunService, SuiteService
  ├─ api/             Controller, DTO
  └─ infra/           Repository, 스케줄러, 암호화
@@ -505,6 +508,13 @@ docker compose up -d --build --wait
   | 케이스 응답시간 추세 (90일) | 145ms | 140ms |
 
   - 응답시간 집계(변화·추세·스위트 요약)는 결과를 읽어야 하는 집계라 그대로 두고 200ms 이하 확인. 이력이 더 늘어 느려지면 일 단위 집계 테이블 도입
+- 응답 값 추출 1단계 api (2026-09-27): 케이스의 추출 규칙(`test_case.extractors`, V11)으로 앞 케이스의 응답 값을 같은 스위트 실행의 뒤 케이스 변수로 전달 (`api/README.md` "응답 값 추출"). 2단계는 web 입력 화면·결과 표시
+  - 위치는 본문 JSON 경로와 응답 헤더 두 가지. 로그인 토큰, 등록 응답의 ID·`Location`이 주 용도
+  - 추출 결과는 별도 컬럼 대신 판정 결과(`assertionResults`) 뒤에 덧붙임. 기존 결과 화면·알림·보관 정책을 그대로 사용하고 추출 실패가 판정 실패로 드러남
+  - 추출 실패·응답 없음이면 변수를 비움. 환경 변수에 같은 이름이 있을 때 이전 값으로 조용히 전송되는 것 방지
+  - 가림 지정 값은 시크릿과 같이 이후 이력에서 값 일치로 가림. 판정 메시지(`was "..."`)도 가리도록 확장 (환경 시크릿 포함)
+  - 케이스 단건 실행은 앞 케이스를 함께 실행하지 않음 (의도하지 않은 등록·삭제 요청 방지). 추출 변수가 비면 오류 메시지로 안내
+  - 실행 순서는 케이스 ID 순 그대로. 순서 변경은 별도 슬라이스
 - 결과 데이터 보관기간 파기 배치 (2026-09-23 구현). 실행·결과 행은 유지, 요청·응답 헤더·본문만 30일 경과 후 삭제 (`api/README.md` "결과 원문 보관기간")
 
 ---

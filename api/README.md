@@ -168,6 +168,32 @@ VALUES ((SELECT s.id FROM sentinel.test_suite s JOIN sentinel.project p ON p.id 
 - 규칙은 실패가 있어도 전부 평가하여 `assertionResults`에 규칙별 결과 기록
 - HTML 오류 페이지 등 JSON 객체·배열이 아닌 본문은 `jsonPath` 규칙 실패(`response body is not JSON`)
 
+### 응답 값 추출 (`extractors`)
+
+앞 케이스의 응답 값을 같은 스위트 실행에서 뒤에 실행하는 케이스의 `{{변수}}`로 사용. 예: 로그인 응답의 토큰으로 조회, 등록 응답의 ID로 조회·삭제
+
+```json
+"extractors": [
+  {"name": "token", "from": "BODY", "expression": "$.data.token", "secret": true},
+  {"name": "orderUrl", "from": "HEADER", "expression": "Location"}
+]
+```
+
+| 속성 | 의미 |
+|------|------|
+| `name` | 변수 이름. 영문·숫자·`_ . -`, 100자 이하. 케이스 안에서 중복 불가 |
+| `from` | `BODY`(응답 본문 JSON 경로) / `HEADER`(응답 헤더, 이름 대소문자 무관, 여러 개면 첫 값) |
+| `expression` | `BODY`는 JsonPath, `HEADER`는 헤더 이름 |
+| `secret` | 토큰 등 가릴 값. 생략 시 `false` |
+
+- 케이스당 최대 20개. 추출은 판정 규칙 평가 뒤에 하며 결과를 `assertionResults` 끝에 `extract {{token}} from $.data.token` 형태로 덧붙임
+- `BODY`는 문자열·숫자·불리언만 추출 (숫자·불리언은 JSON 표기 그대로 문자열로). 결과가 원소 1개인 배열(필터 경로 `$.items[?(@.sku == 'a')].id`)이면 그 원소
+- 추출 실패(경로·헤더 없음, `null`, 객체·배열, JSON 아닌 본문)는 해당 규칙 실패로 기록하여 케이스 `FAILED`
+- 추출한 값은 환경 변수의 같은 이름보다 우선. 추출에 실패하거나 응답을 받지 못하면 그 변수를 비워, 뒤 케이스는 환경 변수 값으로 조용히 실행되지 않고 `UNRESOLVED_VARIABLE`
+- 실행 범위: 같은 스위트 실행 안에서만. 실행 순서(케이스 ID 순)상 뒤 케이스만 사용 가능
+  - 케이스 단건 실행은 앞 케이스를 실행하지 않으므로 추출 변수가 비어 `UNRESOLVED_VARIABLE`. 메시지에 스위트의 다른 케이스가 추출하는 변수임을 안내
+- `secret: true` 값은 이후 저장하는 요청(URL·헤더·본문)·응답(헤더·본문)·판정 메시지에서 `****`로 가림 (추출한 케이스의 응답 포함). 결과 메시지는 `extracted (hidden)`. 3자 이하 값은 시크릿과 같이 가리지 않음
+
 ### 2. 실행 (API)
 
 ```bash
@@ -192,6 +218,7 @@ curl -i -X POST localhost:8080/api/runs \
 | `errorReason` | `UNRESOLVED_VARIABLE`(변수 누락, 미전송) / `INVALID_REQUEST`(잘못된 URL·헤더) / `TIMEOUT` / `CONNECTION_FAILED` / `IO_ERROR` / `BLOCKED_DESTINATION`(링크 로컬·클라우드 메타데이터 주소, 미전송) / `UNEXPECTED` |
 
 - 저장되는 요청·응답 헤더 중 `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` 값은 `****`로 마스킹. 실제 전송 값은 원본 사용
+- 환경 시크릿과 가림 지정 추출 값은 요청·응답과 판정 메시지(`was "..."`)에서 `****`로 가림
 - 응답 본문은 64KB(UTF-8 기준) 초과 시 잘라서 저장, `bodyTruncated: true` 표시
 - `responseSchema`: 응답 JSON의 구조 지문 `{fields: {경로: [타입]}, complete}`. 스키마 드리프트 감지의 기준 데이터
   - 예: `{"$": ["object"], "$.items": ["array"], "$.items[]": ["object"], "$.items[].id": ["number"], "$.items[].tag": ["null", "string"]}`
@@ -298,7 +325,7 @@ curl -i -X POST localhost:8080/api/runs \
 
 - 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
 - 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
-- 스위트는 `caseCount`, 케이스는 요청 정의(`request`)와 판정 규칙(`assertions`), 환경은 `baseUrl`과 변수 포함
+- 스위트는 `caseCount`, 케이스는 요청 정의(`request`)와 판정 규칙(`assertions`)·응답 값 추출(`extractors`), 환경은 `baseUrl`과 변수 포함
 - 실행 목록: 최신순, 페이지 응답 `{content, page, size, totalElements, totalPages}` (`page`는 0부터, `size`는 1~100으로 보정)
   - 행: 프로젝트·스위트·환경의 `{id, name}`, `trigger`, `status`, 시각, `summary`(전체·통과·실패·오류), `triggeredBy`
   - `triggeredBy`: 수동 실행을 시작한 사용자 `{id, name}`(이메일). 스케줄 실행과 이전 기록은 `null`
@@ -311,9 +338,9 @@ curl -i -X POST localhost:8080/api/runs \
 - 등록·수정
   - 등록은 201 + `Location`, 본문은 단건 조회와 같은 형태. 수정은 200 + 수정 후 항목
   - `PATCH`는 부분 수정. 생략(null)한 필드는 유지, `description`은 빈 문자열로 제거
-  - 환경 `variables`, 케이스 `request`·`assertions`는 지정 시 전체 교체. `assertions: []`는 기본 판정(2xx)으로 복귀
+  - 환경 `variables`, 케이스 `request`·`assertions`·`extractors`는 지정 시 전체 교체. `assertions: []`는 기본 판정(2xx)으로 복귀
   - 같은 부모 아래 사용 중인 이름과 중복 시 409 (프로젝트는 전체에서 유일). 앞뒤 공백은 제거 후 비교
-  - 잘못된 값(빈 이름, 길이 초과, 잘못된 `baseUrl`·경로·메서드·판정 규칙)은 400, 미존재·보관된 부모는 404
+  - 잘못된 값(빈 이름, 길이 초과, 잘못된 `baseUrl`·경로·메서드·판정 규칙·추출 규칙)은 400, 미존재·보관된 부모는 404
   - 부모 변경(다른 프로젝트·스위트로 이동)은 미지원
 
 | 등록 | 본문 예시 |

@@ -26,6 +26,7 @@ import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.application.secret.SecretCipher;
 import com.sentinel.runner.assertion.Assertion;
+import com.sentinel.runner.extract.Extractor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -150,19 +151,23 @@ public class CatalogCommandService {
 
 	/**
 	 * @param assertions null 또는 빈 목록이면 기본 판정(status in [2xx])
+	 * @param extractors 응답 값 추출 규칙. null이면 없음
 	 */
-	public CaseItem createCase(long suiteId, String name, Request request, List<Assertion> assertions) {
+	public CaseItem createCase(long suiteId, String name, Request request, List<Assertion> assertions,
+			List<Extractor> extractors) {
 		TestSuite suite = findSuite(suiteId);
 		requireUnusedName("test case", name, null,
 				unique -> testCases.findBySuiteIdAndNameAndArchivedAtIsNull(suiteId, unique));
-		return CaseItem.of(testCases.save(valid(() -> new TestCase(suite, name, specOf(request), assertions))));
+		return CaseItem.of(testCases.save(valid(() -> new TestCase(suite, name, specOf(request), assertions, extractors))));
 	}
 
 	/**
 	 * @param request 지정 시 요청 정의 전체 교체
 	 * @param assertions 지정 시 전체 교체. 빈 목록이면 기본 판정으로 복귀
+	 * @param extractors 지정 시 전체 교체
 	 */
-	public CaseItem updateCase(long caseId, String name, Request request, List<Assertion> assertions) {
+	public CaseItem updateCase(long caseId, String name, Request request, List<Assertion> assertions,
+			List<Extractor> extractors) {
 		TestCase testCase = testCases.findByIdAndArchivedAtIsNull(caseId)
 			.orElseThrow(() -> new NotFoundException("test case", caseId));
 		long suiteId = testCase.getSuite().getId();
@@ -176,6 +181,9 @@ public class CatalogCommandService {
 		}
 		if (assertions != null) {
 			change(() -> testCase.changeAssertions(assertions));
+		}
+		if (extractors != null) {
+			change(() -> testCase.changeExtractors(extractors));
 		}
 		return CaseItem.of(testCase);
 	}

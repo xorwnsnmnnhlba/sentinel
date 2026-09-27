@@ -90,7 +90,7 @@ public class CaseImportService {
 				throw new InvalidRequestException("cases[" + index + "] must not be null");
 			}
 			try {
-				created.add(commands.createCase(suiteId, newCase.name(), newCase.request(), newCase.assertions()));
+				created.add(commands.createCase(suiteId, newCase.name(), newCase.request(), newCase.assertions(), null));
 			}
 			catch (InvalidRequestException ex) {
 				throw new InvalidRequestException("cases[" + index + "] '" + newCase.name() + "': " + ex.getMessage());

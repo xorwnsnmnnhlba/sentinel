@@ -44,6 +44,11 @@ public class FakeRequestExecutor implements RequestExecutor {
 		behavior = request -> new HttpExchange(request, 200, Map.of(), "", elapsed.apply(request));
 	}
 
+	/** 요청별 응답. 경로마다 본문·헤더를 바꾸는 검증용 (응답 값 추출 등) */
+	public void respondWith(Function<ResolvedRequest, HttpExchange> exchange) {
+		behavior = exchange;
+	}
+
 	public void fail(RequestExecutionException.Reason reason) {
 		behavior = request -> {
 			throw new RequestExecutionException(reason, request, Duration.ofMillis(1000), null);

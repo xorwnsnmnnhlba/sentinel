@@ -20,6 +20,7 @@ import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
+import com.sentinel.runner.extract.Extractor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -83,8 +84,13 @@ public class TestFixtures {
 
 	public TestCase testCase(TestSuite suite, HttpMethod method, String path, Map<String, List<String>> headers,
 			String body, List<Assertion> assertions) {
+		return testCase(suite, method, path, headers, body, assertions, List.of());
+	}
+
+	public TestCase testCase(TestSuite suite, HttpMethod method, String path, Map<String, List<String>> headers,
+			String body, List<Assertion> assertions, List<Extractor> extractors) {
 		return testCases.save(new TestCase(suite, "case-" + UUID.randomUUID(),
-				new RequestSpec(method, path, headers, body), assertions));
+				new RequestSpec(method, path, headers, body), assertions, extractors));
 	}
 
 	/** 사용자는 삭제하지 않음. 기본 로그인 계정(TestAuthConfiguration)이 함께 지워지면 이후 요청이 401 */

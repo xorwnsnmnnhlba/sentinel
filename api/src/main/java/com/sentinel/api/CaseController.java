@@ -43,7 +43,8 @@ class CaseController {
 	 */
 	@PostMapping
 	ResponseEntity<CaseItem> create(@Valid @RequestBody CreateCaseRequest request) {
-		CaseItem created = commands.createCase(request.suiteId(), request.name(), request.request(), request.assertions());
+		CaseItem created = commands.createCase(request.suiteId(), request.name(), request.request(), request.assertions(),
+				request.extractors());
 		return ResponseEntity.created(URI.create("/api/cases/" + created.id())).body(created);
 	}
 
@@ -52,7 +53,8 @@ class CaseController {
 	 */
 	@PatchMapping("/{caseId}")
 	CaseItem update(@PathVariable long caseId, @RequestBody UpdateCaseRequest request) {
-		return commands.updateCase(caseId, request.name(), request.request(), request.assertions());
+		return commands.updateCase(caseId, request.name(), request.request(), request.assertions(),
+				request.extractors());
 	}
 
 	/**

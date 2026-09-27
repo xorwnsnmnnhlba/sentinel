@@ -15,6 +15,7 @@ import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
+import com.sentinel.runner.extract.Extractor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -127,14 +128,16 @@ public class CatalogQueryService {
 
 	/**
 	 * @param assertions 비어 있으면 기본 판정(status in [2xx]) 적용
+	 * @param extractors 응답 값 추출 규칙
 	 */
-	public record CaseItem(long id, long suiteId, String name, Request request, List<Assertion> assertions) {
+	public record CaseItem(long id, long suiteId, String name, Request request, List<Assertion> assertions,
+			List<Extractor> extractors) {
 
 		static CaseItem of(TestCase testCase) {
 			RequestSpec spec = testCase.getRequest();
 			return new CaseItem(testCase.getId(), testCase.getSuite().getId(), testCase.getName(),
 					new Request(spec.getMethod(), spec.getPath(), spec.getHeaders(), spec.getBody()),
-					testCase.getAssertions());
+					testCase.getAssertions(), testCase.getExtractors());
 		}
 
 	}

@@ -155,7 +155,11 @@ public class TestResult extends BaseEntity {
 	public static TestResult responded(TestRun run, TestCase testCase, HttpExchange exchange,
 			List<AssertionResult> assertionResults, Set<String> secretValues) {
 		TestResult result = new TestResult(run, testCase, Outcome.RESPONDED, exchange.request().method());
-		result.assertionResults = List.copyOf(assertionResults);
+		// 판정 메시지의 실제 값(예: was "...")에 시크릿·가림 지정 추출 값이 나올 수 있으므로 함께 가림
+		result.assertionResults = assertionResults.stream()
+			.map(assertion -> new AssertionResult(assertion.description(), assertion.passed(),
+					SecretValues.mask(assertion.message(), secretValues)))
+			.toList();
 		result.verdict = assertionResults.stream().allMatch(AssertionResult::passed) ? Verdict.PASSED : Verdict.FAILED;
 		result.recordRequest(exchange.request(), secretValues);
 		result.statusCode = exchange.statusCode();
