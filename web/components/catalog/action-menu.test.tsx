@@ -9,7 +9,7 @@ import { openMenu } from "@/test/menu";
 import { ActionMenu } from "./action-menu";
 import { DeleteDialog } from "./delete-dialog";
 import { FormDialog } from "./form-dialog";
-import { EDIT_DELETE, editLinkDelete } from "./menu-items";
+import { caseMenu, EDIT_DELETE } from "./menu-items";
 
 type Action = (state: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -56,9 +56,9 @@ describe("ActionMenu", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "프로젝트 billing 작업" })).toHaveFocus());
   });
 
-  it("puts running a single case first when it can run", async () => {
+  it("orders the case actions with delete last", async () => {
     const user = userEvent.setup();
-    render(<ActionMenu label="케이스 조회 작업" items={editLinkDelete("/cases/7", true)} />);
+    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: true, duplicate: vi.fn() })} />);
 
     await openMenu(user, "케이스 조회 작업");
 
@@ -67,12 +67,40 @@ describe("ActionMenu", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
-    ).toEqual(["실행", "수정", "삭제"]);
+    ).toEqual(["실행", "수정", "복제", "삭제"]);
+  });
+
+  it("runs an action item right away without a dialog", async () => {
+    const user = userEvent.setup();
+    const duplicate = vi.fn(async () => undefined);
+    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: false, duplicate })} />);
+
+    await openMenu(user, "케이스 조회 작업");
+    await user.click(await screen.findByRole("menuitem", { name: "복제" }));
+
+    await waitFor(() => expect(duplicate).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("explains why an action failed and returns focus to the menu button", async () => {
+    const user = userEvent.setup();
+    const duplicate = vi.fn(async () => ({ error: "이미 사용 중인 이름입니다" }));
+    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: false, duplicate })} />);
+
+    await openMenu(user, "케이스 조회 작업");
+    await user.click(await screen.findByRole("menuitem", { name: "복제" }));
+
+    const alert = await screen.findByRole("alertdialog", { name: "작업을 완료하지 못했습니다" });
+    expect(alert).toHaveTextContent("이미 사용 중인 이름입니다");
+    await user.click(within(alert).getByRole("button", { name: "확인" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "케이스 조회 작업" })).toHaveFocus());
   });
 
   it("navigates for link items instead of opening a dialog", async () => {
     const user = userEvent.setup();
-    render(<ActionMenu label="케이스 조회 작업" items={editLinkDelete("/cases/7")} />);
+    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: false, duplicate: vi.fn() })} />);
 
     await openMenu(user, "케이스 조회 작업");
 

@@ -411,6 +411,28 @@ test("케이스만 따로 실행하면 단건 실행으로 기록", async ({ pag
   await expect(page.getByText("실패 1")).toBeVisible();
 });
 
+test("케이스를 복제하면 같은 요청·판정 규칙으로 새 케이스의 수정 화면이 열림", async ({ page }) => {
+  await page.goto("/projects");
+  await page.getByRole("link", { name: project }).click();
+  await page.getByRole("link", { name: suite }).click();
+  await expect(page.getByRole("heading", { name: suite, level: 1 })).toBeVisible();
+
+  await chooseAction(page, "케이스 프로젝트 목록 조회 작업", "복제");
+
+  await expect(page).toHaveURL(/\/cases\/\d+$/);
+  await expect(page.getByRole("heading", { name: "케이스 수정", level: 1 })).toBeVisible();
+  await expect(page.getByLabel("이름", { exact: true })).toHaveValue("프로젝트 목록 조회 (복사)");
+  await expect(page.getByLabel("경로")).toHaveValue("{{apiPrefix}}/projects?key={{token}}");
+  await expect(page.getByLabel("헤더 1 값")).toHaveValue("Bearer {{token}}");
+  await expect(page.getByLabel("판정 규칙 1 포함할 문자열")).toHaveValue(project);
+
+  // 원본은 그대로, 스위트에 복제본이 추가됨
+  await page.getByRole("link", { name: suite }).click();
+  const cases = page.getByRole("table", { name: "케이스 목록" });
+  await expect(cases.getByRole("link", { name: "프로젝트 목록 조회", exact: true })).toBeVisible();
+  await expect(cases.getByRole("link", { name: "프로젝트 목록 조회 (복사)" })).toBeVisible();
+});
+
 test("프로젝트 삭제 시 하위 항목도 사라지고 실행 이력은 유지", async ({ page }) => {
   await page.goto("/runs");
   // 스위트 전체 실행과 케이스 단건 실행

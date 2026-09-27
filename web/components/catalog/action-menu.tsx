@@ -1,9 +1,18 @@
 "use client";
 
-import { Ellipsis, KeyRound, Pencil, Play, Trash2 } from "lucide-react";
+import { Copy, Ellipsis, KeyRound, Pencil, Play, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { createContext, use, useRef, useState } from "react";
+import { createContext, use, useRef, useState, useTransition } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const icons = { edit: Pencil, delete: Trash2, key: KeyRound, run: Play };
+const icons = { edit: Pencil, delete: Trash2, key: KeyRound, run: Play, copy: Copy };
 
 export type ActionMenuItem = {
   /** 대화상자와 연결하는 이름. 같은 메뉴 안의 대화상자는 menuId로 이 값을 지정 */
@@ -22,6 +31,8 @@ export type ActionMenuItem = {
   icon: keyof typeof icons;
   /** 지정 시 대화상자 대신 화면 이동 */
   href?: string;
+  /** 지정 시 대화상자 없이 바로 실행하는 Server Action (예: 복제). 실패하면 사유를 대화상자로 표시 */
+  action?: () => Promise<{ error?: string } | undefined | void>;
   /** 삭제 등 되돌릴 수 없는 동작. 구분선 아래 빨간 글자 */
   destructive?: boolean;
 };
@@ -54,7 +65,23 @@ export function ActionMenu({
   children?: React.ReactNode;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string>();
+  const [pending, startTransition] = useTransition();
   const trigger = useRef<HTMLButtonElement>(null);
+
+  function select(item: ActionMenuItem) {
+    const action = item.action;
+    if (!action) {
+      setOpenId(item.id);
+      return;
+    }
+    startTransition(async () => {
+      const result = await action();
+      if (result?.error) {
+        setActionError(result.error);
+      }
+    });
+  }
 
   function returnFocus(event: Event) {
     event.preventDefault();
@@ -71,6 +98,8 @@ export function ActionMenu({
             variant={size === "page" ? "outline" : "ghost"}
             size={size === "page" ? "icon" : "icon-sm"}
             aria-label={label}
+            disabled={pending}
+            aria-busy={pending}
           >
             <Ellipsis />
           </Button>
@@ -90,7 +119,7 @@ export function ActionMenu({
                 ) : (
                   <DropdownMenuItem
                     variant={item.destructive ? "destructive" : "default"}
-                    onSelect={() => setOpenId(item.id)}
+                    onSelect={() => select(item)}
                   >
                     <Icon aria-hidden />
                     {item.label}
@@ -102,6 +131,17 @@ export function ActionMenu({
         </DropdownMenuContent>
       </DropdownMenu>
       {children}
+      <AlertDialog open={actionError !== undefined} onOpenChange={(open) => !open && setActionError(undefined)}>
+        <AlertDialogContent onCloseAutoFocus={returnFocus}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>작업을 완료하지 못했습니다</AlertDialogTitle>
+            <AlertDialogDescription>{actionError}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>확인</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MenuContext>
   );
 }
