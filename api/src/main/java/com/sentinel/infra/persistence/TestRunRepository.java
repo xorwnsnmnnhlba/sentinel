@@ -24,29 +24,36 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 	List<TestRun> findBySuiteIdAndEnvironmentIdAndTriggerAndStatusAndIdLessThanOrderByIdDesc(Long suiteId,
 			Long environmentId, TestRun.Trigger trigger, TestRun.Status status, Long id, Limit limit);
 
-	/** 기간 안에 시작한 스위트 전체 실행 수 (스위트별, 케이스 단건 실행 제외) */
+	/**
+	 * 기간 안에 시작한 스위트 전체 실행의 스위트별 합계 (케이스 단건 실행 제외). 실행 행의 판정 수(V10)만 사용.
+	 * 기간 조건은 {@code idx_run_time}
+	 */
 	@Query("""
-			select t.suite.id as suiteId, count(t) as count
+			select t.suite.id as suiteId, count(t) as runs,
+			       sum(case when t.failedCount + t.errorCount > 0 then 1 else 0 end) as failingRuns,
+			       sum(t.passedCount) as passed, sum(t.failedCount) as failed, sum(t.errorCount) as errors
 			from TestRun t
 			where t.startedAt >= :from and t.startedAt < :to
 			  and t.testCaseId is null
 			group by t.suite.id
 			""")
-	List<SuiteCount> countBySuite(@Param("from") Instant from, @Param("to") Instant to);
+	List<SuiteRunTotals> summarizeBySuite(@Param("from") Instant from, @Param("to") Instant to);
 
-	/** 기간 안에 시작한 스위트 전체 실행 중 판정 실패·오류 결과가 있는 실행 수 (스위트별, 케이스 단건 실행 제외) */
-	@Query("""
-			select t.suite.id as suiteId, count(t) as count
-			from TestRun t
-			where t.startedAt >= :from and t.startedAt < :to
-			  and t.testCaseId is null
-			  and exists (
-			      select r.id from TestResult r
-			      where r.run = t
-			        and r.verdict in (com.sentinel.domain.TestResult.Verdict.FAILED, com.sentinel.domain.TestResult.Verdict.ERROR))
-			group by t.suite.id
-			""")
-	List<SuiteCount> countFailingBySuite(@Param("from") Instant from, @Param("to") Instant to);
+	interface SuiteRunTotals {
+
+		Long getSuiteId();
+
+		long getRuns();
+
+		long getFailingRuns();
+
+		long getPassed();
+
+		long getFailed();
+
+		long getErrors();
+
+	}
 
 	/**
 	 * 스위트별 가장 최근 스위트 전체 실행. ID는 시작 순으로 증가하므로 최대 ID가 최근 실행
@@ -57,14 +64,6 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 			where t.id in (select max(latest.id) from TestRun latest where latest.testCaseId is null group by latest.suite.id)
 			""")
 	List<TestRun> findLatestPerSuite();
-
-	interface SuiteCount {
-
-		Long getSuiteId();
-
-		long getCount();
-
-	}
 
 	/**
 	 * 원문 정리 대상. 원문이 남아 있고 {@code cutoff} 이전에 시작한 종료된 실행을 오래된 순으로 조회 ({@code idx_run_raw_purge})

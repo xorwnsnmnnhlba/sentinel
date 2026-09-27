@@ -155,8 +155,8 @@ class SuiteSummaryServiceTest {
 
 		assertThat(suiteSummaries.summaries(null, null).suites()).hasSize(4);
 
-		// 스위트(프로젝트 함께), 실행 수, 실패 실행 수, 판정 수, 최근 실행, 최근 실행의 판정 수
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(6);
+		// 스위트(프로젝트 함께), 실행 행의 판정 수 합계, 최근 실행 (결과 테이블 미사용)
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
 	}
 
 	private TestSuite suite(String name, String... paths) {

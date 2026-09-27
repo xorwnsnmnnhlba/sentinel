@@ -1,19 +1,14 @@
 package com.sentinel.application;
 
-import java.time.ZoneId;
-import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.sentinel.domain.TestCase;
-import com.sentinel.domain.TestResult.Verdict;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.TestCaseRepository;
-import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 실행 이력 조회. 실행 건수와 무관하게 페이지당 쿼리 최대 5회(실행+이름, 전체 건수, 판정 집계, 실행 주체, 단건 실행 대상).
+ * 실행 이력 조회. 실행 건수와 무관하게 페이지당 쿼리 최대 4회(실행+이름, 전체 건수, 실행 주체, 단건 실행 대상).
+ * 판정 수는 실행 행에 보관한 값(V10)이라 결과 테이블을 읽지 않음.
  * 결과가 한 페이지에 모두 들어가면 Spring Data가 전체 건수 쿼리를 생략하고, 수동 실행·단건 실행이 없으면 해당 조회도 생략.
  */
 @Service
@@ -36,8 +32,6 @@ public class RunQueryService {
 	private static final Sort NEWEST_FIRST = Sort.by(Sort.Order.desc("startedAt"), Sort.Order.desc("id"));
 
 	private final TestRunRepository runs;
-
-	private final TestResultRepository results;
 
 	private final UserRepository users;
 
@@ -56,20 +50,10 @@ public class RunQueryService {
 		PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE), NEWEST_FIRST);
 		Page<TestRun> found = runs.findAll(filter.toSpecification(scheduleProperties.zone()), pageable);
 
-		Map<Long, Map<Verdict, Long>> counts = new HashMap<>();
-		if (found.hasContent()) {
-			List<Long> runIds = found.map(TestRun::getId).getContent();
-			for (TestResultRepository.VerdictCount count : results.countVerdictsByRunIds(runIds)) {
-				if (count.getVerdict() != null) {
-					counts.computeIfAbsent(count.getRunId(), id -> new EnumMap<>(Verdict.class))
-						.put(count.getVerdict(), count.getCount());
-				}
-			}
-		}
 		Map<Long, IdName> triggeredBy = triggeredBy(found.getContent());
 		Map<Long, IdName> targetCases = targetCases(found.getContent());
 		return PageResponse.of(found,
-				found.map(run -> summaryOf(run, counts.getOrDefault(run.getId(), Map.of()),
+				found.map(run -> summaryOf(run,
 						// 스케줄 실행은 주체가, 스위트 전체 실행은 대상 케이스가 null. 불변 Map은 null 키 조회 시 예외이므로 먼저 확인
 						run.getTriggeredBy() == null ? null : triggeredBy.get(run.getTriggeredBy()),
 						run.isSingleCase() ? targetCases.get(run.getTestCaseId()) : null))
@@ -98,10 +82,10 @@ public class RunQueryService {
 			.collect(Collectors.toMap(User::getId, user -> new IdName(user.getId(), user.getEmail())));
 	}
 
-	private static RunSummary summaryOf(TestRun run, Map<Verdict, Long> counts, IdName triggeredBy, IdName testCase) {
-		int passed = counts.getOrDefault(Verdict.PASSED, 0L).intValue();
-		int failed = counts.getOrDefault(Verdict.FAILED, 0L).intValue();
-		int errors = counts.getOrDefault(Verdict.ERROR, 0L).intValue();
+	private static RunSummary summaryOf(TestRun run, IdName triggeredBy, IdName testCase) {
+		int passed = run.getPassedCount();
+		int failed = run.getFailedCount();
+		int errors = run.getErrorCount();
 		return new RunSummary(run.getId(),
 				new IdName(run.getSuite().getProject().getId(), run.getSuite().getProject().getName()),
 				new IdName(run.getSuite().getId(), run.getSuite().getName()),

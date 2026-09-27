@@ -193,9 +193,14 @@ public class TestRunService {
 		Map<TestResult.Verdict, Integer> counts = new EnumMap<>(TestResult.Verdict.class);
 		for (PreparedCase preparedCase : prepared.cases()) {
 			Execution execution = execute(preparedCase, prepared.variables());
-			TestResult.Verdict verdict = transactions.write(
-					status -> results.save(resultOf(prepared.runId(), preparedCase, execution, prepared.secretValues()))
-						.getVerdict());
+			TestResult.Verdict verdict = transactions.write(status -> {
+				TestResult.Verdict saved = results
+					.save(resultOf(prepared.runId(), preparedCase, execution, prepared.secretValues()))
+					.getVerdict();
+				// 실행의 판정 수도 같은 트랜잭션에서 올려 결과와 어긋나지 않음 (중단된 실행도 저장된 결과 기준)
+				runs.findById(prepared.runId()).orElseThrow().countVerdict(saved);
+				return saved;
+			});
 			counts.merge(verdict, 1, Integer::sum);
 		}
 		transactions.writeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(clock.instant()));

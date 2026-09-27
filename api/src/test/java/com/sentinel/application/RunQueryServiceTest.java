@@ -231,15 +231,15 @@ class RunQueryServiceTest {
 		PageResponse<RunSummary> singlePage = runQueries.listRuns(RunFilter.none(), 0, 20);
 
 		assertThat(singlePage.content()).hasSize(5);
-		// 실행+이름(fetch), 판정 집계, 실행 주체. 한 페이지에 모두 들어가 전체 건수 쿼리 생략
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+		// 실행+이름(fetch), 실행 주체. 한 페이지에 모두 들어가 전체 건수 쿼리 생략. 판정 수는 실행 행에 있어 결과 조회 없음
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
 
 		statistics.clear();
 		PageResponse<RunSummary> firstOfMany = runQueries.listRuns(RunFilter.none(), 0, 2);
 
 		assertThat(firstOfMany.totalPages()).isEqualTo(3);
-		// 실행+이름(fetch), 전체 건수, 판정 집계, 실행 주체
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
+		// 실행+이름(fetch), 전체 건수, 실행 주체
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
 	}
 
 	@Test
@@ -256,8 +256,8 @@ class RunQueryServiceTest {
 
 		assertThat(runQueries.listRuns(RunFilter.none(), 0, 20).content()).allSatisfy(
 				run -> assertThat(run.testCase()).isNotNull());
-		// 실행+이름(fetch), 판정 집계, 실행 주체, 대상 케이스
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
+		// 실행+이름(fetch), 실행 주체, 대상 케이스
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
 	}
 
 

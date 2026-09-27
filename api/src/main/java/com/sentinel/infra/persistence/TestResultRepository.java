@@ -18,15 +18,6 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 	@Query("select r from TestResult r join fetch r.testCase where r.run.id = :runId order by r.id")
 	List<TestResult> findWithTestCaseByRunId(@Param("runId") Long runId);
 
-	/** 실행 목록의 판정별 건수. 목록의 실행 ID를 한 번에 집계 */
-	@Query("""
-			select r.run.id as runId, r.verdict as verdict, count(r) as count
-			from TestResult r
-			where r.run.id in :runIds
-			group by r.run.id, r.verdict
-			""")
-	List<VerdictCount> countVerdictsByRunIds(@Param("runIds") Collection<Long> runIds);
-
 	/**
 	 * 요청·응답 헤더와 본문을 일괄로 비움. 판정·규칙별 결과·상태 코드·URL·소요 시간은 유지
 	 * @return 갱신한 결과 건수
@@ -118,47 +109,33 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 	/**
 	 * 케이스별 이전 구조 지문 최근 {@code window}건 (같은 환경, {@code runId}보다 앞선 실행). 구조 변화 판정의 기준선
 	 * <p>
-	 * 케이스별 건수 제한은 SQL 표준 창 함수 {@code ROW_NUMBER}. JSON 열은 문자열로 변환하여 반환
+	 * 케이스마다 SQL 표준 {@code LATERAL} + {@code FETCH FIRST}로 {@code idx_result_case_time}을 최근 결과부터 읽고
+	 * {@code window}건에서 멈춤. 이력 전체를 읽지 않도록 {@code beforeResultId}(이 실행의 첫 결과 ID)보다 앞선 결과부터 읽음.
+	 * 결과 ID는 기록 순으로 증가하므로 오래된 실행을 조회해도 그 실행 직전의 결과부터 읽음. JSON 열은 문자열로 변환하여 반환
+	 * @param beforeResultId 이 결과 ID보다 작은 결과만 (이 실행의 첫 결과 ID)
 	 * @return [케이스 ID, 지문 JSON] 케이스 순, 최근 순
 	 */
 	@Query(nativeQuery = true, value = """
-			SELECT w.test_case_id, w.schema_json
-			FROM (
-			    SELECT r.test_case_id, CAST(r.response_schema AS VARCHAR) AS schema_json,
-			           ROW_NUMBER() OVER (PARTITION BY r.test_case_id ORDER BY r.id DESC) AS rn
+			SELECT c.id, CAST(s.response_schema AS VARCHAR)
+			FROM {h-schema}test_case c
+			CROSS JOIN LATERAL (
+			    SELECT r.id, r.response_schema
 			    FROM {h-schema}test_result r
 			    JOIN {h-schema}test_run t ON t.id = r.run_id
-			    WHERE t.environment_id = :environmentId
-			      AND r.test_case_id IN (:caseIds)
+			    WHERE r.test_case_id = c.id
+			      AND r.id < :beforeResultId
 			      AND t.id < :runId
+			      AND t.environment_id = :environmentId
 			      AND r.response_schema IS NOT NULL
-			) w
-			WHERE w.rn <= :window
-			ORDER BY w.test_case_id, w.rn
+			    ORDER BY r.id DESC
+			    FETCH FIRST (:window) ROWS ONLY
+			) s
+			WHERE c.id IN (:caseIds)
+			ORDER BY c.id, s.id DESC
 			""")
 	List<Object[]> findRecentSchemas(@Param("environmentId") long environmentId,
-			@Param("caseIds") Collection<Long> caseIds, @Param("runId") long runId, @Param("window") int window);
-
-	/** 기간 안에 시작한 스위트 전체 실행의 판정별 결과 수 (스위트별, 케이스 단건 실행 제외) */
-	@Query("""
-			select t.suite.id as suiteId, r.verdict as verdict, count(r) as count
-			from TestResult r
-			join r.run t
-			where t.startedAt >= :from and t.startedAt < :to
-			  and t.testCaseId is null
-			group by t.suite.id, r.verdict
-			""")
-	List<SuiteVerdictCount> countVerdictsBySuite(@Param("from") Instant from, @Param("to") Instant to);
-
-	interface SuiteVerdictCount {
-
-		Long getSuiteId();
-
-		TestResult.Verdict getVerdict();
-
-		long getCount();
-
-	}
+			@Param("caseIds") Collection<Long> caseIds, @Param("runId") long runId,
+			@Param("beforeResultId") long beforeResultId, @Param("window") int window);
 
 	/** 실행별 케이스 판정. 연속 실패 계산용 */
 	@Query("select r.run.id as runId, r.testCase.id as caseId, r.verdict as verdict from TestResult r where r.run.id in :runIds")
@@ -171,16 +148,6 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 		Long getCaseId();
 
 		TestResult.Verdict getVerdict();
-
-	}
-
-	interface VerdictCount {
-
-		Long getRunId();
-
-		TestResult.Verdict getVerdict();
-
-		long getCount();
 
 	}
 
