@@ -1,4 +1,5 @@
 import { VerdictBadge } from "@/components/run-badges";
+import { DriftSummary } from "@/components/runs/drift";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,6 +56,7 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
       {rawPurged && result.responseSchema && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium">응답 구조</h4>
+          {result.drift && <DriftSummary drift={result.drift} />}
           <SchemaTable schema={result.responseSchema} />
         </div>
       )}
@@ -77,7 +79,8 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
             )}
           </TabsContent>
           {result.responseSchema && (
-            <TabsContent value="schema">
+            <TabsContent value="schema" className="space-y-3">
+              {result.drift && <DriftSummary drift={result.drift} />}
               <SchemaTable schema={result.responseSchema} />
             </TabsContent>
           )}

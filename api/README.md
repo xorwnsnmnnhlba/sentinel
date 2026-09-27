@@ -199,6 +199,19 @@ curl -i -X POST localhost:8080/api/runs \
   - 잘라서 저장하는 본문과 달리 전체 본문(최대 5MB)으로 계산. 깊이 20·경로 1,000개 한도를 넘으면 `complete: false`
   - Content-Type이 JSON(`application/json`, `+json`)이거나 없을 때 본문이 `{`·`[`로 시작하면 대상. 그 외·해석 실패·응답 없음은 `null`
   - 원문 보관기간(30일)이 지나도 삭제하지 않음
+- `drift`: 같은 케이스·환경의 이전 실행 대비 구조 변화 `{status, observations, changes}`. 지문이 없으면 `null`
+  - 기준선: 이 실행보다 앞선 실행의 지문 최근 20건(`sentinel.schema-drift.window`). 3건(`min-observations`) 미만이면 `status: COLLECTING`, 비교하지 않음
+  - 필수 필드: 상위 경로가 있었던 모든 응답에 존재 (빈 배열·선택 필드인 상위 객체가 없던 응답은 관측에서 제외). null은 한 번이라도 관측되면 허용
+  - `changes[]`: `{level, kind, path, expected, actual}`. 등급(심한 순) → 경로 순
+
+    | level | kind | 의미 |
+    |-------|------|------|
+    | `BREAKING` | `REMOVED` | 필수 필드 없음 |
+    | `BREAKING` | `TYPE_CHANGED` | null 외 타입이 새로 나타남 (예: number → string, object → array) |
+    | `WARNING` | `NULLABLE` | null이 새로 나타남 |
+    | `INFO` | `ADDED` | 새 필드 (하위 필드는 상위 한 건으로) |
+  - 보고하지 않는 경우: 빈 배열·빈 동적 키, 상위가 없거나 null인 필드의 하위, 타입이 바뀐 경로의 하위, 일부만 기록한(`complete: false`) 지문의 없어진 필드
+  - 기준선은 조회 시점 계산이며 저장하지 않음. 실행 1건의 모든 케이스를 쿼리 1회로 조회. 기준선 저장·승인·알림은 이후 단계
 - 요청·응답 헤더와 본문은 보관기간(기본 30일) 경과 후 삭제 ("결과 원문 보관기간" 참고)
 - 요청 URL의 변수 값은 인코딩하지 않음. 공백 등 URL에 쓸 수 없는 문자는 `INVALID_REQUEST`
 - 링크 로컬(`169.254.0.0/16`, `fe80::/10`)과 클라우드 메타데이터 주소(`fd00:ec2::254`, `100.100.100.200`)로는 전송하지 않고 `BLOCKED_DESTINATION`
@@ -476,6 +489,13 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 | `sentinel.retention.raw-retention` | `30d` | 원문 보관 기간. 0 이하이면 기동 실패 |
 | `sentinel.retention.cron` | `0 30 3 * * *` | 실행 시각 (Spring cron 6자리, 초 포함) |
 | `sentinel.retention.batch-size` | `500` | 한 트랜잭션에서 정리할 실행 수 |
+
+구조 변화 판정 (`drift`)
+
+| 설정 | 기본값 | 설명 |
+|------|--------|------|
+| `sentinel.schema-drift.window` | `20` | 기준선에 쓰는 이전 실행 수 (같은 케이스·환경) |
+| `sentinel.schema-drift.min-observations` | `3` | 판정에 필요한 최소 이전 실행 수. 1 이상, window 이하가 아니면 기동 실패 |
 
 ## 실패 알림
 

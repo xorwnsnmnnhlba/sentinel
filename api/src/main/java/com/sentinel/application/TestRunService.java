@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.sentinel.application.drift.SchemaDriftService;
 import com.sentinel.domain.BaseEntity;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.RequestSpec;
@@ -71,6 +72,8 @@ public class TestRunService {
 
 	private final Clock clock;
 
+	private final SchemaDriftService schemaDrift;
+
 	/**
 	 * 케이스 1건 수동 실행. 응답 미수신·변수 누락도 실패 결과로 기록하며 예외로 전파하지 않음.
 	 * @return 생성된 실행 ID
@@ -107,7 +110,9 @@ public class TestRunService {
 	public TestRunDetail getRun(long runId) {
 		return transactions.readOnly(status -> {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
-			return TestRunDetail.of(run, results.findWithTestCaseByRunId(runId), triggeredBy(run), testCase(run));
+			List<TestResult> runResults = results.findWithTestCaseByRunId(runId);
+			return TestRunDetail.of(run, runResults, triggeredBy(run), testCase(run),
+					schemaDrift.driftOf(run, runResults));
 		});
 	}
 

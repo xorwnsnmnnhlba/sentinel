@@ -1,6 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-
-import { expect, test, type Page } from "./fixtures";
+import { accessibilityViolations, expect, test, type Page } from "./fixtures";
 
 /**
  * 접근성 자동 검사 (axe-core). WCAG 2.2 A·AA 규칙과 axe 권장 규칙(best-practice: 제목 순서, 랜드마크 등). 라이트·다크 모두
@@ -8,13 +6,6 @@ import { expect, test, type Page } from "./fixtures";
  * 비활성(disabled) 컨트롤은 WCAG 대비 기준 제외 대상
  */
 test.describe.configure({ mode: "serial" });
-
-/**
- * 검토 후 허용한 위반. 규칙 id와 요소 선택자로 지정하고 사유를 남김
- * - region: Radix가 떠 있는 메뉴(role=menu)를 body 끝에 그려 랜드마크 밖에 위치. 메뉴는 main 안의 "⋯" 버튼이
- *   aria-controls로 가리키고 열면 포커스가 메뉴로 이동하므로 랜드마크 탐색과 무관 (대화상자는 axe가 원래 제외)
- */
-const ACCEPTED = [{ rule: "region", target: "[data-radix-popper-content-wrapper]" }];
 
 const api = process.env.E2E_API_URL ?? "http://localhost:18080";
 const stamp = Date.now();
@@ -66,32 +57,6 @@ async function login(page: Page) {
   await page.getByRole("button", { name: "로그인" }).click();
   // 좁은 화면은 사이드바 대신 메뉴 서랍이므로 화면 이동으로 로그인 완료 확인
   await expect(page).toHaveURL(/\/$/);
-}
-
-/** 접근성 위반. "[규칙] 선택자 — 사유" 목록 (허용 목록 제외) */
-async function accessibilityViolations(page: Page): Promise<string[]> {
-  // 글꼴 적용과 열림 애니메이션(투명도 변화)이 끝난 뒤 검사
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== "running"));
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
-    .analyze();
-  // 태그 설정이 어긋나 일부 규칙만 도는 경우 방지 (색 대비만 검사하면 규칙 1~2개)
-  expect(results.passes.length + results.violations.length).toBeGreaterThan(20);
-  return results.violations.flatMap((violation) =>
-    violation.nodes
-      .filter(
-        (node) =>
-          !ACCEPTED.some(
-            (accepted) =>
-              accepted.rule === violation.id && node.target.join(" ").includes(accepted.target.slice(1, -1)),
-          ),
-      )
-      .map((node) => {
-        const reason = [...node.any, ...node.all, ...node.none][0]?.message ?? violation.help;
-        return `[${violation.id}] ${node.target.join(" ")} — ${reason}`;
-      }),
-  );
 }
 
 for (const colorScheme of ["light", "dark"] as const) {
