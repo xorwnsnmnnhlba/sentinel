@@ -62,10 +62,17 @@ class RunController {
 	@PostMapping
 	ResponseEntity<TestRunDetail> create(@Valid @RequestBody CreateRunRequest request) {
 		long triggeredBy = currentUser.get().id();
-		long runId = request.suiteId() != null
-				? testRunService.runSuite(request.suiteId(), request.environmentId(), TestRun.Trigger.MANUAL,
-						triggeredBy)
-				: testRunService.runTestCase(request.caseId(), request.environmentId(), triggeredBy);
+		long runId;
+		if (request.suiteId() != null) {
+			runId = testRunService.runSuite(request.suiteId(), request.environmentId(), TestRun.Trigger.MANUAL,
+					triggeredBy);
+		}
+		else if (request.caseId() != null) {
+			runId = testRunService.runTestCase(request.caseId(), request.environmentId(), triggeredBy);
+		}
+		else {
+			runId = testRunService.runThroughCase(request.throughCaseId(), request.environmentId(), triggeredBy);
+		}
 		return ResponseEntity.created(URI.create("/api/runs/" + runId)).body(testRunService.getRun(runId));
 	}
 

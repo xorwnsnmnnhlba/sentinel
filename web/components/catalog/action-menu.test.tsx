@@ -58,7 +58,9 @@ describe("ActionMenu", () => {
 
   it("orders the case actions with delete last", async () => {
     const user = userEvent.setup();
-    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: true, duplicate: vi.fn() })} />);
+    render(
+      <ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: true, first: false, duplicate: vi.fn() })} />,
+    );
 
     await openMenu(user, "케이스 조회 작업");
 
@@ -67,13 +69,24 @@ describe("ActionMenu", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
-    ).toEqual(["실행", "수정", "복제", "삭제"]);
+    ).toEqual(["실행", "여기까지 실행", "수정", "복제", "삭제"]);
+  });
+
+  it("offers no run through for the first case, where it equals running the case alone", async () => {
+    const user = userEvent.setup();
+    render(
+      <ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: true, first: true, duplicate: vi.fn() })} />,
+    );
+
+    await openMenu(user, "케이스 조회 작업");
+
+    expect(within(await screen.findByRole("menu")).queryByRole("menuitem", { name: "여기까지 실행" })).toBeNull();
   });
 
   it("runs an action item right away without a dialog", async () => {
     const user = userEvent.setup();
     const duplicate = vi.fn(async () => undefined);
-    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: false, duplicate })} />);
+    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: false, first: false, duplicate })} />);
 
     await openMenu(user, "케이스 조회 작업");
     await user.click(await screen.findByRole("menuitem", { name: "복제" }));
@@ -86,7 +99,7 @@ describe("ActionMenu", () => {
   it("explains why an action failed and returns focus to the menu button", async () => {
     const user = userEvent.setup();
     const duplicate = vi.fn(async () => ({ error: "이미 사용 중인 이름입니다" }));
-    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: false, duplicate })} />);
+    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: false, first: false, duplicate })} />);
 
     await openMenu(user, "케이스 조회 작업");
     await user.click(await screen.findByRole("menuitem", { name: "복제" }));
@@ -100,7 +113,12 @@ describe("ActionMenu", () => {
 
   it("navigates for link items instead of opening a dialog", async () => {
     const user = userEvent.setup();
-    render(<ActionMenu label="케이스 조회 작업" items={caseMenu(7, { runnable: false, duplicate: vi.fn() })} />);
+    render(
+      <ActionMenu
+        label="케이스 조회 작업"
+        items={caseMenu(7, { runnable: false, first: false, duplicate: vi.fn() })}
+      />,
+    );
 
     await openMenu(user, "케이스 조회 작업");
 

@@ -25,7 +25,7 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 			Long environmentId, TestRun.Trigger trigger, TestRun.Status status, Long id, Limit limit);
 
 	/**
-	 * 기간 안에 시작한 스위트 전체 실행의 스위트별 합계 (케이스 단건 실행 제외). 실행 행의 판정 수(V10)만 사용.
+	 * 기간 안에 시작한 스위트 전체 실행의 스위트별 합계 (케이스 단건 실행·여기까지 실행 제외). 실행 행의 판정 수(V10)만 사용.
 	 * 기간 조건은 {@code idx_run_time}
 	 */
 	@Query("""
@@ -35,6 +35,7 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 			from TestRun t
 			where t.startedAt >= :from and t.startedAt < :to
 			  and t.testCaseId is null
+			  and t.throughCaseId is null
 			group by t.suite.id
 			""")
 	List<SuiteRunTotals> summarizeBySuite(@Param("from") Instant from, @Param("to") Instant to);
@@ -57,11 +58,14 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 
 	/**
 	 * 스위트별 가장 최근 스위트 전체 실행. ID는 시작 순으로 증가하므로 최대 ID가 최근 실행
-	 * 케이스 단건 실행은 제외 (한 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
+	 * 케이스 단건 실행·여기까지 실행은 제외 (일부 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
 	 */
 	@Query("""
 			select t from TestRun t
-			where t.id in (select max(latest.id) from TestRun latest where latest.testCaseId is null group by latest.suite.id)
+			where t.id in (
+			    select max(latest.id) from TestRun latest
+			    where latest.testCaseId is null and latest.throughCaseId is null
+			    group by latest.suite.id)
 			""")
 	List<TestRun> findLatestPerSuite();
 

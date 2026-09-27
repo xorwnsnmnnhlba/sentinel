@@ -39,6 +39,7 @@ import { prettyBody } from "@/lib/format";
 /**
  * 케이스 등록·수정 폼. 저장 전 화면에서 먼저 검증하고, Server Action이 같은 규칙으로 재검사한 뒤 Spring에 저장
  * environments가 있으면 "{submitLabel} 후 실행"으로 저장하고 바로 이 케이스만 실행 (환경이 여럿이면 선택)
+ * runThrough면 "{submitLabel} 후 여기까지 실행"으로 저장하고 스위트 처음부터 이 케이스까지 실행
  */
 export function CaseEditor({
   initial,
@@ -46,19 +47,25 @@ export function CaseEditor({
   cancelHref,
   submitLabel,
   environments = [],
+  runThrough = false,
 }: {
   initial: CaseDraft;
-  /** @param runIn 지정 시 저장 후 그 환경에서 실행 */
-  action: (draft: CaseDraft, runIn?: number) => Promise<CaseActionState>;
+  /**
+   * @param runIn 지정 시 저장 후 그 환경에서 실행
+   * @param through runIn과 함께 true면 이 케이스만이 아니라 스위트 처음부터 이 케이스까지 실행
+   */
+  action: (draft: CaseDraft, runIn?: number, through?: boolean) => Promise<CaseActionState>;
   cancelHref: string;
   submitLabel: string;
   environments?: EnvironmentItem[];
+  /** 여기까지 실행 버튼 표시 (저장된 케이스이면서 스위트의 첫 케이스가 아닐 때) */
+  runThrough?: boolean;
 }) {
   const [draft, setDraft] = useState(initial);
   const [errors, setErrors] = useState<string[]>([]);
   const [newType, setNewType] = useState<AssertionType>("statusCode");
   const [pending, startTransition] = useTransition();
-  const [running, setRunning] = useState(false);
+  const [intent, setIntent] = useState<Intent>("save");
   const [environmentId, setEnvironmentId] = useState(environments[0]?.id);
 
   function update(patch: Partial<CaseDraft>) {
@@ -81,11 +88,17 @@ export function CaseEditor({
       return;
     }
     setErrors([]);
-    // 누른 버튼으로 저장만 할지, 저장 후 실행할지 구분
-    const run = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "run";
-    setRunning(run);
+    // 누른 버튼으로 저장만 할지, 저장 후 실행(이 케이스만·여기까지)할지 구분
+    const submitted = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value");
+    const next: Intent = submitted === "run" || submitted === "run-through" ? submitted : "save";
+    setIntent(next);
     startTransition(async () => {
-      const result = await action(draft, run ? environmentId : undefined);
+      const result =
+        next === "save"
+          ? await action(draft)
+          : next === "run"
+            ? await action(draft, environmentId)
+            : await action(draft, environmentId, true);
       if (result?.errors?.length) {
         setErrors(result.errors);
       }
@@ -261,7 +274,7 @@ export function CaseEditor({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" name="intent" value="save" disabled={pending}>
-          {pending && !running ? "저장 중…" : submitLabel}
+          {pending && intent === "save" ? "저장 중…" : submitLabel}
         </Button>
         {environments.length > 0 && (
           <div className="flex items-center gap-1.5">
@@ -280,8 +293,14 @@ export function CaseEditor({
             )}
             <Button type="submit" name="intent" value="run" variant="outline" disabled={pending}>
               <Play />
-              {pending && running ? "실행 중…" : `${submitLabel} 후 실행`}
+              {pending && intent === "run" ? "실행 중…" : `${submitLabel} 후 실행`}
             </Button>
+            {runThrough && (
+              <Button type="submit" name="intent" value="run-through" variant="outline" disabled={pending}>
+                <Play />
+                {pending && intent === "run-through" ? "실행 중…" : `${submitLabel} 후 여기까지 실행`}
+              </Button>
+            )}
           </div>
         )}
         <Button asChild variant="ghost">
@@ -291,6 +310,9 @@ export function CaseEditor({
     </form>
   );
 }
+
+/** 제출 버튼: 저장만, 저장 후 이 케이스만 실행, 저장 후 스위트 처음부터 이 케이스까지 실행 */
+type Intent = "save" | "run" | "run-through";
 
 function AssertionFields({
   label,

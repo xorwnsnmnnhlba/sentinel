@@ -1,6 +1,6 @@
 import type { APIRequestContext } from "@playwright/test";
 
-import { accessibilityViolations, expect, mainMenu, test } from "./fixtures";
+import { accessibilityViolations, chooseAction, expect, mainMenu, test } from "./fixtures";
 
 /**
  * 응답 값 추출. 로그인 케이스가 응답의 세션 토큰을 꺼내고, 뒤 케이스가 그 토큰으로 인증하여 조회
@@ -33,6 +33,8 @@ test.beforeAll(async ({ request }) => {
   });
   suiteId = (await send(request, "/api/suites", { projectId: project.id, name: suiteName })).id;
 });
+
+test.describe.configure({ mode: "serial" });
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/login");
@@ -86,5 +88,31 @@ test("로그인 응답의 토큰을 꺼내 뒤 케이스의 인증에 사용하�
   const extractions = page.getByRole("table", { name: "값 추출" });
   await expect(extractions.getByRole("row", { name: /\{\{token\}\}/ })).toContainText("가림");
   await expect(page.getByText(/"token":\s*"\*\*\*\*"/)).toBeVisible();
+  expect(await accessibilityViolations(page)).toEqual([]);
+});
+
+test("토큰을 쓰는 케이스만 실행하면 방법을 안내하고, 여기까지 실행하면 앞 케이스와 함께 통과", async ({ page }) => {
+  // 앞 테스트에서 등록한 로그인 → 내 프로젝트 순서의 스위트
+  await page.goto(`/suites/${suiteId}`);
+  await expect(page.getByRole("heading", { name: suiteName, level: 1 })).toBeVisible();
+
+  await chooseAction(page, "케이스 내 프로젝트 작업", "실행");
+  let dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "실행", exact: true }).click();
+  await expect(page).toHaveURL(/\/runs\/\d+$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("케이스 단건");
+  await expect(page.getByText(/"여기까지 실행"으로 앞 케이스와 함께 실행해 주세요/)).toBeVisible();
+
+  await page.goto(`/suites/${suiteId}`);
+  await expect(page.getByRole("heading", { name: suiteName, level: 1 })).toBeVisible();
+  await chooseAction(page, "케이스 내 프로젝트 작업", "여기까지 실행");
+  dialog = page.getByRole("dialog", { name: /내 프로젝트.*까지 실행/ });
+  await expect(dialog).toContainText("2건");
+  await dialog.getByRole("button", { name: "실행", exact: true }).click();
+
+  await expect(page).toHaveURL(/\/runs\/\d+$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("여기까지");
+  await expect(page.getByText("마지막 케이스")).toBeVisible();
+  await expect(page.getByText("통과 2")).toBeVisible();
   expect(await accessibilityViolations(page)).toEqual([]);
 });

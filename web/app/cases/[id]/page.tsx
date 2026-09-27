@@ -24,7 +24,10 @@ export default async function CasePage(props: PageProps<"/cases/[id]">) {
   const { notice } = await props.searchParams;
   const testCase = await apiGetOrNotFound<CaseItem>(`/api/cases/${id}`);
   const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${testCase.suiteId}`);
-  const environments = await apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`);
+  const [environments, siblings] = await Promise.all([
+    apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`),
+    apiGet<CaseItem[]>(`/api/cases?suiteId=${suite.id}`),
+  ]);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -52,6 +55,8 @@ export default async function CasePage(props: PageProps<"/cases/[id]">) {
         cancelHref={`/suites/${suite.id}`}
         submitLabel="저장"
         environments={environments}
+        // 첫 케이스는 여기까지 실행이 이 케이스만 실행과 같음
+        runThrough={siblings.length > 0 && siblings[0].id !== testCase.id}
       />
     </div>
   );

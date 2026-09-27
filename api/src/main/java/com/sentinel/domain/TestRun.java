@@ -66,6 +66,9 @@ public class TestRun extends BaseEntity {
 	/** 케이스 단건 실행의 대상. 스위트 전체 실행은 null */
 	private Long testCaseId;
 
+	/** "여기까지 실행"의 대상 (V14). 스위트의 처음부터 이 케이스까지 실행. 그 외 실행은 null */
+	private Long throughCaseId;
+
 	/**
 	 * 판정별 결과 수. 결과를 저장할 때마다 {@link #countVerdict}로 올림.
 	 * 실행 목록의 실패·오류 조건과 스위트 집계가 결과 테이블을 훑지 않도록 실행에 함께 보관
@@ -83,7 +86,7 @@ public class TestRun extends BaseEntity {
 	private Instant rawPurgedAt;
 
 	private TestRun(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt, Long triggeredBy,
-			Long testCaseId) {
+			Long testCaseId, Long throughCaseId) {
 		this.suite = Objects.requireNonNull(suite, "suite");
 		this.environment = Objects.requireNonNull(environment, "environment");
 		this.trigger = Objects.requireNonNull(trigger, "trigger");
@@ -91,10 +94,11 @@ public class TestRun extends BaseEntity {
 		this.status = Status.RUNNING;
 		this.triggeredBy = triggeredBy;
 		this.testCaseId = testCaseId;
+		this.throughCaseId = throughCaseId;
 	}
 
 	public static TestRun start(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt) {
-		return new TestRun(suite, environment, trigger, startedAt, null, null);
+		return new TestRun(suite, environment, trigger, startedAt, null, null, null);
 	}
 
 	/**
@@ -102,7 +106,7 @@ public class TestRun extends BaseEntity {
 	 */
 	public static TestRun start(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt,
 			Long triggeredBy) {
-		return new TestRun(suite, environment, trigger, startedAt, triggeredBy, null);
+		return new TestRun(suite, environment, trigger, startedAt, triggeredBy, null, null);
 	}
 
 	/**
@@ -112,12 +116,27 @@ public class TestRun extends BaseEntity {
 	public static TestRun startCase(TestCase testCase, Environment environment, Trigger trigger, Instant startedAt,
 			Long triggeredBy) {
 		return new TestRun(testCase.getSuite(), environment, trigger, startedAt, triggeredBy,
-				Objects.requireNonNull(testCase.getId(), "testCase.id"));
+				Objects.requireNonNull(testCase.getId(), "testCase.id"), null);
+	}
+
+	/**
+	 * 여기까지 실행. 케이스가 속한 스위트의 실행으로 기록하되 마지막 케이스를 남겨 스위트 전체 실행과 구분
+	 * @param through 마지막으로 실행할 케이스
+	 */
+	public static TestRun startThrough(TestCase through, Environment environment, Trigger trigger, Instant startedAt,
+			Long triggeredBy) {
+		return new TestRun(through.getSuite(), environment, trigger, startedAt, triggeredBy, null,
+				Objects.requireNonNull(through.getId(), "through.id"));
 	}
 
 	/** 케이스 단건 실행 여부 */
 	public boolean isSingleCase() {
 		return testCaseId != null;
+	}
+
+	/** 여기까지 실행 여부 */
+	public boolean isThroughCase() {
+		return throughCaseId != null;
 	}
 
 	/** 결과 1건의 판정 반영. 결과 저장과 같은 트랜잭션에서 호출. 판정 없는 결과(null)는 세지 않음 */

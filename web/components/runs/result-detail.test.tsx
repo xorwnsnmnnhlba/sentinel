@@ -138,4 +138,56 @@ describe("ResultDetail", () => {
 
     expect(screen.queryByRole("table", { name: "값 추출" })).not.toBeInTheDocument();
   });
+
+  it("explains how to fill a value that an earlier case extracts", () => {
+    const missing: RunResult = {
+      ...responded,
+      outcome: "ERROR",
+      verdict: "ERROR",
+      assertionResults: [],
+      errorReason: "UNRESOLVED_VARIABLE",
+      errorMessage: "Unresolved variables: token. Extracted by a case in this suite: token (set only when ...)",
+      request: { method: "GET", url: null, headers: null, body: null },
+      response: null,
+      responseSchema: null,
+      drift: null,
+    };
+
+    const { unmount } = render(<ResultDetail result={missing} singleCase />);
+    expect(screen.getByText(/"여기까지 실행"으로 앞 케이스와 함께 실행해 주세요/)).toBeInTheDocument();
+    unmount();
+
+    render(<ResultDetail result={missing} />);
+    expect(screen.getByText(/실행 순서와 앞 케이스의 값 추출 결과를 확인해 주세요/)).toBeInTheDocument();
+  });
+
+  it("adds no hint for other unresolved variables", () => {
+    render(
+      <ResultDetail
+        result={{
+          ...responded,
+          errorReason: "UNRESOLVED_VARIABLE",
+          errorMessage: "Unresolved variables: userId",
+        }}
+        singleCase
+      />,
+    );
+
+    expect(screen.queryByText(/여기까지 실행/)).not.toBeInTheDocument();
+  });
+
+  it("adds no hint to other errors that merely quote the same words", () => {
+    render(
+      <ResultDetail
+        result={{
+          ...responded,
+          errorReason: "INVALID_REQUEST",
+          errorMessage: "invalid path: /Extracted by a case in this suite",
+        }}
+        singleCase
+      />,
+    );
+
+    expect(screen.queryByText(/여기까지 실행/)).not.toBeInTheDocument();
+  });
 });

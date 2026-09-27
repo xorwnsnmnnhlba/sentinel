@@ -2,7 +2,14 @@ import { notFound } from "next/navigation";
 
 import { Empty, SectionHeader } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
-import { RunCountBadges, SingleCaseBadge, StatusBadge, TriggerBadge, VerdictBadge } from "@/components/run-badges";
+import {
+  RunCountBadges,
+  SingleCaseBadge,
+  StatusBadge,
+  ThroughCaseBadge,
+  TriggerBadge,
+  VerdictBadge,
+} from "@/components/run-badges";
 import { DriftBadge, highestLevel } from "@/components/runs/drift";
 import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -38,12 +45,14 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
               </span>
               <TriggerBadge trigger={run.trigger} />
               {run.testCase && <SingleCaseBadge />}
+              {run.throughCase && <ThroughCaseBadge />}
               <StatusBadge status={run.status} />
             </span>
           }
         />
         <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
           {run.testCase && <Meta label="케이스" value={run.testCase.name} />}
+          {run.throughCase && <Meta label="마지막 케이스" value={run.throughCase.name} />}
           <Meta label="환경" value={run.environmentName} />
           {run.triggeredBy && <Meta label="실행" value={run.triggeredBy.name} />}
           <Meta label="시작" value={formatDateTime(run.startedAt)} />
@@ -85,7 +94,11 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <ResultDetail result={result} rawPurged={run.rawPurgedAt !== null} />
+                  <ResultDetail
+                    result={result}
+                    rawPurged={run.rawPurgedAt !== null}
+                    singleCase={run.testCase !== null}
+                  />
                 </AccordionContent>
               </AccordionItem>
             ))}

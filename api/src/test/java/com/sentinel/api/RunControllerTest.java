@@ -89,6 +89,28 @@ class RunControllerTest {
 	}
 
 	@Test
+	void createsARunThroughTheChosenCaseAndListsIt() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/a", null, null);
+		TestCase through = fixtures.testCase(suite, HttpMethod.GET, "/b", null, null);
+		fixtures.testCase(suite, HttpMethod.GET, "/c", null, null);
+
+		MvcTestResult created = createRun("{\"throughCaseId\": %d, \"environmentId\": %d}"
+			.formatted(through.getId(), environment.getId()));
+
+		assertThat(created).hasStatus(HttpStatus.CREATED);
+		assertThat(created).bodyJson().extractingPath("$.summary.total").isEqualTo(2);
+		assertThat(created).bodyJson().extractingPath("$.throughCase.name").isEqualTo(through.getName());
+		assertThat(created).bodyJson().extractingPath("$.testCase").isNull();
+		assertThat(executor.requests()).extracting(request -> request.uri().getPath()).containsExactly("/a", "/b");
+		var listed = assertThat(mvc.get().uri("/api/runs")).bodyJson();
+		listed.extractingPath("$.content[0].throughCase.id").isEqualTo(through.getId().intValue());
+		listed.extractingPath("$.content[0].testCase").isNull();
+	}
+
+	@Test
 	void requiresExactlyOneTarget() {
 		assertThat(createRun("{\"environmentId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST);
 		// package-private record의 @AssertTrue 검증 적용 여부. 미적용 시 스위트 실행으로 넘어가 404
@@ -98,11 +120,19 @@ class RunControllerTest {
 			.asString()
 			.contains("Invalid request content");
 		assertThat(createRun("{\"suiteId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(createRun("{\"caseId\": 1, \"throughCaseId\": 1, \"environmentId\": 1}"))
+			.hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(createRun("{\"suiteId\": 1, \"throughCaseId\": 1, \"environmentId\": 1}"))
+			.hasStatus(HttpStatus.BAD_REQUEST);
 	}
 
 	@Test
 	void returnsProblemDetailForMissingTarget() {
 		assertThat(createRun("{\"caseId\": -1, \"environmentId\": 1}")).hasStatus(HttpStatus.NOT_FOUND)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("test case -1 not found");
+		assertThat(createRun("{\"throughCaseId\": -1, \"environmentId\": 1}")).hasStatus(HttpStatus.NOT_FOUND)
 			.bodyJson()
 			.extractingPath("$.detail")
 			.isEqualTo("test case -1 not found");

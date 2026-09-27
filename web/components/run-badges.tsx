@@ -29,6 +29,11 @@ export function SingleCaseBadge() {
   return <Badge variant="outline">케이스 단건</Badge>;
 }
 
+/** 스위트 처음부터 한 케이스까지만 실행한 기록. 스위트 전체 실행과 구분 */
+export function ThroughCaseBadge() {
+  return <Badge variant="outline">여기까지</Badge>;
+}
+
 const statusLabel: Record<RunStatus, string> = { RUNNING: "실행 중", COMPLETED: "완료", ABORTED: "중단" };
 
 export function StatusBadge({ status }: { status: RunStatus }) {
