@@ -8,7 +8,7 @@ import { CaseOrderFields } from "@/components/catalog/case-order-fields";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
-import { caseMenu, EDIT_DELETE } from "@/components/catalog/menu-items";
+import { caseMenu, EDIT_DELETE, withHistory } from "@/components/catalog/menu-items";
 import { RunCaseFields } from "@/components/catalog/run-case-fields";
 import { RunSuiteForm } from "@/components/catalog/run-suite-form";
 import { ScheduleFields } from "@/components/catalog/schedule-fields";
@@ -32,6 +32,7 @@ import {
 } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
 import type { CaseItem, EnvironmentItem, ProjectItem, ScheduleDetail, SuiteItem } from "@/lib/api/types";
+import { historyHref } from "@/lib/change-log";
 import { formatDateTime } from "@/lib/format";
 
 import { ResponseTimes } from "./response-times";
@@ -78,7 +79,11 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
               </Link>
             </Button>
             <RunSuiteForm environments={environments} caseCount={cases.length} action={runSuite.bind(null, suite.id)} />
-            <ActionMenu label={`스위트 ${suite.name} 작업`} items={EDIT_DELETE} size="page">
+            <ActionMenu
+              label={`스위트 ${suite.name} 작업`}
+              items={withHistory(EDIT_DELETE, historyHref("SUITE", suite.id))}
+              size="page"
+            >
               <FormDialog
                 menuId="edit"
                 title="스위트 수정"
@@ -184,10 +189,13 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                     <TableCell className="text-right">
                       <ActionMenu
                         label={`케이스 ${testCase.name} 작업`}
-                        items={caseMenu(testCase.id, {
-                          runnable: environments.length > 0,
-                          duplicate: duplicateCase.bind(null, testCase.id),
-                        })}
+                        items={withHistory(
+                          caseMenu(testCase.id, {
+                            runnable: environments.length > 0,
+                            duplicate: duplicateCase.bind(null, testCase.id),
+                          }),
+                          historyHref("CASE", testCase.id),
+                        )}
                       >
                         {environments.length > 0 && (
                           <FormDialog
@@ -274,7 +282,10 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                       />
                     </TableCell>
                     <TableCell className="text-right">
-                      <ActionMenu label={`스케줄 ${schedule.cron} 작업`} items={EDIT_DELETE}>
+                      <ActionMenu
+                        label={`스케줄 ${schedule.cron} 작업`}
+                        items={withHistory(EDIT_DELETE, historyHref("SCHEDULE", schedule.id))}
+                      >
                         <FormDialog
                           menuId="edit"
                           title="스케줄 수정"

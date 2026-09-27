@@ -17,6 +17,16 @@ export const EDIT_DUPLICATE_DELETE: ActionMenuItem[] = [
 ];
 
 /**
+ * "변경 이력" 항목 추가. 되돌릴 수 없는 동작(삭제) 앞에 두어 구분선 아래에는 삭제만 남김
+ * @param href 변경 이력 화면 주소 (lib/change-log.ts historyHref·projectHistoryHref)
+ */
+export function withHistory(items: ActionMenuItem[], href: string): ActionMenuItem[] {
+  const history: ActionMenuItem = { id: "history", label: "변경 이력", icon: "history", href };
+  const destructive = items.findIndex((item) => item.destructive);
+  return destructive < 0 ? [...items, history] : [...items.slice(0, destructive), history, ...items.slice(destructive)];
+}
+
+/**
  * 케이스 행 메뉴: 실행(환경이 있을 때) · 수정(별도 화면) · 복제 · 삭제
  * @param duplicate 복제 Server Action (대화상자 없이 바로 실행)
  */

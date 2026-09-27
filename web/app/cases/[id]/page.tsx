@@ -1,11 +1,15 @@
+import { FileClock } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CaseEditor } from "@/components/catalog/case-editor";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { updateCase } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
 import type { CaseItem, EnvironmentItem, SuiteItem } from "@/lib/api/types";
 import { toDraft } from "@/lib/case-draft";
+import { historyHref } from "@/lib/change-log";
 
 export async function generateMetadata(props: PageProps<"/cases/[id]">) {
   const { id } = await props.params;
@@ -28,6 +32,13 @@ export default async function CasePage(props: PageProps<"/cases/[id]">) {
         back={{ href: `/suites/${suite.id}`, label: suite.name }}
         title="케이스 수정"
         description="저장하면 요청 정의·판정 규칙·값 추출이 통째로 바뀝니다. 이전 실행 이력은 그대로 유지됩니다."
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href={historyHref("CASE", testCase.id)}>
+              <FileClock /> 변경 이력
+            </Link>
+          </Button>
+        }
       />
       {/* 등록 후 실행에서 등록만 되고 실행이 실패한 경우 (같은 케이스를 다시 등록하지 않도록 수정 화면으로 이동) */}
       {notice === "run-failed" && (

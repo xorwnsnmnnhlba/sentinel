@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { deleteUser } from "@/lib/actions/users";
 import { apiGet } from "@/lib/api/server";
 import type { AuthenticatedUser, UserSummary } from "@/lib/api/types";
+import { historyHref } from "@/lib/change-log";
 import { formatDateTime } from "@/lib/format";
 
 export const metadata = { title: "사용자 · Sentinel" };
@@ -64,7 +65,7 @@ export default async function UsersPage() {
                     {formatDateTime(user.createdAt)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <ActionMenu label={`${user.email} 작업`} items={userMenu(user.id !== me.id)}>
+                    <ActionMenu label={`${user.email} 작업`} items={userMenu(user.id, user.id !== me.id)}>
                       <ResetLinkDialog menuId="reset" userId={user.id} email={user.email} baseUrl={baseUrl} />
                       {user.id !== me.id && (
                         <DeleteDialog
@@ -95,7 +96,15 @@ async function siteUrl(): Promise<string> {
 }
 
 /** 본인 계정은 삭제 불가 */
-function userMenu(deletable: boolean): ActionMenuItem[] {
+function userMenu(userId: number, deletable: boolean): ActionMenuItem[] {
   const reset: ActionMenuItem = { id: "reset", label: "비밀번호 재설정 링크", icon: "key" };
-  return deletable ? [reset, { id: "delete", label: "삭제", icon: "delete", destructive: true }] : [reset];
+  const history: ActionMenuItem = {
+    id: "history",
+    label: "변경 이력",
+    icon: "history",
+    href: historyHref("USER", userId),
+  };
+  return deletable
+    ? [reset, history, { id: "delete", label: "삭제", icon: "delete", destructive: true }]
+    : [reset, history];
 }
