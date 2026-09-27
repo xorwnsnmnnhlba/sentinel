@@ -12,7 +12,7 @@ const cases: OrderedCase[] = [
 
 function renderInForm() {
   const { container } = render(
-    <form>
+    <form method="post">
       <CaseOrderFields cases={cases} />
     </form>,
   );
