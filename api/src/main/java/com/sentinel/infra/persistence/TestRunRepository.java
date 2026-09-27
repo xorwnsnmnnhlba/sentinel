@@ -70,6 +70,24 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 	List<TestRun> findLatestPerSuite();
 
 	/**
+	 * 직전 스위트 전체 실행 (같은 스위트·환경, 지정 상태). 케이스 단건 실행·여기까지 실행 제외.
+	 * 시작 시각 상한({@code <= startedAt})을 따로 두어 인덱스를 기준 실행의 시작 시각부터 거슬러 읽음 (이력 길이와 무관).
+	 * OR 조건만 두면 상한이 인덱스 조건이 되지 못해 최신 실행부터 훑음 (45일치에서 40일 전 실행 기준 29ms → 0.06ms)
+	 * @param startedAt 기준 실행의 시작 시각. 같은 시각이면 ID가 작은 실행이 앞선 실행
+	 */
+	@Query("""
+			select t from TestRun t
+			where t.suite.id = :suiteId and t.environment.id = :environmentId
+			  and t.testCaseId is null and t.throughCaseId is null
+			  and t.status = :status
+			  and t.startedAt <= :startedAt and (t.startedAt < :startedAt or t.id < :runId)
+			order by t.startedAt desc, t.id desc
+			""")
+	List<TestRun> findPreviousWholeRuns(@Param("suiteId") long suiteId, @Param("environmentId") long environmentId,
+			@Param("status") TestRun.Status status, @Param("startedAt") Instant startedAt, @Param("runId") long runId,
+			Limit limit);
+
+	/**
 	 * 원문 정리 대상. 원문이 남아 있고 {@code cutoff} 이전에 시작한 종료된 실행을 오래된 순으로 조회 ({@code idx_run_raw_purge})
 	 */
 	List<TestRun> findByRawPurgedAtIsNullAndStartedAtBeforeAndStatusNotOrderByStartedAt(Instant cutoff,
