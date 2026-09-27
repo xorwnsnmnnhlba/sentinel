@@ -6,7 +6,7 @@ import { ActionMenu } from "@/components/catalog/action-menu";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { EnvironmentFields, ProjectFields, SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
-import { EDIT_DELETE } from "@/components/catalog/menu-items";
+import { EDIT_DELETE, EDIT_DUPLICATE_DELETE } from "@/components/catalog/menu-items";
 import { Empty, SectionHeader, TableFrame } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
 } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
 import type { EnvironmentItem, ProjectItem, SuiteItem } from "@/lib/api/types";
+import { copyName, MAX_ENVIRONMENT_NAME_LENGTH } from "@/lib/copy-name";
 
 export async function generateMetadata(props: PageProps<"/projects/[id]">) {
   const { id } = await props.params;
@@ -114,7 +115,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                       {environment.secretNames.join(", ") || "-"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <ActionMenu label={`환경 ${environment.name} 작업`} items={EDIT_DELETE}>
+                      <ActionMenu label={`환경 ${environment.name} 작업`} items={EDIT_DUPLICATE_DELETE}>
                         <FormDialog
                           menuId="edit"
                           title="환경 수정"
@@ -122,6 +123,24 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                           action={updateEnvironment.bind(null, environment.id)}
                         >
                           <EnvironmentFields environment={environment} />
+                        </FormDialog>
+                        <FormDialog
+                          menuId="duplicate"
+                          title="환경 복제"
+                          description={`${environment.name}의 기본 URL·변수를 채운 새 환경을 등록합니다. 원본은 바뀌지 않습니다.`}
+                          submitLabel="등록"
+                          action={createEnvironment.bind(null, project.id)}
+                        >
+                          <EnvironmentFields
+                            copy={{
+                              from: environment,
+                              name: copyName(
+                                environment.name,
+                                environments.map((other) => other.name),
+                                MAX_ENVIRONMENT_NAME_LENGTH,
+                              ),
+                            }}
+                          />
                         </FormDialog>
                         <DeleteDialog
                           menuId="delete"

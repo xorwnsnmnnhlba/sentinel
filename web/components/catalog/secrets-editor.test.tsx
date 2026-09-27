@@ -68,4 +68,19 @@ describe("SecretsEditor", () => {
     await user.click(screen.getByRole("button", { name: "새 시크릿 2 삭제" }));
     expect(serialized(container)).toEqual({});
   });
+
+  it("prefills names waiting for values and requires the values", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<SecretsEditor pendingNames={["token", "apiKey"]} />);
+
+    expect(screen.getByLabelText("새 시크릿 1 이름")).toHaveValue("token");
+    expect(screen.getByLabelText("새 시크릿 2 이름")).toHaveValue("apiKey");
+    expect(screen.getByLabelText("새 시크릿 1 값")).toBeRequired();
+    expect(screen.getByLabelText("새 시크릿 1 값")).toHaveValue("");
+
+    await user.type(screen.getByLabelText("새 시크릿 1 값"), "t-value");
+    await user.click(screen.getByRole("button", { name: "새 시크릿 2 삭제" }));
+
+    expect(serialized(container)).toEqual({ token: "t-value" });
+  });
 });

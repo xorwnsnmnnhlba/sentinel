@@ -433,6 +433,38 @@ test("케이스를 복제하면 같은 요청·판정 규칙으로 새 케이스
   await expect(cases.getByRole("link", { name: "프로젝트 목록 조회 (복사)" })).toBeVisible();
 });
 
+test("환경을 복제하면 기본 URL·변수를 채운 등록 창이 열리고 시크릿은 다시 입력", async ({ page }) => {
+  await page.goto("/projects");
+  await page.getByRole("link", { name: project }).click();
+  await expect(page.getByRole("heading", { name: project, level: 1 })).toBeVisible();
+
+  await chooseAction(page, "환경 self 작업", "복제");
+  const dialog = page.getByRole("dialog", { name: "환경 복제" });
+  await expect(dialog.getByLabel("이름", { exact: true })).toHaveValue("self (복사)");
+  await expect(dialog.getByLabel("기본 URL")).toHaveValue("http://e2e-api:8080");
+  await expect(dialog.getByLabel("변수 1 이름")).toHaveValue("apiPrefix");
+  await expect(dialog.getByLabel("변수 1 값")).toHaveValue("/api");
+  await expect(dialog.getByLabel("새 시크릿 1 이름")).toHaveValue("token");
+  await expect(dialog.getByLabel("새 시크릿 1 값")).toHaveValue("");
+
+  // 시크릿 값을 비운 채로는 등록되지 않음 (브라우저 필수 입력 확인)
+  await dialog.getByRole("button", { name: "등록" }).click();
+  await expect(dialog).toBeVisible();
+
+  await dialog.getByLabel("이름", { exact: true }).fill("staging");
+  await dialog.getByLabel("새 시크릿 1 값").fill("staging-token");
+  await dialog.getByRole("button", { name: "등록" }).click();
+
+  await expect(dialog).toBeHidden();
+  const staging = page.getByRole("row", { name: /staging/ });
+  await expect(staging).toContainText("http://e2e-api:8080");
+  await expect(staging).toContainText("apiPrefix");
+  await expect(staging).toContainText("token");
+  // 원본은 그대로
+  await expect(page.getByRole("row", { name: /^self / })).toContainText("token");
+  expect(await page.content()).not.toContain("staging-token");
+});
+
 test("프로젝트 삭제 시 하위 항목도 사라지고 실행 이력은 유지", async ({ page }) => {
   await page.goto("/runs");
   // 스위트 전체 실행과 케이스 단건 실행

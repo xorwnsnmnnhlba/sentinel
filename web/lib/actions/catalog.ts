@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { apiGet, apiSend, isApiError } from "@/lib/api/server";
 import type { CaseItem, EnvironmentItem, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
-import { copyName } from "@/lib/case-copy";
+import { copyName, MAX_CASE_NAME_LENGTH } from "@/lib/copy-name";
 import { type CaseDraft, isCaseDraft, validateDraft } from "@/lib/case-draft";
 
 /**
@@ -210,6 +210,7 @@ export async function duplicateCase(caseId: number): Promise<ActionState> {
       name: copyName(
         original.name,
         siblings.map((sibling) => sibling.name),
+        MAX_CASE_NAME_LENGTH,
       ),
       request: original.request,
       assertions: original.assertions,
@@ -347,6 +348,11 @@ function secretsOf(form: FormData): Record<string, string | null> | string {
   const entries = Object.entries(parsed);
   if (entries.some(([, value]) => value !== null && typeof value !== "string")) {
     return "시크릿 값은 문자열이어야 합니다";
+  }
+  // 빈 값은 의미가 없고, 복제 시 이름만 채운 행을 그대로 저장하면 조용히 빈 시크릿이 됨. 이름만 알림 (값은 알리지 않음)
+  const empty = entries.find(([, value]) => value === "");
+  if (empty) {
+    return `시크릿 ${empty[0]}의 값을 입력하거나 그 행을 지워 주세요`;
   }
   return Object.fromEntries(entries) as Record<string, string | null>;
 }

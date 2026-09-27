@@ -14,9 +14,16 @@ type NewSecret = { name: string; value: string };
  *
  * 저장된 값은 암호화되어 다시 볼 수 없으므로 이름만 표시하고, 값 변경은 같은 이름으로 다시 입력.
  */
-export function SecretsEditor({ savedNames = [] }: { savedNames?: string[] }) {
+export function SecretsEditor({
+  savedNames = [],
+  pendingNames = [],
+}: {
+  savedNames?: string[];
+  /** 값 입력을 기다리는 새 시크릿 이름 (환경 복제: 원본의 값은 옮길 수 없어 이름만 채움) */
+  pendingNames?: string[];
+}) {
   const [removed, setRemoved] = useState<string[]>([]);
-  const [added, setAdded] = useState<NewSecret[]>([]);
+  const [added, setAdded] = useState<NewSecret[]>(() => pendingNames.map((name) => ({ name, value: "" })));
 
   const serialized = JSON.stringify({
     ...Object.fromEntries(removed.map((name) => [name, null])),
@@ -83,6 +90,7 @@ export function SecretsEditor({ savedNames = [] }: { savedNames?: string[] }) {
               placeholder="값"
               value={secret.value}
               autoComplete="off"
+              required
               onChange={(event) => update(index, { value: event.target.value })}
               className="font-mono"
             />
