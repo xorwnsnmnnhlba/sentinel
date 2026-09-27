@@ -11,6 +11,7 @@ import {
   VerdictBadge,
 } from "@/components/run-badges";
 import { DriftBadge, highestLevel } from "@/components/runs/drift";
+import { ChangeBadge, ChangeSummary } from "@/components/runs/run-change";
 import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { apiGetOrNotFound } from "@/lib/api/server";
@@ -59,6 +60,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
           <Meta label="소요" value={formatRunDuration(run.startedAt, run.finishedAt)} />
         </dl>
         <RunCountBadges counts={run.summary} />
+        <ChangeSummary run={run} />
       </div>
 
       {run.rawPurgedAt && (
@@ -85,6 +87,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <VerdictBadge verdict={result.verdict} />
                     <span className="truncate font-medium">{result.testCaseName}</span>
+                    <ChangeBadge change={result.change} />
                     <DriftBadge drift={result.drift} />
                     <span className="ml-auto flex shrink-0 items-center gap-3 font-mono text-xs text-muted-foreground">
                       <span>{result.request.method}</span>

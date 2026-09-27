@@ -19,10 +19,12 @@ import com.sentinel.runner.schema.ResponseSchema;
  * @param rawPurgedAt 보관기간이 지나 요청·응답 원문(헤더·본문)을 비운 시각. null이면 원문 보관 중
  * @param testCase 케이스 단건 실행의 대상. 스위트 전체 실행은 null
  * @param throughCase 여기까지 실행의 마지막 케이스. 그 외 실행은 null
+ * @param previousRun 비교 기준인 직전 실행 (같은 스위트·환경의 완료된 스위트 전체 실행). 없거나 스위트 전체 실행이 아니면 null
  */
 public record TestRunDetail(long id, long suiteId, String suiteName, long environmentId, String environmentName,
 		TestRun.Trigger trigger, TestRun.Status status, Instant startedAt, Instant finishedAt, Summary summary,
-		List<Result> results, IdName triggeredBy, Instant rawPurgedAt, IdName testCase, IdName throughCase) {
+		List<Result> results, IdName triggeredBy, Instant rawPurgedAt, IdName testCase, IdName throughCase,
+		PreviousRun previousRun) {
 
 	/**
 	 * @param results 케이스가 함께 로딩된 결과. 트랜잭션 안에서 호출
@@ -30,14 +32,62 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 	 * @param testCase 케이스 단건 실행의 대상. 스위트 전체 실행은 null
 	 * @param throughCase 여기까지 실행의 마지막 케이스. 그 외 실행은 null
 	 * @param drifts 결과 ID별 구조 변화 ({@link SchemaDriftService})
+	 * @param previous 직전 실행과 그 실행의 케이스별 판정. 비교하지 않으면 null
 	 */
 	static TestRunDetail of(TestRun run, List<TestResult> results, IdName triggeredBy, IdName testCase,
-			IdName throughCase, Map<Long, ResultDrift> drifts) {
-		List<Result> mapped = results.stream().map(result -> Result.of(result, drifts.get(result.getId()))).toList();
+			IdName throughCase, Map<Long, ResultDrift> drifts, Previous previous) {
+		List<Result> mapped = results.stream()
+			.map(result -> Result.of(result, drifts.get(result.getId()),
+					previous == null ? null : Change.of(previous.verdicts(), result)))
+			.toList();
 		return new TestRunDetail(run.getId(), run.getSuite().getId(), run.getSuite().getName(),
 				run.getEnvironment().getId(), run.getEnvironment().getName(), run.getTrigger(), run.getStatus(),
 				run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped, triggeredBy, run.getRawPurgedAt(),
-				testCase, throughCase);
+				testCase, throughCase, previous == null ? null : previous.run());
+	}
+
+	/**
+	 * 비교 기준
+	 * @param verdicts 직전 실행의 케이스 ID별 판정 (판정 없는 이전 기록은 빠짐)
+	 */
+	record Previous(PreviousRun run, Map<Long, Verdict> verdicts) {
+	}
+
+	public record PreviousRun(long id, Instant startedAt) {
+	}
+
+	/**
+	 * 직전 실행 대비 케이스 판정 변화. 실패는 판정 실패·오류
+	 */
+	public enum Change {
+
+		/** 직전 실행에 없던 케이스 (새로 추가 등) */
+		NEW,
+		/** 통과 → 실패 */
+		NEWLY_FAILING,
+		/** 실패 → 통과 */
+		RECOVERED,
+		/** 실패 → 실패 */
+		STILL_FAILING,
+		/** 통과 → 통과 */
+		UNCHANGED;
+
+		static Change of(Map<Long, Verdict> previous, TestResult result) {
+			if (!previous.containsKey(result.getTestCase().getId())) {
+				return NEW;
+			}
+			boolean wasFailing = failing(previous.get(result.getTestCase().getId()));
+			boolean failing = failing(result.getVerdict());
+			if (wasFailing) {
+				return failing ? STILL_FAILING : RECOVERED;
+			}
+			return failing ? NEWLY_FAILING : UNCHANGED;
+		}
+
+		private static boolean failing(Verdict verdict) {
+			return verdict == Verdict.FAILED || verdict == Verdict.ERROR;
+		}
+
 	}
 
 	/**
@@ -61,12 +111,13 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 	/**
 	 * @param responseSchema 응답 JSON의 구조 지문. 원문 보관기간이 지나도 유지. JSON이 아닌 응답·응답 없음은 null
 	 * @param drift 이전 실행 대비 구조 변화. 지문이 없으면 null
+	 * @param change 직전 실행 대비 판정 변화. 비교하지 않는 실행(직전 실행 없음, 단건·여기까지 실행)은 null
 	 */
 	public record Result(long id, long testCaseId, String testCaseName, Verdict verdict, Outcome outcome,
 			List<AssertionResult> assertionResults, ErrorReason errorReason, String errorMessage, Long elapsedMs,
-			Request request, Response response, ResponseSchema responseSchema, ResultDrift drift) {
+			Request request, Response response, ResponseSchema responseSchema, ResultDrift drift, Change change) {
 
-		static Result of(TestResult result, ResultDrift drift) {
+		static Result of(TestResult result, ResultDrift drift, Change change) {
 			Response response = result.getOutcome() == Outcome.RESPONDED
 					? new Response(result.getStatusCode(), result.getResponseHeaders(), result.getResponseBody(),
 							result.isResponseBodyTruncated())
@@ -76,7 +127,7 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 					result.getAssertionResults(), result.getErrorReason(), result.getErrorMessage(), result.getElapsedMs(),
 					new Request(result.getRequestMethod(), result.getRequestUrl(), result.getRequestHeaders(),
 							result.getRequestBody()),
-					response, result.getResponseSchema(), drift);
+					response, result.getResponseSchema(), drift, change);
 		}
 
 	}

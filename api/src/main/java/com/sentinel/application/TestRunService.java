@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,6 +43,7 @@ import com.sentinel.runner.assertion.AssertionResult;
 import com.sentinel.runner.extract.Extractor;
 import com.sentinel.runner.extract.Extractor.Extraction;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Limit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -146,8 +148,33 @@ public class TestRunService {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
 			List<TestResult> runResults = results.findWithTestCaseByRunId(runId);
 			return TestRunDetail.of(run, runResults, triggeredBy(run), caseName(run.getTestCaseId()),
-					caseName(run.getThroughCaseId()), schemaDrift.driftOf(run, runResults));
+					caseName(run.getThroughCaseId()), schemaDrift.driftOf(run, runResults), previous(run));
 		});
+	}
+
+	/**
+	 * 비교 기준인 직전 실행. 스위트 전체 실행끼리만 비교 (단건·여기까지 실행은 일부 케이스라 비교하지 않음).
+	 * 같은 스위트·환경의 완료된 실행 중 바로 앞 실행 (수동·스케줄 무관). 없으면 null
+	 */
+	private TestRunDetail.Previous previous(TestRun run) {
+		if (run.isSingleCase() || run.isThroughCase()) {
+			return null;
+		}
+		return runs
+			.findPreviousWholeRuns(run.getSuite().getId(), run.getEnvironment().getId(), TestRun.Status.COMPLETED,
+					run.getStartedAt(), run.getId(), Limit.of(1))
+			.stream()
+			.findFirst()
+			.map(previous -> {
+				Map<Long, TestResult.Verdict> verdicts = new HashMap<>();
+				results.findCaseVerdictsByRunIds(List.of(previous.getId()))
+					.stream()
+					.filter(verdict -> verdict.getVerdict() != null)
+					.forEach(verdict -> verdicts.put(verdict.getCaseId(), verdict.getVerdict()));
+				return new TestRunDetail.Previous(
+						new TestRunDetail.PreviousRun(previous.getId(), previous.getStartedAt()), verdicts);
+			})
+			.orElse(null);
 	}
 
 	/** 단건 실행·여기까지 실행의 대상 케이스. 해당 없으면 null, 삭제(보관)된 케이스도 이력 표시를 위해 조회 */

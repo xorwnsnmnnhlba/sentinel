@@ -69,7 +69,12 @@ export interface RunResult {
   responseSchema: ResponseSchema | null;
   /** 같은 케이스·환경의 이전 실행 대비 구조 변화. 지문이 없으면 null */
   drift: ResultDrift | null;
+  /** 직전 실행 대비 판정 변화. 비교하지 않는 실행(직전 실행 없음, 단건·여기까지 실행)은 null */
+  change: RunChange | null;
 }
+
+/** 직전 실행 대비 판정 변화. 실패는 판정 실패·오류 (api/README.md "직전 실행 대비 변화") */
+export type RunChange = "NEW" | "NEWLY_FAILING" | "RECOVERED" | "STILL_FAILING" | "UNCHANGED";
 
 export type DriftLevel = "BREAKING" | "WARNING" | "INFO";
 
@@ -118,6 +123,8 @@ export interface RunDetail {
   throughCase: IdName | null;
   /** 보관기간이 지나 요청·응답 원문(헤더·본문)을 삭제한 시각. null이면 원문 보관 중 */
   rawPurgedAt: string | null;
+  /** 비교 기준인 직전 실행 (같은 스위트·환경의 완료된 스위트 전체 실행). 없거나 스위트 전체 실행이 아니면 null */
+  previousRun: { id: number; startedAt: string } | null;
 }
 
 export interface SuiteItem {
