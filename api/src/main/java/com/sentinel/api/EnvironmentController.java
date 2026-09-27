@@ -28,6 +28,8 @@ class EnvironmentController {
 
 	private final CatalogCommandService commands;
 
+	private final CurrentUser currentUser;
+
 	@GetMapping
 	List<EnvironmentItem> list(@RequestParam(required = false) Long projectId) {
 		return catalog.listEnvironments(projectId);
@@ -44,7 +46,7 @@ class EnvironmentController {
 	@PostMapping
 	ResponseEntity<EnvironmentItem> create(@Valid @RequestBody CreateEnvironmentRequest request) {
 		EnvironmentItem created = commands.createEnvironment(request.projectId(), request.name(), request.baseUrl(), request.variables(),
-				request.secrets());
+				request.secrets(), currentUser.get().id());
 		return ResponseEntity.created(URI.create("/api/environments/" + created.id())).body(created);
 	}
 
@@ -54,7 +56,7 @@ class EnvironmentController {
 	@PatchMapping("/{environmentId}")
 	EnvironmentItem update(@PathVariable long environmentId, @RequestBody UpdateEnvironmentRequest request) {
 		return commands.updateEnvironment(environmentId, request.name(), request.baseUrl(), request.variables(),
-				request.secrets());
+				request.secrets(), currentUser.get().id());
 	}
 
 	/**
@@ -62,7 +64,7 @@ class EnvironmentController {
 	 */
 	@DeleteMapping("/{environmentId}")
 	ResponseEntity<Void> delete(@PathVariable long environmentId) {
-		commands.archiveEnvironment(environmentId);
+		commands.archiveEnvironment(environmentId, currentUser.get().id());
 		return ResponseEntity.noContent().build();
 	}
 

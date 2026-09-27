@@ -21,6 +21,8 @@ class CaseImportController {
 
 	private final CaseImportService imports;
 
+	private final CurrentUser currentUser;
+
 	/**
 	 * 문서를 케이스 후보로 변환. 저장하지 않음
 	 */
@@ -35,7 +37,7 @@ class CaseImportController {
 	@PostMapping("/api/case-imports")
 	@ResponseStatus(HttpStatus.CREATED)
 	CaseImportResponse create(@Valid @RequestBody CreateCaseImportRequest request) {
-		return new CaseImportResponse(request.suiteId(), imports.importCases(request.suiteId(), request.cases()));
+		return new CaseImportResponse(request.suiteId(), imports.importCases(request.suiteId(), request.cases(), currentUser.get().id()));
 	}
 
 	record CaseImportResponse(long suiteId, List<CaseItem> cases) {

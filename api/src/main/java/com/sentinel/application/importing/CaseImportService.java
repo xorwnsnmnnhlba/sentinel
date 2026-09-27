@@ -76,7 +76,7 @@ public class CaseImportService {
 	 * @throws com.sentinel.application.ConflictException 스위트에 이미 있거나 목록 안에서 겹치는 이름
 	 */
 	@Transactional
-	public List<CaseItem> importCases(long suiteId, List<NewCase> cases) {
+	public List<CaseItem> importCases(long suiteId, List<NewCase> cases, long actorId) {
 		if (cases == null || cases.isEmpty()) {
 			throw new InvalidRequestException("cases must not be empty");
 		}
@@ -90,7 +90,8 @@ public class CaseImportService {
 				throw new InvalidRequestException("cases[" + index + "] must not be null");
 			}
 			try {
-				created.add(commands.createCase(suiteId, newCase.name(), newCase.request(), newCase.assertions(), null));
+				created.add(commands.createCase(suiteId, newCase.name(), newCase.request(), newCase.assertions(), null,
+						actorId));
 			}
 			catch (InvalidRequestException ex) {
 				throw new InvalidRequestException("cases[" + index + "] '" + newCase.name() + "': " + ex.getMessage());

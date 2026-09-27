@@ -35,6 +35,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 		SchedulePollingTest.ClockConfiguration.class })
 class SchedulePollingTest {
 
+	/** 변경 이력에 남길 사용자. 이력 자체는 이 테스트의 대상이 아님 */
+	private static final long ACTOR = 1L;
+
 	/** 2026-09-18 09:00 KST */
 	private static final Instant NINE_AM_KST = Instant.parse("2026-09-18T00:00:00Z");
 
@@ -87,7 +90,7 @@ class SchedulePollingTest {
 
 	@Test
 	void runsSuiteWhenDueAndMovesToNextDay() {
-		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *");
+		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", ACTOR);
 		assertThat(schedule.nextRunAt()).isEqualTo("2026-09-18T00:10:00Z");
 		assertThat(schedule.zone()).isEqualTo("Asia/Seoul");
 
@@ -112,7 +115,7 @@ class SchedulePollingTest {
 
 	@Test
 	void runsMissedScheduleOnlyOnce() {
-		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "*/10 * * * *");
+		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "*/10 * * * *", ACTOR);
 		clock.advance(Duration.ofHours(3));
 
 		assertThat(poller.poll()).hasSize(1);
@@ -122,13 +125,13 @@ class SchedulePollingTest {
 
 	@Test
 	void skipsDisabledScheduleAndResumesAfterEnable() {
-		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *");
-		scheduleService.update(schedule.id(), false, null, null);
+		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", ACTOR);
+		scheduleService.update(schedule.id(), false, null, null, ACTOR);
 		clock.set(Instant.parse("2026-09-18T01:00:00Z"));
 
 		assertThat(poller.poll()).isEmpty();
 
-		ScheduleDetail enabled = scheduleService.update(schedule.id(), true, null, null);
+		ScheduleDetail enabled = scheduleService.update(schedule.id(), true, null, null, ACTOR);
 		assertThat(enabled.nextRunAt()).isEqualTo("2026-09-19T00:10:00Z");
 	}
 
@@ -136,7 +139,7 @@ class SchedulePollingTest {
 	void notifiesOnlyWhenScheduledRunHasFailures() {
 		fixtures.testCase(suite, HttpMethod.POST, "/billing/v1/charge", null, "{}",
 				List.of(new StatusCodeAssertion(List.of("201"))));
-		scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *");
+		scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", ACTOR);
 		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
 
 		List<Long> runIds = poller.poll();
@@ -152,7 +155,7 @@ class SchedulePollingTest {
 
 	@Test
 	void sendsNothingWhenScheduledRunPasses() {
-		scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *");
+		scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", ACTOR);
 		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
 
 		assertThat(poller.poll()).hasSize(1);

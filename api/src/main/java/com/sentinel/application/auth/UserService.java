@@ -4,9 +4,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+import com.sentinel.application.ChangeLogService;
+import com.sentinel.application.ChangeLogService.Target;
 import com.sentinel.application.ConflictException;
 import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.NotFoundException;
+import com.sentinel.domain.ChangeLog.Action;
+import com.sentinel.domain.ChangeLog.TargetType;
 import com.sentinel.domain.User;
 import com.sentinel.domain.UserToken;
 import com.sentinel.infra.persistence.UserRepository;
@@ -20,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * 가입은 관리자 초대로만 이루어지며, 초대·재설정 링크의 토큰은 1회용이고 만료가 있음.
  * 토큰 원문은 발급 응답에서만 확인할 수 있고 저장은 해시로만 함.
+ * <p>
+ * 초대 발급, 가입(초대 수락), 재설정 링크 발급, 비밀번호 변경·재설정, 삭제는 변경 이력을 남김. 비밀번호·토큰 값은 남기지 않음
  */
 @Service
 @RequiredArgsConstructor
@@ -37,6 +43,8 @@ public class UserService {
 	private final AuthProperties properties;
 
 	private final Clock clock;
+
+	private final ChangeLogService changeLog;
 
 	@Transactional(readOnly = true)
 	public List<UserSummary> list() {
@@ -56,6 +64,7 @@ public class UserService {
 		String token = AuthService.newToken();
 		UserToken saved = tokens.save(UserToken.invite(AuthService.hash(token), normalized, role, clock.instant(),
 				properties.inviteValidity(), invitedBy));
+		changeLog.record(invitedBy, new Target(TargetType.INVITE, saved.getId(), normalized, null), Action.CREATED);
 		return new IssuedToken(token, saved.getExpiresAt());
 	}
 
@@ -78,8 +87,9 @@ public class UserService {
 		if (users.findByEmailAndArchivedAtIsNull(invite.getEmail()).isPresent()) {
 			throw new ConflictException("email '" + invite.getEmail() + "' is already in use");
 		}
-		users.save(new User(invite.getEmail(), name, authService.encodePassword(password), invite.getRole()));
+		User user = users.save(new User(invite.getEmail(), name, authService.encodePassword(password), invite.getRole()));
 		invite.use(clock.instant());
+		changeLog.record(user.getId(), target(user), Action.CREATED);
 		return authService.login(invite.getEmail(), password);
 	}
 
@@ -93,6 +103,7 @@ public class UserService {
 		String token = AuthService.newToken();
 		UserToken saved = tokens.save(UserToken.passwordReset(AuthService.hash(token), user.getId(), clock.instant(),
 				properties.passwordResetValidity(), createdBy));
+		changeLog.record(createdBy, target(user), Action.UPDATED, List.of("passwordResetLink"));
 		return new IssuedToken(token, saved.getExpiresAt());
 	}
 
@@ -117,6 +128,7 @@ public class UserService {
 		user.changePasswordHash(authService.encodePassword(password));
 		reset.use(clock.instant());
 		authService.logoutEverywhere(user.getId());
+		changeLog.record(user.getId(), target(user), Action.UPDATED, List.of("password"));
 	}
 
 	/**
@@ -133,6 +145,7 @@ public class UserService {
 		requireStrongPassword(newPassword);
 		user.changePasswordHash(authService.encodePassword(newPassword));
 		authService.logoutEverywhere(userId);
+		changeLog.record(userId, target(user), Action.UPDATED, List.of("password"));
 	}
 
 	/**
@@ -152,6 +165,11 @@ public class UserService {
 		user.archive(clock.instant());
 		authService.logoutEverywhere(userId);
 		tokens.deleteByUserId(userId);
+		changeLog.record(requestedBy, target(user), Action.DELETED);
+	}
+
+	private static Target target(User user) {
+		return new Target(TargetType.USER, user.getId(), user.getEmail(), null);
 	}
 
 	private long adminCount() {

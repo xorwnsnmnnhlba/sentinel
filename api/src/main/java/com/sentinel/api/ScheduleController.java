@@ -25,6 +25,8 @@ class ScheduleController {
 
 	private final ScheduleService scheduleService;
 
+	private final CurrentUser currentUser;
+
 	@GetMapping
 	List<ScheduleDetail> list(@RequestParam(required = false) Long suiteId) {
 		return scheduleService.list(suiteId);
@@ -37,7 +39,8 @@ class ScheduleController {
 
 	@PostMapping
 	ResponseEntity<ScheduleDetail> create(@Valid @RequestBody CreateScheduleRequest request) {
-		ScheduleDetail schedule = scheduleService.create(request.suiteId(), request.environmentId(), request.cron());
+		ScheduleDetail schedule = scheduleService.create(request.suiteId(), request.environmentId(), request.cron(),
+				currentUser.get().id());
 		return ResponseEntity.created(URI.create("/api/schedules/" + schedule.id())).body(schedule);
 	}
 
@@ -46,7 +49,8 @@ class ScheduleController {
 	 */
 	@PatchMapping("/{scheduleId}")
 	ScheduleDetail update(@PathVariable long scheduleId, @RequestBody UpdateScheduleRequest request) {
-		return scheduleService.update(scheduleId, request.enabled(), request.cron(), request.environmentId());
+		return scheduleService.update(scheduleId, request.enabled(), request.cron(), request.environmentId(),
+				currentUser.get().id());
 	}
 
 	/**
@@ -54,7 +58,7 @@ class ScheduleController {
 	 */
 	@DeleteMapping("/{scheduleId}")
 	ResponseEntity<Void> delete(@PathVariable long scheduleId) {
-		scheduleService.delete(scheduleId);
+		scheduleService.delete(scheduleId, currentUser.get().id());
 		return ResponseEntity.noContent().build();
 	}
 

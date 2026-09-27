@@ -17,6 +17,10 @@ import com.sentinel.application.CatalogQueryService.EnvironmentItem;
 import com.sentinel.application.CatalogQueryService.ProjectItem;
 import com.sentinel.application.CatalogQueryService.Request;
 import com.sentinel.application.CatalogQueryService.SuiteItem;
+import com.sentinel.application.ChangeLogService.Changes;
+import com.sentinel.application.ChangeLogService.Target;
+import com.sentinel.domain.ChangeLog.Action;
+import com.sentinel.domain.ChangeLog.TargetType;
 import com.sentinel.domain.ArchivableEntity;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
@@ -54,6 +58,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>케이스: 없음</li>
  * </ul>
  * 보관된 항목은 조회·수정·실행 대상에서 제외. 미존재 또는 이미 보관된 항목은 {@link NotFoundException}.
+ * <p>
+ * 모든 등록·수정·삭제는 같은 트랜잭션에서 변경 이력({@link ChangeLogService})을 남김. 수정은 값이 실제로 바뀐 항목 이름만.
+ * {@code actorId}는 변경한 사용자
  */
 @Service
 @Transactional
@@ -72,15 +79,20 @@ public class CatalogCommandService {
 
 	private final SecretCipher secretCipher;
 
+	private final ChangeLogService changeLog;
+
 	private final Clock clock;
 
-	public ProjectItem createProject(String name, String description) {
+	public ProjectItem createProject(String name, String description, long actorId) {
 		requireUnusedName("project", name, null, projects::findByNameAndArchivedAtIsNull);
-		return ProjectItem.of(projects.save(valid(() -> new Project(name, description))));
+		Project project = projects.save(valid(() -> new Project(name, description)));
+		changeLog.record(actorId, target(project), Action.CREATED);
+		return ProjectItem.of(project);
 	}
 
-	public ProjectItem updateProject(long projectId, String name, String description) {
+	public ProjectItem updateProject(long projectId, String name, String description, long actorId) {
 		Project project = findProject(projectId);
+		ProjectItem before = ProjectItem.of(project);
 		if (name != null) {
 			requireUnusedName("project", name, projectId, projects::findByNameAndArchivedAtIsNull);
 			change(() -> project.rename(name));
@@ -88,7 +100,12 @@ public class CatalogCommandService {
 		if (description != null) {
 			change(() -> project.describe(description));
 		}
-		return ProjectItem.of(project);
+		ProjectItem after = ProjectItem.of(project);
+		changeLog.record(actorId, target(project), Action.UPDATED,
+				new Changes().compare("name", before.name(), after.name())
+					.compare("description", before.description(), after.description())
+					.fields());
+		return after;
 	}
 
 	/**
@@ -96,7 +113,7 @@ public class CatalogCommandService {
 	 * @param secrets 시크릿 평문. 저장 시 암호화
 	 */
 	public EnvironmentItem createEnvironment(long projectId, String name, String baseUrl,
-			Map<String, String> variables, Map<String, String> secrets) {
+			Map<String, String> variables, Map<String, String> secrets, long actorId) {
 		Project project = findProject(projectId);
 		requireUnusedName("environment", name, null,
 				unique -> environments.findByProjectIdAndNameAndArchivedAtIsNull(projectId, unique));
@@ -106,7 +123,9 @@ public class CatalogCommandService {
 			return created;
 		});
 		applySecrets(environment, secrets);
-		return EnvironmentItem.of(environments.save(environment));
+		environments.save(environment);
+		changeLog.record(actorId, target(environment), Action.CREATED);
+		return EnvironmentItem.of(environment);
 	}
 
 	/**
@@ -114,8 +133,9 @@ public class CatalogCommandService {
 	 * @param secrets 이름별 반영. 값이 있으면 등록·교체, null이면 삭제, 목록에 없는 이름은 유지
 	 */
 	public EnvironmentItem updateEnvironment(long environmentId, String name, String baseUrl,
-			Map<String, String> variables, Map<String, String> secrets) {
+			Map<String, String> variables, Map<String, String> secrets, long actorId) {
 		Environment environment = findEnvironment(environmentId);
+		EnvironmentItem before = EnvironmentItem.of(environment);
 		long projectId = environment.getProject().getId();
 		if (name != null) {
 			requireUnusedName("environment", name, environmentId,
@@ -129,14 +149,25 @@ public class CatalogCommandService {
 			change(() -> environment.replaceVariables(variables));
 		}
 		applySecrets(environment, secrets);
-		return EnvironmentItem.of(environment);
+		EnvironmentItem after = EnvironmentItem.of(environment);
+		Changes changes = new Changes().compare("name", before.name(), after.name())
+			.compare("baseUrl", before.baseUrl(), after.baseUrl())
+			.compareEntries("variables", before.variables(), after.variables());
+		// 시크릿은 암호화 값이 매번 달라 비교할 수 없으므로 요청에 있는 이름을 모두 변경으로 기록 (값은 남기지 않음)
+		if (secrets != null) {
+			secrets.keySet().stream().sorted().forEach(secretName -> changes.add("secrets." + secretName));
+		}
+		changeLog.record(actorId, target(environment), Action.UPDATED, changes.fields());
+		return after;
 	}
 
-	public SuiteItem createSuite(long projectId, String name, String description) {
+	public SuiteItem createSuite(long projectId, String name, String description, long actorId) {
 		Project project = findProject(projectId);
 		requireUnusedName("test suite", name, null,
 				unique -> suites.findByProjectIdAndNameAndArchivedAtIsNull(projectId, unique));
-		return SuiteItem.of(suites.save(valid(() -> new TestSuite(project, name, description))), 0);
+		TestSuite suite = suites.save(valid(() -> new TestSuite(project, name, description)));
+		changeLog.record(actorId, target(suite), Action.CREATED);
+		return SuiteItem.of(suite, 0);
 	}
 
 	/**
@@ -144,10 +175,13 @@ public class CatalogCommandService {
 	 * @throws ConflictException caseOrder의 케이스가 스위트의 현재 케이스와 다름 (그사이 추가·삭제됨)
 	 * @throws InvalidRequestException caseOrder에 null·중복 ID
 	 */
-	public SuiteItem updateSuite(long suiteId, String name, String description, List<Long> caseOrder) {
+	public SuiteItem updateSuite(long suiteId, String name, String description, List<Long> caseOrder,
+			long actorId) {
 		TestSuite suite = findSuite(suiteId);
+		SuiteItem before = SuiteItem.of(suite, 0);
+		Changes changes = new Changes();
 		if (caseOrder != null) {
-			reorderCases(suiteId, caseOrder);
+			changes.compare("caseOrder", reorderCases(suiteId, caseOrder), caseOrder);
 		}
 		long projectId = suite.getProject().getId();
 		if (name != null) {
@@ -158,11 +192,18 @@ public class CatalogCommandService {
 		if (description != null) {
 			change(() -> suite.describe(description));
 		}
-		return SuiteItem.of(suite, (int) testCases.countBySuiteIdAndArchivedAtIsNull(suiteId));
+		SuiteItem after = SuiteItem.of(suite, (int) testCases.countBySuiteIdAndArchivedAtIsNull(suiteId));
+		changes.compare("name", before.name(), after.name()).compare("description", before.description(),
+				after.description());
+		changeLog.record(actorId, target(suite), Action.UPDATED, changes.fields());
+		return after;
 	}
 
-	/** 목록 순서대로 실행 순서 1, 2, 3 … 지정 */
-	private void reorderCases(long suiteId, List<Long> caseOrder) {
+	/**
+	 * 목록 순서대로 실행 순서 1, 2, 3 … 지정
+	 * @return 바꾸기 전 순서 (케이스 ID)
+	 */
+	private List<Long> reorderCases(long suiteId, List<Long> caseOrder) {
 		if (caseOrder.stream().anyMatch(Objects::isNull) || new HashSet<>(caseOrder).size() != caseOrder.size()) {
 			throw new InvalidRequestException("caseOrder must list each case once");
 		}
@@ -175,6 +216,7 @@ public class CatalogCommandService {
 		for (int i = 0; i < caseOrder.size(); i++) {
 			byId.get(caseOrder.get(i)).placeAt(i + 1);
 		}
+		return cases.stream().map(TestCase::getId).toList();
 	}
 
 	/**
@@ -183,13 +225,15 @@ public class CatalogCommandService {
 	 * @param extractors 응답 값 추출 규칙. null이면 없음
 	 */
 	public CaseItem createCase(long suiteId, String name, Request request, List<Assertion> assertions,
-			List<Extractor> extractors) {
+			List<Extractor> extractors, long actorId) {
 		TestSuite suite = findSuite(suiteId);
 		requireUnusedName("test case", name, null,
 				unique -> testCases.findBySuiteIdAndNameAndArchivedAtIsNull(suiteId, unique));
 		TestCase testCase = valid(() -> new TestCase(suite, name, specOf(request), assertions, extractors));
 		testCase.placeAt(testCases.findMaxRunOrder(suiteId) + 1);
-		return CaseItem.of(testCases.save(testCase));
+		testCases.save(testCase);
+		changeLog.record(actorId, target(testCase), Action.CREATED);
+		return CaseItem.of(testCase);
 	}
 
 	/**
@@ -198,9 +242,10 @@ public class CatalogCommandService {
 	 * @param extractors 지정 시 전체 교체
 	 */
 	public CaseItem updateCase(long caseId, String name, Request request, List<Assertion> assertions,
-			List<Extractor> extractors) {
+			List<Extractor> extractors, long actorId) {
 		TestCase testCase = testCases.findByIdAndArchivedAtIsNull(caseId)
 			.orElseThrow(() -> new NotFoundException("test case", caseId));
+		CaseItem before = CaseItem.of(testCase);
 		long suiteId = testCase.getSuite().getId();
 		if (name != null) {
 			requireUnusedName("test case", name, caseId,
@@ -216,29 +261,60 @@ public class CatalogCommandService {
 		if (extractors != null) {
 			change(() -> testCase.changeExtractors(extractors));
 		}
-		return CaseItem.of(testCase);
+		CaseItem after = CaseItem.of(testCase);
+		changeLog.record(actorId, target(testCase), Action.UPDATED,
+				new Changes().compare("name", before.name(), after.name())
+					.compare("request", before.request(), after.request())
+					.compare("assertions", before.assertions(), after.assertions())
+					.compare("extractors", before.extractors(), after.extractors())
+					.fields());
+		return after;
 	}
 
-	public void archiveProject(long projectId) {
+	public void archiveProject(long projectId, long actorId) {
 		Project project = findProject(projectId);
 		Instant now = clock.instant();
 		environments.findByProjectIdAndArchivedAtIsNullOrderByName(projectId).forEach(environment -> archive(environment, now));
 		suites.findByProjectIdAndArchivedAtIsNullOrderByName(projectId).forEach(suite -> archive(suite, now));
 		project.archive(now);
+		changeLog.record(actorId, target(project), Action.DELETED);
 	}
 
-	public void archiveEnvironment(long environmentId) {
-		archive(findEnvironment(environmentId), clock.instant());
+	public void archiveEnvironment(long environmentId, long actorId) {
+		Environment environment = findEnvironment(environmentId);
+		archive(environment, clock.instant());
+		changeLog.record(actorId, target(environment), Action.DELETED);
 	}
 
-	public void archiveSuite(long suiteId) {
-		archive(findSuite(suiteId), clock.instant());
+	public void archiveSuite(long suiteId, long actorId) {
+		TestSuite suite = findSuite(suiteId);
+		archive(suite, clock.instant());
+		changeLog.record(actorId, target(suite), Action.DELETED);
 	}
 
-	public void archiveCase(long caseId) {
-		testCases.findByIdAndArchivedAtIsNull(caseId)
-			.orElseThrow(() -> new NotFoundException("test case", caseId))
-			.archive(clock.instant());
+	public void archiveCase(long caseId, long actorId) {
+		TestCase testCase = testCases.findByIdAndArchivedAtIsNull(caseId)
+			.orElseThrow(() -> new NotFoundException("test case", caseId));
+		testCase.archive(clock.instant());
+		changeLog.record(actorId, target(testCase), Action.DELETED);
+	}
+
+	private static Target target(Project project) {
+		return new Target(TargetType.PROJECT, project.getId(), project.getName(), project.getId());
+	}
+
+	private static Target target(Environment environment) {
+		return new Target(TargetType.ENVIRONMENT, environment.getId(), environment.getName(),
+				environment.getProject().getId());
+	}
+
+	private static Target target(TestSuite suite) {
+		return new Target(TargetType.SUITE, suite.getId(), suite.getName(), suite.getProject().getId());
+	}
+
+	private static Target target(TestCase testCase) {
+		return new Target(TargetType.CASE, testCase.getId(), testCase.getName(),
+				testCase.getSuite().getProject().getId());
 	}
 
 	/**
