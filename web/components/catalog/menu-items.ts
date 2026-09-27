@@ -9,11 +9,18 @@ export const EDIT_DELETE: ActionMenuItem[] = [
   { id: "delete", label: "삭제", icon: "delete", destructive: true },
 ];
 
-/** 수정은 별도 화면인 경우 (케이스). runnable이면 맨 앞에 단건 실행 */
-export function editLinkDelete(href: string, runnable = false): ActionMenuItem[] {
+/**
+ * 케이스 행 메뉴: 실행(환경이 있을 때) · 수정(별도 화면) · 복제 · 삭제
+ * @param duplicate 복제 Server Action (대화상자 없이 바로 실행)
+ */
+export function caseMenu(
+  caseId: number,
+  { runnable, duplicate }: { runnable: boolean; duplicate: ActionMenuItem["action"] },
+): ActionMenuItem[] {
   return [
     ...(runnable ? [{ id: "run", label: "실행", icon: "run" } as const] : []),
-    { id: "edit", label: "수정", icon: "edit", href },
+    { id: "edit", label: "수정", icon: "edit", href: `/cases/${caseId}` },
+    { id: "duplicate", label: "복제", icon: "copy", action: duplicate },
     { id: "delete", label: "삭제", icon: "delete", destructive: true },
   ];
 }

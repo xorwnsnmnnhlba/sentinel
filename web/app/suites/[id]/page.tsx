@@ -7,7 +7,7 @@ import { CaseImportDialog } from "@/components/catalog/case-import-dialog";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
-import { EDIT_DELETE, editLinkDelete } from "@/components/catalog/menu-items";
+import { caseMenu, EDIT_DELETE } from "@/components/catalog/menu-items";
 import { RunCaseFields } from "@/components/catalog/run-case-fields";
 import { RunSuiteForm } from "@/components/catalog/run-suite-form";
 import { ScheduleFields } from "@/components/catalog/schedule-fields";
@@ -22,6 +22,7 @@ import {
   deleteCase,
   deleteSchedule,
   deleteSuite,
+  duplicateCase,
   runCase,
   runSuite,
   updateSchedule,
@@ -150,7 +151,10 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                     <TableCell className="text-right">
                       <ActionMenu
                         label={`케이스 ${testCase.name} 작업`}
-                        items={editLinkDelete(`/cases/${testCase.id}`, environments.length > 0)}
+                        items={caseMenu(testCase.id, {
+                          runnable: environments.length > 0,
+                          duplicate: duplicateCase.bind(null, testCase.id),
+                        })}
                       >
                         {environments.length > 0 && (
                           <FormDialog

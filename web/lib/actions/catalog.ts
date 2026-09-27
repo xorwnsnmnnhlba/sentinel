@@ -3,8 +3,9 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { apiSend, isApiError } from "@/lib/api/server";
+import { apiGet, apiSend, isApiError } from "@/lib/api/server";
 import type { CaseItem, EnvironmentItem, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
+import { copyName } from "@/lib/case-copy";
 import { type CaseDraft, isCaseDraft, validateDraft } from "@/lib/case-draft";
 
 /**
@@ -183,6 +184,40 @@ async function saveCase(
     return { errors: [`저장했지만 실행하지 못했습니다. ${reason}`.trim()] };
   }
   redirect(`/runs/${run!.id}`);
+}
+
+/**
+ * 케이스 복제. 요청 정의·판정 규칙을 그대로 복사해 같은 스위트에 등록하고 새 케이스의 수정 화면으로 이동
+ * 이름은 "원본 (복사)"부터 스위트 안에서 비어 있는 이름 (Spring API 변경 없이 조회·등록 API 조합)
+ */
+export async function duplicateCase(caseId: number): Promise<ActionState> {
+  let original: CaseItem;
+  let siblings: CaseItem[];
+  try {
+    original = await apiGet<CaseItem>(`/api/cases/${id(caseId)}`);
+    siblings = await apiGet<CaseItem[]>(`/api/cases?suiteId=${original.suiteId}`);
+  } catch (error) {
+    // 세션 만료 시 로그인 화면 이동(redirect)은 그대로 전달
+    if (!isApiError(error)) {
+      throw error;
+    }
+    return failure(error);
+  }
+  let created: CaseItem | null;
+  try {
+    created = await apiSend<CaseItem>("POST", "/api/cases", {
+      suiteId: original.suiteId,
+      name: copyName(
+        original.name,
+        siblings.map((sibling) => sibling.name),
+      ),
+      request: original.request,
+      assertions: original.assertions,
+    });
+  } catch (error) {
+    return failure(error);
+  }
+  redirect(`/cases/${created!.id}`);
 }
 
 export async function createSchedule(suiteId: number, _: ActionState, form: FormData): Promise<ActionState> {

@@ -18,6 +18,7 @@ import {
   runCase,
   runSuite,
   deleteSchedule,
+  duplicateCase,
   setScheduleEnabled,
   updateCase,
   updateEnvironment,
@@ -410,5 +411,61 @@ describe("schedules", () => {
 
     await expect(deleteSchedule(5)).resolves.toEqual({});
     expect(refresh).toHaveBeenCalledOnce();
+  });
+});
+
+describe("duplicateCase", () => {
+  const original = {
+    id: 7,
+    suiteId: 4,
+    name: "주문 조회",
+    request: { method: "GET", path: "/orders/{{id}}", headers: { Authorization: ["Bearer {{token}}"] }, body: null },
+    assertions: [{ type: "statusCode", anyOf: ["200"] }],
+  };
+
+  function existing(names: string[]) {
+    server.use(
+      http.get(springUrl("/api/cases/7"), () => HttpResponse.json(original)),
+      http.get(springUrl("/api/cases"), ({ request }) => {
+        expect(new URL(request.url).searchParams.get("suiteId")).toBe("4");
+        return HttpResponse.json(names.map((name, index) => ({ ...original, id: 100 + index, name })));
+      }),
+    );
+  }
+
+  it("copies the request and rules into the same suite under a free name and opens the copy", async () => {
+    existing(["주문 조회", "주문 조회 (복사)"]);
+    const bodies = capture("post", "/api/cases", () => HttpResponse.json({ id: 20 }, { status: 201 }));
+
+    await expect(captureRedirect(() => duplicateCase(7))).resolves.toBe("/cases/20");
+    expect(bodies).toEqual([
+      {
+        suiteId: 4,
+        name: "주문 조회 (복사 2)",
+        request: original.request,
+        assertions: original.assertions,
+      },
+    ]);
+  });
+
+  it("tells when the original was deleted meanwhile", async () => {
+    server.use(http.get(springUrl("/api/cases/7"), () => problem(404, "test case 7 not found")));
+
+    await expect(duplicateCase(7)).resolves.toEqual({
+      error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다",
+    });
+  });
+
+  it("reports a name taken by someone else in between", async () => {
+    existing(["주문 조회"]);
+    capture("post", "/api/cases", () => problem(409, "test case name '주문 조회 (복사)' is already in use"));
+
+    await expect(duplicateCase(7)).resolves.toEqual({ error: "이미 사용 중인 이름입니다" });
+  });
+
+  it("sends an expired session to the login page instead of showing an error", async () => {
+    server.use(http.get(springUrl("/api/cases/7"), () => problem(401, "authentication required")));
+
+    await expect(captureRedirect(() => duplicateCase(7))).resolves.toBe("/login");
   });
 });
