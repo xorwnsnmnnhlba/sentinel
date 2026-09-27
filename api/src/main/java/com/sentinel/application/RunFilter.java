@@ -6,11 +6,8 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.sentinel.domain.TestResult;
 import com.sentinel.domain.TestRun;
 import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
-import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 /**
@@ -55,13 +52,9 @@ public record RunFilter(Long projectId, Long suiteId, Long environmentId, TestRu
 				conditions.add(builder.lessThan(root.get("startedAt"), toInstant(zone)));
 			}
 			if (failing) {
-				// 결과 행 수만큼 실행이 중복되지 않도록 조인 대신 EXISTS
-				Subquery<Long> failed = query.subquery(Long.class);
-				Root<TestResult> result = failed.from(TestResult.class);
-				failed.select(result.get("id"))
-					.where(builder.equal(result.get("run"), root),
-							result.get("verdict").in(TestResult.Verdict.FAILED, TestResult.Verdict.ERROR));
-				conditions.add(builder.exists(failed));
+				// 실행에 보관한 판정 수로 판단. 결과 테이블을 훑지 않음 (V10)
+				conditions.add(builder.greaterThan(
+						builder.sum(root.<Integer>get("failedCount"), root.<Integer>get("errorCount")), 0));
 			}
 			return builder.and(conditions.toArray(Predicate[]::new));
 		};

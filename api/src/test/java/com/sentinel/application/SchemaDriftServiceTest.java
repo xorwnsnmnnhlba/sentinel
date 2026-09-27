@@ -108,6 +108,19 @@ class SchemaDriftServiceTest {
 	}
 
 	@Test
+	void comparesWithTheMostRecentRunsInTheWindow() {
+		// 창(4) 밖의 가장 오래된 실행에서만 id가 문자열
+		runWith(dev, "{\"id\": \"legacy\"}");
+		for (int i = 0; i < 4; i++) {
+			runWith(dev, "{\"id\": " + i + "}");
+		}
+
+		TestRunDetail.Result result = runWith(dev, "{\"id\": \"legacy\"}");
+
+		assertThat(result.drift().changes()).extracting(Change::kind).containsExactly(Kind.TYPE_CHANGED);
+	}
+
+	@Test
 	void judgesAnOldRunOnlyAgainstRunsBeforeIt() {
 		runWith(dev, "{\"id\": 1}");
 		long oldRun = runIdWith(dev, "{\"id\": 2}");

@@ -17,6 +17,7 @@ sentinel/
  ├─ api/                  Spring Boot 백엔드 (러너, 스케줄러, API)
  ├─ web/                  Next.js 프론트엔드 (BFF, 화면)
  ├─ docs/                 설계 문서
+ ├─ scripts/              배포 전 점검(preflight.sh), 성능 점검(perf/)
  ├─ .github/workflows/    CI (PR·main 푸시마다 web lint·서식·테스트·빌드, api 테스트, E2E)
  ├─ docker-compose.e2e.yml E2E 테스트용 독립 스택 (PostgreSQL·api·web·HTTPS 앞단, 포트 13443·18080)
  ├─ docker-compose.yml    컨테이너 실행 구성 (HTTPS 앞단 :443, web·api는 127.0.0.1 :3000·:8080)

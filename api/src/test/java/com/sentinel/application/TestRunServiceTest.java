@@ -16,6 +16,7 @@ import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.TestCaseRepository;
+import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.RequestExecutionException;
@@ -55,6 +56,9 @@ class TestRunServiceTest {
 
 	@Autowired
 	private TestCaseRepository testCases;
+
+	@Autowired
+	private TestRunRepository runs;
 
 	@AfterEach
 	void cleanUp() {
@@ -282,6 +286,38 @@ class TestRunServiceTest {
 		assertThat(run.results()).extracting(TestRunDetail.Result::outcome)
 			.containsExactly(Outcome.RESPONDED, Outcome.ERROR, Outcome.RESPONDED);
 		assertThat(run.summary()).isEqualTo(new TestRunDetail.Summary(3, 2, 0, 1));
+	}
+
+	@Test
+	void keepsTheVerdictCountsOfTheRunInStepWithSavedResults() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/ok", null, null);
+		fixtures.testCase(suite, HttpMethod.GET, "/fail", null, null, List.of(new StatusCodeAssertion(List.of("201"))));
+		fixtures.testCase(suite, HttpMethod.GET, "/{{missing}}", null, null);
+		fixtures.testCase(suite, HttpMethod.GET, "/stop", null, null);
+		// 네 번째 케이스 도중 앱이 멈춘 상황 (예외가 실행 밖으로 빠져나감)
+		executor.respondStatus(request -> {
+			if (request.uri().getPath().equals("/stop")) {
+				throw new AppStopped();
+			}
+			return 200;
+		});
+
+		assertThatThrownBy(() -> service.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null))
+			.isInstanceOf(AppStopped.class);
+
+		// 실행 행의 판정 수는 저장된 결과 3건과 같음 (결과 저장과 같은 트랜잭션에서 올림)
+		TestRun run = runs.findAll().getFirst();
+		assertThat(run.getStatus()).isEqualTo(TestRun.Status.RUNNING);
+		assertThat(service.getRun(run.getId()).summary()).isEqualTo(new TestRunDetail.Summary(3, 1, 1, 1));
+		assertThat(List.of(run.getPassedCount(), run.getFailedCount(), run.getErrorCount())).containsExactly(1, 1, 1);
+	}
+
+	/** 앱 종료 흉내. 실행 코드가 잡지 않는 Error */
+	private static final class AppStopped extends Error {
+
 	}
 
 	@Test

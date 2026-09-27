@@ -66,6 +66,19 @@ public class TestRun extends BaseEntity {
 	/** 케이스 단건 실행의 대상. 스위트 전체 실행은 null */
 	private Long testCaseId;
 
+	/**
+	 * 판정별 결과 수. 결과를 저장할 때마다 {@link #countVerdict}로 올림.
+	 * 실행 목록의 실패·오류 조건과 스위트 집계가 결과 테이블을 훑지 않도록 실행에 함께 보관
+	 */
+	@Column(nullable = false)
+	private int passedCount;
+
+	@Column(nullable = false)
+	private int failedCount;
+
+	@Column(nullable = false)
+	private int errorCount;
+
 	/** 보관기간이 지나 결과의 요청·응답 원문을 비운 시각. null이면 원문 보관 중 */
 	private Instant rawPurgedAt;
 
@@ -105,6 +118,18 @@ public class TestRun extends BaseEntity {
 	/** 케이스 단건 실행 여부 */
 	public boolean isSingleCase() {
 		return testCaseId != null;
+	}
+
+	/** 결과 1건의 판정 반영. 결과 저장과 같은 트랜잭션에서 호출. 판정 없는 결과(null)는 세지 않음 */
+	public void countVerdict(TestResult.Verdict verdict) {
+		if (verdict == null) {
+			return;
+		}
+		switch (verdict) {
+			case PASSED -> passedCount++;
+			case FAILED -> failedCount++;
+			case ERROR -> errorCount++;
+		}
 	}
 
 	public void complete(Instant finishedAt) {

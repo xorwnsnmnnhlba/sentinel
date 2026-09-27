@@ -227,6 +227,7 @@ ANSI SQL 표준 준수 (2026-09-19). 마이그레이션, 샘플, 운영 쿼리 �
   - `CREATE INDEX`: 표준 미정의, 주요 DB 공통 구문
   - 계정·권한 관리(`CREATE USER`, 스키마 `GRANT`): DB 관리 명령
   - `DatabaseTimeoutTest`의 `pg_sleep`: PostgreSQL 드라이버 타임아웃 검증이 목적
+  - 성능 점검 도구(`scripts/perf/seed-history.sql`)의 `generate_series`·`random`: 앱 SQL이 아닌 대량 생성 도구
 - 표준 집계·시간대 문법 사용: 백분위 `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ...)`, 날짜 변환 `CAST(... AT TIME ZONE ... AS DATE)`
 - 네이티브 쿼리의 테이블은 `{h-schema}`(Hibernate 기본 스키마 치환)로 한정. 네이티브 쿼리에는 `hibernate.default_schema`가 적용되지 않아 JDBC URL의 `currentSchema`에 의존하지 않도록 함
 
@@ -238,6 +239,7 @@ GRANT USAGE, CREATE ON SCHEMA sentinel TO sentinel_app;
 CREATE INDEX idx_result_run       ON test_result(run_id);
 CREATE INDEX idx_result_case_time ON test_result(test_case_id, id DESC);
 CREATE INDEX idx_run_suite_time   ON test_run(suite_id, started_at DESC);
+CREATE INDEX idx_run_time         ON test_run(started_at DESC, id DESC);
 ```
 
 공용 RDS이므로 스키마 한정 권한 계정 사용. Flyway가 sentinel 스키마 안에 테이블과 이력 테이블(flyway_schema_history)을 생성하므로 스키마 내 CREATE 권한 필요
@@ -483,6 +485,26 @@ docker compose up -d --build --wait
   - Spring API 변경 없이 web Server Action이 조회·등록 API를 조합 (URL에 동사를 넣지 않는 REST 원칙 유지)
 - 환경 복제 (2026-09-27): 프로젝트 화면 환경 행의 "⋯" 메뉴. 바로 만들지 않고 원본의 기본 URL·변수와 복제본 이름을 채운 등록 창을 열어 이름·URL을 고친 뒤 등록 (dev → staging처럼 대부분 값을 바꾸므로)
   - 시크릿은 암호화되어 값을 꺼낼 수 없으므로 이름만 채운 입력 행으로 두고 값 재입력. 빈 시크릿 값은 입력 칸 필수 확인과 Server Action 양쪽에서 거부 (조용히 빈 시크릿이 저장되는 것 방지)
+- 대용량 이력 성능 점검 (2026-09-27): 1년치 이력으로 화면이 쓰는 API 응답 시간 측정·개선 (측정 방법 `scripts/perf/README.md`)
+  - 규모: 프로젝트 4 × 스위트 5 × 케이스 10, 스위트마다 10분 간격 1년 → 실행 105만·결과 1,046만 건(DB 5.3GB). 최근 30일만 원문 보관
+  - 원인: 실행 목록의 실패·오류 조건(결과 EXISTS), 대시보드 판정 수(결과 조인 집계), 실행 목록의 판정 수, 구조 변화 기준선(케이스 이력 전체에 창 함수)이 이력에 비례하여 결과 테이블을 읽음. 스위트 조건 없는 최신순 목록은 인덱스 없음
+  - 실행별 판정 수(`test_run.passed_count`·`failed_count`·`error_count`, V10): 결과를 저장하는 트랜잭션에서 함께 올림. 실행 도중 앱이 멈춰도 저장된 결과와 일치. 실패 조건·대시보드·목록은 실행 행만 읽음
+  - `idx_run_time (started_at DESC, id DESC)`: 스위트 조건 없는 최신순 목록·기간 조건
+  - 구조 변화 기준선: 케이스마다 `LATERAL` + `FETCH FIRST`(SQL 표준)로 `idx_result_case_time`을 이 실행의 첫 결과 직전부터 창 크기만큼만 읽음. 결과 ID 상한이 없으면 오래된 실행 조회 시 그 뒤 결과를 모두 거쳐 감 (180일 전 실행: 상한 있음 1.5ms, 없음 646ms)
+  - 검토 후 제외: `test_result (verdict, run_id)` 인덱스는 실패 조건이 오히려 느려짐(648 → 1,301ms). 일 단위 집계 테이블은 판정 수 보관만으로 목표 달성하여 불필요
+  - V10 적용: 1년치 기준 9.4초 (기존 실행 판정 수 채우기, 결과 합계와 일치 확인). 전 행 갱신으로 `test_run` 크기가 일시적으로 늘어나며 autovacuum이 회수
+
+  | API (중앙값, 5회) | 개선 전 | 개선 후 |
+  |------|--------:|--------:|
+  | 대시보드 스위트 요약 7일 / 30일 | 137 / 913ms | 52 / 55ms |
+  | 대시보드 최근 실패 (7일) | 47ms | 13ms |
+  | 실행 이력 첫 페이지 / 마지막 쪽 페이지 | 201 / 193ms | 37 / 100ms |
+  | 실행 이력 실패만 | 777ms | 39ms |
+  | 실행 상세 최근 / 180일 전 (구조 변화 포함) | 721 / 673ms | 9 / 7ms |
+  | 대시보드 응답시간 변화 (7일) | 221ms | 198ms |
+  | 케이스 응답시간 추세 (90일) | 145ms | 140ms |
+
+  - 응답시간 집계(변화·추세·스위트 요약)는 결과를 읽어야 하는 집계라 그대로 두고 200ms 이하 확인. 이력이 더 늘어 느려지면 일 단위 집계 테이블 도입
 - 결과 데이터 보관기간 파기 배치 (2026-09-23 구현). 실행·결과 행은 유지, 요청·응답 헤더·본문만 30일 경과 후 삭제 (`api/README.md` "결과 원문 보관기간")
 
 ---

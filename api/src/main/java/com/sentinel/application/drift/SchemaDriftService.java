@@ -44,8 +44,9 @@ public class SchemaDriftService {
 		}
 		List<Long> caseIds = fingerprinted.stream().map(result -> result.getTestCase().getId()).distinct().toList();
 		Map<Long, List<ResponseSchema>> previous = new HashMap<>();
+		long firstResultId = runResults.stream().mapToLong(TestResult::getId).min().orElseThrow();
 		for (Object[] row : results.findRecentSchemas(run.getEnvironment().getId(), caseIds, run.getId(),
-				properties.window())) {
+				firstResultId, properties.window())) {
 			long caseId = ((Number) row[0]).longValue();
 			previous.computeIfAbsent(caseId, id -> new ArrayList<>())
 				.add(JSON.readValue(Objects.toString(row[1]), ResponseSchema.class));
