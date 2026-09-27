@@ -206,6 +206,60 @@ class CatalogWriteTest {
 	}
 
 	@Test
+	void createsAndPatchesCaseExtractors() {
+		TestSuite suite = fixtures.suite(fixtures.project());
+
+		MvcTestResult created = post("/api/cases", """
+				{"suiteId": %d, "name": "login", "request": {"method": "POST", "path": "/login"},
+				 "extractors": [{"name": "token", "from": "BODY", "expression": "$.data.token", "secret": true},
+				                {"name": "requestId", "from": "HEADER", "expression": "X-Request-Id"}]}"""
+			.formatted(suite.getId()));
+
+		assertThat(created).hasStatus(HttpStatus.CREATED);
+		var body = assertThat(created).bodyJson();
+		body.extractingPath("$.extractors[0].name").isEqualTo("token");
+		body.extractingPath("$.extractors[0].secret").isEqualTo(true);
+		// 생략한 가림 여부는 false
+		body.extractingPath("$.extractors[1].secret").isEqualTo(false);
+		String location = created.getResponse().getHeader("Location");
+
+		// 생략하면 유지, 지정하면 전체 교체
+		assertThat(patch(location, """
+				{"name": "sign in"}""")).hasStatusOk().bodyJson().extractingPath("$.extractors.length()").isEqualTo(2);
+		assertThat(patch(location, """
+				{"extractors": []}""")).hasStatusOk().bodyJson().extractingPath("$.extractors").asArray().isEmpty();
+		assertThat(mvc.get().uri("/api/cases?suiteId={id}", suite.getId())).bodyJson()
+			.extractingPath("$[0].extractors")
+			.asArray()
+			.isEmpty();
+	}
+
+	@Test
+	void rejectsInvalidExtractors() {
+		TestSuite suite = fixtures.suite(fixtures.project());
+		String request = """
+				{"method": "GET", "path": "/a"}""";
+
+		assertThat(post("/api/cases", extractorCaseJson(suite.getId(), "a", request, """
+				[{"name": "user id", "from": "BODY", "expression": "$.id"}]"""))).hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(post("/api/cases", extractorCaseJson(suite.getId(), "b", request, """
+				[{"name": "id", "from": "QUERY", "expression": "id"}]"""))).hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(post("/api/cases", extractorCaseJson(suite.getId(), "c", request, """
+				[{"name": "id", "from": "BODY", "expression": "$.["}]"""))).hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(post("/api/cases", extractorCaseJson(suite.getId(), "d", request, """
+				[{"name": "id", "from": "BODY", "expression": "$.id"},
+				 {"name": "id", "from": "HEADER", "expression": "X-Id"}]"""))).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.asString()
+			.contains("'id' is duplicated");
+
+		assertThat(mvc.get().uri("/api/cases?suiteId={id}", suite.getId())).bodyJson()
+			.extractingPath("$.length()")
+			.isEqualTo(0);
+	}
+
+	@Test
 	void rejectsInvalidCaseDefinitions() {
 		TestSuite suite = fixtures.suite(fixtures.project());
 
@@ -303,6 +357,12 @@ class CatalogWriteTest {
 		return """
 				{"suiteId": %d, "name": "%s", "request": %s, "assertions": %s}""".formatted(suiteId, name, request,
 				assertions);
+	}
+
+	private static String extractorCaseJson(long suiteId, String name, String request, String extractors) {
+		return """
+				{"suiteId": %d, "name": "%s", "request": %s, "extractors": %s}""".formatted(suiteId, name, request,
+				extractors);
 	}
 
 }
