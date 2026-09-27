@@ -288,6 +288,46 @@ describe("cases", () => {
     ]);
   });
 
+  it("saves and then runs only this case, opening its result", async () => {
+    const saved = capture("patch", "/api/cases/9", () => HttpResponse.json({ id: 9 }));
+    const runs = capture("post", "/api/runs", () => HttpResponse.json({ id: 77 }, { status: 201 }));
+
+    await expect(captureRedirect(() => updateCase(9, 4, draft, 3))).resolves.toBe("/runs/77");
+    expect(saved).toHaveLength(1);
+    expect(runs).toEqual([{ caseId: 9, environmentId: 3 }]);
+  });
+
+  it("runs a newly created case by the id Spring gave it", async () => {
+    capture("post", "/api/cases", () => HttpResponse.json({ id: 12 }, { status: 201 }));
+    const runs = capture("post", "/api/runs", () => HttpResponse.json({ id: 78 }, { status: 201 }));
+
+    await expect(captureRedirect(() => createCase(4, draft, 3))).resolves.toBe("/runs/78");
+    expect(runs).toEqual([{ caseId: 12, environmentId: 3 }]);
+  });
+
+  it("moves a created case to its edit page when only the run fails, so it is not created twice", async () => {
+    capture("post", "/api/cases", () => HttpResponse.json({ id: 12 }, { status: 201 }));
+    capture("post", "/api/runs", () => problem(404, "environment 3 not found"));
+
+    await expect(captureRedirect(() => createCase(4, draft, 3))).resolves.toBe("/cases/12?notice=run-failed");
+  });
+
+  it("keeps an updated case on the form when only the run fails", async () => {
+    capture("patch", "/api/cases/9", () => HttpResponse.json({ id: 9 }));
+    capture("post", "/api/runs", () => problem(404, "environment 3 not found"));
+
+    await expect(updateCase(9, 4, draft, 3)).resolves.toEqual({
+      errors: ["저장했지만 실행하지 못했습니다. 대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다"],
+    });
+  });
+
+  it.each([0, -1, 1.5, "3"])("rejects the environment %s before saving", async (runIn) => {
+    // 저장 요청도 보내지 않음 (MSW는 처리하지 않은 요청을 실패로 처리)
+    await expect(updateCase(9, 4, draft, runIn as number)).resolves.toEqual({
+      errors: ["실행할 환경을 선택해 주세요"],
+    });
+  });
+
   it("revalidates on the server and skips Spring for invalid drafts", async () => {
     await expect(createCase(4, { ...draft, path: "health" })).resolves.toEqual({
       errors: ["경로는 / 또는 {{변수}}로 시작해야 합니다 (기본 URL 뒤에 붙는 상대 경로)"],

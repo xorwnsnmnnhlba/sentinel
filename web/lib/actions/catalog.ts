@@ -121,15 +121,24 @@ export type CaseActionState = { errors?: string[] } | undefined;
 /**
  * 케이스 등록. 성공 시 스위트 화면으로 이동
  */
-export async function createCase(suiteId: number, draft: CaseDraft): Promise<CaseActionState> {
-  return saveCase("POST", "/api/cases", id(suiteId), draft, { suiteId: id(suiteId) });
+/**
+ * @param runIn 지정 시 등록 후 그 환경에서 이 케이스만 실행하고 결과 화면으로 이동
+ */
+export async function createCase(suiteId: number, draft: CaseDraft, runIn?: number): Promise<CaseActionState> {
+  return saveCase("POST", "/api/cases", id(suiteId), draft, { suiteId: id(suiteId) }, runIn);
 }
 
 /**
  * 케이스 수정. 요청 정의·판정 규칙은 전체 교체, 성공 시 스위트 화면으로 이동
+ * @param runIn 지정 시 저장 후 그 환경에서 이 케이스만 실행하고 결과 화면으로 이동
  */
-export async function updateCase(caseId: number, suiteId: number, draft: CaseDraft): Promise<CaseActionState> {
-  return saveCase("PATCH", `/api/cases/${id(caseId)}`, id(suiteId), draft, {});
+export async function updateCase(
+  caseId: number,
+  suiteId: number,
+  draft: CaseDraft,
+  runIn?: number,
+): Promise<CaseActionState> {
+  return saveCase("PATCH", `/api/cases/${id(caseId)}`, id(suiteId), draft, {}, runIn);
 }
 
 async function saveCase(
@@ -138,21 +147,42 @@ async function saveCase(
   suiteId: number,
   draft: unknown,
   extra: Record<string, number>,
+  runIn: unknown,
 ): Promise<CaseActionState> {
   if (!isCaseDraft(draft)) {
     return { errors: ["요청 형식이 올바르지 않습니다"] };
+  }
+  // 브라우저에서 임의 값을 보낼 수 있으므로 저장 전에 확인
+  if (runIn !== undefined && !(typeof runIn === "number" && Number.isSafeInteger(runIn) && runIn > 0)) {
+    return { errors: ["실행할 환경을 선택해 주세요"] };
   }
   const validation = validateDraft(draft);
   if (!validation.ok) {
     return { errors: validation.errors };
   }
+  let saved: CaseItem | null;
   try {
-    await apiSend<CaseItem>(method, path, { ...extra, ...validation.payload });
+    saved = await apiSend<CaseItem>(method, path, { ...extra, ...validation.payload });
   } catch (error) {
     const message = failure(error)?.error;
     return { errors: message ? [message] : [] };
   }
-  redirect(`/suites/${suiteId}`);
+  if (runIn === undefined) {
+    redirect(`/suites/${suiteId}`);
+  }
+
+  let run: RunDetail | null;
+  try {
+    run = await apiSend<RunDetail>("POST", "/api/runs", { caseId: saved!.id, environmentId: runIn });
+  } catch (error) {
+    const reason = failure(error)?.error ?? "";
+    if (method === "POST") {
+      // 등록은 끝났으므로 다시 누르면 같은 케이스가 또 등록됨. 수정 화면으로 옮겨 안내
+      redirect(`/cases/${saved!.id}?notice=run-failed`);
+    }
+    return { errors: [`저장했지만 실행하지 못했습니다. ${reason}`.trim()] };
+  }
+  redirect(`/runs/${run!.id}`);
 }
 
 export async function createSchedule(suiteId: number, _: ActionState, form: FormData): Promise<ActionState> {
