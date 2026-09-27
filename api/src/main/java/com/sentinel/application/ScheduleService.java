@@ -3,6 +3,10 @@ package com.sentinel.application;
 import java.time.Clock;
 import java.util.List;
 
+import com.sentinel.application.ChangeLogService.Changes;
+import com.sentinel.application.ChangeLogService.Target;
+import com.sentinel.domain.ChangeLog.Action;
+import com.sentinel.domain.ChangeLog.TargetType;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.TestSchedule;
 import com.sentinel.domain.TestSuite;
@@ -13,6 +17,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 스케줄 등록·수정·삭제·조회. 등록·수정·삭제는 같은 트랜잭션에서 변경 이력을 남김 ({@code actorId}는 변경한 사용자).
+ * 스케줄러가 다음 실행 시각을 옮기는 것은 설정 변경이 아니므로 기록하지 않음
+ */
 @Service
 @RequiredArgsConstructor
 public class ScheduleService {
@@ -27,12 +35,14 @@ public class ScheduleService {
 
 	private final Clock clock;
 
+	private final ChangeLogService changeLog;
+
 	/**
 	 * @throws NotFoundException 스위트 또는 환경 미존재
 	 * @throws InvalidRequestException 잘못된 cron, 스위트와 환경의 프로젝트 불일치
 	 */
 	@Transactional
-	public ScheduleDetail create(long suiteId, long environmentId, String cron) {
+	public ScheduleDetail create(long suiteId, long environmentId, String cron, long actorId) {
 		TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
 		Environment environment = environments.findByIdAndArchivedAtIsNull(environmentId)
 			.orElseThrow(() -> new NotFoundException("environment", environmentId));
@@ -43,7 +53,9 @@ public class ScheduleService {
 		catch (IllegalArgumentException ex) {
 			throw new InvalidRequestException(ex.getMessage());
 		}
-		return detailOf(schedules.save(schedule));
+		schedules.save(schedule);
+		changeLog.record(actorId, target(schedule), Action.CREATED);
+		return detailOf(schedule);
 	}
 
 	/**
@@ -55,8 +67,9 @@ public class ScheduleService {
 	 * @throws InvalidRequestException 잘못된 cron, 스위트와 환경의 프로젝트 불일치
 	 */
 	@Transactional
-	public ScheduleDetail update(long scheduleId, Boolean enabled, String cron, Long environmentId) {
+	public ScheduleDetail update(long scheduleId, Boolean enabled, String cron, Long environmentId, long actorId) {
 		TestSchedule schedule = find(scheduleId);
+		ScheduleDetail before = detailOf(schedule);
 		if (environmentId != null) {
 			Environment environment = environments.findByIdAndArchivedAtIsNull(environmentId)
 				.orElseThrow(() -> new NotFoundException("environment", environmentId));
@@ -81,7 +94,13 @@ public class ScheduleService {
 		else if (Boolean.FALSE.equals(enabled)) {
 			schedule.disable();
 		}
-		return detailOf(schedule);
+		ScheduleDetail after = detailOf(schedule);
+		changeLog.record(actorId, target(schedule), Action.UPDATED,
+				new Changes().compare("environment", before.environmentId(), after.environmentId())
+					.compare("cron", before.cron(), after.cron())
+					.compare("enabled", before.enabled(), after.enabled())
+					.fields());
+		return after;
 	}
 
 	/**
@@ -100,8 +119,16 @@ public class ScheduleService {
 	 * @throws NotFoundException 미존재 또는 이미 삭제
 	 */
 	@Transactional
-	public void delete(long scheduleId) {
-		find(scheduleId).archive(clock.instant());
+	public void delete(long scheduleId, long actorId) {
+		TestSchedule schedule = find(scheduleId);
+		schedule.archive(clock.instant());
+		changeLog.record(actorId, target(schedule), Action.DELETED);
+	}
+
+	/** 스케줄은 이름이 없으므로 스위트 이름으로 표시 */
+	private static Target target(TestSchedule schedule) {
+		return new Target(TargetType.SCHEDULE, schedule.getId(), schedule.getSuite().getName(),
+				schedule.getSuite().getProject().getId());
 	}
 
 	@Transactional(readOnly = true)

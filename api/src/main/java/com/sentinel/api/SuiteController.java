@@ -28,6 +28,8 @@ class SuiteController {
 
 	private final CatalogCommandService commands;
 
+	private final CurrentUser currentUser;
+
 	@GetMapping
 	List<SuiteItem> list(@RequestParam(required = false) Long projectId) {
 		return catalog.listSuites(projectId);
@@ -43,7 +45,8 @@ class SuiteController {
 	 */
 	@PostMapping
 	ResponseEntity<SuiteItem> create(@Valid @RequestBody CreateSuiteRequest request) {
-		SuiteItem created = commands.createSuite(request.projectId(), request.name(), request.description());
+		SuiteItem created = commands.createSuite(request.projectId(), request.name(), request.description(),
+				currentUser.get().id());
 		return ResponseEntity.created(URI.create("/api/suites/" + created.id())).body(created);
 	}
 
@@ -52,7 +55,8 @@ class SuiteController {
 	 */
 	@PatchMapping("/{suiteId}")
 	SuiteItem update(@PathVariable long suiteId, @RequestBody UpdateSuiteRequest request) {
-		return commands.updateSuite(suiteId, request.name(), request.description(), request.caseOrder());
+		return commands.updateSuite(suiteId, request.name(), request.description(), request.caseOrder(),
+				currentUser.get().id());
 	}
 
 	/**
@@ -60,7 +64,7 @@ class SuiteController {
 	 */
 	@DeleteMapping("/{suiteId}")
 	ResponseEntity<Void> delete(@PathVariable long suiteId) {
-		commands.archiveSuite(suiteId);
+		commands.archiveSuite(suiteId, currentUser.get().id());
 		return ResponseEntity.noContent().build();
 	}
 

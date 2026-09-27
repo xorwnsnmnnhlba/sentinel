@@ -27,6 +27,8 @@ class ProjectController {
 
 	private final CatalogCommandService commands;
 
+	private final CurrentUser currentUser;
+
 	@GetMapping
 	List<ProjectItem> list() {
 		return catalog.listProjects();
@@ -42,7 +44,7 @@ class ProjectController {
 	 */
 	@PostMapping
 	ResponseEntity<ProjectItem> create(@Valid @RequestBody CreateProjectRequest request) {
-		ProjectItem created = commands.createProject(request.name(), request.description());
+		ProjectItem created = commands.createProject(request.name(), request.description(), currentUser.get().id());
 		return ResponseEntity.created(URI.create("/api/projects/" + created.id())).body(created);
 	}
 
@@ -51,7 +53,7 @@ class ProjectController {
 	 */
 	@PatchMapping("/{projectId}")
 	ProjectItem update(@PathVariable long projectId, @RequestBody UpdateProjectRequest request) {
-		return commands.updateProject(projectId, request.name(), request.description());
+		return commands.updateProject(projectId, request.name(), request.description(), currentUser.get().id());
 	}
 
 	/**
@@ -59,7 +61,7 @@ class ProjectController {
 	 */
 	@DeleteMapping("/{projectId}")
 	ResponseEntity<Void> delete(@PathVariable long projectId) {
-		commands.archiveProject(projectId);
+		commands.archiveProject(projectId, currentUser.get().id());
 		return ResponseEntity.noContent().build();
 	}
 

@@ -33,6 +33,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 		TestAuthConfiguration.class })
 class CatalogArchiveTest {
 
+	/** 변경 이력에 남길 사용자. 이력 자체는 이 테스트의 대상이 아님 */
+	private static final long ACTOR = 1L;
+
 	@Autowired
 	private MockMvcTester mvc;
 
@@ -94,7 +97,7 @@ class CatalogArchiveTest {
 		Environment environment = fixtures.environment(project, Map.of());
 		TestSuite suite = fixtures.suite(project);
 		TestCase testCase = fixtures.testCase(suite, HttpMethod.GET, "/a", null, null);
-		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * 1-5");
+		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * 1-5", ACTOR);
 		long run = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 
 		assertThat(mvc.delete().uri("/api/projects/{id}", project.getId())).hasStatus(HttpStatus.NO_CONTENT);
@@ -122,7 +125,7 @@ class CatalogArchiveTest {
 		Environment dev = fixtures.environment(project, Map.of());
 		Environment staging = fixtures.environment(fixtures.project(), Map.of());
 		TestSuite suite = fixtures.suite(project);
-		ScheduleDetail devSchedule = scheduleService.create(suite.getId(), dev.getId(), "10 9 * * 1-5");
+		ScheduleDetail devSchedule = scheduleService.create(suite.getId(), dev.getId(), "10 9 * * 1-5", ACTOR);
 
 		assertThat(mvc.delete().uri("/api/environments/{id}", dev.getId())).hasStatus(HttpStatus.NO_CONTENT);
 
@@ -139,7 +142,7 @@ class CatalogArchiveTest {
 		Environment environment = fixtures.environment(project, Map.of());
 		TestSuite suite = fixtures.suite(project);
 		TestCase testCase = fixtures.testCase(suite, HttpMethod.GET, "/a", null, null);
-		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * 1-5");
+		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * 1-5", ACTOR);
 
 		assertThat(mvc.delete().uri("/api/suites/{id}", suite.getId())).hasStatus(HttpStatus.NO_CONTENT);
 
@@ -155,7 +158,7 @@ class CatalogArchiveTest {
 		Project project = fixtures.project();
 		Environment environment = fixtures.environment(project, Map.of());
 		ScheduleDetail schedule = scheduleService.create(fixtures.suite(project).getId(), environment.getId(),
-				"10 9 * * 1-5");
+				"10 9 * * 1-5", ACTOR);
 
 		assertThat(mvc.delete().uri("/api/schedules/{id}", schedule.id())).hasStatus(HttpStatus.NO_CONTENT);
 

@@ -1,5 +1,7 @@
 package com.sentinel.application;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -109,6 +111,12 @@ public class CatalogQueryService {
 	 */
 	public record EnvironmentItem(long id, long projectId, String name, String baseUrl, Map<String, String> variables,
 			List<String> secretNames) {
+
+		/** 엔티티의 변수 목록은 실시간 뷰이므로 복사 (수정 전후 비교가 같은 목록을 보지 않도록). 입력 순서 유지 */
+		public EnvironmentItem {
+			variables = Collections.unmodifiableMap(new LinkedHashMap<>(variables));
+			secretNames = List.copyOf(secretNames);
+		}
 
 		static EnvironmentItem of(Environment environment) {
 			return new EnvironmentItem(environment.getId(), environment.getProject().getId(), environment.getName(),

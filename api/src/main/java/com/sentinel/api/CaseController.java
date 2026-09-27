@@ -28,6 +28,8 @@ class CaseController {
 
 	private final CatalogCommandService commands;
 
+	private final CurrentUser currentUser;
+
 	@GetMapping
 	List<CaseItem> list(@RequestParam(required = false) Long suiteId) {
 		return catalog.listCases(suiteId);
@@ -44,7 +46,7 @@ class CaseController {
 	@PostMapping
 	ResponseEntity<CaseItem> create(@Valid @RequestBody CreateCaseRequest request) {
 		CaseItem created = commands.createCase(request.suiteId(), request.name(), request.request(), request.assertions(),
-				request.extractors());
+				request.extractors(), currentUser.get().id());
 		return ResponseEntity.created(URI.create("/api/cases/" + created.id())).body(created);
 	}
 
@@ -54,7 +56,7 @@ class CaseController {
 	@PatchMapping("/{caseId}")
 	CaseItem update(@PathVariable long caseId, @RequestBody UpdateCaseRequest request) {
 		return commands.updateCase(caseId, request.name(), request.request(), request.assertions(),
-				request.extractors());
+				request.extractors(), currentUser.get().id());
 	}
 
 	/**
@@ -62,7 +64,7 @@ class CaseController {
 	 */
 	@DeleteMapping("/{caseId}")
 	ResponseEntity<Void> delete(@PathVariable long caseId) {
-		commands.archiveCase(caseId);
+		commands.archiveCase(caseId, currentUser.get().id());
 		return ResponseEntity.noContent().build();
 	}
 
