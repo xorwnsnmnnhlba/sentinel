@@ -146,6 +146,17 @@ export interface EnvironmentItem {
 /** 판정 규칙. type별 필드는 api/README.md "판정 규칙 (assertions)" 참고 */
 export type Assertion = { type: string } & Record<string, unknown>;
 
+/**
+ * 응답 값 추출 규칙. 추출한 값은 같은 스위트 실행에서 뒤 케이스가 {{name}}으로 사용 (api/README.md "응답 값 추출")
+ * expression: BODY는 JsonPath, HEADER는 헤더 이름. secret이면 실행 이력에서 값을 가림
+ */
+export interface Extractor {
+  name: string;
+  from: "BODY" | "HEADER";
+  expression: string;
+  secret: boolean;
+}
+
 export interface CaseItem {
   id: number;
   suiteId: number;
@@ -153,6 +164,7 @@ export interface CaseItem {
   request: { method: HttpMethod; path: string; headers: Headers; body: string | null };
   /** 비어 있으면 기본 판정(status in [2xx]) */
   assertions: Assertion[];
+  extractors: Extractor[];
 }
 
 /** 스위트 정기 실행. cron은 5자리(분 시 일 월 요일), zone 기준 해석 */

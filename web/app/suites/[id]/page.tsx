@@ -142,6 +142,15 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                         <MethodBadge method={testCase.request.method} />
                         <span className="[overflow-wrap:anywhere]">{testCase.request.path}</span>
                       </div>
+                      {testCase.extractors.length > 0 && (
+                        // 뒤 케이스에 넘기는 변수. 스위트 실행 순서(# 순)대로 값이 전달됨
+                        <p className="mt-1 text-xs [overflow-wrap:anywhere] text-muted-foreground">
+                          추출{" "}
+                          <span className="font-mono">
+                            {testCase.extractors.map((extractor) => `{{${extractor.name}}}`).join(" ")}
+                          </span>
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {testCase.assertions.length > 0

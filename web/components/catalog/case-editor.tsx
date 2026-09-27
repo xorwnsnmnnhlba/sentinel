@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { CaseActionState } from "@/lib/actions/catalog";
 import type { EnvironmentItem, HttpMethod } from "@/lib/api/types";
@@ -18,10 +19,16 @@ import {
   type AssertionDraft,
   type AssertionType,
   type CaseDraft,
+  EXTRACTOR_SOURCE_LABELS,
+  EXTRACTOR_SOURCES,
+  type ExtractorDraft,
+  type ExtractorSource,
   HEADER_OPERATORS,
   HTTP_METHODS,
+  MAX_EXTRACTORS,
   needsValue,
   newAssertion,
+  newExtractor,
   type Operator,
   OPERATOR_LABELS,
   OPERATORS,
@@ -60,6 +67,10 @@ export function CaseEditor({
 
   function updateAssertion(index: number, next: AssertionDraft) {
     update({ assertions: draft.assertions.map((assertion, i) => (i === index ? next : assertion)) });
+  }
+
+  function updateExtractor(index: number, next: ExtractorDraft) {
+    update({ extractors: draft.extractors.map((extractor, i) => (i === index ? next : extractor)) });
   }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -208,6 +219,36 @@ export function CaseEditor({
             <Plus /> 규칙 추가
           </Button>
         </div>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">
+            값 추출 <span className="text-sm font-normal text-muted-foreground">(선택)</span>
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            응답 값을 변수로 저장하여 같은 스위트 실행에서 뒤에 실행하는 케이스가{" "}
+            <code className="font-mono">{"{{변수}}"}</code>로 사용 (예: 로그인 토큰, 등록한 ID). 스위트 전체 실행에서
+            등록 순서대로 전달되며, 이 케이스만 실행하면 뒤 케이스에 전달되지 않음
+          </p>
+        </div>
+        {draft.extractors.map((extractor, index) => (
+          <ExtractorRow
+            key={index}
+            index={index}
+            extractor={extractor}
+            onChange={(next) => updateExtractor(index, next)}
+            onRemove={() => update({ extractors: draft.extractors.filter((_, i) => i !== index) })}
+          />
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={draft.extractors.length >= MAX_EXTRACTORS}
+          onClick={() => update({ extractors: [...draft.extractors, newExtractor()] })}
+        >
+          <Plus /> 추출 추가
+        </Button>
       </section>
 
       {errors.length > 0 && (
@@ -364,6 +405,90 @@ function AssertionFields({
         </Field>
       );
   }
+}
+
+/** 추출 규칙 1건. 변수 이름, 위치(본문 JSON 값·응답 헤더), JsonPath·헤더 이름, 값 가리기 */
+function ExtractorRow({
+  index,
+  extractor,
+  onChange,
+  onRemove,
+}: {
+  index: number;
+  extractor: ExtractorDraft;
+  onChange: (next: ExtractorDraft) => void;
+  onRemove: () => void;
+}) {
+  const label = `값 추출 ${index + 1}`;
+  const secretId = `extractor-${index}-secret`;
+  const isBody = extractor.from === "BODY";
+
+  // 위치를 바꾸면 입력하지 않은 예시 값만 새 위치의 예시로 교체
+  function changeSource(from: ExtractorSource) {
+    const untouched = extractor.expression === newExtractor(extractor.from).expression;
+    onChange({ ...extractor, from, expression: untouched ? newExtractor(from).expression : extractor.expression });
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium">
+          {index + 1}.{" "}
+          <code className="font-mono">
+            {extractor.name.trim() === "" ? "{{변수}}" : `{{${extractor.name.trim()}}}`}
+          </code>
+        </h3>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={`${label} 삭제`} onClick={onRemove}>
+          <Trash2 />
+        </Button>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-[minmax(8rem,12rem)_auto_1fr]">
+        <Input
+          aria-label={`${label} 변수 이름`}
+          value={extractor.name}
+          maxLength={100}
+          placeholder="token"
+          onChange={(event) => onChange({ ...extractor, name: event.target.value })}
+          className="font-mono"
+        />
+        <NativeSelect
+          aria-label={`${label} 위치`}
+          value={extractor.from}
+          onChange={(event) => changeSource(event.target.value as ExtractorSource)}
+        >
+          {EXTRACTOR_SOURCES.map((source) => (
+            <NativeSelectOption key={source} value={source}>
+              {EXTRACTOR_SOURCE_LABELS[source]}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+        <Input
+          aria-label={`${label} ${isBody ? "JsonPath" : "헤더 이름"}`}
+          value={extractor.expression}
+          maxLength={500}
+          placeholder={isBody ? "$.data.token" : "Location"}
+          onChange={(event) => onChange({ ...extractor, expression: event.target.value })}
+          className="font-mono"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch
+          id={secretId}
+          checked={extractor.secret}
+          onCheckedChange={(secret) => onChange({ ...extractor, secret })}
+          // 보이는 이름 "값 가리기"를 포함하고 여러 추출 규칙을 번호로 구분
+          aria-label={`${label} 값 가리기`}
+          aria-describedby={`${secretId}-hint`}
+        />
+        <Label htmlFor={secretId} className="shrink-0 font-normal">
+          값 가리기
+        </Label>
+        <span id={`${secretId}-hint`} className="text-xs text-muted-foreground">
+          토큰 등은 실행 이력의 요청·응답에서 ****로 표시
+        </span>
+      </div>
+    </div>
+  );
 }
 
 /** 입력 칸 하나와 안내 문구. 접근성 이름에 규칙 번호를 포함하여 여러 규칙의 입력 칸 구분 */

@@ -27,7 +27,7 @@ export default async function CasePage(props: PageProps<"/cases/[id]">) {
       <PageHeader
         back={{ href: `/suites/${suite.id}`, label: suite.name }}
         title="케이스 수정"
-        description="저장하면 요청 정의와 판정 규칙이 통째로 바뀝니다. 이전 실행 이력은 그대로 유지됩니다."
+        description="저장하면 요청 정의·판정 규칙·값 추출이 통째로 바뀝니다. 이전 실행 이력은 그대로 유지됩니다."
       />
       {/* 등록 후 실행에서 등록만 되고 실행이 실패한 경우 (같은 케이스를 다시 등록하지 않도록 수정 화면으로 이동) */}
       {notice === "run-failed" && (

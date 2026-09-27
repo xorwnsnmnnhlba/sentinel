@@ -106,4 +106,36 @@ describe("ResultDetail", () => {
     // 원문이 원래 없던 결과에는 삭제 안내를 붙이지 않음
     expect(screen.queryByText(/헤더와 본문을 삭제했습니다/)).not.toBeInTheDocument();
   });
+
+  it("lists extracted values apart from the rules and hides secret ones", () => {
+    render(
+      <ResultDetail
+        result={{
+          ...responded,
+          assertionResults: [
+            { description: "status in [200]", passed: true, message: "200" },
+            { description: "extract {{token}} from $.data.token", passed: true, message: "extracted (hidden)" },
+            { description: "extract {{orderUrl}} from header Location", passed: true, message: 'was "/orders/7"' },
+            { description: "extract {{id}} from $.id", passed: false, message: "path not found" },
+          ],
+        }}
+      />,
+    );
+
+    expect(within(screen.getByRole("table", { name: "판정 규칙" })).getAllByRole("row")).toHaveLength(2);
+    const rows = within(screen.getByRole("table", { name: "값 추출" }))
+      .getAllByRole("row")
+      .slice(1);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "통과{{token}}$.data.token가림",
+      "통과{{orderUrl}}헤더 Location/orders/7",
+      "실패{{id}}$.idpath not found",
+    ]);
+  });
+
+  it("shows no extraction table for cases without extractors", () => {
+    render(<ResultDetail result={responded} />);
+
+    expect(screen.queryByRole("table", { name: "값 추출" })).not.toBeInTheDocument();
+  });
 });

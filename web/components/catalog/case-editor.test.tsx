@@ -64,7 +64,76 @@ describe("CaseEditor", () => {
         { type: "statusCode", anyOf: "2xx" },
         { type: "jsonPath", path: "$.amount", operator: "EQUALS", expected: "1000" },
       ],
+      extractors: [],
     });
+  });
+
+  it("adds extractors that later cases can use as variables", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => undefined);
+    renderEditor(action, valid);
+
+    await user.click(screen.getByRole("button", { name: "추출 추가" }));
+    await user.type(screen.getByLabelText("값 추출 1 변수 이름"), "token");
+    await user.type(screen.getByLabelText("값 추출 1 JsonPath"), "data.token");
+    await user.click(screen.getByRole("switch", { name: "값 추출 1 값 가리기" }));
+    await user.click(screen.getByRole("button", { name: "추출 추가" }));
+    await user.type(screen.getByLabelText("값 추출 2 변수 이름"), "orderUrl");
+    // 입력하지 않은 예시 값은 위치를 바꾸면 새 위치의 예시로 교체
+    await user.selectOptions(screen.getByLabelText("값 추출 2 위치"), "HEADER");
+    expect(screen.getByLabelText("값 추출 2 헤더 이름")).toHaveValue("Location");
+    // 제목에 뒤 케이스에서 쓸 변수 표기
+    expect(screen.getByRole("heading", { name: "1. {{token}}" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "등록" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(action.mock.calls[0][0].extractors).toEqual([
+      { name: "token", from: "BODY", expression: "$.data.token", secret: true },
+      { name: "orderUrl", from: "HEADER", expression: "Location", secret: false },
+    ]);
+  });
+
+  it("keeps a typed expression when the source changes and removes extractors", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => undefined);
+    renderEditor(action, {
+      ...valid,
+      extractors: [
+        { name: "id", from: "BODY", expression: "$.id", secret: false },
+        { name: "trace", from: "HEADER", expression: "X-Trace-Id", secret: false },
+      ],
+    });
+
+    await user.selectOptions(screen.getByLabelText("값 추출 1 위치"), "HEADER");
+    expect(screen.getByLabelText("값 추출 1 헤더 이름")).toHaveValue("$.id");
+    await user.click(screen.getByRole("button", { name: "값 추출 1 삭제" }));
+
+    expect(screen.getByLabelText("값 추출 1 변수 이름")).toHaveValue("trace");
+    expect(screen.queryByLabelText("값 추출 2 변수 이름")).not.toBeInTheDocument();
+  });
+
+  it("shows extractor errors without calling the action", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<Action>(async () => undefined);
+    renderEditor(action, valid);
+
+    await user.click(screen.getByRole("button", { name: "추출 추가" }));
+    await user.click(screen.getByRole("button", { name: "등록" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("값 추출 1: 변수 이름은");
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("stops adding extractors at the limit", () => {
+    const extractors = Array.from({ length: 20 }, (_, i) => ({
+      name: `v${i}`,
+      from: "BODY" as const,
+      expression: "$.v",
+      secret: false,
+    }));
+    renderEditor(vi.fn<Action>(), { ...valid, extractors });
+
+    expect(screen.getByRole("button", { name: "추출 추가" })).toBeDisabled();
   });
 
   it("shows validation errors without calling the action", async () => {

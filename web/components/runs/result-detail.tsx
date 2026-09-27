@@ -4,13 +4,15 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Headers, ResponseSchema, RunResult } from "@/lib/api/types";
+import { type ExtractionResult, splitExtractions } from "@/lib/extraction";
 import { prettyBody } from "@/lib/format";
 
 /**
- * 케이스 1건의 결과. 오류 사유, 판정 규칙별 결과, 요청·응답 원문, 응답 구조
+ * 케이스 1건의 결과. 오류 사유, 판정 규칙별 결과, 응답 값 추출 결과, 요청·응답 원문, 응답 구조
  * 보관기간이 지나 원문을 삭제한 실행(rawPurged)은 원문 대신 안내 문구 표시. 응답 구조는 원문과 달리 계속 표시
  */
 export function ResultDetail({ result, rawPurged = false }: { result: RunResult; rawPurged?: boolean }) {
+  const { assertions, extractions } = splitExtractions(result.assertionResults);
   return (
     <div className="space-y-4">
       <p className="font-mono text-xs break-all text-muted-foreground">
@@ -24,9 +26,9 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
         </div>
       )}
 
-      {result.assertionResults.length > 0 && (
+      {assertions.length > 0 && (
         <div className="rounded-md border">
-          <Table>
+          <Table aria-label="판정 규칙">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-16">판정</TableHead>
@@ -35,7 +37,7 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
               </TableRow>
             </TableHeader>
             <TableBody>
-              {result.assertionResults.map((assertion, index) => (
+              {assertions.map((assertion, index) => (
                 <TableRow key={index}>
                   <TableCell>
                     <VerdictBadge verdict={assertion.passed ? "PASSED" : "FAILED"} />
@@ -48,6 +50,8 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
           </Table>
         </div>
       )}
+
+      {extractions.length > 0 && <ExtractionTable extractions={extractions} />}
 
       {result.request.url && rawPurged && (
         <p className="text-xs text-muted-foreground">보관기간이 지나 요청·응답 헤더와 본문을 삭제했습니다</p>
@@ -90,6 +94,44 @@ export function ResultDetail({ result, rawPurged = false }: { result: RunResult;
           </TabsContent>
         </Tabs>
       )}
+    </div>
+  );
+}
+
+/** 응답에서 꺼내 뒤 케이스에 넘긴 값. 가림 지정 값은 표시하지 않음 */
+function ExtractionTable({ extractions }: { extractions: ExtractionResult[] }) {
+  return (
+    <div className="rounded-md border">
+      <Table aria-label="값 추출">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-16">추출</TableHead>
+            <TableHead>변수</TableHead>
+            <TableHead>위치</TableHead>
+            <TableHead>값</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {extractions.map((extraction) => (
+            <TableRow key={extraction.name}>
+              <TableCell>
+                <VerdictBadge verdict={extraction.passed ? "PASSED" : "FAILED"} />
+              </TableCell>
+              <TableCell className="font-mono text-xs">{`{{${extraction.name}}}`}</TableCell>
+              <TableCell className="font-mono text-xs break-all whitespace-normal">
+                {extraction.from === "HEADER" ? `헤더 ${extraction.expression}` : extraction.expression}
+              </TableCell>
+              <TableCell className="font-mono text-xs break-all whitespace-normal">
+                {extraction.hidden ? (
+                  <span className="font-sans text-muted-foreground">가림</span>
+                ) : (
+                  (extraction.value ?? extraction.failure)
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

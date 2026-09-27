@@ -187,7 +187,7 @@ async function saveCase(
 }
 
 /**
- * 케이스 복제. 요청 정의·판정 규칙을 그대로 복사해 같은 스위트에 등록하고 새 케이스의 수정 화면으로 이동
+ * 케이스 복제. 요청 정의·판정 규칙·값 추출을 그대로 복사해 같은 스위트에 등록하고 새 케이스의 수정 화면으로 이동
  * 이름은 "원본 (복사)"부터 스위트 안에서 비어 있는 이름 (Spring API 변경 없이 조회·등록 API 조합)
  */
 export async function duplicateCase(caseId: number): Promise<ActionState> {
@@ -214,6 +214,7 @@ export async function duplicateCase(caseId: number): Promise<ActionState> {
       ),
       request: original.request,
       assertions: original.assertions,
+      extractors: original.extractors,
     });
   } catch (error) {
     return failure(error);
