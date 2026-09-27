@@ -52,6 +52,12 @@ public class TestCase extends ArchivableEntity {
 	@Column(columnDefinition = "json")
 	private List<Assertion> assertions = new ArrayList<>();
 
+	/**
+	 * 스위트 안 실행 순서 (V12). 작을수록 먼저, 같으면 ID 순. 새 케이스는 스위트의 마지막 순서 다음
+	 */
+	@Column(nullable = false)
+	private int runOrder;
+
 	/** 응답 값 추출 규칙 (V11). 이전 데이터는 null, 빈 목록으로 취급 */
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(columnDefinition = "json")
@@ -97,6 +103,14 @@ public class TestCase extends ArchivableEntity {
 			}
 		}
 		this.extractors = new ArrayList<>(valid);
+	}
+
+	/** 실행 순서 지정. 0 이상 */
+	public void placeAt(int runOrder) {
+		if (runOrder < 0) {
+			throw new IllegalArgumentException("runOrder must not be negative: " + runOrder);
+		}
+		this.runOrder = runOrder;
 	}
 
 	public void rename(String name) {

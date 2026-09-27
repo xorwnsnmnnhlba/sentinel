@@ -14,9 +14,15 @@ import org.springframework.data.repository.query.Param;
  */
 public interface TestCaseRepository extends JpaRepository<TestCase, Long> {
 
-	List<TestCase> findBySuiteIdAndArchivedAtIsNullOrderById(Long suiteId);
+	/** 스위트의 케이스를 실행 순서로 (순서가 같으면 ID 순) */
+	List<TestCase> findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(Long suiteId);
 
-	List<TestCase> findByArchivedAtIsNullOrderById();
+	/** 모든 케이스를 스위트별 실행 순서로 */
+	List<TestCase> findByArchivedAtIsNullOrderBySuiteIdAscRunOrderAscIdAsc();
+
+	/** 스위트의 가장 큰 실행 순서. 케이스가 없으면 0. 보관된 케이스도 포함하여 새 케이스가 항상 마지막 */
+	@Query("select coalesce(max(c.runOrder), 0) from TestCase c where c.suite.id = :suiteId")
+	int findMaxRunOrder(@Param("suiteId") Long suiteId);
 
 	Optional<TestCase> findByIdAndArchivedAtIsNull(Long id);
 

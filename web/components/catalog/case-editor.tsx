@@ -229,7 +229,7 @@ export function CaseEditor({
           <p className="text-sm text-muted-foreground">
             응답 값을 변수로 저장하여 같은 스위트 실행에서 뒤에 실행하는 케이스가{" "}
             <code className="font-mono">{"{{변수}}"}</code>로 사용 (예: 로그인 토큰, 등록한 ID). 스위트 전체 실행에서
-            등록 순서대로 전달되며, 이 케이스만 실행하면 뒤 케이스에 전달되지 않음
+            스위트의 실행 순서대로 전달되며, 이 케이스만 실행하면 뒤 케이스에 전달되지 않음
           </p>
         </div>
         {draft.extractors.map((extractor, index) => (

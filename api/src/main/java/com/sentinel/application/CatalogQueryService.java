@@ -86,8 +86,8 @@ public class CatalogQueryService {
 	 * @param suiteId null이면 전체
 	 */
 	public List<CaseItem> listCases(Long suiteId) {
-		List<TestCase> found = suiteId == null ? testCases.findByArchivedAtIsNullOrderById()
-				: testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId);
+		List<TestCase> found = suiteId == null ? testCases.findByArchivedAtIsNullOrderBySuiteIdAscRunOrderAscIdAsc()
+				: testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId);
 		return found.stream().map(CaseItem::of).toList();
 	}
 

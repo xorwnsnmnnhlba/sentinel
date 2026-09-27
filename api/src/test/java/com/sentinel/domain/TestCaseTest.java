@@ -73,4 +73,14 @@ class TestCaseTest {
 		assertThat(testCase.getExtractors()).hasSize(TestCase.MAX_EXTRACTORS);
 	}
 
+	@Test
+	void startsFirstAndRejectsNegativeRunOrders() {
+		TestCase testCase = new TestCase(suite, "login", request);
+
+		assertThat(testCase.getRunOrder()).isZero();
+		testCase.placeAt(3);
+		assertThat(testCase.getRunOrder()).isEqualTo(3);
+		assertThatThrownBy(() -> testCase.placeAt(-1)).isInstanceOf(IllegalArgumentException.class);
+	}
+
 }

@@ -49,7 +49,7 @@ import org.springframework.stereotype.Service;
  * 실행 흐름: 준비(트랜잭션) → 케이스별 전송(트랜잭션 밖) + 결과 기록(케이스별 트랜잭션) → 완료 처리(트랜잭션).
  * <p>
  * HTTP 호출 동안 DB 커넥션을 점유하지 않기 위해 전송 구간을 트랜잭션에서 분리. 커넥션 풀 크기 5 전제.
- * 스위트 내 케이스는 ID 순서로 순차 실행하여 GW 동시 호출 없음.
+ * 스위트 내 케이스는 실행 순서(run_order, 같으면 ID 순)대로 순차 실행하여 GW 동시 호출 없음.
  * <p>
  * 응답 값 추출: 케이스의 추출 규칙으로 얻은 값은 같은 실행에서 뒤에 실행하는 케이스의 변수가 됨 (환경 변수보다 우선).
  * 추출에 실패하거나 응답을 받지 못하면 그 변수를 비워 뒤 케이스가 환경 변수의 같은 이름 값으로 조용히 실행되지 않고
@@ -110,7 +110,7 @@ public class TestRunService {
 	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
 		Prepared prepared = transactions.write(status -> {
 			TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
-			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId), trigger,
+			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId), trigger,
 					triggeredBy, null);
 		});
 		return executeAndRecord(prepared);
@@ -167,7 +167,7 @@ public class TestRunService {
 			.toList();
 		// 단건 실행에서 앞 케이스가 추출하는 변수를 쓰면 미해결 변수 메시지로 안내하기 위해 스위트 전체의 추출 변수 이름 수집
 		List<TestCase> suiteCases = target == null ? cases
-				: testCases.findBySuiteIdAndArchivedAtIsNullOrderById(suite.getId());
+				: testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId());
 		Set<String> extractedInSuite = suiteCases.stream()
 			.flatMap(testCase -> testCase.getExtractors().stream())
 			.map(Extractor::name)

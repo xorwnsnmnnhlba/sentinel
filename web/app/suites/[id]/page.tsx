@@ -1,9 +1,10 @@
-import { History, Plus } from "lucide-react";
+import { ArrowUpDown, History, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ActionMenu } from "@/components/catalog/action-menu";
 import { CaseImportDialog } from "@/components/catalog/case-import-dialog";
+import { CaseOrderFields } from "@/components/catalog/case-order-fields";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
@@ -23,6 +24,7 @@ import {
   deleteSchedule,
   deleteSuite,
   duplicateCase,
+  reorderCases,
   runCase,
   runSuite,
   updateSchedule,
@@ -63,7 +65,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
           <>
             {suite.description && <p>{suite.description}</p>}
             <p className="text-xs">
-              케이스 {cases.length} · 스케줄 {schedules.length} · 케이스를 등록 순서대로 실행, 완료 후 결과 화면으로
+              케이스 {cases.length} · 스케줄 {schedules.length} · 케이스를 목록 순서대로 실행, 완료 후 결과 화면으로
               이동
             </p>
           </>
@@ -100,9 +102,31 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
         <SectionHeader
           title="케이스"
           count={cases.length}
-          description="요청 정의와 판정 규칙. 실행 순서는 등록 순"
+          description="요청 정의와 판정 규칙. 목록 순서대로 실행 (새 케이스는 마지막)"
           action={
             <>
+              {cases.length > 1 && (
+                <FormDialog
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <ArrowUpDown /> 순서 변경
+                    </Button>
+                  }
+                  title="케이스 실행 순서"
+                  description="스위트 실행과 목록에 이 순서가 적용됩니다. 값 추출은 앞 케이스에서 뒤 케이스로 전달됩니다."
+                  submitLabel="저장"
+                  action={reorderCases.bind(null, suite.id)}
+                >
+                  <CaseOrderFields
+                    cases={cases.map((testCase) => ({
+                      id: testCase.id,
+                      name: testCase.name,
+                      method: testCase.request.method,
+                      path: testCase.request.path,
+                    }))}
+                  />
+                </FormDialog>
+              )}
               <CaseImportDialog suiteId={suite.id} existingNames={cases.map((testCase) => testCase.name)} />
               <Button asChild variant="outline" size="sm">
                 <Link href={`/cases/new?suiteId=${suite.id}`}>
@@ -119,7 +143,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
             <Table aria-label="케이스 목록">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-14">#</TableHead>
+                  <TableHead className="w-14">순서</TableHead>
                   <TableHead>이름</TableHead>
                   <TableHead>요청</TableHead>
                   <TableHead>판정 규칙</TableHead>
@@ -129,9 +153,9 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {cases.map((testCase) => (
+                {cases.map((testCase, index) => (
                   <TableRow key={testCase.id}>
-                    <TableCell className="text-muted-foreground tabular-nums">{testCase.id}</TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">{index + 1}</TableCell>
                     <TableCell className="font-medium whitespace-normal">
                       <Link href={`/cases/${testCase.id}`} className="hover:underline">
                         {testCase.name}
@@ -143,7 +167,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                         <span className="[overflow-wrap:anywhere]">{testCase.request.path}</span>
                       </div>
                       {testCase.extractors.length > 0 && (
-                        // 뒤 케이스에 넘기는 변수. 스위트 실행 순서(# 순)대로 값이 전달됨
+                        // 뒤 케이스에 넘기는 변수. 스위트 실행 순서(목록 순)대로 값이 전달됨
                         <p className="mt-1 text-xs [overflow-wrap:anywhere] text-muted-foreground">
                           추출{" "}
                           <span className="font-mono">

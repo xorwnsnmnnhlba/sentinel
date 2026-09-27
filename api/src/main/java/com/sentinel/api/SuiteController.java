@@ -52,7 +52,7 @@ class SuiteController {
 	 */
 	@PatchMapping("/{suiteId}")
 	SuiteItem update(@PathVariable long suiteId, @RequestBody UpdateSuiteRequest request) {
-		return commands.updateSuite(suiteId, request.name(), request.description());
+		return commands.updateSuite(suiteId, request.name(), request.description(), request.caseOrder());
 	}
 
 	/**

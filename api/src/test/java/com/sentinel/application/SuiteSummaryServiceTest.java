@@ -118,7 +118,7 @@ class SuiteSummaryServiceTest {
 		// 이후 케이스를 하나씩 따로 실행 (케이스 수정 확인 등). 통과 1건, 실패 1건
 		clock.set(SEPT_10);
 		long tester = fixtures.user().getId();
-		for (TestCase testCase : testCases.findBySuiteIdAndArchivedAtIsNullOrderById(orders.getId())) {
+		for (TestCase testCase : testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(orders.getId())) {
 			testRunService.runTestCase(testCase.getId(), environment.getId(), tester);
 		}
 
