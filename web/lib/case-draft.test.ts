@@ -6,8 +6,11 @@ import {
   type AssertionDraft,
   type CaseDraft,
   emptyDraft,
+  type ExtractorDraft,
   isCaseDraft,
+  MAX_EXTRACTORS,
   newAssertion,
+  newExtractor,
   parseExpected,
   toDraft,
   validateDraft,
@@ -46,6 +49,10 @@ describe("toDraft", () => {
         { type: "jsonPath", path: "$.items", operator: "EXISTS", expected: null },
         { type: "bodyContains", text: "OK" },
       ],
+      extractors: [
+        { name: "token", from: "BODY", expression: "$.data.token", secret: true },
+        { name: "orderUrl", from: "HEADER", expression: "Location", secret: false },
+      ],
     };
 
     const form = toDraft(item);
@@ -64,6 +71,7 @@ describe("toDraft", () => {
       name: item.name,
       request: item.request,
       assertions: item.assertions,
+      extractors: item.extractors,
     });
   });
 
@@ -74,6 +82,7 @@ describe("toDraft", () => {
       name: "a",
       request: { method: "GET", path: "/", headers: {}, body: null },
       assertions: [],
+      extractors: [],
     });
 
     expect(form.body).toBe("");
@@ -116,6 +125,7 @@ describe("validateDraft request", () => {
         name: "health",
         request: { method: "POST", path: "/health", headers: { Accept: ["application/json"] }, body: "{}" },
         assertions: [],
+        extractors: [],
       },
     });
   });
@@ -233,6 +243,68 @@ describe("validateDraft assertions", () => {
   });
 });
 
+describe("validateDraft extractors", () => {
+  function withExtractors(...extractors: ExtractorDraft[]) {
+    return validateDraft(draft({ extractors }));
+  }
+
+  it("trims names and expressions and keeps the secret flag", () => {
+    const result = withExtractors(
+      { name: " token ", from: "BODY", expression: " $.data.token ", secret: true },
+      { name: "order-url", from: "HEADER", expression: "Location", secret: false },
+    );
+
+    expect(result.ok && result.payload.extractors).toEqual([
+      { name: "token", from: "BODY", expression: "$.data.token", secret: true },
+      { name: "order-url", from: "HEADER", expression: "Location", secret: false },
+    ]);
+  });
+
+  it("starts new extractors with a sample expression per source", () => {
+    expect(newExtractor()).toEqual({ name: "", from: "BODY", expression: "$.", secret: false });
+    expect(newExtractor("HEADER")).toEqual({ name: "", from: "HEADER", expression: "Location", secret: false });
+  });
+
+  it("rejects names that cannot be used as {{variables}}", () => {
+    for (const name of ["", "user id", "{{token}}", "토큰", "a".repeat(101)]) {
+      expect(errorsOf(withExtractors({ ...newExtractor(), name, expression: "$.a" }))).toEqual([
+        "값 추출 1: 변수 이름은 영문·숫자·_ . - 로 100자 이하 입력해 주세요 (예: token)",
+      ]);
+    }
+  });
+
+  it("rejects duplicate names, unfinished expressions and unknown sources", () => {
+    const errors = errorsOf(
+      withExtractors(
+        { name: "id", from: "BODY", expression: "$.id", secret: false },
+        { name: "id", from: "HEADER", expression: "X-Id", secret: false },
+        { name: "a", from: "BODY", expression: "$.", secret: false },
+        { name: "b", from: "HEADER", expression: " ", secret: false },
+        { name: "c", from: "QUERY" as ExtractorDraft["from"], expression: "c", secret: false },
+        { name: "d", from: "HEADER", expression: "X".repeat(501), secret: false },
+      ),
+    );
+
+    expect(errors).toEqual([
+      "값 추출 2: 변수 이름 id이(가) 중복됩니다",
+      "값 추출 3: JsonPath를 $로 시작하여 입력해 주세요 (예: $.data.token)",
+      "값 추출 4: 헤더 이름을 입력해 주세요 (예: Location)",
+      "값 추출 5: 추출 위치를 선택해 주세요",
+      "값 추출 6: 헤더 이름은 500자 이하로 입력해 주세요",
+    ]);
+  });
+
+  it("allows up to the Spring limit", () => {
+    const many = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({ ...newExtractor(), name: `v${i}`, expression: "$.v" }));
+
+    expect(withExtractors(...many(MAX_EXTRACTORS)).ok).toBe(true);
+    expect(errorsOf(withExtractors(...many(MAX_EXTRACTORS + 1)))).toEqual([
+      "값 추출은 케이스당 20개까지 등록할 수 있습니다",
+    ]);
+  });
+});
+
 describe("isCaseDraft", () => {
   it("accepts a well-formed draft", () => {
     expect(isCaseDraft(draft({ headers: [{ name: "A", value: "b" }], assertions: [newAssertion("jsonPath")] }))).toBe(
@@ -248,6 +320,9 @@ describe("isCaseDraft", () => {
     { ...emptyDraft(), headers: [{ name: "A" }] },
     { ...emptyDraft(), assertions: [{ type: "unknown" }] },
     { ...emptyDraft(), assertions: [{ type: "responseTime", maxMillis: 100 }] },
+    { ...emptyDraft(), extractors: undefined },
+    { ...emptyDraft(), extractors: [{ name: "token", from: "BODY", expression: "$.a" }] },
+    { ...emptyDraft(), extractors: [{ name: "token", from: "BODY", expression: "$.a", secret: "yes" }] },
   ])("rejects %j", (value) => {
     expect(isCaseDraft(value)).toBe(false);
   });
@@ -263,6 +338,7 @@ describe("expected value round trip", () => {
         name: "a",
         request: { method: "GET", path: "/", headers: {}, body: null },
         assertions: [{ type: "jsonPath", path: "$.a", operator: "EQUALS", expected }],
+        extractors: [],
       });
 
       expect(validateDraft(form)).toMatchObject({ ok: true, payload: { assertions: [{ expected }] } });

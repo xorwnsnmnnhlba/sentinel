@@ -1,4 +1,4 @@
-import type { Assertion, CaseItem, Headers, HttpMethod } from "@/lib/api/types";
+import type { Assertion, CaseItem, Extractor, Headers, HttpMethod } from "@/lib/api/types";
 
 /**
  * 케이스 편집 폼 상태와 API 요청 본문 사이의 변환·검증. 화면(입력 즉시 안내)과 Server Action(재검사)에서 공용.
@@ -60,6 +60,23 @@ export type AssertionDraft =
 
 export type HeaderRow = { name: string; value: string };
 
+export const EXTRACTOR_SOURCES = ["BODY", "HEADER"] as const;
+
+export type ExtractorSource = (typeof EXTRACTOR_SOURCES)[number];
+
+export const EXTRACTOR_SOURCE_LABELS: Record<ExtractorSource, string> = {
+  BODY: "본문 JSON 값",
+  HEADER: "응답 헤더",
+};
+
+/** 입력 중 추출 규칙. API 형태와 같음 */
+export type ExtractorDraft = Extractor;
+
+/** Spring Extractor 검증과 일치 */
+export const MAX_EXTRACTORS = 20;
+const EXTRACTOR_NAME = /^[A-Za-z0-9_.-]{1,100}$/;
+const MAX_EXTRACTOR_EXPRESSION = 500;
+
 export type CaseDraft = {
   name: string;
   method: HttpMethod;
@@ -67,6 +84,7 @@ export type CaseDraft = {
   headers: HeaderRow[];
   body: string;
   assertions: AssertionDraft[];
+  extractors: ExtractorDraft[];
 };
 
 /** Spring 등록·수정 요청 본문 (suiteId 제외) */
@@ -74,6 +92,7 @@ export type CasePayload = {
   name: string;
   request: { method: HttpMethod; path: string; headers: Headers; body: string | null };
   assertions: Assertion[];
+  extractors: Extractor[];
 };
 
 export type CaseValidation = { ok: true; payload: CasePayload } | { ok: false; errors: string[] };
@@ -86,7 +105,13 @@ const MAX_BODY = 65_536;
 const STATUS_CODE = /^[1-5][0-9x]{2}$/;
 
 export function emptyDraft(): CaseDraft {
-  return { name: "", method: "GET", path: "/", headers: [], body: "", assertions: [] };
+  return { name: "", method: "GET", path: "/", headers: [], body: "", assertions: [], extractors: [] };
+}
+
+export function newExtractor(from: ExtractorSource = "BODY"): ExtractorDraft {
+  return from === "BODY"
+    ? { name: "", from, expression: "$.", secret: false }
+    : { name: "", from, expression: "Location", secret: false };
 }
 
 export function newAssertion(type: AssertionType): AssertionDraft {
@@ -113,6 +138,7 @@ export function toDraft(item: CaseItem): CaseDraft {
     headers: Object.entries(item.request.headers).flatMap(([name, values]) => values.map((value) => ({ name, value }))),
     body: item.request.body ?? "",
     assertions: item.assertions.map(assertionDraftOf),
+    extractors: item.extractors.map((extractor) => ({ ...extractor })),
   };
 }
 
@@ -232,6 +258,8 @@ export function validateDraft(draft: CaseDraft): CaseValidation {
     }
   });
 
+  const extractors = validateExtractors(draft.extractors, errors);
+
   if (errors.length > 0) {
     return { ok: false, errors };
   }
@@ -241,8 +269,51 @@ export function validateDraft(draft: CaseDraft): CaseValidation {
       name,
       request: { method: draft.method, path, headers, body: draft.body === "" ? null : draft.body },
       assertions,
+      extractors,
     },
   };
+}
+
+/** 추출 규칙 검증. 오류는 errors에 덧붙이고 통과한 규칙만 반환 */
+function validateExtractors(drafts: ExtractorDraft[], errors: string[]): Extractor[] {
+  if (drafts.length > MAX_EXTRACTORS) {
+    errors.push(`값 추출은 케이스당 ${MAX_EXTRACTORS}개까지 등록할 수 있습니다`);
+  }
+  const seen = new Set<string>();
+  const extractors: Extractor[] = [];
+  drafts.forEach((draft, index) => {
+    const label = `값 추출 ${index + 1}`;
+    const name = draft.name.trim();
+    const expression = draft.expression.trim();
+    if (!EXTRACTOR_NAME.test(name)) {
+      errors.push(`${label}: 변수 이름은 영문·숫자·_ . - 로 100자 이하 입력해 주세요 (예: token)`);
+      return;
+    }
+    if (seen.has(name)) {
+      errors.push(`${label}: 변수 이름 ${name}이(가) 중복됩니다`);
+      return;
+    }
+    seen.add(name);
+    if (!EXTRACTOR_SOURCES.includes(draft.from)) {
+      errors.push(`${label}: 추출 위치를 선택해 주세요`);
+      return;
+    }
+    if (draft.from === "BODY" && (!expression.startsWith("$") || expression === "$.")) {
+      errors.push(`${label}: JsonPath를 $로 시작하여 입력해 주세요 (예: $.data.token)`);
+      return;
+    }
+    if (expression === "") {
+      errors.push(`${label}: 헤더 이름을 입력해 주세요 (예: Location)`);
+      return;
+    }
+    if (expression.length > MAX_EXTRACTOR_EXPRESSION) {
+      const what = draft.from === "BODY" ? "JsonPath는" : "헤더 이름은";
+      errors.push(`${label}: ${what} ${MAX_EXTRACTOR_EXPRESSION}자 이하로 입력해 주세요`);
+      return;
+    }
+    extractors.push({ name, from: draft.from, expression, secret: draft.secret });
+  });
+  return extractors;
 }
 
 /** 규칙 1건 검증. 오류 시 문구 반환 */
@@ -335,7 +406,22 @@ export function isCaseDraft(value: unknown): value is CaseDraft {
       (row) => typeof row === "object" && row !== null && isString(row.name) && isString(row.value),
     ) &&
     Array.isArray(draft.assertions) &&
-    draft.assertions.every(isAssertionDraft)
+    draft.assertions.every(isAssertionDraft) &&
+    Array.isArray(draft.extractors) &&
+    draft.extractors.every(isExtractorDraft)
+  );
+}
+
+function isExtractorDraft(value: unknown): value is ExtractorDraft {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const draft = value as Record<string, unknown>;
+  return (
+    typeof draft.name === "string" &&
+    typeof draft.from === "string" &&
+    typeof draft.expression === "string" &&
+    typeof draft.secret === "boolean"
   );
 }
 

@@ -262,6 +262,7 @@ describe("cases", () => {
     headers: [{ name: "Accept", value: "application/json" }],
     body: "{}",
     assertions: [{ type: "jsonPath", path: "$.status", operator: "EQUALS", expected: "UP" }],
+    extractors: [{ name: " token ", from: "BODY", expression: "$.token", secret: true }],
   };
 
   it("creates a case in the suite and returns to the suite page", async () => {
@@ -274,6 +275,7 @@ describe("cases", () => {
         name: "health",
         request: { method: "POST", path: "/health", headers: { Accept: ["application/json"] }, body: "{}" },
         assertions: [{ type: "jsonPath", path: "$.status", operator: "EQUALS", expected: "UP" }],
+        extractors: [{ name: "token", from: "BODY", expression: "$.token", secret: true }],
       },
     ]);
   });
@@ -281,12 +283,15 @@ describe("cases", () => {
   it("replaces the whole case on update without sending suiteId", async () => {
     const bodies = capture("patch", "/api/cases/9", () => HttpResponse.json({ id: 9 }));
 
-    await expect(captureRedirect(() => updateCase(9, 4, { ...draft, assertions: [] }))).resolves.toBe("/suites/4");
+    await expect(captureRedirect(() => updateCase(9, 4, { ...draft, assertions: [], extractors: [] }))).resolves.toBe(
+      "/suites/4",
+    );
     expect(bodies).toEqual([
       {
         name: "health",
         request: { method: "POST", path: "/health", headers: { Accept: ["application/json"] }, body: "{}" },
         assertions: [],
+        extractors: [],
       },
     ]);
   });
@@ -423,6 +428,7 @@ describe("duplicateCase", () => {
     name: "주문 조회",
     request: { method: "GET", path: "/orders/{{id}}", headers: { Authorization: ["Bearer {{token}}"] }, body: null },
     assertions: [{ type: "statusCode", anyOf: ["200"] }],
+    extractors: [{ name: "orderNo", from: "BODY", expression: "$.orderNo", secret: false }],
   };
 
   function existing(names: string[]) {
@@ -435,7 +441,7 @@ describe("duplicateCase", () => {
     );
   }
 
-  it("copies the request and rules into the same suite under a free name and opens the copy", async () => {
+  it("copies the request, rules and extractors into the same suite under a free name and opens the copy", async () => {
     existing(["주문 조회", "주문 조회 (복사)"]);
     const bodies = capture("post", "/api/cases", () => HttpResponse.json({ id: 20 }, { status: 201 }));
 
@@ -446,6 +452,7 @@ describe("duplicateCase", () => {
         name: "주문 조회 (복사 2)",
         request: original.request,
         assertions: original.assertions,
+        extractors: original.extractors,
       },
     ]);
   });
