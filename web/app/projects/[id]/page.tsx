@@ -6,7 +6,7 @@ import { ActionMenu } from "@/components/catalog/action-menu";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { EnvironmentFields, ProjectFields, SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
-import { EDIT_DELETE, EDIT_DUPLICATE_DELETE } from "@/components/catalog/menu-items";
+import { EDIT_DELETE, EDIT_DUPLICATE_DELETE, withHistory } from "@/components/catalog/menu-items";
 import { Empty, SectionHeader, TableFrame } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
 } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
 import type { EnvironmentItem, ProjectItem, SuiteItem } from "@/lib/api/types";
+import { historyHref, projectHistoryHref } from "@/lib/change-log";
 import { copyName, MAX_ENVIRONMENT_NAME_LENGTH } from "@/lib/copy-name";
 
 export async function generateMetadata(props: PageProps<"/projects/[id]">) {
@@ -48,7 +49,11 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
         title={project.name}
         description={project.description}
         actions={
-          <ActionMenu label={`프로젝트 ${project.name} 작업`} items={EDIT_DELETE} size="page">
+          <ActionMenu
+            label={`프로젝트 ${project.name} 작업`}
+            items={withHistory(EDIT_DELETE, projectHistoryHref(project.id))}
+            size="page"
+          >
             <FormDialog
               menuId="edit"
               title="프로젝트 수정"
@@ -115,7 +120,10 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                       {environment.secretNames.join(", ") || "-"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <ActionMenu label={`환경 ${environment.name} 작업`} items={EDIT_DUPLICATE_DELETE}>
+                      <ActionMenu
+                        label={`환경 ${environment.name} 작업`}
+                        items={withHistory(EDIT_DUPLICATE_DELETE, historyHref("ENVIRONMENT", environment.id))}
+                      >
                         <FormDialog
                           menuId="edit"
                           title="환경 수정"
@@ -206,7 +214,10 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{suite.caseCount}</TableCell>
                     <TableCell className="text-right">
-                      <ActionMenu label={`스위트 ${suite.name} 작업`} items={EDIT_DELETE}>
+                      <ActionMenu
+                        label={`스위트 ${suite.name} 작업`}
+                        items={withHistory(EDIT_DELETE, historyHref("SUITE", suite.id))}
+                      >
                         <FormDialog
                           menuId="edit"
                           title="스위트 수정"

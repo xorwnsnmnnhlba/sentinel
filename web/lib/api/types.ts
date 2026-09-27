@@ -314,3 +314,25 @@ export interface ResponseTimeChanges {
   previousTo: string;
   changes: ResponseTimeChange[];
 }
+
+/** 변경 이력 대상 (api/README.md "변경 이력") */
+export type ChangeTargetType = "PROJECT" | "ENVIRONMENT" | "SUITE" | "CASE" | "SCHEDULE" | "USER" | "INVITE";
+
+export type ChangeAction = "CREATED" | "UPDATED" | "DELETED";
+
+/** 설정 변경 1건. 값은 없고 바뀐 항목 이름만 */
+export interface ChangeLogItem {
+  id: number;
+  occurredAt: string;
+  /** 변경한 사용자 {id, name(이메일)}. 알 수 없으면 null */
+  actor: IdName | null;
+  targetType: ChangeTargetType;
+  targetId: number;
+  /** 변경 당시 이름 (스케줄은 스위트 이름, 사용자·초대는 이메일) */
+  targetName: string;
+  /** 사용자·초대는 null */
+  projectId: number | null;
+  action: ChangeAction;
+  /** 수정에서 값이 바뀐 항목 이름. 예: name, variables.userId, secrets.token */
+  fields: string[];
+}

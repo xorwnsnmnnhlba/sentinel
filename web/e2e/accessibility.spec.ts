@@ -79,6 +79,8 @@ for (const colorScheme of ["light", "dark"] as const) {
         `/cases/${ids.passingCase}`,
         "/runs",
         `/runs/${ids.failingRun}`,
+        "/change-logs",
+        `/change-logs?targetType=CASE&targetId=${ids.passingCase}`,
         "/users",
         "/settings/password",
       ];
