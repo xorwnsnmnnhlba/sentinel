@@ -84,6 +84,9 @@ public class TestRun extends BaseEntity {
 	@Column(nullable = false)
 	private int errorCount;
 
+	/** 실패 다시 실행의 원래 실행 (V18). 그 외 실행은 null */
+	private Long rerunOfRunId;
+
 	/** 실행을 중지한 사용자 (V16). 중지된 실행만 값이 있음 */
 	private Long canceledBy;
 
@@ -94,7 +97,7 @@ public class TestRun extends BaseEntity {
 	private Instant rawPurgedAt;
 
 	private TestRun(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt, Long triggeredBy,
-			Long testCaseId, Long throughCaseId) {
+			Long testCaseId, Long throughCaseId, Long rerunOfRunId) {
 		this.suite = Objects.requireNonNull(suite, "suite");
 		this.environment = Objects.requireNonNull(environment, "environment");
 		this.trigger = Objects.requireNonNull(trigger, "trigger");
@@ -103,10 +106,11 @@ public class TestRun extends BaseEntity {
 		this.triggeredBy = triggeredBy;
 		this.testCaseId = testCaseId;
 		this.throughCaseId = throughCaseId;
+		this.rerunOfRunId = rerunOfRunId;
 	}
 
 	public static TestRun start(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt) {
-		return new TestRun(suite, environment, trigger, startedAt, null, null, null);
+		return new TestRun(suite, environment, trigger, startedAt, null, null, null, null);
 	}
 
 	/**
@@ -114,7 +118,7 @@ public class TestRun extends BaseEntity {
 	 */
 	public static TestRun start(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt,
 			Long triggeredBy) {
-		return new TestRun(suite, environment, trigger, startedAt, triggeredBy, null, null);
+		return new TestRun(suite, environment, trigger, startedAt, triggeredBy, null, null, null);
 	}
 
 	/**
@@ -124,7 +128,7 @@ public class TestRun extends BaseEntity {
 	public static TestRun startCase(TestCase testCase, Environment environment, Trigger trigger, Instant startedAt,
 			Long triggeredBy) {
 		return new TestRun(testCase.getSuite(), environment, trigger, startedAt, triggeredBy,
-				Objects.requireNonNull(testCase.getId(), "testCase.id"), null);
+				Objects.requireNonNull(testCase.getId(), "testCase.id"), null, null);
 	}
 
 	/**
@@ -134,7 +138,19 @@ public class TestRun extends BaseEntity {
 	public static TestRun startThrough(TestCase through, Environment environment, Trigger trigger, Instant startedAt,
 			Long triggeredBy) {
 		return new TestRun(through.getSuite(), environment, trigger, startedAt, triggeredBy, null,
-				Objects.requireNonNull(through.getId(), "through.id"));
+				Objects.requireNonNull(through.getId(), "through.id"), null);
+	}
+
+	/**
+	 * 실패 다시 실행. 원래 실행과 같은 스위트·환경의 수동 실행으로 기록하되 원래 실행을 남겨 스위트 전체 실행과 구분
+	 * @param original 다시 실행할 실행 (끝난 실행)
+	 */
+	public static TestRun startRerun(TestRun original, Instant startedAt, Long triggeredBy) {
+		if (original.status == Status.RUNNING) {
+			throw new IllegalStateException("run " + original.getId() + " is still running");
+		}
+		return new TestRun(original.suite, original.environment, Trigger.MANUAL, startedAt, triggeredBy, null, null,
+				Objects.requireNonNull(original.getId(), "original.id"));
 	}
 
 	/** 케이스 단건 실행 여부 */
@@ -145,6 +161,16 @@ public class TestRun extends BaseEntity {
 	/** 여기까지 실행 여부 */
 	public boolean isThroughCase() {
 		return throughCaseId != null;
+	}
+
+	/** 실패 다시 실행 여부 */
+	public boolean isRerun() {
+		return rerunOfRunId != null;
+	}
+
+	/** 스위트 전체 실행 여부. 일부 케이스만 실행한 기록(단건·여기까지·실패 다시 실행)은 스위트 집계·직전 실행 비교에서 제외 */
+	public boolean isWholeSuite() {
+		return !isSingleCase() && !isThroughCase() && !isRerun();
 	}
 
 	/** 실행할 케이스 수 기록. 실행 시작 시 호출 */

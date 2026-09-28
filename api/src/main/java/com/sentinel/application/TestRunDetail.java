@@ -3,6 +3,7 @@ package com.sentinel.application;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.sentinel.application.drift.ResultDrift;
 import com.sentinel.application.drift.SchemaDriftService;
@@ -22,11 +23,12 @@ import com.sentinel.runner.schema.ResponseSchema;
  * @param canceledBy 실행을 중지한 사용자. 중지된 실행이 아니면 null (중지 시각은 finishedAt)
  * @param plannedCount 실행할 케이스 수. 진행 중이면 results 수와 비교해 진행률 표시. 이전 실행은 null
  * @param previousRun 비교 기준인 직전 실행 (같은 스위트·환경의 완료된 스위트 전체 실행). 없거나 스위트 전체 실행이 아니면 null
+ * @param rerunOf 실패 다시 실행의 원래 실행 ID. 그 외 실행은 null
  */
 public record TestRunDetail(long id, long suiteId, String suiteName, long environmentId, String environmentName,
 		TestRun.Trigger trigger, TestRun.Status status, Instant startedAt, Instant finishedAt, Summary summary,
 		List<Result> results, IdName triggeredBy, IdName canceledBy, Instant rawPurgedAt, IdName testCase,
-		IdName throughCase, Integer plannedCount, PreviousRun previousRun) {
+		IdName throughCase, Integer plannedCount, PreviousRun previousRun, Long rerunOf) {
 
 	/**
 	 * @param results 케이스가 함께 로딩된 결과. 트랜잭션 안에서 호출
@@ -35,18 +37,22 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 	 * @param throughCase 여기까지 실행의 마지막 케이스. 그 외 실행은 null
 	 * @param drifts 결과 ID별 구조 변화 ({@link SchemaDriftService})
 	 * @param previous 직전 실행과 그 실행의 케이스별 판정. 비교하지 않으면 null
+	 * @param rerunTargets 실패 다시 실행이면 원래 실행에서 실패·오류가 난 케이스. 그 외 실행은 null
 	 */
 	static TestRunDetail of(TestRun run, List<TestResult> results, IdName triggeredBy, IdName canceledBy,
-			IdName testCase, IdName throughCase, Map<Long, ResultDrift> drifts, Previous previous) {
+			IdName testCase, IdName throughCase, Map<Long, ResultDrift> drifts, Previous previous,
+			Set<Long> rerunTargets) {
 		List<Result> mapped = results.stream()
 			.map(result -> Result.of(result, drifts.get(result.getId()),
-					previous == null ? null : Change.of(previous.verdicts(), result)))
+					previous == null ? null : Change.of(previous.verdicts(), result),
+					rerunTargets != null && !rerunTargets.contains(result.getTestCase().getId())))
 			.toList();
 		return new TestRunDetail(run.getId(), run.getSuite().getId(), run.getSuite().getName(),
 				run.getEnvironment().getId(), run.getEnvironment().getName(), run.getTrigger(), run.getStatus(),
 				run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped, triggeredBy, canceledBy,
 				run.getRawPurgedAt(),
-				testCase, throughCase, run.getPlannedCount(), previous == null ? null : previous.run());
+				testCase, throughCase, run.getPlannedCount(), previous == null ? null : previous.run(),
+				run.getRerunOfRunId());
 	}
 
 	/**
@@ -114,13 +120,16 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 	/**
 	 * @param responseSchema 응답 JSON의 구조 지문. 원문 보관기간이 지나도 유지. JSON이 아닌 응답·응답 없음은 null
 	 * @param drift 이전 실행 대비 구조 변화. 지문이 없으면 null
-	 * @param change 직전 실행 대비 판정 변화. 비교하지 않는 실행(직전 실행 없음, 단건·여기까지 실행)은 null
+	 * @param change 직전 실행 대비 판정 변화. 비교하지 않는 실행(직전 실행 없음, 단건·여기까지·실패 다시 실행)은 null
+	 * @param supporting 실패 다시 실행에서 원래 실행에 실패하지 않았지만 다시 실행하는 케이스가 쓰는 추출 값을 만들기 위해
+	 *     함께 실행한 케이스. 그 외는 false
 	 */
 	public record Result(long id, long testCaseId, String testCaseName, Verdict verdict, Outcome outcome,
 			List<AssertionResult> assertionResults, ErrorReason errorReason, String errorMessage, Long elapsedMs,
-			Request request, Response response, ResponseSchema responseSchema, ResultDrift drift, Change change) {
+			Request request, Response response, ResponseSchema responseSchema, ResultDrift drift, Change change,
+			boolean supporting) {
 
-		static Result of(TestResult result, ResultDrift drift, Change change) {
+		static Result of(TestResult result, ResultDrift drift, Change change, boolean supporting) {
 			Response response = result.getOutcome() == Outcome.RESPONDED
 					? new Response(result.getStatusCode(), result.getResponseHeaders(), result.getResponseBody(),
 							result.isResponseBodyTruncated())
@@ -130,7 +139,7 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 					result.getAssertionResults(), result.getErrorReason(), result.getErrorMessage(), result.getElapsedMs(),
 					new Request(result.getRequestMethod(), result.getRequestUrl(), result.getRequestHeaders(),
 							result.getRequestBody()),
-					response, result.getResponseSchema(), drift, change);
+					response, result.getResponseSchema(), drift, change, supporting);
 		}
 
 	}

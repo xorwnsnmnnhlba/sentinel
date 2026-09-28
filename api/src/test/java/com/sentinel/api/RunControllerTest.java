@@ -1,5 +1,7 @@
 package com.sentinel.api;
 
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import com.jayway.jsonpath.JsonPath;
@@ -115,6 +117,43 @@ class RunControllerTest {
 	}
 
 	@Test
+	void rerunsTheFailedCasesOfARunAndListsIt() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/ok", null, null);
+		fixtures.testCase(suite, HttpMethod.GET, "/broken", null, null);
+		executor.respondStatus(request -> request.uri().getPath().equals("/broken") ? 500 : 200);
+		long original = id(createRun("{\"suiteId\": %d, \"environmentId\": %d}".formatted(suite.getId(),
+				environment.getId())));
+		executor.reset();
+
+		MvcTestResult rerun = createRun("{\"rerunOf\": %d}".formatted(original));
+
+		assertThat(rerun).hasStatus(HttpStatus.ACCEPTED);
+		assertThat(rerun.getResponse().getHeader("Location")).isEqualTo("/api/runs/" + id(rerun));
+		var body = assertThat(rerun).bodyJson();
+		body.extractingPath("$.rerunOf").isEqualTo((int) original);
+		body.extractingPath("$.environmentId").isEqualTo(environment.getId().intValue());
+		body.extractingPath("$.plannedCount").isEqualTo(1);
+		body.extractingPath("$.results[0].supporting").isEqualTo(false);
+		assertThat(executor.requests()).extracting(request -> request.uri().getPath()).containsExactly("/broken");
+		var listed = assertThat(mvc.get().uri("/api/runs")).bodyJson();
+		listed.extractingPath("$.content[0].rerunOf").isEqualTo((int) original);
+		listed.extractingPath("$.content[1].rerunOf").isNull();
+
+		// 실패가 없는 실행(방금 다시 실행은 모두 통과)은 409
+		assertThat(createRun("{\"rerunOf\": %d}".formatted(id(rerun)))).hasStatus(HttpStatus.CONFLICT)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("test run " + id(rerun) + " has no failed cases to rerun");
+		assertThat(createRun("{\"rerunOf\": -1}")).hasStatus(HttpStatus.NOT_FOUND)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("test run -1 not found");
+	}
+
+	@Test
 	void requiresExactlyOneTarget() {
 		assertThat(createRun("{\"environmentId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST);
 		// package-private record의 @AssertTrue 검증 적용 여부. 미적용 시 스위트 실행으로 넘어가 404
@@ -128,6 +167,9 @@ class RunControllerTest {
 			.hasStatus(HttpStatus.BAD_REQUEST);
 		assertThat(createRun("{\"suiteId\": 1, \"throughCaseId\": 1, \"environmentId\": 1}"))
 			.hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(createRun("{\"suiteId\": 1, \"rerunOf\": 1}")).hasStatus(HttpStatus.BAD_REQUEST);
+		// 다시 실행은 원래 실행의 환경을 쓰므로 환경 지정 불가
+		assertThat(createRun("{\"rerunOf\": 1, \"environmentId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST);
 	}
 
 	@Test
@@ -163,6 +205,16 @@ class RunControllerTest {
 
 		assertThat(mvc.get().uri("/api/runs")).bodyJson().extractingPath("$.totalElements").isEqualTo(3);
 		assertThat(mvc.get().uri("/api/runs?suiteId=-1")).bodyJson().extractingPath("$.totalElements").isEqualTo(0);
+	}
+
+	private static long id(MvcTestResult result) {
+		try {
+			return ((Number) JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.id"))
+				.longValue();
+		}
+		catch (UnsupportedEncodingException ex) {
+			throw new IllegalStateException(ex);
+		}
 	}
 
 	private MvcTestResult createRun(String body) {

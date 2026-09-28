@@ -74,7 +74,7 @@ class RunController {
 	/**
 	 * 수동 실행 시작. 실행을 만들고 바로 202 + Location으로 응답 (본문은 그 시점의 실행, 보통 RUNNING).
 	 * 케이스 실행은 백그라운드에서 진행하므로 완료 여부는 {@code GET /api/runs/{id}}의 status로 확인.
-	 * 동시 수동 실행 한도에 도달하면 429
+	 * 동시 수동 실행 한도에 도달하면 429. 실패 다시 실행({@code rerunOf})은 원래 실행이 진행 중이거나 실패 케이스가 없으면 409
 	 */
 	@PostMapping
 	ResponseEntity<TestRunDetail> create(@Valid @RequestBody CreateRunRequest request) {
@@ -86,8 +86,11 @@ class RunController {
 		else if (request.caseId() != null) {
 			runId = testRunService.startTestCase(request.caseId(), request.environmentId(), triggeredBy);
 		}
-		else {
+		else if (request.throughCaseId() != null) {
 			runId = testRunService.startThroughCase(request.throughCaseId(), request.environmentId(), triggeredBy);
+		}
+		else {
+			runId = testRunService.startRerun(request.rerunOf(), triggeredBy);
 		}
 		return ResponseEntity.accepted()
 			.location(URI.create("/api/runs/" + runId))

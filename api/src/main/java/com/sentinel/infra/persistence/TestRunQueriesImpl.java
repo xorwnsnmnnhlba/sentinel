@@ -95,7 +95,7 @@ class TestRunQueriesImpl implements TestRunQueries {
 		return queries.selectFrom(run)
 			.where(run.id.in(JPAExpressions.select(latest.id.max())
 				.from(latest)
-				.where(latest.testCaseId.isNull(), latest.throughCaseId.isNull(),
+				.where(latest.testCaseId.isNull(), latest.throughCaseId.isNull(), latest.rerunOfRunId.isNull(),
 						latest.status.ne(TestRun.Status.CANCELED))
 				.groupBy(latest.suite.id)))
 			.fetch();
@@ -142,9 +142,9 @@ class TestRunQueriesImpl implements TestRunQueries {
 			.execute();
 	}
 
-	/** 스위트 전체 실행 (케이스 단건 실행·여기까지 실행 제외) */
+	/** 스위트 전체 실행 (케이스 단건 실행·여기까지 실행·실패 다시 실행 제외, {@link TestRun#isWholeSuite()}) */
 	private static BooleanExpression wholeSuite() {
-		return run.testCaseId.isNull().and(run.throughCaseId.isNull());
+		return run.testCaseId.isNull().and(run.throughCaseId.isNull()).and(run.rerunOfRunId.isNull());
 	}
 
 }
