@@ -35,7 +35,9 @@ public class TestRun extends BaseEntity {
 	public enum Status {
 		RUNNING, COMPLETED,
 		/** 실행 중 앱 종료로 중단. 재기동 시 기록 */
-		ABORTED
+		ABORTED,
+		/** 사용자가 중지. 진행 중이던 케이스까지 기록하고 이후 케이스는 보내지 않음 */
+		CANCELED
 	}
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -70,7 +72,7 @@ public class TestRun extends BaseEntity {
 	private Long throughCaseId;
 
 	/**
-	 * 판정별 결과 수. 결과를 저장할 때마다 {@link #countVerdict}로 올림.
+	 * 판정별 결과 수. 결과를 저장할 때마다 같은 트랜잭션에서 올림 ({@code TestRunRepository#incrementPassed} 등).
 	 * 실행 목록의 실패·오류 조건과 스위트 집계가 결과 테이블을 훑지 않도록 실행에 함께 보관
 	 */
 	@Column(nullable = false)
@@ -81,6 +83,9 @@ public class TestRun extends BaseEntity {
 
 	@Column(nullable = false)
 	private int errorCount;
+
+	/** 실행을 중지한 사용자 (V16). 중지된 실행만 값이 있음 */
+	private Long canceledBy;
 
 	/** 실행할 케이스 수 (V15). 진행 중 화면의 진행률 표시용. 이전 실행은 null */
 	private Integer plannedCount;
@@ -150,25 +155,6 @@ public class TestRun extends BaseEntity {
 		this.plannedCount = caseCount;
 	}
 
-	/** 결과 1건의 판정 반영. 결과 저장과 같은 트랜잭션에서 호출. 판정 없는 결과(null)는 세지 않음 */
-	public void countVerdict(TestResult.Verdict verdict) {
-		if (verdict == null) {
-			return;
-		}
-		switch (verdict) {
-			case PASSED -> passedCount++;
-			case FAILED -> failedCount++;
-			case ERROR -> errorCount++;
-		}
-	}
-
-	public void complete(Instant finishedAt) {
-		if (status != Status.RUNNING) {
-			throw new IllegalStateException("run " + getId() + " is already " + status);
-		}
-		this.status = Status.COMPLETED;
-		this.finishedAt = Objects.requireNonNull(finishedAt, "finishedAt");
-	}
 
 	/**
 	 * 결과 원문 정리 기록. 원문 자체는 {@code TestResultRepository#purgeRawByRunIds}가 일괄로 비움

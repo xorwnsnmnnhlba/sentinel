@@ -11,6 +11,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,7 +26,7 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 			Long environmentId, TestRun.Trigger trigger, TestRun.Status status, Long id, Limit limit);
 
 	/**
-	 * 기간 안에 시작한 스위트 전체 실행의 스위트별 합계 (케이스 단건 실행·여기까지 실행 제외). 실행 행의 판정 수(V10)만 사용.
+	 * 기간 안에 시작한 스위트 전체 실행의 스위트별 합계 (케이스 단건 실행·여기까지 실행·중지된 실행 제외). 실행 행의 판정 수(V10)만 사용.
 	 * 기간 조건은 {@code idx_run_time}
 	 */
 	@Query("""
@@ -36,6 +37,7 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 			where t.startedAt >= :from and t.startedAt < :to
 			  and t.testCaseId is null
 			  and t.throughCaseId is null
+			  and t.status <> com.sentinel.domain.TestRun.Status.CANCELED
 			group by t.suite.id
 			""")
 	List<SuiteRunTotals> summarizeBySuite(@Param("from") Instant from, @Param("to") Instant to);
@@ -58,13 +60,14 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 
 	/**
 	 * 스위트별 가장 최근 스위트 전체 실행. ID는 시작 순으로 증가하므로 최대 ID가 최근 실행
-	 * 케이스 단건 실행·여기까지 실행은 제외 (일부 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
+	 * 케이스 단건 실행·여기까지 실행·중지된 실행은 제외 (일부 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
 	 */
 	@Query("""
 			select t from TestRun t
 			where t.id in (
 			    select max(latest.id) from TestRun latest
 			    where latest.testCaseId is null and latest.throughCaseId is null
+			      and latest.status <> com.sentinel.domain.TestRun.Status.CANCELED
 			    group by latest.suite.id)
 			""")
 	List<TestRun> findLatestPerSuite();
@@ -86,6 +89,45 @@ public interface TestRunRepository extends JpaRepository<TestRun, Long>, JpaSpec
 	List<TestRun> findPreviousWholeRuns(@Param("suiteId") long suiteId, @Param("environmentId") long environmentId,
 			@Param("status") TestRun.Status status, @Param("startedAt") Instant startedAt, @Param("runId") long runId,
 			Limit limit);
+
+	/*
+	 * 진행 중 실행의 상태·판정 수 변경. 실행 스레드(판정 수·완료)와 중지 요청(상태)이 같은 행을 동시에 바꾸므로
+	 * 엔티티 전체를 다시 쓰지 않고 해당 컬럼만 갱신 (한쪽이 다른 쪽의 변경을 덮어쓰지 않도록)
+	 */
+
+	@Modifying
+	@Query("update TestRun t set t.passedCount = t.passedCount + 1 where t.id = :runId")
+	void incrementPassed(@Param("runId") long runId);
+
+	@Modifying
+	@Query("update TestRun t set t.failedCount = t.failedCount + 1 where t.id = :runId")
+	void incrementFailed(@Param("runId") long runId);
+
+	@Modifying
+	@Query("update TestRun t set t.errorCount = t.errorCount + 1 where t.id = :runId")
+	void incrementErrors(@Param("runId") long runId);
+
+	/** 진행 중이면 완료 처리 @return 갱신한 행 수. 그사이 중지됐으면 0 */
+	@Modifying
+	@Query("""
+			update TestRun t set t.status = com.sentinel.domain.TestRun.Status.COMPLETED, t.finishedAt = :finishedAt,
+			  t.updatedAt = :finishedAt
+			where t.id = :runId and t.status = com.sentinel.domain.TestRun.Status.RUNNING
+			""")
+	int completeIfRunning(@Param("runId") long runId, @Param("finishedAt") Instant finishedAt);
+
+	/** 진행 중이면 중지 처리 @return 갱신한 행 수. 이미 끝났으면 0 */
+	@Modifying
+	@Query("""
+			update TestRun t set t.status = com.sentinel.domain.TestRun.Status.CANCELED, t.finishedAt = :canceledAt,
+			  t.canceledBy = :canceledBy, t.updatedAt = :canceledAt
+			where t.id = :runId and t.status = com.sentinel.domain.TestRun.Status.RUNNING
+			""")
+	int cancelIfRunning(@Param("runId") long runId, @Param("canceledBy") long canceledBy,
+			@Param("canceledAt") Instant canceledAt);
+
+	@Query("select t.status from TestRun t where t.id = :runId")
+	TestRun.Status findStatus(@Param("runId") long runId);
 
 	/**
 	 * 원문 정리 대상. 원문이 남아 있고 {@code cutoff} 이전에 시작한 종료된 실행을 오래된 순으로 조회 ({@code idx_run_raw_purge})

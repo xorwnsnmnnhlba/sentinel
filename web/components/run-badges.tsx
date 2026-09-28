@@ -34,7 +34,12 @@ export function ThroughCaseBadge() {
   return <Badge variant="outline">여기까지</Badge>;
 }
 
-const statusLabel: Record<RunStatus, string> = { RUNNING: "실행 중", COMPLETED: "완료", ABORTED: "중단" };
+const statusLabel: Record<RunStatus, string> = {
+  RUNNING: "실행 중",
+  COMPLETED: "완료",
+  ABORTED: "중단",
+  CANCELED: "중지",
+};
 
 export function StatusBadge({ status }: { status: RunStatus }) {
   return <Badge variant={status === "COMPLETED" ? "secondary" : "outline"}>{statusLabel[status]}</Badge>;

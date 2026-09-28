@@ -11,10 +11,12 @@ import {
   VerdictBadge,
 } from "@/components/run-badges";
 import { DriftBadge, highestLevel } from "@/components/runs/drift";
+import { CancelRunButton } from "@/components/runs/cancel-run-button";
 import { ChangeBadge, ChangeSummary } from "@/components/runs/run-change";
 import { RunProgress } from "@/components/runs/run-progress";
 import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { cancelRun } from "@/lib/actions/catalog";
 import { apiGetOrNotFound } from "@/lib/api/server";
 import type { RunDetail } from "@/lib/api/types";
 import { formatDateTime, formatElapsed, formatRunDuration } from "@/lib/format";
@@ -51,12 +53,14 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
               <StatusBadge status={run.status} />
             </span>
           }
+          actions={run.status === "RUNNING" && <CancelRunButton action={cancelRun.bind(null, run.id)} />}
         />
         <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
           {run.testCase && <Meta label="케이스" value={run.testCase.name} />}
           {run.throughCase && <Meta label="마지막 케이스" value={run.throughCase.name} />}
           <Meta label="환경" value={run.environmentName} />
           {run.triggeredBy && <Meta label="실행" value={run.triggeredBy.name} />}
+          {run.canceledBy && <Meta label="중지" value={run.canceledBy.name} />}
           <Meta label="시작" value={formatDateTime(run.startedAt)} />
           <Meta label="소요" value={formatRunDuration(run.startedAt, run.finishedAt)} />
         </dl>
@@ -64,7 +68,18 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
         {run.status === "RUNNING" ? (
           <RunProgress done={run.results.length} planned={run.plannedCount} />
         ) : (
-          <ChangeSummary run={run} />
+          <>
+            {run.status === "CANCELED" && (
+              <p className="text-sm">
+                중지됨 ·{" "}
+                {run.plannedCount === null
+                  ? `${run.results.length}건 실행`
+                  : `${run.plannedCount}건 중 ${run.results.length}건 실행`}
+                . 남은 케이스는 보내지 않았습니다
+              </p>
+            )}
+            <ChangeSummary run={run} />
+          </>
         )}
       </div>
 

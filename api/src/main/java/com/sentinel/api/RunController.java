@@ -3,6 +3,7 @@ package com.sentinel.api;
 import java.net.URI;
 import java.time.LocalDate;
 
+import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.PageResponse;
 import com.sentinel.application.RunFilter;
 import com.sentinel.application.RunQueryService;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -53,6 +55,19 @@ class RunController {
 
 	@GetMapping("/{runId}")
 	TestRunDetail get(@PathVariable long runId) {
+		return testRunService.getRun(runId);
+	}
+
+	/**
+	 * 진행 중인 실행 중지 ({@code {"status": "CANCELED"}}). 진행 중이던 케이스는 끝까지 기록하고 이후 케이스는 보내지 않음.
+	 * 이미 끝난 실행은 409, CANCELED 외 상태는 400
+	 */
+	@PatchMapping("/{runId}")
+	TestRunDetail update(@PathVariable long runId, @Valid @RequestBody UpdateRunRequest request) {
+		if (request.status() != TestRun.Status.CANCELED) {
+			throw new InvalidRequestException("only status CANCELED is supported");
+		}
+		testRunService.cancel(runId, currentUser.get().id());
 		return testRunService.getRun(runId);
 	}
 

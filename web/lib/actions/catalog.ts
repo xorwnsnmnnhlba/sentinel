@@ -292,6 +292,24 @@ export async function runThroughCase(caseId: number, _: ActionState, form: FormD
   return startRun({ throughCaseId: id(caseId) }, form);
 }
 
+/**
+ * 진행 중인 실행 중지. 진행 중이던 케이스는 끝까지 기록되고 이후 케이스는 보내지 않음. 성공 시 결과 화면 재조회
+ */
+export async function cancelRun(runId: number): Promise<ActionState> {
+  try {
+    await apiSend<RunDetail>("PATCH", `/api/runs/${id(runId)}`, { status: "CANCELED" });
+  } catch (error) {
+    // 이름 중복이 아닌, 그사이 실행이 끝난 경우. 화면을 다시 받아 끝난 결과를 표시
+    if (isApiError(error) && error.status === 409) {
+      refresh();
+      return { error: "이미 끝난 실행입니다" };
+    }
+    return failure(error);
+  }
+  refresh();
+  return {};
+}
+
 /** 실행이 끝나면 결과 상세로 이동 */
 async function startRun(
   target: { suiteId: number } | { caseId: number } | { throughCaseId: number },
