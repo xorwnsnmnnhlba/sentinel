@@ -371,7 +371,7 @@ curl -i -X POST localhost:8080/api/runs \
   - 등록은 201 + `Location`, 본문은 단건 조회와 같은 형태. 수정은 200 + 수정 후 항목
   - `PATCH`는 부분 수정. 생략(null)한 필드는 유지, `description`은 빈 문자열로 제거
   - 환경 `variables`, 케이스 `request`·`assertions`·`extractors`는 지정 시 전체 교체. `assertions: []`는 기본 판정(2xx)으로 복귀
-  - 스위트 `caseOrder`: 케이스 실행 순서. 스위트의 사용 중인 케이스 ID 전체를 실행할 순서대로 (예: `{"caseOrder": [12, 10, 11]}`). 새 케이스는 마지막 순서로 등록
+  - 스위트 `caseOrder`: 케이스 실행 순서. 스위트의 사용 중인 케이스 ID 전체를 실행할 순서대로 (예: `{"caseOrder": [12, 10, 11]}`). 새 케이스는 마지막 순서로 등록 (케이스 등록의 `afterCaseId`를 지정하면 그 케이스 바로 뒤)
     - 목록이 스위트의 현재 케이스와 다르면(그사이 추가·삭제) 409, 같은 ID 중복·`null`은 400. 거부 시 함께 보낸 이름·설명 변경도 반영하지 않음
   - 같은 부모 아래 사용 중인 이름과 중복 시 409 (프로젝트는 전체에서 유일). 앞뒤 공백은 제거 후 비교
   - 잘못된 값(빈 이름, 길이 초과, 잘못된 `baseUrl`·경로·메서드·판정 규칙·추출 규칙)은 400, 미존재·보관된 부모는 404
@@ -383,6 +383,8 @@ curl -i -X POST localhost:8080/api/runs \
 | 환경 | `{"projectId": 1, "name": "dev", "baseUrl": "https://gw.dev.internal", "variables": {"userId": "42"}, "secrets": {"token": "..."}}` |
 | 스위트 | `{"projectId": 1, "name": "smoke", "description": null}` |
 | 케이스 | `{"suiteId": 1, "name": "결제 내역 조회", "request": {"method": "GET", "path": "/billing/v1/history?userId={{userId}}", "headers": {"Accept": ["application/json"]}, "body": null}, "assertions": [{"type": "statusCode", "anyOf": ["200"]}]}` |
+
+- 케이스 등록의 `afterCaseId`(선택): 같은 스위트의 그 케이스 바로 뒤 실행 순서로 등록하고 뒤 케이스 순서를 한 칸씩 밈. 다른 스위트의 케이스면 400, 없거나 삭제된 케이스면 404. 생략 시 마지막 (화면의 케이스 복제가 원본 바로 뒤에 두는 데 사용)
 
 ### 응답시간 추세
 

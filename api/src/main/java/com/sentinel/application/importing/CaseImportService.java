@@ -91,7 +91,7 @@ public class CaseImportService {
 			}
 			try {
 				created.add(commands.createCase(suiteId, newCase.name(), newCase.request(), newCase.assertions(), null,
-						actorId));
+						null, actorId));
 			}
 			catch (InvalidRequestException ex) {
 				throw new InvalidRequestException("cases[" + index + "] '" + newCase.name() + "': " + ex.getMessage());

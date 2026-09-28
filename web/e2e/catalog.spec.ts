@@ -426,11 +426,12 @@ test("케이스를 복제하면 같은 요청·판정 규칙으로 새 케이스
   await expect(page.getByLabel("헤더 1 값")).toHaveValue("Bearer {{token}}");
   await expect(page.getByLabel("판정 규칙 1 포함할 문자열")).toHaveValue(project);
 
-  // 원본은 그대로, 스위트에 복제본이 추가됨
+  // 원본은 그대로, 복제본은 원본 바로 다음 순서로 추가됨
   await page.getByRole("link", { name: suite }).click();
   const cases = page.getByRole("table", { name: "케이스 목록" });
-  await expect(cases.getByRole("link", { name: "프로젝트 목록 조회", exact: true })).toBeVisible();
   await expect(cases.getByRole("link", { name: "프로젝트 목록 조회 (복사)" })).toBeVisible();
+  const names = await cases.getByRole("link").allTextContents();
+  expect(names[names.indexOf("프로젝트 목록 조회") + 1]).toBe("프로젝트 목록 조회 (복사)");
 });
 
 test("환경을 복제하면 기본 URL·변수를 채운 등록 창이 열리고 시크릿은 다시 입력", async ({ page }) => {
