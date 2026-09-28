@@ -2,6 +2,7 @@ package com.sentinel.application;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -220,20 +221,47 @@ public class CatalogCommandService {
 	}
 
 	/**
-	 * 새 케이스는 스위트의 마지막 실행 순서
+	 * 새 케이스는 스위트의 마지막 실행 순서. afterCaseId를 지정하면 그 케이스 바로 뒤 (복제본을 원본 옆에 두기 위함)
 	 * @param assertions null 또는 빈 목록이면 기본 판정(status in [2xx])
 	 * @param extractors 응답 값 추출 규칙. null이면 없음
+	 * @param afterCaseId 바로 앞에 둘 케이스. 같은 스위트의 사용 중인 케이스. null이면 마지막
+	 * @throws NotFoundException afterCaseId 케이스 미존재·삭제
+	 * @throws InvalidRequestException afterCaseId가 다른 스위트의 케이스
 	 */
 	public CaseItem createCase(long suiteId, String name, Request request, List<Assertion> assertions,
-			List<Extractor> extractors, long actorId) {
+			List<Extractor> extractors, Long afterCaseId, long actorId) {
 		TestSuite suite = findSuite(suiteId);
+		TestCase after = afterCaseId == null ? null : findCaseIn(suiteId, afterCaseId);
 		requireUnusedName("test case", name, null,
 				unique -> testCases.findBySuiteIdAndNameAndArchivedAtIsNull(suiteId, unique));
 		TestCase testCase = valid(() -> new TestCase(suite, name, specOf(request), assertions, extractors));
 		testCase.placeAt(testCases.findMaxRunOrder(suiteId) + 1);
 		testCases.save(testCase);
+		if (after != null) {
+			placeAfter(suiteId, testCase, after);
+		}
+		// 뒤 케이스들의 순서가 밀리는 것은 등록에 따른 결과라 스위트 실행 순서 변경으로 따로 기록하지 않음
 		changeLog.record(actorId, target(testCase), Action.CREATED);
 		return CaseItem.of(testCase);
+	}
+
+	private TestCase findCaseIn(long suiteId, long caseId) {
+		TestCase found = testCases.findByIdAndArchivedAtIsNull(caseId)
+			.orElseThrow(() -> new NotFoundException("test case", caseId));
+		if (found.getSuite().getId() != suiteId) {
+			throw new InvalidRequestException("afterCaseId " + caseId + " is not a case of test suite " + suiteId);
+		}
+		return found;
+	}
+
+	/** 새 케이스를 after 바로 뒤로 옮기고 스위트 실행 순서를 1부터 다시 매김 */
+	private void placeAfter(long suiteId, TestCase created, TestCase after) {
+		List<TestCase> ordered = new ArrayList<>(testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId));
+		ordered.remove(created);
+		ordered.add(ordered.indexOf(after) + 1, created);
+		for (int i = 0; i < ordered.size(); i++) {
+			ordered.get(i).placeAt(i + 1);
+		}
 	}
 
 	/**

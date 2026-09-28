@@ -46,7 +46,7 @@ class CaseController {
 	@PostMapping
 	ResponseEntity<CaseItem> create(@Valid @RequestBody CreateCaseRequest request) {
 		CaseItem created = commands.createCase(request.suiteId(), request.name(), request.request(), request.assertions(),
-				request.extractors(), currentUser.get().id());
+				request.extractors(), request.afterCaseId(), currentUser.get().id());
 		return ResponseEntity.created(URI.create("/api/cases/" + created.id())).body(created);
 	}
 

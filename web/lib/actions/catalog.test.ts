@@ -510,7 +510,7 @@ describe("duplicateCase", () => {
     );
   }
 
-  it("copies the request, rules and extractors into the same suite under a free name and opens the copy", async () => {
+  it("copies the request, rules and extractors right after the original under a free name and opens the copy", async () => {
     existing(["주문 조회", "주문 조회 (복사)"]);
     const bodies = capture("post", "/api/cases", () => HttpResponse.json({ id: 20 }, { status: 201 }));
 
@@ -522,6 +522,7 @@ describe("duplicateCase", () => {
         request: original.request,
         assertions: original.assertions,
         extractors: original.extractors,
+        afterCaseId: 7,
       },
     ]);
   });

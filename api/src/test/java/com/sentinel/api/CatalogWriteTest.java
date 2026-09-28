@@ -289,6 +289,46 @@ class CatalogWriteTest {
 	}
 
 	@Test
+	void placesANewCaseRightAfterTheGivenCase() {
+		TestSuite suite = fixtures.suite(fixtures.project());
+		long a = createCase(suite, "a");
+		long b = createCase(suite, "b");
+		long c = createCase(suite, "c");
+
+		MvcTestResult copy = post("/api/cases", """
+				{"suiteId": %d, "name": "a (copy)", "request": {"method": "GET", "path": "/a"}, "afterCaseId": %d}"""
+			.formatted(suite.getId(), a));
+		// 마지막 케이스 뒤도 가능
+		MvcTestResult last = post("/api/cases", """
+				{"suiteId": %d, "name": "c (copy)", "request": {"method": "GET", "path": "/c"}, "afterCaseId": %d}"""
+			.formatted(suite.getId(), c));
+
+		assertThat(copy).hasStatus(HttpStatus.CREATED);
+		assertThat(mvc.get().uri("/api/cases?suiteId={id}", suite.getId())).bodyJson()
+			.extractingPath("$[*].id")
+			.isEqualTo(List.of((int) a, (int) idOf(copy), (int) b, (int) c, (int) idOf(last)));
+	}
+
+	@Test
+	void rejectsPlacingAfterACaseOfAnotherSuiteOrAMissingOne() {
+		Project project = fixtures.project();
+		TestSuite suite = fixtures.suite(project);
+		long other = createCase(fixtures.suite(project), "other");
+		String json = """
+				{"suiteId": %d, "name": "x", "request": {"method": "GET", "path": "/x"}, "afterCaseId": %d}""";
+
+		assertThat(post("/api/cases", json.formatted(suite.getId(), other))).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.asString()
+			.contains("is not a case of test suite");
+		assertThat(post("/api/cases", json.formatted(suite.getId(), -1))).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(mvc.get().uri("/api/cases?suiteId={id}", suite.getId())).bodyJson()
+			.extractingPath("$.length()")
+			.isEqualTo(0);
+	}
+
+	@Test
 	void rejectsCaseOrdersThatDoNotMatchTheCurrentCases() {
 		Project project = fixtures.project();
 		TestSuite suite = fixtures.suite(project);
@@ -431,6 +471,11 @@ class CatalogWriteTest {
 	private long createCase(TestSuite suite, String name) {
 		String location = post("/api/cases", caseJson(suite.getId(), name, """
 				{"method": "GET", "path": "/%s"}""".formatted(name))).getResponse().getHeader("Location");
+		return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
+	}
+
+	private static long idOf(MvcTestResult created) {
+		String location = created.getResponse().getHeader("Location");
 		return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
 	}
 
