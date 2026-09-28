@@ -349,7 +349,7 @@ curl -i -X POST localhost:8080/api/runs \
 | 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | `POST /api/projects`, `PATCH /api/projects/{id}` | `DELETE /api/projects/{id}` |
 | 환경 | `GET /api/environments?projectId=` | `GET /api/environments/{id}` | `POST /api/environments`, `PATCH /api/environments/{id}` | `DELETE /api/environments/{id}` |
 | 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | `POST /api/suites`, `PATCH /api/suites/{id}` | `DELETE /api/suites/{id}` |
-| 케이스 | `GET /api/cases?suiteId=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
+| 케이스 | `GET /api/cases?suiteId=&q=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
 | 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&failing=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs`, `PATCH /api/runs/{id}`(중지) | |
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
 | 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
@@ -358,6 +358,7 @@ curl -i -X POST localhost:8080/api/runs \
 | 스위트 요약 | `GET /api/suite-summaries?from=&to=` | | | |
 | 변경 이력 | `GET /api/change-logs?targetType=&targetId=&projectId=&suiteId=&page=0&size=20` | | | |
 
+- 케이스 검색 `q`: 이름·경로 부분 일치 (대소문자 무시, 앞뒤 공백 제거, `%`·`_`는 문자 그대로). 스위트별 실행 순서, 최대 100건. `suiteId`와 함께 쓰면 그 스위트 안에서만. 빈 검색어·200자 초과는 400
 - 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
 - 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
 - 스위트는 `caseCount`, 케이스는 요청 정의(`request`)와 판정 규칙(`assertions`)·응답 값 추출(`extractors`), 환경은 `baseUrl`과 변수 포함

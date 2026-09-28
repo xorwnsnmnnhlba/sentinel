@@ -8,6 +8,7 @@ import { CaseOrderFields } from "@/components/catalog/case-order-fields";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
+import { MethodBadge } from "@/components/catalog/method-badge";
 import { caseMenu, EDIT_DELETE, withHistory } from "@/components/catalog/menu-items";
 import { RunCaseFields } from "@/components/catalog/run-case-fields";
 import { RunSuiteForm } from "@/components/catalog/run-suite-form";
@@ -15,7 +16,6 @@ import { ScheduleFields } from "@/components/catalog/schedule-fields";
 import { ScheduleToggle } from "@/components/catalog/schedule-toggle";
 import { Empty, SectionHeader, TableFrame } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -332,9 +332,4 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
       />
     </div>
   );
-}
-
-/** HTTP 메서드. 보라 계열 옅은 바탕 (DESIGN.md --brand-violet-soft) */
-function MethodBadge({ method }: { method: string }) {
-  return <Badge className="shrink-0 rounded-sm bg-brand-violet-soft font-mono text-brand-violet-deep">{method}</Badge>;
 }

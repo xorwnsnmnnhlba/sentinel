@@ -83,6 +83,7 @@ for (const colorScheme of ["light", "dark"] as const) {
         "/runs",
         `/runs/${ids.failingRun}`,
         "/change-logs",
+        "/search?q=invites",
         `/change-logs?targetType=CASE&targetId=${ids.passingCase}`,
         "/users",
         "/settings/password",
