@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { ChangeLogItem } from "@/lib/api/types";
 
-import { actionLabel, fieldLabel, historyHref, isTargetType, projectHistoryHref, targetHref } from "./change-log";
+import {
+  actionLabel,
+  fieldLabel,
+  historyHref,
+  isTargetType,
+  projectHistoryHref,
+  suiteHistoryHref,
+  targetHref,
+} from "./change-log";
 
 function log(patch: Partial<ChangeLogItem>): ChangeLogItem {
   return {
@@ -13,6 +21,7 @@ function log(patch: Partial<ChangeLogItem>): ChangeLogItem {
     targetId: 7,
     targetName: "health",
     projectId: 3,
+    suiteId: 5,
     action: "UPDATED",
     fields: [],
     ...patch,
@@ -64,6 +73,7 @@ describe("history links", () => {
   it("builds filtered change log addresses", () => {
     expect(historyHref("CASE", 7)).toBe("/change-logs?targetType=CASE&targetId=7");
     expect(projectHistoryHref(3)).toBe("/change-logs?projectId=3");
+    expect(suiteHistoryHref(5)).toBe("/change-logs?suiteId=5");
   });
 
   it("accepts only known target types", () => {

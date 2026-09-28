@@ -337,12 +337,12 @@ public class CatalogCommandService {
 	}
 
 	private static Target target(TestSuite suite) {
-		return new Target(TargetType.SUITE, suite.getId(), suite.getName(), suite.getProject().getId());
+		return new Target(TargetType.SUITE, suite.getId(), suite.getName(), suite.getProject().getId(), suite.getId());
 	}
 
 	private static Target target(TestCase testCase) {
 		return new Target(TargetType.CASE, testCase.getId(), testCase.getName(),
-				testCase.getSuite().getProject().getId());
+				testCase.getSuite().getProject().getId(), testCase.getSuite().getId());
 	}
 
 	/**

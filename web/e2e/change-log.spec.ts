@@ -93,3 +93,17 @@ test("환경 변수를 바꾸면 값 없이 변수 이름만 남고 프로젝트
   expect(await page.content()).not.toContain("user-value-after");
   expect(await page.content()).not.toContain("user-value-before");
 });
+
+test("스위트의 변경 이력에는 소속 케이스 변경도 함께 표시", async ({ page }) => {
+  await page.goto(`/projects/${projectId}`);
+  await expect(page.getByRole("heading", { name: projectName, level: 1 })).toBeVisible();
+  await chooseAction(page, "스위트 smoke 작업", "변경 이력");
+
+  await expect(page.getByRole("heading", { name: "변경 이력", level: 1 })).toBeVisible();
+  await expect(page.getByText(/스위트\s*smoke\s*및 소속 케이스·스케줄의 변경 이력만 표시 중/)).toBeVisible();
+  const table = page.getByRole("table", { name: "변경 이력" });
+  // 앞 테스트에서 이름을 바꾼 케이스와 스위트 등록 (프로젝트·환경 기록은 제외)
+  await expect(table.getByRole("row", { name: /health check/ })).toContainText("수정");
+  await expect(table.getByRole("row", { name: /스위트/ })).toContainText("등록");
+  await expect(table.getByRole("row")).toHaveCount(4);
+});

@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { apiGet } from "@/lib/api/server";
-import type { ChangeAction, ChangeLogItem, ChangeTargetType, Page, ProjectItem } from "@/lib/api/types";
+import { apiGet, isApiError } from "@/lib/api/server";
+import type { ChangeAction, ChangeLogItem, ChangeTargetType, Page, ProjectItem, SuiteItem } from "@/lib/api/types";
 import { actionLabel, fieldLabel, isTargetType, TARGET_LABELS, TARGET_TYPES, targetHref } from "@/lib/change-log";
 import { formatDateTime } from "@/lib/format";
 
@@ -15,7 +15,7 @@ const PAGE_SIZE = 20;
 
 export const metadata = { title: "변경 이력 · Sentinel" };
 
-type Filters = { projectId?: string; targetType?: ChangeTargetType; targetId?: string };
+type Filters = { projectId?: string; suiteId?: string; targetType?: ChangeTargetType; targetId?: string };
 
 const actionStyle: Record<ChangeAction, string> = {
   CREATED: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
@@ -25,6 +25,7 @@ const actionStyle: Record<ChangeAction, string> = {
 
 /**
  * 설정 변경 이력. 최신순, 프로젝트·대상 종류로 좁히거나 항목 화면의 "변경 이력"에서 항목 1건만 표시
+ * 스위트의 "변경 이력"은 스위트와 소속 케이스·스케줄을 함께 표시
  * 값은 남기지 않으므로 바뀐 항목 이름만 표시
  */
 export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
@@ -33,17 +34,20 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
   const targetType = single(searchParams.targetType);
   const filters: Filters = {
     projectId: numeric(single(searchParams.projectId)),
+    suiteId: numeric(single(searchParams.suiteId)),
     targetType: isTargetType(targetType) ? targetType : undefined,
     targetId: isTargetType(targetType) ? numeric(single(searchParams.targetId)) : undefined,
   };
   const scoped = filters.targetType !== undefined && filters.targetId !== undefined;
+  const suiteScoped = !scoped && filters.suiteId !== undefined;
   const hasFilter = Object.values(filters).some((value) => value);
 
   const query = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
   appendFilters(query, filters);
-  const [logs, projects] = await Promise.all([
+  const [logs, projects, suite] = await Promise.all([
     apiGet<Page<ChangeLogItem>>(`/api/change-logs?${query}`),
     apiGet<ProjectItem[]>("/api/projects"),
+    suiteScoped ? suiteOrNull(filters.suiteId!) : null,
   ]);
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
 
@@ -56,13 +60,25 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
         } ${logs.totalElements}건`}
       />
 
-      {scoped ? (
+      {scoped || suiteScoped ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4 text-sm">
-          <p>
-            {TARGET_LABELS[filters.targetType!]}{" "}
-            <span className="font-medium">{logs.content[0]?.targetName ?? `#${filters.targetId}`}</span>의 변경 이력만
-            표시 중
-          </p>
+          {scoped ? (
+            <p>
+              {TARGET_LABELS[filters.targetType!]}{" "}
+              <span className="font-medium">{logs.content[0]?.targetName ?? `#${filters.targetId}`}</span>의 변경 이력만
+              표시 중
+            </p>
+          ) : (
+            <p>
+              스위트{" "}
+              <span className="font-medium">
+                {suite?.name ??
+                  logs.content.find((log) => log.targetType === "SUITE")?.targetName ??
+                  `#${filters.suiteId}`}
+              </span>{" "}
+              및 소속 케이스·스케줄의 변경 이력만 표시 중
+            </p>
+          )}
           <Button asChild variant="outline" size="sm">
             <Link href="/change-logs">전체 보기</Link>
           </Button>
@@ -178,6 +194,18 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
       )}
     </div>
   );
+}
+
+/** 스위트 이름 표시용. 삭제(보관)된 스위트는 조회되지 않으므로 null (이력의 이름으로 대신 표시) */
+async function suiteOrNull(suiteId: string): Promise<SuiteItem | null> {
+  try {
+    return await apiGet<SuiteItem>(`/api/suites/${suiteId}`);
+  } catch (error) {
+    if (isApiError(error) && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function single(value: string | string[] | undefined): string | undefined {

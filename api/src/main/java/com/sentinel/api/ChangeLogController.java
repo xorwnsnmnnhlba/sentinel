@@ -25,12 +25,14 @@ class ChangeLogController {
 	 *
 	 * @param targetType targetId와 함께 지정하면 항목 1건의 이력
 	 * @param projectId 프로젝트와 그 안의 환경·스위트·케이스·스케줄 이력
+	 * @param suiteId 스위트와 그 안의 케이스·스케줄 이력
 	 */
 	@GetMapping
 	PageResponse<ChangeLogItem> list(@RequestParam(required = false) ChangeLog.TargetType targetType,
 			@RequestParam(required = false) Long targetId, @RequestParam(required = false) Long projectId,
-			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-		return changeLogs.list(new ChangeLogService.Filter(targetType, targetId, projectId), page, size);
+			@RequestParam(required = false) Long suiteId, @RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "20") int size) {
+		return changeLogs.list(new ChangeLogService.Filter(targetType, targetId, projectId, suiteId), page, size);
 	}
 
 }

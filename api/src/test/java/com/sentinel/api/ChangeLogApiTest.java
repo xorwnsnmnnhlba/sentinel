@@ -169,6 +169,31 @@ class ChangeLogApiTest {
 	}
 
 	@Test
+	void filtersBySuiteIncludingItsCasesAndSchedules() {
+		long project = id(post("/api/projects", "{\"name\": \"billing\"}"));
+		long environment = id(post("/api/environments", """
+				{"projectId": %d, "name": "dev", "baseUrl": "https://gw.dev.internal"}""".formatted(project)));
+		long smoke = id(post("/api/suites", "{\"projectId\": %d, \"name\": \"smoke\"}".formatted(project)));
+		long other = id(post("/api/suites", "{\"projectId\": %d, \"name\": \"other\"}".formatted(project)));
+		long health = createCase(smoke, "health");
+		createCase(other, "elsewhere");
+		post("/api/schedules", """
+				{"suiteId": %d, "environmentId": %d, "cron": "0 9 * * *"}""".formatted(smoke, environment));
+		patch("/api/cases/" + health, "{\"name\": \"health check\"}");
+
+		String logs = logs("suiteId=" + smoke);
+
+		// 스위트 자신과 소속 케이스·스케줄만 (다른 스위트, 프로젝트·환경 제외)
+		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].targetType")).containsExactly("CASE", "SCHEDULE",
+				"CASE", "SUITE");
+		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].targetName")).containsExactly("health check",
+				"smoke", "health", "smoke");
+		assertThat(JsonPath.<List<Integer>>read(logs, "$.content[*].suiteId")).containsOnly((int) smoke);
+		assertThat(JsonPath.<Object>read(logs("targetType=PROJECT&targetId=" + project), "$.content[0].suiteId"))
+			.isNull();
+	}
+
+	@Test
 	void recordsInvitesSignUpsResetLinksAndDeletions() {
 		String email = "member-" + System.nanoTime() + "@sentinel.test";
 		String invite = JsonPath.read(body(post("/api/users/invites", """
