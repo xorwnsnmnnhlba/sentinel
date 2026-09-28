@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import com.sentinel.application.drift.SchemaDriftService;
@@ -86,6 +87,53 @@ public class TestRunService {
 
 	private final SchemaDriftService schemaDrift;
 
+	private final BackgroundRuns backgroundRuns;
+
+	private final ManualRunSlots manualRunSlots;
+
+	/**
+	 * 스위트 전체 수동 실행 시작. 실행을 만들고 바로 반환하며 케이스 실행은 백그라운드에서 진행 (진행 상황은 {@link #getRun})
+	 * @return 생성된 실행 ID
+	 * @throws TooManyRunsException 동시 수동 실행 한도 도달 (실행을 만들지 않음)
+	 * @throws NotFoundException 스위트 또는 환경 미존재
+	 * @throws InvalidRequestException 스위트와 환경의 프로젝트 불일치, 시크릿 복호화 불가
+	 */
+	public long startSuite(long suiteId, long environmentId, long triggeredBy) {
+		return launch(() -> prepareSuite(suiteId, environmentId, TestRun.Trigger.MANUAL, triggeredBy));
+	}
+
+	/** 케이스 단건 수동 실행 시작. 예외는 {@link #startSuite}와 같음 (케이스 미존재 포함) */
+	public long startTestCase(long testCaseId, long environmentId, long triggeredBy) {
+		return launch(() -> prepareTestCase(testCaseId, environmentId, triggeredBy));
+	}
+
+	/** 여기까지 수동 실행 시작. 예외는 {@link #startSuite}와 같음 (케이스 미존재 포함) */
+	public long startThroughCase(long testCaseId, long environmentId, long triggeredBy) {
+		return launch(() -> prepareThroughCase(testCaseId, environmentId, triggeredBy));
+	}
+
+	/** 자리를 잡고 실행을 만든 뒤(요청 스레드) 케이스 실행은 백그라운드로. 준비가 실패하면 실행 없이 자리 반납 */
+	private long launch(Supplier<Prepared> prepare) {
+		manualRunSlots.acquire();
+		Prepared prepared;
+		try {
+			prepared = prepare.get();
+		}
+		catch (RuntimeException ex) {
+			manualRunSlots.release();
+			throw ex;
+		}
+		backgroundRuns.submit(() -> {
+			try {
+				executeAndRecord(prepared);
+			}
+			finally {
+				manualRunSlots.release();
+			}
+		});
+		return prepared.runId();
+	}
+
 	/**
 	 * 케이스 1건 수동 실행. 응답 미수신·변수 누락도 실패 결과로 기록하며 예외로 전파하지 않음.
 	 * @return 생성된 실행 ID
@@ -94,13 +142,16 @@ public class TestRunService {
 	 * @param triggeredBy 실행을 시작한 사용자
 	 */
 	public long runTestCase(long testCaseId, long environmentId, long triggeredBy) {
-		Prepared prepared = transactions.write(status -> {
+		return executeAndRecord(prepareTestCase(testCaseId, environmentId, triggeredBy));
+	}
+
+	private Prepared prepareTestCase(long testCaseId, long environmentId, long triggeredBy) {
+		return transactions.write(status -> {
 			TestCase testCase = testCases.findByIdAndArchivedAtIsNull(testCaseId)
 				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
 			return start(testCase.getSuite(), findEnvironment(environmentId), List.of(testCase),
 					TestRun.Trigger.MANUAL, triggeredBy, testCase, null);
 		});
-		return executeAndRecord(prepared);
 	}
 
 	/**
@@ -112,7 +163,11 @@ public class TestRunService {
 	 * @param triggeredBy 실행을 시작한 사용자
 	 */
 	public long runThroughCase(long testCaseId, long environmentId, long triggeredBy) {
-		Prepared prepared = transactions.write(status -> {
+		return executeAndRecord(prepareThroughCase(testCaseId, environmentId, triggeredBy));
+	}
+
+	private Prepared prepareThroughCase(long testCaseId, long environmentId, long triggeredBy) {
+		return transactions.write(status -> {
 			TestCase through = testCases.findByIdAndArchivedAtIsNull(testCaseId)
 				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
 			List<TestCase> suiteCases = testCases
@@ -124,7 +179,6 @@ public class TestRunService {
 			return start(through.getSuite(), findEnvironment(environmentId), suiteCases.subList(0, last + 1),
 					TestRun.Trigger.MANUAL, triggeredBy, null, through);
 		});
-		return executeAndRecord(prepared);
 	}
 
 	/**
@@ -135,12 +189,15 @@ public class TestRunService {
 	 * @param triggeredBy 수동 실행을 시작한 사용자. 스케줄 실행은 null
 	 */
 	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
-		Prepared prepared = transactions.write(status -> {
+		return executeAndRecord(prepareSuite(suiteId, environmentId, trigger, triggeredBy));
+	}
+
+	private Prepared prepareSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
+		return transactions.write(status -> {
 			TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
 			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId), trigger,
 					triggeredBy, null, null);
 		});
-		return executeAndRecord(prepared);
 	}
 
 	public TestRunDetail getRun(long runId) {
@@ -212,9 +269,11 @@ public class TestRunService {
 			throw new InvalidRequestException("environment " + environment.getId()
 					+ " does not belong to the project of test suite " + suite.getId());
 		}
-		TestRun run = runs.save(target != null ? TestRun.startCase(target, environment, trigger, clock.instant(), triggeredBy)
+		TestRun started = target != null ? TestRun.startCase(target, environment, trigger, clock.instant(), triggeredBy)
 				: through != null ? TestRun.startThrough(through, environment, trigger, clock.instant(), triggeredBy)
-						: TestRun.start(suite, environment, trigger, clock.instant(), triggeredBy));
+						: TestRun.start(suite, environment, trigger, clock.instant(), triggeredBy);
+		started.plan(cases.size());
+		TestRun run = runs.save(started);
 		List<PreparedCase> preparedCases = cases.stream()
 			.map(testCase -> new PreparedCase(testCase.getId(), templateOf(testCase.getRequest(), environment),
 					testCase.getAssertions(), testCase.getExtractors()))

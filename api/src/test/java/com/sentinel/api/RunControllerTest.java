@@ -7,6 +7,7 @@ import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
+import com.sentinel.application.InlineBackgroundRunsConfiguration;
 import com.sentinel.application.TestFixtures;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
@@ -28,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class,
+@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class,
+		InlineBackgroundRunsConfiguration.class, TestFixtures.class,
 		TestAuthConfiguration.class })
 class RunControllerTest {
 
@@ -58,7 +60,7 @@ class RunControllerTest {
 		MvcTestResult created = createRun("{\"suiteId\": %d, \"environmentId\": %d}".formatted(suite.getId(),
 				environment.getId()));
 
-		assertThat(created).hasStatus(HttpStatus.CREATED);
+		assertThat(created).hasStatus(HttpStatus.ACCEPTED);
 		assertThat(created).bodyJson().extractingPath("$.trigger").isEqualTo("MANUAL");
 		assertThat(created).bodyJson().extractingPath("$.summary.passed").isEqualTo(1);
 		String location = created.getResponse().getHeader("Location");
@@ -70,6 +72,7 @@ class RunControllerTest {
 		detail.extractingPath("$.environmentName").isEqualTo("dev");
 		detail.extractingPath("$.results[0].testCaseName").isEqualTo(testCase.getName());
 		detail.extractingPath("$.results[0].response.body").isEqualTo("{\"status\":\"UP\"}");
+		detail.extractingPath("$.plannedCount").isEqualTo(1);
 	}
 
 	@Test
@@ -83,7 +86,7 @@ class RunControllerTest {
 		MvcTestResult created = createRun("{\"caseId\": %d, \"environmentId\": %d}".formatted(target.getId(),
 				environment.getId()));
 
-		assertThat(created).hasStatus(HttpStatus.CREATED);
+		assertThat(created).hasStatus(HttpStatus.ACCEPTED);
 		assertThat(created).bodyJson().extractingPath("$.summary.total").isEqualTo(1);
 		assertThat(executor.requests()).singleElement().satisfies(request -> assertThat(request.uri().getPath()).isEqualTo("/a"));
 	}
@@ -100,7 +103,7 @@ class RunControllerTest {
 		MvcTestResult created = createRun("{\"throughCaseId\": %d, \"environmentId\": %d}"
 			.formatted(through.getId(), environment.getId()));
 
-		assertThat(created).hasStatus(HttpStatus.CREATED);
+		assertThat(created).hasStatus(HttpStatus.ACCEPTED);
 		assertThat(created).bodyJson().extractingPath("$.summary.total").isEqualTo(2);
 		assertThat(created).bodyJson().extractingPath("$.throughCase.name").isEqualTo(through.getName());
 		assertThat(created).bodyJson().extractingPath("$.testCase").isNull();

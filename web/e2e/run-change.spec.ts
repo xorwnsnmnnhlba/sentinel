@@ -1,6 +1,6 @@
 import type { APIRequestContext } from "@playwright/test";
 
-import { accessibilityViolations, expect, mainMenu, test } from "./fixtures";
+import { accessibilityViolations, expect, mainMenu, test, waitForRun } from "./fixtures";
 
 /**
  * 결과 상세의 직전 실행 대비 변화. 첫 실행 뒤 한 케이스의 판정 규칙을 바꿔 새로 실패하게 만든 다음 다시 실행
@@ -13,16 +13,20 @@ const suiteName = `변화 ${stamp}`;
 let suiteId = 0;
 let firstRunId = 0;
 
+async function sessionHeaders(request: APIRequestContext): Promise<Record<string, string>> {
+  const session = await request.post(`${api}/api/sessions`, {
+    data: { email: "admin@sentinel.test", password: "e2e-admin-password" },
+  });
+  return { Authorization: `Bearer ${(await session.json()).token}` };
+}
+
 async function call(
   request: APIRequestContext,
   method: "post" | "patch",
   path: string,
   data: object,
 ): Promise<{ id: number }> {
-  const session = await request.post(`${api}/api/sessions`, {
-    data: { email: "admin@sentinel.test", password: "e2e-admin-password" },
-  });
-  const headers = { Authorization: `Bearer ${(await session.json()).token}` };
+  const headers = await sessionHeaders(request);
   const response = await request[method](`${api}${path}`, { headers, data });
   expect(response.ok(), `${method} ${path} ${response.status()}`).toBe(true);
   return (await response.json()) as { id: number };
@@ -45,6 +49,8 @@ test.beforeAll(async ({ request }) => {
   await call(request, "post", "/api/cases", caseOf("stable"));
   const breaking = await call(request, "post", "/api/cases", caseOf("breaking"));
   firstRunId = (await call(request, "post", "/api/runs", { suiteId, environmentId: environment.id })).id;
+  // 첫 실행이 끝나야 두 번째 실행의 비교 기준이 됨 (실행은 백그라운드 진행)
+  await waitForRun(request, api, await sessionHeaders(request), firstRunId);
   // 두 번째 실행에서 실패하도록 기대 상태 코드 변경
   await call(request, "patch", `/api/cases/${breaking.id}`, { assertions: [{ type: "statusCode", anyOf: ["200"] }] });
 });

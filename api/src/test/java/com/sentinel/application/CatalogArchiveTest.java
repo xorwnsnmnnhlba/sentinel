@@ -29,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class,
+@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class,
+		InlineBackgroundRunsConfiguration.class, TestFixtures.class,
 		TestAuthConfiguration.class })
 class CatalogArchiveTest {
 

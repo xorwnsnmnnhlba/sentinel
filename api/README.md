@@ -202,7 +202,12 @@ curl -i -X POST localhost:8080/api/runs \
 ```
 
 - 본문 `suiteId`(스위트 전체), `caseId`(케이스 1건), `throughCaseId`(여기까지 실행) 중 정확히 하나 지정. 없거나 둘 이상이면 400
-- 201 + `Location: /api/runs/{id}`, 본문은 실행 결과
+- 202 + `Location: /api/runs/{id}`. 실행을 만들고 바로 응답하며 케이스는 백그라운드에서 순서대로 실행. 본문은 그 시점의 실행 (보통 `status: RUNNING`, `results` 비어 있음)
+  - 완료 확인: `GET /api/runs/{id}`의 `status`가 `RUNNING`이 아닐 때까지 조회. 진행 중에는 끝난 케이스 결과가 `results`에 차례로 추가되고 `plannedCount`(실행할 케이스 수)로 진행률 계산
+  - 동시에 진행 중인 수동 실행이 `sentinel.runner.manual.max-concurrent`(기본 4)이면 실행을 만들지 않고 429. 하나가 끝나면 다시 시도
+  - 없는 스위트·케이스·환경(404), 프로젝트 불일치·시크릿 복호화 불가(400)는 실행을 만들기 전에 응답
+  - 진행 중 앱이 멈추면 실행은 `RUNNING`으로 남고 재기동 시 `ABORTED`
+  - 스케줄 실행은 스케줄러 스레드에서 끝까지 진행 (한도와 무관)
 - 스위트 실행은 케이스 실행 순서대로 순차 실행, 실패 케이스가 있어도 나머지 계속 실행
   - 실행 순서: 케이스 목록(`GET /api/cases?suiteId=`) 순서와 같음. 새 케이스는 마지막. 스위트 `PATCH`의 `caseOrder`로 변경 ("REST API" 참고)
 - 케이스 단건 실행은 케이스가 속한 스위트의 실행으로 기록하고 대상 케이스를 `testCase`(`{id, name}`)로 표시. 스위트 전체 실행은 `null`
@@ -281,6 +286,7 @@ curl -i -X POST localhost:8080/api/runs \
   - 압축 요청(`Accept-Encoding`) 없음, 쿠키 저장·자동 전송 없음 (케이스에 적은 헤더만 전송)
 - 연결 재사용. 1초 이상 쉰 연결은 사용 전 확인, 30초 이상 쉰 연결은 정리. 동시 연결 한도 200 (Tomcat 기본 요청 스레드 수)
 - 제한 시간: 연결 `sentinel.runner.http.connect-timeout`(기본 5초) 초과 시 `CONNECTION_FAILED`, 응답 대기 `read-timeout`(기본 30초) 초과 시 `TIMEOUT`
+- 수동 실행은 실행마다 가상 스레드 하나에서 진행 (대부분 GW 응답 대기이므로 스레드를 점유하지 않음). 동시 수동 실행 수는 `sentinel.runner.manual.max-concurrent`(기본 4, 1 미만이면 기동 실패)
 
 ## 인증
 

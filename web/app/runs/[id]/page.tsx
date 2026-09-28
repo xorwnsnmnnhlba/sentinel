@@ -12,6 +12,7 @@ import {
 } from "@/components/run-badges";
 import { DriftBadge, highestLevel } from "@/components/runs/drift";
 import { ChangeBadge, ChangeSummary } from "@/components/runs/run-change";
+import { RunProgress } from "@/components/runs/run-progress";
 import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { apiGetOrNotFound } from "@/lib/api/server";
@@ -60,7 +61,11 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
           <Meta label="소요" value={formatRunDuration(run.startedAt, run.finishedAt)} />
         </dl>
         <RunCountBadges counts={run.summary} />
-        <ChangeSummary run={run} />
+        {run.status === "RUNNING" ? (
+          <RunProgress done={run.results.length} planned={run.plannedCount} />
+        ) : (
+          <ChangeSummary run={run} />
+        )}
       </div>
 
       {run.rawPurgedAt && (
@@ -78,9 +83,10 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
           description="실행 순서대로 표시. 실패·오류 케이스는 펼친 상태"
         />
         {run.results.length === 0 ? (
-          <Empty message="실행된 케이스가 없습니다" />
+          <Empty message={run.status === "RUNNING" ? "아직 끝난 케이스가 없습니다" : "실행된 케이스가 없습니다"} />
         ) : (
-          <Accordion type="multiple" defaultValue={openByDefault} className="rounded-xl border px-4">
+          // 진행 중 새로 고침은 펼침 상태를 유지하므로, 실행이 끝나면 다시 그려 실패 케이스를 펼침
+          <Accordion key={run.status} type="multiple" defaultValue={openByDefault} className="rounded-xl border px-4">
             {run.results.map((result) => (
               <AccordionItem key={result.id} value={String(result.id)}>
                 <AccordionTrigger className="hover:no-underline">

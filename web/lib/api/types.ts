@@ -123,6 +123,8 @@ export interface RunDetail {
   throughCase: IdName | null;
   /** 보관기간이 지나 요청·응답 원문(헤더·본문)을 삭제한 시각. null이면 원문 보관 중 */
   rawPurgedAt: string | null;
+  /** 실행할 케이스 수. 진행 중이면 results 수와 비교해 진행률 표시. 이전 실행은 null */
+  plannedCount: number | null;
   /** 비교 기준인 직전 실행 (같은 스위트·환경의 완료된 스위트 전체 실행). 없거나 스위트 전체 실행이 아니면 null */
   previousRun: { id: number; startedAt: string } | null;
 }
