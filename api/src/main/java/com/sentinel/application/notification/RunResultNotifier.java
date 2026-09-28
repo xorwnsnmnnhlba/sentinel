@@ -11,11 +11,11 @@ import com.sentinel.application.ScheduleProperties;
 import com.sentinel.application.Transactions;
 import com.sentinel.domain.TestResult;
 import com.sentinel.domain.TestRun;
+import com.sentinel.infra.persistence.TestResultQueries;
 import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.runner.assertion.AssertionResult;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
 /**
@@ -71,9 +71,8 @@ public class RunResultNotifier {
 		if (current.isEmpty()) {
 			return Optional.empty();
 		}
-		List<TestRun> previous = runs.findBySuiteIdAndEnvironmentIdAndTriggerAndStatusAndIdLessThanOrderByIdDesc(
-				run.getSuite().getId(), run.getEnvironment().getId(), TestRun.Trigger.SCHEDULED,
-				TestRun.Status.COMPLETED, runId, Limit.of(LOOKBACK));
+		List<TestRun> previous = runs.findPreviousRuns(run.getSuite().getId(),
+				run.getEnvironment().getId(), TestRun.Trigger.SCHEDULED, TestRun.Status.COMPLETED, runId, LOOKBACK);
 		Map<Long, Map<Long, Boolean>> failedByRun = failedCasesByRun(previous);
 
 		List<TestResult> failing = current.stream().filter(RunResultNotifier::failed).toList();
@@ -140,10 +139,10 @@ public class RunResultNotifier {
 		if (previous.isEmpty()) {
 			return failed;
 		}
-		for (TestResultRepository.CaseVerdict verdict : results
+		for (TestResultQueries.CaseVerdict verdict : results
 			.findCaseVerdictsByRunIds(previous.stream().map(TestRun::getId).toList())) {
-			failed.computeIfAbsent(verdict.getRunId(), id -> new HashMap<>())
-				.put(verdict.getCaseId(), failed(verdict.getVerdict()));
+			failed.computeIfAbsent(verdict.runId(), id -> new HashMap<>())
+				.put(verdict.caseId(), failed(verdict.verdict()));
 		}
 		return failed;
 	}

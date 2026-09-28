@@ -6,29 +6,16 @@ import java.util.List;
 
 import com.sentinel.domain.TestResult;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface TestResultRepository extends JpaRepository<TestResult, Long> {
+/**
+ * 응답시간 백분위({@code PERCENTILE_CONT})·구조 지문 기준선({@code LATERAL})은 JPQL로 표현할 수 없어 네이티브 SQL (SQL 표준 문법).
+ * 그 외 조건 조회·일괄 변경은 {@link TestResultQueries} (QueryDSL)
+ */
+public interface TestResultRepository extends JpaRepository<TestResult, Long>, TestResultQueries {
 
 	List<TestResult> findByRunIdOrderById(Long runId);
-
-	/** 결과 상세용. 케이스 이름 조회 시 결과 건수만큼 추가 쿼리가 발생하지 않도록 함께 로딩 */
-	@Query("select r from TestResult r join fetch r.testCase where r.run.id = :runId order by r.id")
-	List<TestResult> findWithTestCaseByRunId(@Param("runId") Long runId);
-
-	/**
-	 * 요청·응답 헤더와 본문을 일괄로 비움. 판정·규칙별 결과·상태 코드·URL·소요 시간은 유지
-	 * @return 갱신한 결과 건수
-	 */
-	@Modifying
-	@Query("""
-			update TestResult r
-			set r.requestHeaders = null, r.requestBody = null, r.responseHeaders = null, r.responseBody = null
-			where r.run.id in :runIds
-			""")
-	int purgeRawByRunIds(@Param("runIds") Collection<Long> runIds);
 
 	/**
 	 * 케이스 1건의 일별 응답시간 (응답을 받은 결과만). 일자는 {@code zone} 기준 실행 시작 날짜.
@@ -136,19 +123,5 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 	List<Object[]> findRecentSchemas(@Param("environmentId") long environmentId,
 			@Param("caseIds") Collection<Long> caseIds, @Param("runId") long runId,
 			@Param("beforeResultId") long beforeResultId, @Param("window") int window);
-
-	/** 실행별 케이스 판정. 연속 실패 계산용 */
-	@Query("select r.run.id as runId, r.testCase.id as caseId, r.verdict as verdict from TestResult r where r.run.id in :runIds")
-	List<CaseVerdict> findCaseVerdictsByRunIds(@Param("runIds") Collection<Long> runIds);
-
-	interface CaseVerdict {
-
-		Long getRunId();
-
-		Long getCaseId();
-
-		TestResult.Verdict getVerdict();
-
-	}
 
 }

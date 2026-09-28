@@ -20,6 +20,7 @@ Sentinel 백엔드. 테스트 케이스 실행(러너), 스케줄 실행, 결과
 | PostgreSQL JDBC | 42.7.11 |
 | DB | PostgreSQL 18, 개발기 AWS RDS `sentinel` 스키마 |
 | Flyway | 12.4.0 |
+| QueryDSL | 7.7 (OpenFeign 포크, 조건 조회·일괄 변경. Boot 미관리라 버전 명시) |
 | SnakeYAML Engine | 3.0.1 (케이스 가져오기의 문서 해석, Boot 미관리라 버전 명시) |
 | Testcontainers | 2.0.5 |
 | Lombok | 1.18.46 (`@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor(access = PROTECTED)`만 사용, `lombok.config`로 제한) |
@@ -108,6 +109,17 @@ Flyway 마이그레이션으로만 변경. 기동 시 `ddl-auto: validate`가 �
 - 데이터가 있는 테이블에 NOT NULL 컬럼 추가 시 `DEFAULT` 지정 또는 값 채운 뒤 제약 추가
 - 적용 이력: `sentinel.flyway_schema_history`
 - 큰 테이블(`test_run`·`test_result`)을 바꾸는 마이그레이션은 1년치 이력으로 적용 시간·조회 성능 확인 (`scripts/perf/README.md`)
+
+## 조회 작성
+
+- 파생 쿼리 메서드는 조건 1~2개의 단순 조회만 (`findByTokenHash`, `countBySuiteIdAndArchivedAtIsNull` 등)
+- 그 외 조건 조회·집계·일괄 변경은 QueryDSL. 저장소마다 `XxxQueries`(인터페이스) + `XxxQueriesImpl`(구현)을 두고 저장소가 인터페이스를 상속 (Spring Data 사용자 정의 조각)
+  - 엔티티에서 생성한 Q-타입(`QTestRun` 등, `build/generated/sources/annotationProcessor`)으로 필드명·타입을 컴파일 시점에 확인. 엔티티 필드 변경 시 쿼리가 컴파일 오류로 드러남
+  - 목록 조건(`RunFilter`, `ChangeLogService.Filter`)은 null이 아닌 값만 `BooleanBuilder`로 조합한 `Predicate`
+  - 페이지 목록은 `PageableExecutionUtils.getPage`로 결과가 한 페이지에 모두 들어가면 건수 쿼리 생략
+  - 구현은 공유 `EntityManager`로 `JPAQueryFactory`를 직접 생성. 설정 빈이 없어 `@DataJpaTest` 슬라이스에서도 별도 설정 없이 동작
+- 네이티브 SQL은 JPQL로 표현할 수 없는 경우만 (`TestResultRepository`의 `PERCENTILE_CONT` 3건, `LATERAL` 1건). SQL 표준 문법, 테이블은 `{h-schema}` 한정
+- 성능 조건이 있는 쿼리는 주석에 이유와 측정값 기록 (예: 직전 실행 조회의 시작 시각 상한). 조건을 바꾸면 `scripts/perf`로 실행 계획 확인
 
 ## 케이스 1건 실행 확인
 

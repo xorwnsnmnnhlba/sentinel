@@ -116,13 +116,26 @@ class SuiteSummaryServiceTest {
 	}
 
 	@Test
+	void countsOnlyRunsWithFailuresOrErrorsAsFailingRuns() {
+		TestSuite healthy = suite("healthy", "/ok");
+		runAt(SEPT_10, healthy);
+
+		SuiteSummaryService.SuiteSummary summary = suiteSummaries.summaries(LocalDate.of(2026, 9, 10), null)
+			.suites()
+			.getFirst();
+
+		assertThat(summary.runs()).isEqualTo(1);
+		assertThat(summary.failingRuns()).isZero();
+	}
+
+	@Test
 	void countsOnlyWholeSuiteRunsInSuiteSummaries() {
 		TestSuite orders = suite("orders", "/ok", "/fail");
 		runAt(SEPT_10.minus(Duration.ofHours(1)), orders);
 		// 이후 케이스를 하나씩 따로 실행 (케이스 수정 확인 등). 통과 1건, 실패 1건
 		clock.set(SEPT_10);
 		long tester = fixtures.user().getId();
-		List<TestCase> cases = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(orders.getId());
+		List<TestCase> cases = testCases.findActiveInRunOrder(orders.getId());
 		for (TestCase testCase : cases) {
 			testRunService.runTestCase(testCase.getId(), environment.getId(), tester);
 		}

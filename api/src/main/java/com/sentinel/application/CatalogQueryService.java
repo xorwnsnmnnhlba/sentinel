@@ -15,12 +15,12 @@ import com.sentinel.domain.TestSuite;
 import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
+import com.sentinel.infra.persistence.TestSuiteQueries;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.extract.Extractor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,11 +74,11 @@ public class CatalogQueryService {
 	 * @param projectId null이면 전체
 	 */
 	public List<SuiteItem> listSuites(Long projectId) {
-		List<TestSuiteRepository.SuiteCaseCount> counts = projectId == null ? suites.countCases()
+		List<TestSuiteQueries.SuiteCaseCount> counts = projectId == null ? suites.countCases()
 				: suites.countCasesByProjectId(projectId);
 		Map<Long, Long> caseCounts = counts.stream()
-			.collect(Collectors.toMap(TestSuiteRepository.SuiteCaseCount::getSuiteId,
-					TestSuiteRepository.SuiteCaseCount::getCount));
+			.collect(Collectors.toMap(TestSuiteQueries.SuiteCaseCount::suiteId,
+					TestSuiteQueries.SuiteCaseCount::count));
 		List<TestSuite> found = projectId == null ? suites.findByArchivedAtIsNullOrderByName()
 				: suites.findByProjectIdAndArchivedAtIsNullOrderByName(projectId);
 		return found.stream()
@@ -105,15 +105,15 @@ public class CatalogQueryService {
 	 */
 	public List<CaseItem> listCases(Long suiteId, String query) {
 		if (query == null) {
-			List<TestCase> found = suiteId == null ? testCases.findByArchivedAtIsNullOrderBySuiteIdAscRunOrderAscIdAsc()
-					: testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId);
+			List<TestCase> found = suiteId == null ? testCases.findAllActiveInRunOrder()
+					: testCases.findActiveInRunOrder(suiteId);
 			return found.stream().map(CaseItem::of).toList();
 		}
 		String trimmed = query.strip();
 		if (trimmed.isEmpty() || trimmed.length() > MAX_QUERY_LENGTH) {
 			throw new InvalidRequestException("q must be 1-" + MAX_QUERY_LENGTH + " characters");
 		}
-		return testCases.search(likePattern(trimmed), suiteId, Limit.of(MAX_SEARCH_RESULTS))
+		return testCases.search(likePattern(trimmed), suiteId, MAX_SEARCH_RESULTS)
 			.stream()
 			.map(CaseItem::of)
 			.toList();

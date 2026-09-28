@@ -15,7 +15,6 @@ import com.sentinel.infra.persistence.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,8 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class RunQueryService {
 
 	public static final int MAX_PAGE_SIZE = 100;
-
-	private static final Sort NEWEST_FIRST = Sort.by(Sort.Order.desc("startedAt"), Sort.Order.desc("id"));
 
 	private final TestRunRepository runs;
 
@@ -48,8 +45,8 @@ public class RunQueryService {
 	 */
 	@Transactional(readOnly = true)
 	public PageResponse<RunSummary> listRuns(RunFilter filter, int page, int size) {
-		PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE), NEWEST_FIRST);
-		Page<TestRun> found = runs.findAll(filter.toSpecification(scheduleProperties.zone()), pageable);
+		PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE));
+		Page<TestRun> found = runs.findNewestFirst(filter.toPredicate(scheduleProperties.zone()), pageable);
 
 		Map<Long, IdName> triggeredBy = triggeredBy(found.getContent());
 		Map<Long, IdName> targetCases = targetCases(found.getContent());

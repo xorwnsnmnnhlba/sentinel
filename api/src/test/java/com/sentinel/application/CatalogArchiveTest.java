@@ -80,6 +80,9 @@ class CatalogArchiveTest {
 			.asArray()
 			.containsExactly(kept.getId().intValue());
 		assertThat(mvc.get().uri("/api/suites/{id}", suite.getId())).bodyJson().extractingPath("$.caseCount").isEqualTo(1);
+		assertThat(mvc.get().uri("/api/suites?projectId={id}", project.getId())).bodyJson()
+			.extractingPath("$[0].caseCount")
+			.isEqualTo(1);
 
 		// 이력은 보관된 케이스 이름까지 그대로 조회
 		assertThat(testRunService.getRun(earlierRun).results()).extracting(TestRunDetail.Result::testCaseName)

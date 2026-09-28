@@ -3,12 +3,10 @@ package com.sentinel.application;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
-
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.Predicate;
+import com.sentinel.domain.QTestRun;
 import com.sentinel.domain.TestRun;
-import jakarta.persistence.criteria.Predicate;
-import org.springframework.data.jpa.domain.Specification;
 
 /**
  * 실행 이력 조회 조건. null인 값은 조건에서 제외.
@@ -25,39 +23,37 @@ public record RunFilter(Long projectId, Long suiteId, Long environmentId, TestRu
 	}
 
 	/**
-	 * 지정한 조건만 SQL에 포함. null 파라미터를 넘기면 PostgreSQL이 타입을 추론하지 못하므로 조건 자체를 만들지 않음
+	 * 지정한 조건만 SQL에 포함 (null인 조건은 제외)
 	 *
 	 * @param zone 기간 조건 해석 시간대
 	 */
-	Specification<TestRun> toSpecification(ZoneId zone) {
-		return (root, query, builder) -> {
-			List<Predicate> conditions = new ArrayList<>();
-			if (projectId != null) {
-				conditions.add(builder.equal(root.get("suite").get("project").get("id"), projectId));
-			}
-			if (suiteId != null) {
-				conditions.add(builder.equal(root.get("suite").get("id"), suiteId));
-			}
-			if (environmentId != null) {
-				conditions.add(builder.equal(root.get("environment").get("id"), environmentId));
-			}
-			if (status != null) {
-				conditions.add(builder.equal(root.get("status"), status));
-			}
-			if (from != null) {
-				conditions.add(builder.greaterThanOrEqualTo(root.get("startedAt"), fromInstant(zone)));
-			}
-			if (to != null) {
-				// 종료일을 포함하도록 다음 날 00:00을 상한(미포함)으로 사용
-				conditions.add(builder.lessThan(root.get("startedAt"), toInstant(zone)));
-			}
-			if (failing) {
-				// 실행에 보관한 판정 수로 판단. 결과 테이블을 훑지 않음 (V10)
-				conditions.add(builder.greaterThan(
-						builder.sum(root.<Integer>get("failedCount"), root.<Integer>get("errorCount")), 0));
-			}
-			return builder.and(conditions.toArray(Predicate[]::new));
-		};
+	Predicate toPredicate(ZoneId zone) {
+		QTestRun run = QTestRun.testRun;
+		BooleanBuilder conditions = new BooleanBuilder();
+		if (projectId != null) {
+			conditions.and(run.suite.project.id.eq(projectId));
+		}
+		if (suiteId != null) {
+			conditions.and(run.suite.id.eq(suiteId));
+		}
+		if (environmentId != null) {
+			conditions.and(run.environment.id.eq(environmentId));
+		}
+		if (status != null) {
+			conditions.and(run.status.eq(status));
+		}
+		if (from != null) {
+			conditions.and(run.startedAt.goe(fromInstant(zone)));
+		}
+		if (to != null) {
+			// 종료일을 포함하도록 다음 날 00:00을 상한(미포함)으로 사용
+			conditions.and(run.startedAt.lt(toInstant(zone)));
+		}
+		if (failing) {
+			// 실행에 보관한 판정 수로 판단. 결과 테이블을 훑지 않음 (V10)
+			conditions.and(run.failedCount.add(run.errorCount).gt(0));
+		}
+		return conditions;
 	}
 
 	Instant fromInstant(ZoneId zone) {

@@ -130,7 +130,7 @@ class DomainPersistenceTest {
 		testCases.save(new TestCase(suite, "금액 누락", new RequestSpec(HttpMethod.POST, "/billing/v1/charge", null, "{}")));
 		flushAndClear();
 
-		List<TestCase> found = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId());
+		List<TestCase> found = testCases.findActiveInRunOrder(suite.getId());
 
 		assertThat(found).extracting(TestCase::getName).containsExactly("정상 결제", "금액 누락");
 		assertThat(found.getFirst().getRequest()).isEqualTo(request);
