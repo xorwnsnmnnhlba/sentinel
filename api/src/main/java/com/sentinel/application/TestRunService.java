@@ -25,6 +25,7 @@ import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
+import com.sentinel.infra.persistence.TestResultQueries;
 import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.UserRepository;
@@ -111,6 +112,16 @@ public class TestRunService {
 		return launch(() -> prepareThroughCase(testCaseId, environmentId, triggeredBy));
 	}
 
+	/**
+	 * 실패 다시 실행 시작. 원래 실행과 같은 환경에서 실패·오류가 난 케이스만 실행 순서대로 다시 실행.
+	 * 그 케이스가 쓰는 추출 값을 만드는 앞 케이스는 함께 실행 ({@link RerunSelection}). 삭제된 케이스는 제외.
+	 * 예외는 {@link #startSuite}와 같음 (원래 실행 미존재, 원래 실행 뒤 삭제된 스위트·환경 포함)
+	 * @throws ConflictException 원래 실행이 진행 중이거나 다시 실행할 실패 케이스가 없음
+	 */
+	public long startRerun(long runId, long triggeredBy) {
+		return launch(() -> prepareRerun(runId, triggeredBy));
+	}
+
 	/** 자리를 잡고 실행을 만든 뒤(요청 스레드) 케이스 실행은 백그라운드로. 준비가 실패하면 실행 없이 자리 반납 */
 	private long launch(Supplier<Prepared> prepare) {
 		manualRunSlots.acquire();
@@ -148,8 +159,8 @@ public class TestRunService {
 		return transactions.write(status -> {
 			TestCase testCase = testCases.findByIdAndArchivedAtIsNull(testCaseId)
 				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
-			return start(testCase.getSuite(), findEnvironment(environmentId), List.of(testCase),
-					TestRun.Trigger.MANUAL, triggeredBy, testCase, null);
+			return start(List.of(testCase), TestRun.startCase(testCase, findEnvironment(environmentId),
+					TestRun.Trigger.MANUAL, clock.instant(), triggeredBy));
 		});
 	}
 
@@ -175,9 +186,60 @@ public class TestRunService {
 				.filter(index -> BaseEntity.same(suiteCases.get(index), through))
 				.findFirst()
 				.orElseThrow();
-			return start(through.getSuite(), findEnvironment(environmentId), suiteCases.subList(0, last + 1),
-					TestRun.Trigger.MANUAL, triggeredBy, null, through);
+			return start(suiteCases.subList(0, last + 1), TestRun.startThrough(through, findEnvironment(environmentId),
+					TestRun.Trigger.MANUAL, clock.instant(), triggeredBy));
 		});
+	}
+
+	/**
+	 * 실패 다시 실행 (호출 스레드에서 끝까지 실행). 동작과 예외는 {@link #startRerun}과 같음
+	 * @return 생성된 실행 ID
+	 */
+	public long runRerun(long runId, long triggeredBy) {
+		return executeAndRecord(prepareRerun(runId, triggeredBy));
+	}
+
+	private Prepared prepareRerun(long runId, long triggeredBy) {
+		return transactions.write(status -> {
+			TestRun original = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
+			if (original.getStatus() == TestRun.Status.RUNNING) {
+				throw new ConflictException("test run " + runId + " is still running");
+			}
+			// 원래 실행 뒤 삭제(보관)된 스위트·환경으로는 실행하지 않음
+			if (original.getSuite().isArchived()) {
+				throw new NotFoundException("test suite", original.getSuite().getId());
+			}
+			if (original.getEnvironment().isArchived()) {
+				throw new NotFoundException("environment", original.getEnvironment().getId());
+			}
+			Set<Long> failed = failedCaseIds(runId);
+			List<TestCase> suiteCases = testCases.findActiveInRunOrder(original.getSuite().getId());
+			if (suiteCases.stream().noneMatch(testCase -> failed.contains(testCase.getId()))) {
+				throw new ConflictException("test run " + runId + " has no failed cases to rerun");
+			}
+			Set<Long> selected = RerunSelection.select(suiteCases.stream().map(TestRunService::stepOf).toList(), failed);
+			return start(suiteCases.stream().filter(testCase -> selected.contains(testCase.getId())).toList(),
+					TestRun.startRerun(original, clock.instant(), triggeredBy));
+		});
+	}
+
+	/** 실행에서 판정 실패·오류가 난 케이스 */
+	private Set<Long> failedCaseIds(long runId) {
+		return results.findCaseVerdictsByRunIds(List.of(runId))
+			.stream()
+			.filter(verdict -> verdict.verdict() == TestResult.Verdict.FAILED
+					|| verdict.verdict() == TestResult.Verdict.ERROR)
+			.map(TestResultQueries.CaseVerdict::caseId)
+			.collect(Collectors.toUnmodifiableSet());
+	}
+
+	private static RerunSelection.Step stepOf(TestCase testCase) {
+		RequestSpec spec = testCase.getRequest();
+		// 변수 이름만 필요하므로 기본 URL은 치환 대상이 아닌 임의 값
+		Set<String> uses = new RequestTemplate(spec.getMethod(), "", spec.getPath(), spec.getHeaders(), spec.getBody())
+			.variableNames();
+		return new RerunSelection.Step(testCase.getId(), uses,
+				testCase.getExtractors().stream().map(Extractor::name).collect(Collectors.toUnmodifiableSet()));
 	}
 
 	/**
@@ -194,8 +256,8 @@ public class TestRunService {
 	private Prepared prepareSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
 		return transactions.write(status -> {
 			TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
-			return start(suite, findEnvironment(environmentId), testCases.findActiveInRunOrder(suiteId), trigger,
-					triggeredBy, null, null);
+			return start(testCases.findActiveInRunOrder(suiteId),
+					TestRun.start(suite, findEnvironment(environmentId), trigger, clock.instant(), triggeredBy));
 		});
 	}
 
@@ -204,17 +266,18 @@ public class TestRunService {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
 			List<TestResult> runResults = results.findWithTestCaseByRunId(runId);
 			return TestRunDetail.of(run, runResults, userName(run.getTriggeredBy()), userName(run.getCanceledBy()),
-					caseName(run.getTestCaseId()),
-					caseName(run.getThroughCaseId()), schemaDrift.driftOf(run, runResults), previous(run));
+					caseName(run.getTestCaseId()), caseName(run.getThroughCaseId()),
+					schemaDrift.driftOf(run, runResults), previous(run),
+					run.isRerun() ? failedCaseIds(run.getRerunOfRunId()) : null);
 		});
 	}
 
 	/**
-	 * 비교 기준인 직전 실행. 스위트 전체 실행끼리만 비교 (단건·여기까지 실행은 일부 케이스라 비교하지 않음).
+	 * 비교 기준인 직전 실행. 스위트 전체 실행끼리만 비교 (단건·여기까지·실패 다시 실행은 일부 케이스라 비교하지 않음).
 	 * 같은 스위트·환경의 완료된 실행 중 바로 앞 실행 (수동·스케줄 무관). 없으면 null
 	 */
 	private TestRunDetail.Previous previous(TestRun run) {
-		if (run.isSingleCase() || run.isThroughCase()) {
+		if (!run.isWholeSuite()) {
 			return null;
 		}
 		return runs
@@ -260,18 +323,16 @@ public class TestRunService {
 	}
 
 	/**
-	 * @param target 케이스 단건 실행의 대상. 그 외 실행은 null
-	 * @param through 여기까지 실행의 마지막 케이스. 그 외 실행은 null
+	 * @param cases 실행할 케이스 (실행 순서)
+	 * @param started 저장 전 실행 (스위트·환경·종류는 호출자가 지정)
 	 */
-	private Prepared start(TestSuite suite, Environment environment, List<TestCase> cases, TestRun.Trigger trigger,
-			Long triggeredBy, TestCase target, TestCase through) {
+	private Prepared start(List<TestCase> cases, TestRun started) {
+		TestSuite suite = started.getSuite();
+		Environment environment = started.getEnvironment();
 		if (!BaseEntity.same(suite.getProject(), environment.getProject())) {
 			throw new InvalidRequestException("environment " + environment.getId()
 					+ " does not belong to the project of test suite " + suite.getId());
 		}
-		TestRun started = target != null ? TestRun.startCase(target, environment, trigger, clock.instant(), triggeredBy)
-				: through != null ? TestRun.startThrough(through, environment, trigger, clock.instant(), triggeredBy)
-						: TestRun.start(suite, environment, trigger, clock.instant(), triggeredBy);
 		started.plan(cases.size());
 		TestRun run = runs.save(started);
 		List<PreparedCase> preparedCases = cases.stream()
@@ -279,8 +340,7 @@ public class TestRunService {
 					testCase.getAssertions(), testCase.getExtractors()))
 			.toList();
 		// 단건 실행 등에서 다른 케이스가 추출하는 변수를 쓰면 미해결 변수 메시지로 안내하기 위해 스위트 전체의 추출 변수 이름 수집
-		List<TestCase> suiteCases = target == null && through == null ? cases
-				: testCases.findActiveInRunOrder(suite.getId());
+		List<TestCase> suiteCases = started.isWholeSuite() ? cases : testCases.findActiveInRunOrder(suite.getId());
 		Set<String> extractedInSuite = suiteCases.stream()
 			.flatMap(testCase -> testCase.getExtractors().stream())
 			.map(Extractor::name)
@@ -288,7 +348,7 @@ public class TestRunService {
 		Map<String, String> secrets = decrypt(environment);
 		Map<String, String> values = new LinkedHashMap<>(environment.getVariables());
 		values.putAll(secrets);
-		return new Prepared(run.getId(), suite.getId(), trigger, preparedCases, Map.copyOf(values),
+		return new Prepared(run.getId(), suite.getId(), run.getTrigger(), preparedCases, Map.copyOf(values),
 				Set.copyOf(secrets.values()), extractedInSuite);
 	}
 

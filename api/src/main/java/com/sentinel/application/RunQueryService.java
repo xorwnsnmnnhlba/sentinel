@@ -95,7 +95,7 @@ public class RunQueryService {
 				new IdName(run.getEnvironment().getId(), run.getEnvironment().getName()), run.getTrigger(),
 				run.getStatus(), run.getStartedAt(), run.getFinishedAt(),
 				new TestRunDetail.Summary(passed + failed + errors, passed, failed, errors), triggeredBy, testCase,
-				throughCase, run.getPlannedCount());
+				throughCase, run.getPlannedCount(), run.getRerunOfRunId());
 	}
 
 }

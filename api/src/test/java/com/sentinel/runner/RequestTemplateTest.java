@@ -24,6 +24,15 @@ class RequestTemplateTest {
 	}
 
 	@Test
+	void listsVariablesOfPathHeaderValuesAndBodyInOrder() {
+		// 헤더명·이스케이프한 {{는 치환 대상이 아니므로 제외
+		RequestTemplate template = new RequestTemplate(HttpMethod.POST, "https://gw", "/{{a}}/items",
+				Map.of("X-{{name}}", List.of("{{b}}", "{{ c }}")), "{\"d\": \"{{d}}\", \"e\": \"\\{{e}}\", \"a\": \"{{a}}\"}");
+
+		assertThat(template.variableNames()).containsExactly("a", "b", "c", "d");
+	}
+
+	@Test
 	void reportsMissingVariablesFromAllParts() {
 		RequestTemplate template = new RequestTemplate(HttpMethod.POST, "https://gw", "/{{a}}",
 				Map.of("X-B", List.of("{{b}}")), "{{c}}");

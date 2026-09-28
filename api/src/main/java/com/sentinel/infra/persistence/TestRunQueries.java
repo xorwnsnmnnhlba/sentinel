@@ -26,7 +26,7 @@ public interface TestRunQueries {
 			long beforeRunId, int limit);
 
 	/**
-	 * 직전 스위트 전체 실행 (같은 스위트·환경, 지정 상태). 케이스 단건 실행·여기까지 실행 제외.
+	 * 직전 스위트 전체 실행 (같은 스위트·환경, 지정 상태). 케이스 단건 실행·여기까지 실행·실패 다시 실행 제외.
 	 * 시작 시각 상한({@code <= startedAt})을 따로 두어 인덱스를 기준 실행의 시작 시각부터 거슬러 읽음 (이력 길이와 무관).
 	 * OR 조건만 두면 상한이 인덱스 조건이 되지 못해 최신 실행부터 훑음 (45일치에서 40일 전 실행 기준 29ms → 0.06ms)
 	 * @param startedAt 기준 실행의 시작 시각. 같은 시각이면 ID가 작은 실행이 앞선 실행
@@ -41,14 +41,14 @@ public interface TestRunQueries {
 	List<TestRun> findRawPurgeTargets(Instant cutoff, TestRun.Status excluded, int limit);
 
 	/**
-	 * 기간 안에 시작한 스위트 전체 실행의 스위트별 합계 (케이스 단건 실행·여기까지 실행·중지된 실행 제외). 실행 행의 판정 수(V10)만 사용.
+	 * 기간 안에 시작한 스위트 전체 실행의 스위트별 합계 (케이스 단건 실행·여기까지 실행·실패 다시 실행·중지된 실행 제외). 실행 행의 판정 수(V10)만 사용.
 	 * 기간 조건은 {@code idx_run_time}
 	 */
 	List<SuiteRunTotals> summarizeBySuite(Instant from, Instant to);
 
 	/**
 	 * 스위트별 가장 최근 스위트 전체 실행. ID는 시작 순으로 증가하므로 최대 ID가 최근 실행
-	 * 케이스 단건 실행·여기까지 실행·중지된 실행은 제외 (일부 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
+	 * 케이스 단건 실행·여기까지 실행·실패 다시 실행·중지된 실행은 제외 (일부 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
 	 */
 	List<TestRun> findLatestPerSuite();
 

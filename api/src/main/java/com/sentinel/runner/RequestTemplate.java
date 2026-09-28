@@ -1,6 +1,7 @@
 package com.sentinel.runner;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -22,6 +23,16 @@ public record RequestTemplate(HttpMethod method, String baseUrl, String path, Ma
 		Objects.requireNonNull(baseUrl, "baseUrl");
 		Objects.requireNonNull(path, "path");
 		headers = Headers.copyOf(headers);
+	}
+
+	/** 경로·헤더 값·본문이 참조하는 변수 이름 (등장 순) */
+	public Set<String> variableNames() {
+		VariableResolver none = new VariableResolver(Map.of());
+		Set<String> names = new LinkedHashSet<>();
+		none.resolve(path, names);
+		headers.values().forEach(values -> values.forEach(value -> none.resolve(value, names)));
+		none.resolve(body, names);
+		return Collections.unmodifiableSet(names);
 	}
 
 	/**

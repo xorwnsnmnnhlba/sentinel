@@ -213,7 +213,8 @@ curl -i -X POST localhost:8080/api/runs \
   -H 'Content-Type: application/json' -d '{"caseId": 1, "environmentId": 1}'
 ```
 
-- 본문 `suiteId`(스위트 전체), `caseId`(케이스 1건), `throughCaseId`(여기까지 실행) 중 정확히 하나 지정. 없거나 둘 이상이면 400
+- 본문 `suiteId`(스위트 전체), `caseId`(케이스 1건), `throughCaseId`(여기까지 실행), `rerunOf`(실패 다시 실행) 중 정확히 하나 지정. 없거나 둘 이상이면 400
+- `environmentId`는 `rerunOf` 외에는 필수. `rerunOf`는 원래 실행의 환경을 쓰므로 함께 지정하면 400
 - 202 + `Location: /api/runs/{id}`. 실행을 만들고 바로 응답하며 케이스는 백그라운드에서 순서대로 실행. 본문은 그 시점의 실행 (보통 `status: RUNNING`, `results` 비어 있음)
   - 완료 확인: `GET /api/runs/{id}`의 `status`가 `RUNNING`이 아닐 때까지 조회. 진행 중에는 끝난 케이스 결과가 `results`에 차례로 추가되고 `plannedCount`(실행할 케이스 수)로 진행률 계산
   - 동시에 진행 중인 수동 실행이 `sentinel.runner.manual.max-concurrent`(기본 4)이면 실행을 만들지 않고 429. 하나가 끝나면 다시 시도
@@ -231,6 +232,12 @@ curl -i -X POST localhost:8080/api/runs \
 - 여기까지 실행(`throughCaseId`)은 스위트의 처음부터 그 케이스까지 실행 순서대로 실행하고 뒤 케이스는 보내지 않음. 마지막 케이스를 `throughCase`(`{id, name}`)로 표시, 그 외 실행은 `null`
   - 앞 케이스가 추출하는 값을 쓰는 케이스를 스위트 전체 실행 없이 확인하는 용도 (뒤의 등록·삭제 요청 방지)
   - 일부 케이스만 실행하므로 단건 실행과 같이 스위트 단위 집계에서 제외
+- 실패 다시 실행(`{"rerunOf": 실행 ID}`)은 그 실행에서 판정 실패·오류가 난 케이스만 같은 환경에서 실행 순서대로 다시 실행. 원래 실행 ID를 `rerunOf`로 표시, 그 외 실행은 `null`
+  - 다시 실행하는 케이스가 `{{변수}}`로 쓰는 추출 값을 만드는 앞 케이스는 함께 실행 (연쇄). 같은 변수를 여러 케이스가 추출하면 바로 앞 케이스만. 함께 실행한 케이스는 결과의 `supporting: true` (그 외 결과는 `false`)
+  - 케이스는 현재 정의로 실행. 원래 실행 뒤 삭제된 케이스는 제외
+  - 원래 실행이 진행 중이거나 다시 실행할 실패 케이스가 없으면(모두 통과, 실패 케이스가 모두 삭제됨) 409. 원래 실행 뒤 스위트·환경이 삭제됐으면 404
+  - 다시 실행도 다시 실행 가능 (남은 실패만 반복 확인)
+  - 일부 케이스만 실행하므로 단건·여기까지 실행과 같이 스위트 단위 집계·직전 실행 비교에서 제외
 
 ### 결과 해석
 
@@ -283,8 +290,8 @@ curl -i -X POST localhost:8080/api/runs \
   | `UNCHANGED` | 통과 → 통과 |
   | `NEW` | 직전 실행에 없던 케이스 |
 
-- 비교하지 않는 실행(`previousRun`·`change` 모두 `null`): 첫 실행, 케이스 단건 실행·여기까지 실행(일부 케이스만 실행)
-- 직전 실행 후보에서 제외: 케이스 단건 실행·여기까지 실행, 완료되지 않은 실행(`RUNNING`·`ABORTED`·`CANCELED`)
+- 비교하지 않는 실행(`previousRun`·`change` 모두 `null`): 첫 실행, 케이스 단건 실행·여기까지 실행·실패 다시 실행(일부 케이스만 실행)
+- 직전 실행 후보에서 제외: 케이스 단건 실행·여기까지 실행·실패 다시 실행, 완료되지 않은 실행(`RUNNING`·`ABORTED`·`CANCELED`)
 - 오래된 실행을 조회해도 그 실행 바로 앞 실행과 비교 (조회 시점에 계산, 저장하지 않음)
 - 요청 URL의 변수 값은 인코딩하지 않음. 공백 등 URL에 쓸 수 없는 문자는 `INVALID_REQUEST`
 - 링크 로컬(`169.254.0.0/16`, `fe80::/10`)과 클라우드 메타데이터 주소(`fd00:ec2::254`, `100.100.100.200`)로는 전송하지 않고 `BLOCKED_DESTINATION`
@@ -379,6 +386,7 @@ curl -i -X POST localhost:8080/api/runs \
   - `triggeredBy`: 수동 실행을 시작한 사용자 `{id, name}`(이메일). 스케줄 실행과 이전 기록은 `null`
   - `testCase`: 케이스 단건 실행의 대상 `{id, name}`. 스위트 전체 실행은 `null`. 삭제(보관)된 케이스도 이름 표시
   - `throughCase`: 여기까지 실행의 마지막 케이스 `{id, name}`. 그 외 실행은 `null`
+  - `rerunOf`: 실패 다시 실행의 원래 실행 ID. 그 외 실행은 `null`
   - `plannedCount`: 실행할 케이스 수. 진행 중(`RUNNING`)이면 `summary.total`(끝난 케이스 수)과 비교해 진행률 표시. 이전 실행은 `null`
   - 필터: `projectId`, `suiteId`, `environmentId`, `status`(`RUNNING`/`COMPLETED`/`ABORTED`/`CANCELED`), 시작 시각 기간 `from`·`to`, `failing=true`(판정 실패·오류 결과가 하나 이상 있는 실행). 여러 개를 함께 지정하면 모두 만족하는 실행만
   - `from`·`to`는 `yyyy-MM-dd`이며 `sentinel.schedule.zone`(기본 `Asia/Seoul`) 기준. 시작일 00:00부터 종료일 다음 날 00:00 직전까지 (종료일 당일 포함)
@@ -434,7 +442,7 @@ curl -i -X POST localhost:8080/api/runs \
 
 - 보관되지 않은 모든 스위트 (프로젝트·스위트 이름 순), 실행한 적 없는 스위트도 포함
 - 항목: `suite`·`project`, 기간 안 실행 수 `runs`, 그중 실패·오류가 있는 실행 수 `failingRuns`, 판정별 결과 수 `results`, 통과 결과 비율 `passRate`(0~1, 결과 없으면 `null`), 기간과 무관한 최근 실행 `lastRun`(없으면 `null`)
-- 모든 값은 스위트 전체 실행 기준. 케이스 단건 실행·여기까지 실행·중지된 실행은 제외 (일부 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
+- 모든 값은 스위트 전체 실행 기준. 케이스 단건 실행·여기까지 실행·실패 다시 실행·중지된 실행은 제외 (일부 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
 - 스위트 수와 무관하게 쿼리 3회. 실행 행의 판정 수(V10)를 합산하여 결과 테이블을 읽지 않음
 
 ### 케이스 가져오기 (OpenAPI 3, Postman)
