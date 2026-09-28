@@ -44,7 +44,6 @@ import com.sentinel.runner.assertion.AssertionResult;
 import com.sentinel.runner.extract.Extractor;
 import com.sentinel.runner.extract.Extractor.Extraction;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Limit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -171,7 +170,7 @@ public class TestRunService {
 			TestCase through = testCases.findByIdAndArchivedAtIsNull(testCaseId)
 				.orElseThrow(() -> new NotFoundException("test case", testCaseId));
 			List<TestCase> suiteCases = testCases
-				.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(through.getSuite().getId());
+				.findActiveInRunOrder(through.getSuite().getId());
 			int last = IntStream.range(0, suiteCases.size())
 				.filter(index -> BaseEntity.same(suiteCases.get(index), through))
 				.findFirst()
@@ -195,7 +194,7 @@ public class TestRunService {
 	private Prepared prepareSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
 		return transactions.write(status -> {
 			TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
-			return start(suite, findEnvironment(environmentId), testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId), trigger,
+			return start(suite, findEnvironment(environmentId), testCases.findActiveInRunOrder(suiteId), trigger,
 					triggeredBy, null, null);
 		});
 	}
@@ -220,15 +219,15 @@ public class TestRunService {
 		}
 		return runs
 			.findPreviousWholeRuns(run.getSuite().getId(), run.getEnvironment().getId(), TestRun.Status.COMPLETED,
-					run.getStartedAt(), run.getId(), Limit.of(1))
+					run.getStartedAt(), run.getId(), 1)
 			.stream()
 			.findFirst()
 			.map(previous -> {
 				Map<Long, TestResult.Verdict> verdicts = new HashMap<>();
 				results.findCaseVerdictsByRunIds(List.of(previous.getId()))
 					.stream()
-					.filter(verdict -> verdict.getVerdict() != null)
-					.forEach(verdict -> verdicts.put(verdict.getCaseId(), verdict.getVerdict()));
+					.filter(verdict -> verdict.verdict() != null)
+					.forEach(verdict -> verdicts.put(verdict.caseId(), verdict.verdict()));
 				return new TestRunDetail.Previous(
 						new TestRunDetail.PreviousRun(previous.getId(), previous.getStartedAt()), verdicts);
 			})
@@ -281,7 +280,7 @@ public class TestRunService {
 			.toList();
 		// 단건 실행 등에서 다른 케이스가 추출하는 변수를 쓰면 미해결 변수 메시지로 안내하기 위해 스위트 전체의 추출 변수 이름 수집
 		List<TestCase> suiteCases = target == null && through == null ? cases
-				: testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId());
+				: testCases.findActiveInRunOrder(suite.getId());
 		Set<String> extractedInSuite = suiteCases.stream()
 			.flatMap(testCase -> testCase.getExtractors().stream())
 			.map(Extractor::name)

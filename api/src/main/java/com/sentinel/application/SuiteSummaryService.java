@@ -9,6 +9,7 @@ import java.util.Map;
 
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.infra.persistence.TestRunQueries;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,20 +46,20 @@ public class SuiteSummaryService {
 		List<TestSuite> active = suites.findActiveWithProject();
 
 		// 실행 수·실패 실행 수·판정별 결과 수를 실행 행의 판정 수(V10)로 한 번에 집계 (결과 테이블 미사용)
-		Map<Long, TestRunRepository.SuiteRunTotals> totals = new HashMap<>();
-		runs.summarizeBySuite(period.start(), period.end()).forEach(total -> totals.put(total.getSuiteId(), total));
+		Map<Long, TestRunQueries.SuiteRunTotals> totals = new HashMap<>();
+		runs.summarizeBySuite(period.start(), period.end()).forEach(total -> totals.put(total.suiteId(), total));
 
 		Map<Long, TestRun> latest = new HashMap<>();
 		runs.findLatestPerSuite().forEach(run -> latest.put(run.getSuite().getId(), run));
 
 		List<SuiteSummary> summaries = active.stream().map(suite -> {
-			TestRunRepository.SuiteRunTotals total = totals.get(suite.getId());
+			TestRunQueries.SuiteRunTotals total = totals.get(suite.getId());
 			TestRun last = latest.get(suite.getId());
 			return SuiteSummary.of(new IdName(suite.getId(), suite.getName()),
 					new IdName(suite.getProject().getId(), suite.getProject().getName()),
-					total == null ? 0 : total.getRuns(), total == null ? 0 : total.getFailingRuns(),
+					total == null ? 0 : total.runs(), total == null ? 0 : total.failingRuns(),
 					total == null ? new TestRunDetail.Summary(0, 0, 0, 0)
-							: summary(total.getPassed(), total.getFailed(), total.getErrors()),
+							: summary(total.passed(), total.failed(), total.errors()),
 					last == null ? null : LastRun.of(last,
 							summary(last.getPassedCount(), last.getFailedCount(), last.getErrorCount())));
 		}).toList();

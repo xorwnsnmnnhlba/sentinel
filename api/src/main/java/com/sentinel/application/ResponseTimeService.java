@@ -101,7 +101,7 @@ public class ResponseTimeService {
 				period.end())) {
 			byCase.put(((Number) row[0]).longValue(), Stats.of(row, 1));
 		}
-		List<CaseStats> cases = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId)
+		List<CaseStats> cases = testCases.findActiveInRunOrder(suiteId)
 			.stream()
 			.map(testCase -> CaseStats.of(testCase, byCase.getOrDefault(testCase.getId(), Stats.NONE)))
 			.toList();

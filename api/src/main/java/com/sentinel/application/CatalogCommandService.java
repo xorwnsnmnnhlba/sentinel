@@ -208,7 +208,7 @@ public class CatalogCommandService {
 		if (caseOrder.stream().anyMatch(Objects::isNull) || new HashSet<>(caseOrder).size() != caseOrder.size()) {
 			throw new InvalidRequestException("caseOrder must list each case once");
 		}
-		List<TestCase> cases = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId);
+		List<TestCase> cases = testCases.findActiveInRunOrder(suiteId);
 		Map<Long, TestCase> byId = cases.stream().collect(Collectors.toMap(TestCase::getId, testCase -> testCase));
 		if (!byId.keySet().equals(Set.copyOf(caseOrder))) {
 			throw new ConflictException(
@@ -256,7 +256,7 @@ public class CatalogCommandService {
 
 	/** 새 케이스를 after 바로 뒤로 옮기고 스위트 실행 순서를 1부터 다시 매김 */
 	private void placeAfter(long suiteId, TestCase created, TestCase after) {
-		List<TestCase> ordered = new ArrayList<>(testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId));
+		List<TestCase> ordered = new ArrayList<>(testCases.findActiveInRunOrder(suiteId));
 		ordered.remove(created);
 		ordered.add(ordered.indexOf(after) + 1, created);
 		for (int i = 0; i < ordered.size(); i++) {
@@ -374,7 +374,7 @@ public class CatalogCommandService {
 	}
 
 	private void archive(TestSuite suite, Instant now) {
-		testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId()).forEach(testCase -> testCase.archive(now));
+		testCases.findActiveInRunOrder(suite.getId()).forEach(testCase -> testCase.archive(now));
 		// 프로젝트 연쇄 보관 시 환경 쪽에서 먼저 보관된 스케줄은 조회 시점 자동 flush로 제외됨
 		schedules.findBySuiteIdAndArchivedAtIsNullOrderById(suite.getId()).forEach(schedule -> schedule.archive(now));
 		suite.archive(now);

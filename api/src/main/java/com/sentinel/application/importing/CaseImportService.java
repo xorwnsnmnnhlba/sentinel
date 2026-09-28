@@ -59,7 +59,7 @@ public class CaseImportService {
 			case OPENAPI_3 -> openApiConverter.convert(content);
 			case POSTMAN -> postmanConverter.convert(content);
 		};
-		Set<String> existingNames = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId)
+		Set<String> existingNames = testCases.findActiveInRunOrder(suiteId)
 			.stream()
 			.map(TestCase::getName)
 			.collect(Collectors.toSet());

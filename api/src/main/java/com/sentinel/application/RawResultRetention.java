@@ -11,7 +11,6 @@ import com.sentinel.infra.persistence.TestRunRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
 /**
@@ -54,12 +53,12 @@ public class RawResultRetention {
 	}
 
 	private Purged purgeBatch(Instant cutoff, Instant now) {
-		List<TestRun> targets = runs.findByRawPurgedAtIsNullAndStartedAtBeforeAndStatusNotOrderByStartedAt(cutoff,
-				TestRun.Status.RUNNING, Limit.of(properties.batchSize()));
+		List<TestRun> targets = runs.findRawPurgeTargets(cutoff, TestRun.Status.RUNNING,
+				properties.batchSize());
 		if (targets.isEmpty()) {
 			return Purged.NONE;
 		}
-		int purgedResults = results.purgeRawByRunIds(targets.stream().map(BaseEntity::getId).toList());
+		long purgedResults = results.purgeRawByRunIds(targets.stream().map(BaseEntity::getId).toList());
 		targets.forEach(run -> run.markRawPurged(now));
 		return new Purged(targets.size(), purgedResults);
 	}
@@ -68,7 +67,7 @@ public class RawResultRetention {
 	 * @param runs 원문을 정리한 실행 수
 	 * @param results 원문을 비운 결과 건수
 	 */
-	public record Purged(int runs, int results) {
+	public record Purged(int runs, long results) {
 
 		static final Purged NONE = new Purged(0, 0);
 

@@ -100,7 +100,7 @@ class CaseImportTest {
 		body.extractingPath("$.cases[1].assertions[0].anyOf").isEqualTo(List.of("201"));
 		body.extractingPath("$.cases[2].request.path").isEqualTo("/orders/{{orderId}}");
 		// 미리보기는 저장하지 않음
-		assertThat(testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId())).hasSize(1);
+		assertThat(testCases.findActiveInRunOrder(suite.getId())).hasSize(1);
 	}
 
 	@Test
@@ -117,7 +117,7 @@ class CaseImportTest {
 		assertThat(imported).hasStatus(HttpStatus.CREATED);
 		assertThat(imported).bodyJson().extractingPath("$.suiteId").isEqualTo(suite.getId().intValue());
 		assertThat(imported).bodyJson().extractingPath("$.cases[*].name").isEqualTo(List.of("Create order", "Get one order"));
-		List<TestCase> saved = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId());
+		List<TestCase> saved = testCases.findActiveInRunOrder(suite.getId());
 		assertThat(saved).extracting(TestCase::getName).containsExactly("Create order", "Get one order");
 		assertThat(saved.getFirst().getRequest().getBody()).contains("\"item\": 1");
 		assertThat(saved.get(1).getRequest().getPath()).isEqualTo("/orders/{{orderId}}");
@@ -150,7 +150,7 @@ class CaseImportTest {
 		assertThat(post("/api/case-imports", """
 				{"suiteId": %d, "cases": %s}""".formatted(suite.getId(), json.writeValueAsString(candidates))))
 			.hasStatus(HttpStatus.CREATED);
-		assertThat(testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId())).singleElement()
+		assertThat(testCases.findActiveInRunOrder(suite.getId())).singleElement()
 			.satisfies(saved -> assertThat(saved.getRequest().getHeaders())
 				.containsEntry("Authorization", List.of("Bearer {{bearerToken}}")));
 	}
@@ -158,7 +158,7 @@ class CaseImportTest {
 	@Test
 	void importsNothingWhenAnyCaseConflicts() {
 		fixtures.testCase(suite, HttpMethod.GET, "/orders", null, null);
-		String existingName = testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId()).getFirst().getName();
+		String existingName = testCases.findActiveInRunOrder(suite.getId()).getFirst().getName();
 
 		MvcTestResult conflict = post("/api/case-imports", """
 				{"suiteId": %d, "cases": [
@@ -168,7 +168,7 @@ class CaseImportTest {
 
 		assertThat(conflict).hasStatus(HttpStatus.CONFLICT);
 		// 앞선 케이스도 등록되지 않음
-		assertThat(testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId())).hasSize(1);
+		assertThat(testCases.findActiveInRunOrder(suite.getId())).hasSize(1);
 
 		// 목록 안에서 겹치는 이름도 거부
 		assertThat(post("/api/case-imports", """
@@ -176,7 +176,7 @@ class CaseImportTest {
 				  {"name": "Twice", "request": {"method": "GET", "path": "/a"}},
 				  {"name": "Twice", "request": {"method": "GET", "path": "/b"}}
 				]}""".formatted(suite.getId()))).hasStatus(HttpStatus.CONFLICT);
-		assertThat(testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId())).hasSize(1);
+		assertThat(testCases.findActiveInRunOrder(suite.getId())).hasSize(1);
 	}
 
 	@Test
@@ -192,7 +192,7 @@ class CaseImportTest {
 			.extractingPath("$.detail")
 			.asString()
 			.startsWith("cases[1] 'Broken': path must start with");
-		assertThat(testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suite.getId())).isEmpty();
+		assertThat(testCases.findActiveInRunOrder(suite.getId())).isEmpty();
 	}
 
 	@Test

@@ -8,18 +8,18 @@ import java.util.Objects;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.Predicate;
 import com.sentinel.domain.ChangeLog;
 import com.sentinel.domain.ChangeLog.Action;
 import com.sentinel.domain.ChangeLog.TargetType;
+import com.sentinel.domain.QChangeLog;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.ChangeLogRepository;
 import com.sentinel.infra.persistence.UserRepository;
-import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,8 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChangeLogService {
 
 	public static final int MAX_PAGE_SIZE = 100;
-
-	private static final Sort NEWEST_FIRST = Sort.by(Sort.Order.desc("id"));
 
 	private final ChangeLogRepository changeLogs;
 
@@ -68,8 +66,8 @@ public class ChangeLogService {
 	 */
 	@Transactional(readOnly = true)
 	public PageResponse<ChangeLogItem> list(Filter filter, int page, int size) {
-		PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE), NEWEST_FIRST);
-		Page<ChangeLog> found = changeLogs.findAll(filter.toSpecification(), pageable);
+		PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE));
+		Page<ChangeLog> found = changeLogs.findNewestFirst(filter.toPredicate(), pageable);
 		Map<Long, IdName> actors = actors(found.getContent());
 		return PageResponse.of(found, found.getContent()
 			.stream()
@@ -148,23 +146,22 @@ public class ChangeLogService {
 			return new Filter(null, null, null, null);
 		}
 
-		Specification<ChangeLog> toSpecification() {
-			return (root, query, builder) -> {
-				List<Predicate> conditions = new ArrayList<>();
-				if (targetType != null) {
-					conditions.add(builder.equal(root.get("targetType"), targetType));
-				}
-				if (targetId != null) {
-					conditions.add(builder.equal(root.get("targetId"), targetId));
-				}
-				if (projectId != null) {
-					conditions.add(builder.equal(root.get("projectId"), projectId));
-				}
-				if (suiteId != null) {
-					conditions.add(builder.equal(root.get("suiteId"), suiteId));
-				}
-				return builder.and(conditions.toArray(Predicate[]::new));
-			};
+		Predicate toPredicate() {
+			QChangeLog log = QChangeLog.changeLog;
+			BooleanBuilder conditions = new BooleanBuilder();
+			if (targetType != null) {
+				conditions.and(log.targetType.eq(targetType));
+			}
+			if (targetId != null) {
+				conditions.and(log.targetId.eq(targetId));
+			}
+			if (projectId != null) {
+				conditions.and(log.projectId.eq(projectId));
+			}
+			if (suiteId != null) {
+				conditions.and(log.suiteId.eq(suiteId));
+			}
+			return conditions;
 		}
 
 	}

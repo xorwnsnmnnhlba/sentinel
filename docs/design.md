@@ -98,7 +98,7 @@ sentinel/
 |------|------|
 | Java | 25 |
 | BE | Spring Boot 4.1 (Spring Framework 7.0.8 기반) |
-| ORM | JPA (heavy query 부재, 단순 스키마) |
+| ORM | JPA + QueryDSL 7.7 (OpenFeign 포크). 조건 조회·일괄 변경은 Q-타입으로 조립 (2026-09-28 `@Query` 문자열에서 전환, 아래 "조회 작성 방식") |
 | DB | PostgreSQL — 개발기 AWS RDS의 sentinel 스키마 |
 | 실행기 | RestClient + Apache HttpClient 5 (2026-09-26 JDK HttpClient에서 전환, DNS rebinding 방어) |
 | 스케줄 | DB 폴링 (5장 참조) |
@@ -231,6 +231,14 @@ ANSI SQL 표준 준수 (2026-09-19). 마이그레이션, 샘플, 운영 쿼리 �
   - 성능 점검 도구(`scripts/perf/seed-history.sql`)의 `generate_series`·`random`: 앱 SQL이 아닌 대량 생성 도구
 - 표준 집계·시간대 문법 사용: 백분위 `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ...)`, 날짜 변환 `CAST(... AT TIME ZONE ... AS DATE)`
 - 네이티브 쿼리의 테이블은 `{h-schema}`(Hibernate 기본 스키마 치환)로 한정. 네이티브 쿼리에는 `hibernate.default_schema`가 적용되지 않아 JDBC URL의 `currentSchema`에 의존하지 않도록 함
+
+### 조회 작성 방식 (2026-09-28)
+- JPQL `@Query` 19건(일괄 변경 5건 포함)과 `Specification` 2건을 QueryDSL로 전환 (호출처 없는 만료 세션 삭제 1건은 삭제). 문자열 쿼리는 엔티티 필드 이름을 바꿔도 컴파일되고 실행 시점에야 실패하므로 Q-타입으로 컴파일 시점에 확인
+- 원본 `com.querydsl`은 5.1.0 이후 새 릴리스가 없어 Hibernate 7 대응을 보장할 수 없으므로, 유지보수 중인 OpenFeign 포크(`io.github.openfeign.querydsl`) 사용. Spring Data의 `QuerydslPredicateExecutor` 대신 저장소별 사용자 정의 조각(`XxxQueries` + `XxxQueriesImpl`)으로 조인 로딩·정렬·건수 쿼리를 직접 지정
+- 파생 쿼리 메서드는 조건 1~2개의 단순 조회만. 조건이 많아 이름이 긴 파생 쿼리(`findBySuiteIdAndEnvironmentIdAndTriggerAndStatusAndIdLessThanOrderByIdDesc` 등)는 의도를 드러내는 이름(`findPreviousRuns`)의 QueryDSL 메서드로 교체
+- 네이티브 SQL 4건 유지: 응답시간 백분위(`PERCENTILE_CONT ... WITHIN GROUP`) 3건, 구조 지문 기준선(`LATERAL` + `FETCH FIRST`) 1건. JPQL·QueryDSL에 대응 문법 없음
+- 전환 후 생성 SQL을 전환 전과 비교: 조건·정렬·`FETCH FIRST` 동일. 직전 실행 조회의 시작 시각 상한이 인덱스 범위 조건으로 유지됨을 45일치 이력 실행 계획으로 확인 (0.08ms)
+- 실행 목록의 스위트·프로젝트 조건은 조인 로딩한 테이블의 ID로 생성(`s.id = ?`). PostgreSQL이 조인 조건으로 `test_run.suite_id` 조건을 도출하여 같은 인덱스(`idx_run_suite_time`) 사용 확인
 
 ```sql
 CREATE SCHEMA sentinel;
