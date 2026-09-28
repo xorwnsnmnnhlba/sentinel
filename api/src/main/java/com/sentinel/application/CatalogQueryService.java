@@ -3,6 +3,7 @@ package com.sentinel.application;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -19,6 +20,7 @@ import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.extract.Extractor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class CatalogQueryService {
+
+	/** 케이스 검색 결과 최대 수. 넘으면 검색어를 구체적으로 */
+	public static final int MAX_SEARCH_RESULTS = 100;
+
+	static final int MAX_QUERY_LENGTH = 200;
 
 	private final ProjectRepository projects;
 
@@ -88,9 +95,34 @@ public class CatalogQueryService {
 	 * @param suiteId null이면 전체
 	 */
 	public List<CaseItem> listCases(Long suiteId) {
-		List<TestCase> found = suiteId == null ? testCases.findByArchivedAtIsNullOrderBySuiteIdAscRunOrderAscIdAsc()
-				: testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId);
-		return found.stream().map(CaseItem::of).toList();
+		return listCases(suiteId, null);
+	}
+
+	/**
+	 * @param suiteId null이면 전체
+	 * @param query 지정 시 이름·경로 부분 일치 검색 (대소문자 무시, 앞뒤 공백 제거), 최대 {@value #MAX_SEARCH_RESULTS}건
+	 * @throws InvalidRequestException 빈 검색어, {@value #MAX_QUERY_LENGTH}자 초과
+	 */
+	public List<CaseItem> listCases(Long suiteId, String query) {
+		if (query == null) {
+			List<TestCase> found = suiteId == null ? testCases.findByArchivedAtIsNullOrderBySuiteIdAscRunOrderAscIdAsc()
+					: testCases.findBySuiteIdAndArchivedAtIsNullOrderByRunOrderAscIdAsc(suiteId);
+			return found.stream().map(CaseItem::of).toList();
+		}
+		String trimmed = query.strip();
+		if (trimmed.isEmpty() || trimmed.length() > MAX_QUERY_LENGTH) {
+			throw new InvalidRequestException("q must be 1-" + MAX_QUERY_LENGTH + " characters");
+		}
+		return testCases.search(likePattern(trimmed), suiteId, Limit.of(MAX_SEARCH_RESULTS))
+			.stream()
+			.map(CaseItem::of)
+			.toList();
+	}
+
+	/** 검색어를 문자 그대로 찾도록 LIKE 특수 문자 이스케이프 */
+	private static String likePattern(String query) {
+		String escaped = query.toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+		return "%" + escaped + "%";
 	}
 
 	public CaseItem getCase(long caseId) {

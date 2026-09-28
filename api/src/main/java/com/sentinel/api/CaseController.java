@@ -30,9 +30,12 @@ class CaseController {
 
 	private final CurrentUser currentUser;
 
+	/**
+	 * 목록. q 지정 시 이름·경로 부분 일치 검색 (대소문자 무시, 최대 100건), suiteId와 함께 쓰면 그 스위트 안에서
+	 */
 	@GetMapping
-	List<CaseItem> list(@RequestParam(required = false) Long suiteId) {
-		return catalog.listCases(suiteId);
+	List<CaseItem> list(@RequestParam(required = false) Long suiteId, @RequestParam(required = false) String q) {
+		return catalog.listCases(suiteId, q);
 	}
 
 	@GetMapping("/{caseId}")
