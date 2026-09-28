@@ -40,3 +40,8 @@ export function prettyBody(body: string | null | undefined): string {
     return body;
   }
 }
+
+/** 진행률 문구. 예: "12건 중 5건", 계획 수를 모르면 "5건" */
+export function formatProgress(done: number, planned: number | null): string {
+  return planned === null ? `${done}건` : `${planned}건 중 ${done}건`;
+}

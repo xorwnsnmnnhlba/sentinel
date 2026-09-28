@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime, formatElapsed, formatRunDuration, prettyBody } from "./format";
+import { formatDateTime, formatElapsed, formatProgress, formatRunDuration, prettyBody } from "./format";
 
 describe("formatDateTime", () => {
   it("shows KST regardless of the runtime time zone", () => {
@@ -38,5 +38,13 @@ describe("prettyBody", () => {
     expect(prettyBody('{"a":1}')).toBe('{\n  "a": 1\n}');
     expect(prettyBody("<html>")).toBe("<html>");
     expect(prettyBody(null)).toBe("");
+  });
+});
+
+describe("formatProgress", () => {
+  it("shows done out of planned, or only done without a plan", () => {
+    expect(formatProgress(5, 12)).toBe("12건 중 5건");
+    expect(formatProgress(0, 3)).toBe("3건 중 0건");
+    expect(formatProgress(4, null)).toBe("4건");
   });
 });

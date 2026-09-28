@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import { RunCountBadges, StatusBadge, TriggerBadge } from "@/components/run-badges";
 import { RunFilters, type RunFilterValues } from "@/components/runs/run-filters";
@@ -7,9 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiGet } from "@/lib/api/server";
 import type { EnvironmentItem, Page, ProjectItem, RunSummary, SuiteItem } from "@/lib/api/types";
-import { formatDateTime, formatRunDuration } from "@/lib/format";
+import { formatDateTime, formatProgress, formatRunDuration } from "@/lib/format";
 
 const PAGE_SIZE = 20;
+
+/** 진행 중인 실행이 보이면 이 주기로 목록을 다시 받아 상태·결과 갱신 */
+const REFRESH_MS = 3000;
 
 export const metadata = { title: "실행 이력 · Sentinel" };
 
@@ -37,12 +41,17 @@ export default async function RunsPage(props: PageProps<"/runs">) {
     apiGet<EnvironmentItem[]>("/api/environments"),
   ]);
 
+  const running = runs.content.some((run) => run.status === "RUNNING");
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="실행 이력"
-        description={`최신순. ${hasFilter ? "조건에 맞는 실행" : "전체"} ${runs.totalElements}건`}
+        description={`최신순. ${hasFilter ? "조건에 맞는 실행" : "전체"} ${runs.totalElements}건${
+          running ? ". 진행 중인 실행이 있어 3초마다 새로 고침" : ""
+        }`}
       />
+      {running && <AutoRefresh intervalMs={REFRESH_MS} />}
 
       <RunFilters projects={projects} suites={suites} environments={environments} values={filters} />
 
@@ -90,6 +99,11 @@ export default async function RunsPage(props: PageProps<"/runs">) {
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={run.status} />
+                    {run.status === "RUNNING" && (
+                      <div className="text-xs text-muted-foreground">
+                        {formatProgress(run.summary.total, run.plannedCount)} 완료
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <RunCountBadges counts={run.summary} />

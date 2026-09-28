@@ -366,6 +366,7 @@ curl -i -X POST localhost:8080/api/runs \
   - `triggeredBy`: 수동 실행을 시작한 사용자 `{id, name}`(이메일). 스케줄 실행과 이전 기록은 `null`
   - `testCase`: 케이스 단건 실행의 대상 `{id, name}`. 스위트 전체 실행은 `null`. 삭제(보관)된 케이스도 이름 표시
   - `throughCase`: 여기까지 실행의 마지막 케이스 `{id, name}`. 그 외 실행은 `null`
+  - `plannedCount`: 실행할 케이스 수. 진행 중(`RUNNING`)이면 `summary.total`(끝난 케이스 수)과 비교해 진행률 표시. 이전 실행은 `null`
   - 필터: `projectId`, `suiteId`, `environmentId`, `status`(`RUNNING`/`COMPLETED`/`ABORTED`/`CANCELED`), 시작 시각 기간 `from`·`to`, `failing=true`(판정 실패·오류 결과가 하나 이상 있는 실행). 여러 개를 함께 지정하면 모두 만족하는 실행만
   - `from`·`to`는 `yyyy-MM-dd`이며 `sentinel.schedule.zone`(기본 `Asia/Seoul`) 기준. 시작일 00:00부터 종료일 다음 날 00:00 직전까지 (종료일 당일 포함)
   - 실행 건수와 무관하게 페이지당 쿼리 최대 4회 (이름 함께 로딩, 전체 건수, 실행 주체 일괄 조회, 단건 실행 대상 일괄 조회). 판정 건수와 `failing` 조건은 실행 행에 보관한 판정 수(V10)를 사용하여 결과 테이블을 읽지 않음
