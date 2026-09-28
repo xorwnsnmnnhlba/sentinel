@@ -111,6 +111,7 @@ class RunControllerTest {
 		var listed = assertThat(mvc.get().uri("/api/runs")).bodyJson();
 		listed.extractingPath("$.content[0].throughCase.id").isEqualTo(through.getId().intValue());
 		listed.extractingPath("$.content[0].testCase").isNull();
+		listed.extractingPath("$.content[0].plannedCount").isEqualTo(2);
 	}
 
 	@Test

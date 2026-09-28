@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { Empty, SectionHeader } from "@/components/catalog/section";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import {
   RunCountBadges,
@@ -19,7 +20,15 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { cancelRun } from "@/lib/actions/catalog";
 import { apiGetOrNotFound } from "@/lib/api/server";
 import type { RunDetail } from "@/lib/api/types";
-import { formatDateTime, formatElapsed, formatRunDuration } from "@/lib/format";
+import { formatDateTime, formatElapsed, formatProgress, formatRunDuration } from "@/lib/format";
+
+/**
+ * 중지 뒤 진행 중이던 케이스 결과가 기록될 때까지 새로 고치는 시간. 케이스 1건의 최대 소요(연결 5초 + 응답 대기 30초)에 여유
+ */
+const CANCEL_SETTLE_MS = 40_000;
+
+/** 진행 중·중지 직후 새로 고침 주기 (결과 화면의 진행 표시와 같음) */
+const REFRESH_MS = 1500;
 
 export async function generateMetadata(props: PageProps<"/runs/[id]">) {
   const { id } = await props.params;
@@ -69,13 +78,18 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
           <RunProgress done={run.results.length} planned={run.plannedCount} />
         ) : (
           <>
+            {run.status === "CANCELED" &&
+              run.finishedAt &&
+              (run.plannedCount === null || run.results.length < run.plannedCount) && (
+                // 중지 시점에 보낸 케이스가 끝나면 결과가 추가되므로 잠시 더 새로 고침
+                <AutoRefresh
+                  intervalMs={REFRESH_MS}
+                  until={new Date(Date.parse(run.finishedAt) + CANCEL_SETTLE_MS).toISOString()}
+                />
+              )}
             {run.status === "CANCELED" && (
               <p className="text-sm">
-                중지됨 ·{" "}
-                {run.plannedCount === null
-                  ? `${run.results.length}건 실행`
-                  : `${run.plannedCount}건 중 ${run.results.length}건 실행`}
-                . 남은 케이스는 보내지 않았습니다
+                중지됨 · {formatProgress(run.results.length, run.plannedCount)} 실행. 남은 케이스는 보내지 않았습니다
               </p>
             )}
             <ChangeSummary run={run} />

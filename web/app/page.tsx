@@ -1,9 +1,10 @@
 import Link from "next/link";
 
+import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import { PassRateMeter } from "@/components/dashboard/pass-rate-meter";
 import { StatTile } from "@/components/dashboard/stat-tile";
-import { RunCountBadges, StatusBadge } from "@/components/run-badges";
+import { RunCountBadges, StatusBadge, TriggerBadge } from "@/components/run-badges";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiGet } from "@/lib/api/server";
@@ -20,11 +21,15 @@ import {
   previousRange,
   totals,
 } from "@/lib/dashboard";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatProgress } from "@/lib/format";
 import { formatMs, kstDateRange } from "@/lib/response-times";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "대시보드 · Sentinel" };
+
+/** 진행 중인 실행 표시 수와 새로 고침 주기 */
+const RUNNING_LIMIT = 10;
+const RUNNING_REFRESH_MS = 3000;
 
 /**
  * 홈 대시보드. 기간(최근 7·30일, KST) 동안의 실행 현황과 이전 같은 길이 기간 대비 변화
@@ -36,11 +41,12 @@ export default async function Dashboard(props: PageProps<"/">) {
   const previous = previousRange(current.from, days);
   const range = (period: { from: string; to: string }) => `from=${period.from}&to=${period.to}`;
 
-  const [summaries, previousSummaries, failingRuns, changes] = await Promise.all([
+  const [summaries, previousSummaries, failingRuns, changes, running] = await Promise.all([
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
     apiGet<Page<RunSummary>>(`/api/runs?failing=true&size=5&${range(current)}`),
     apiGet<ResponseTimeChanges>(`/api/response-time-changes?limit=5&${range(current)}`),
+    apiGet<Page<RunSummary>>(`/api/runs?status=RUNNING&size=${RUNNING_LIMIT}`),
   ]);
   const now = totals(summaries.suites);
   const before = totals(previousSummaries.suites);
@@ -56,6 +62,62 @@ export default async function Dashboard(props: PageProps<"/">) {
         description={`${current.from} ~ ${current.to} (KST) 실행 현황`}
         actions={<PeriodLinks days={days} />}
       />
+
+      {running.totalElements > 0 && (
+        <section className="space-y-3">
+          {/* 끝나면 목록에서 빠지도록 진행 중인 실행이 있는 동안만 새로 고침 */}
+          <AutoRefresh intervalMs={RUNNING_REFRESH_MS} />
+          <SectionTitle
+            title={`진행 중인 실행 ${running.totalElements}건`}
+            description="스케줄·수동 실행 모두. 끝나면 자동으로 목록에서 빠짐"
+          />
+          <div className="rounded-xl border">
+            <Table aria-label="진행 중인 실행">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>스위트</TableHead>
+                  <TableHead className="hidden md:table-cell">환경</TableHead>
+                  <TableHead>주체</TableHead>
+                  <TableHead>진행</TableHead>
+                  <TableHead className="hidden md:table-cell">시작 (KST)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {running.content.map((run) => (
+                  <TableRow key={run.id}>
+                    <TableCell className="whitespace-normal">
+                      <Link href={`/runs/${run.id}`} className="font-medium hover:underline">
+                        #{run.id} {run.suite.name}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">
+                        {run.project.name}
+                        {run.testCase && <> · 케이스 단건: {run.testCase.name}</>}
+                        {run.throughCase && <> · {run.throughCase.name}까지</>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{run.environment.name}</TableCell>
+                    <TableCell>
+                      <TriggerBadge trigger={run.trigger} />
+                      {run.triggeredBy && <div className="text-xs text-muted-foreground">{run.triggeredBy.name}</div>}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {formatProgress(run.summary.total, run.plannedCount)} 완료
+                    </TableCell>
+                    <TableCell className="hidden font-mono text-xs md:table-cell">
+                      {formatDateTime(run.startedAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          {running.totalElements > RUNNING_LIMIT && (
+            <Link href="/runs?status=RUNNING" className="text-sm underline-offset-4 hover:underline">
+              진행 중인 실행 모두 보기
+            </Link>
+          )}
+        </section>
+      )}
 
       <section aria-label="요약" className="grid gap-4 sm:grid-cols-3">
         <StatTile

@@ -43,6 +43,8 @@ export interface RunSummary {
   testCase: IdName | null;
   /** 여기까지 실행(스위트 처음부터 이 케이스까지)의 마지막 케이스. 그 외 실행은 null */
   throughCase: IdName | null;
+  /** 실행할 케이스 수. 진행 중이면 summary.total과 비교해 진행률 표시. 이전 실행은 null */
+  plannedCount: number | null;
 }
 
 export interface AssertionResult {
