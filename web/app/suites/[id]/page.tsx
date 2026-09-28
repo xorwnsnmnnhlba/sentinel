@@ -33,7 +33,7 @@ import {
 } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
 import type { CaseItem, EnvironmentItem, ProjectItem, ScheduleDetail, SuiteItem } from "@/lib/api/types";
-import { historyHref } from "@/lib/change-log";
+import { historyHref, suiteHistoryHref } from "@/lib/change-log";
 import { formatDateTime } from "@/lib/format";
 
 import { ResponseTimes } from "./response-times";
@@ -82,7 +82,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
             <RunSuiteForm environments={environments} caseCount={cases.length} action={runSuite.bind(null, suite.id)} />
             <ActionMenu
               label={`스위트 ${suite.name} 작업`}
-              items={withHistory(EDIT_DELETE, historyHref("SUITE", suite.id))}
+              items={withHistory(EDIT_DELETE, suiteHistoryHref(suite.id))}
               size="page"
             >
               <FormDialog

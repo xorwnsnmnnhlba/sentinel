@@ -356,7 +356,7 @@ curl -i -X POST localhost:8080/api/runs \
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
 | 응답시간 변화 | `GET /api/response-time-changes?from=&to=&limit=5` | | | |
 | 스위트 요약 | `GET /api/suite-summaries?from=&to=` | | | |
-| 변경 이력 | `GET /api/change-logs?targetType=&targetId=&projectId=&page=0&size=20` | | | |
+| 변경 이력 | `GET /api/change-logs?targetType=&targetId=&projectId=&suiteId=&page=0&size=20` | | | |
 
 - 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
 - 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
@@ -520,12 +520,13 @@ curl -i -X POST localhost:8080/api/runs \
   - `action`: `CREATED` / `UPDATED` / `DELETED`
   - `targetName`: 변경 당시 이름. 항목을 삭제해도 표시 가능. 스케줄은 스위트 이름
   - `projectId`: 소속 프로젝트. 사용자·초대는 `null`
+  - `suiteId`: 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 `null`
   - `fields`: 수정에서 값이 실제로 바뀐 항목 이름. 등록·삭제는 빈 목록
 - `fields` 값: 프로젝트·스위트 `name`·`description`, 스위트 `caseOrder`, 환경 `name`·`baseUrl`·`variables.<키>`·`secrets.<이름>`, 케이스 `name`·`request`·`assertions`·`extractors`, 스케줄 `environment`·`cron`·`enabled`, 사용자 `password`·`passwordResetLink`
 - 값은 남기지 않음 (변수 값, 시크릿, 비밀번호, 링크 토큰 모두). 시크릿은 암호화 값을 비교할 수 없어 요청에 있던 이름을 모두 변경으로 기록
 - 같은 값으로 저장한 수정은 기록하지 않음. 삭제는 대상 1건만 기록 (프로젝트 삭제 시 함께 보관되는 환경·스위트·케이스·스케줄은 따로 기록하지 않음)
 - 스케줄러가 다음 실행 시각을 옮기는 것과 실행 자체는 기록하지 않음 (실행은 실행 이력)
-- 조회: 최신순, `size` 1~100. `targetType`+`targetId`는 항목 1건, `projectId`는 프로젝트와 그 안의 항목 전체. 잘못된 `targetType`은 400
+- 조회: 최신순, `size` 1~100. `targetType`+`targetId`는 항목 1건, `projectId`는 프로젝트와 그 안의 항목 전체, `suiteId`는 스위트와 그 안의 케이스·스케줄. 잘못된 `targetType`은 400
 - 이 기능 이전(V13 전)의 변경은 기록이 없음
 
 ## 스케줄 실행

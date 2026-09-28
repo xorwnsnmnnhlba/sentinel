@@ -350,6 +350,8 @@ export interface ChangeLogItem {
   targetName: string;
   /** 사용자·초대는 null */
   projectId: number | null;
+  /** 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 null */
+  suiteId: number | null;
   action: ChangeAction;
   /** 수정에서 값이 바뀐 항목 이름. 예: name, variables.userId, secrets.token */
   fields: string[];

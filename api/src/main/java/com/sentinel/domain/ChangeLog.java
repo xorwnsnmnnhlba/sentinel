@@ -56,6 +56,9 @@ public class ChangeLog extends BaseEntity {
 	/** 소속 프로젝트. 사용자·초대는 null */
 	private Long projectId;
 
+	/** 소속 스위트 (V17). 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 null */
+	private Long suiteId;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private Action action;
@@ -66,13 +69,14 @@ public class ChangeLog extends BaseEntity {
 	private List<String> fields = new ArrayList<>();
 
 	public ChangeLog(Long actorId, TargetType targetType, long targetId, String targetName, Long projectId,
-			Action action, List<String> fields) {
+			Long suiteId, Action action, List<String> fields) {
 		this.actorId = actorId;
 		this.targetType = Objects.requireNonNull(targetType, "targetType");
 		this.targetId = targetId;
 		String name = Objects.requireNonNull(targetName, "targetName");
 		this.targetName = name.length() <= MAX_NAME_LENGTH ? name : name.substring(0, MAX_NAME_LENGTH);
 		this.projectId = projectId;
+		this.suiteId = suiteId;
 		this.action = Objects.requireNonNull(action, "action");
 		this.fields = new ArrayList<>(fields);
 	}

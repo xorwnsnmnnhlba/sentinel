@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <ul>
  * <li>V10: 실행별 판정 수</li>
  * <li>V12: 케이스 실행 순서</li>
+ * <li>V17: 변경 이력의 소속 스위트</li>
  * </ul>
  * <p>
  * Flyway는 자체 연결을 쓰므로 넣은 이력이 보이도록 테스트 트랜잭션 없이 실행
@@ -82,6 +83,36 @@ class MigrationBackfillTest {
 			.containsExactly(Map.<String, Object>of("id", 1L, "run_order", 1),
 					Map.<String, Object>of("id", 2L, "run_order", 1), Map.<String, Object>of("id", 3L, "run_order", 2),
 					Map.<String, Object>of("id", 4L, "run_order", 3), Map.<String, Object>of("id", 5L, "run_order", 4));
+	}
+
+	@Test
+	void fillsTheSuiteOfExistingChangeLogs() {
+		migrateTo("16");
+		JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+		insertCase(jdbc, 11, 7, null);
+		jdbc.update("""
+				INSERT INTO %s.test_schedule (id, suite_id, environment_id, cron, enabled, created_at, updated_at)
+				VALUES (21, 8, 1, '0 9 * * *', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+				""".formatted(SCHEMA));
+		insertLog(jdbc, 1, "SUITE", 9);
+		insertLog(jdbc, 2, "CASE", 11);
+		insertLog(jdbc, 3, "SCHEDULE", 21);
+		insertLog(jdbc, 4, "PROJECT", 5);
+		// 대상 케이스 행이 없는 기록은 채우지 못해 NULL
+		insertLog(jdbc, 5, "CASE", 999);
+
+		migrateTo("17");
+
+		assertThat(jdbc.queryForList("SELECT suite_id FROM %s.change_log ORDER BY id".formatted(SCHEMA), Long.class))
+			.containsExactly(9L, 7L, 8L, null, null);
+	}
+
+	private static void insertLog(JdbcTemplate jdbc, long id, String targetType, long targetId) {
+		jdbc.update("""
+				INSERT INTO %s.change_log (id, actor_id, target_type, target_id, target_name, project_id, action, fields,
+				                           created_at, updated_at)
+				VALUES (?, 1, ?, ?, 'name', 1, 'CREATED', '[]', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+				""".formatted(SCHEMA), id, targetType, targetId);
 	}
 
 	private static void insertCase(JdbcTemplate jdbc, long id, long suiteId, String archivedAt) {

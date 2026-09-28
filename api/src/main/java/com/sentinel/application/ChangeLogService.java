@@ -57,8 +57,8 @@ public class ChangeLogService {
 		if (action == Action.UPDATED && fields.isEmpty()) {
 			return;
 		}
-		changeLogs.save(new ChangeLog(actorId, target.type(), target.id(), target.name(), target.projectId(), action,
-				fields));
+		changeLogs.save(new ChangeLog(actorId, target.type(), target.id(), target.name(), target.projectId(),
+				target.suiteId(), action, fields));
 	}
 
 	/**
@@ -125,19 +125,27 @@ public class ChangeLogService {
 	 * 변경 대상
 	 * @param name 변경 당시 이름
 	 * @param projectId 소속 프로젝트. 사용자·초대는 null
+	 * @param suiteId 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 null
 	 */
-	public record Target(TargetType type, long id, String name, Long projectId) {
+	public record Target(TargetType type, long id, String name, Long projectId, Long suiteId) {
+
+		/** 스위트에 속하지 않는 대상 (프로젝트·환경·사용자·초대) */
+		public Target(TargetType type, long id, String name, Long projectId) {
+			this(type, id, name, projectId, null);
+		}
+
 	}
 
 	/**
 	 * 목록 조건. null은 조건 없음
 	 * @param targetType targetId와 함께 쓰면 항목 1건의 이력
 	 * @param projectId 프로젝트와 그 안의 환경·스위트·케이스·스케줄 이력
+	 * @param suiteId 스위트와 그 안의 케이스·스케줄 이력
 	 */
-	public record Filter(TargetType targetType, Long targetId, Long projectId) {
+	public record Filter(TargetType targetType, Long targetId, Long projectId, Long suiteId) {
 
 		public static Filter none() {
-			return new Filter(null, null, null);
+			return new Filter(null, null, null, null);
 		}
 
 		Specification<ChangeLog> toSpecification() {
@@ -152,6 +160,9 @@ public class ChangeLogService {
 				if (projectId != null) {
 					conditions.add(builder.equal(root.get("projectId"), projectId));
 				}
+				if (suiteId != null) {
+					conditions.add(builder.equal(root.get("suiteId"), suiteId));
+				}
 				return builder.and(conditions.toArray(Predicate[]::new));
 			};
 		}
@@ -163,11 +174,11 @@ public class ChangeLogService {
 	 * @param fields 바뀐 항목 이름. 등록·삭제는 빈 목록
 	 */
 	public record ChangeLogItem(long id, Instant occurredAt, IdName actor, TargetType targetType, long targetId,
-			String targetName, Long projectId, Action action, List<String> fields) {
+			String targetName, Long projectId, Long suiteId, Action action, List<String> fields) {
 
 		static ChangeLogItem of(ChangeLog log, IdName actor) {
 			return new ChangeLogItem(log.getId(), log.getCreatedAt(), actor, log.getTargetType(), log.getTargetId(),
-					log.getTargetName(), log.getProjectId(), log.getAction(), log.getFields());
+					log.getTargetName(), log.getProjectId(), log.getSuiteId(), log.getAction(), log.getFields());
 		}
 
 	}

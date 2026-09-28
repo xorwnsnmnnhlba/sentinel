@@ -88,6 +88,11 @@ export function historyHref(targetType: ChangeTargetType, targetId: number): str
   return `/change-logs?${new URLSearchParams({ targetType, targetId: String(targetId) })}`;
 }
 
+/** 스위트와 그 안의 케이스·스케줄 변경 이력 화면 주소 */
+export function suiteHistoryHref(suiteId: number): string {
+  return `/change-logs?${new URLSearchParams({ suiteId: String(suiteId) })}`;
+}
+
 /** 프로젝트와 그 안의 항목 변경 이력 화면 주소 */
 export function projectHistoryHref(projectId: number): string {
   return `/change-logs?${new URLSearchParams({ projectId: String(projectId) })}`;

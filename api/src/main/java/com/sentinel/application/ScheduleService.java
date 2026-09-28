@@ -128,7 +128,7 @@ public class ScheduleService {
 	/** 스케줄은 이름이 없으므로 스위트 이름으로 표시 */
 	private static Target target(TestSchedule schedule) {
 		return new Target(TargetType.SCHEDULE, schedule.getId(), schedule.getSuite().getName(),
-				schedule.getSuite().getProject().getId());
+				schedule.getSuite().getProject().getId(), schedule.getSuite().getId());
 	}
 
 	@Transactional(readOnly = true)

@@ -23,7 +23,7 @@ import {
 } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
 import type { EnvironmentItem, ProjectItem, SuiteItem } from "@/lib/api/types";
-import { historyHref, projectHistoryHref } from "@/lib/change-log";
+import { historyHref, projectHistoryHref, suiteHistoryHref } from "@/lib/change-log";
 import { copyName, MAX_ENVIRONMENT_NAME_LENGTH } from "@/lib/copy-name";
 
 export async function generateMetadata(props: PageProps<"/projects/[id]">) {
@@ -216,7 +216,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                     <TableCell className="text-right">
                       <ActionMenu
                         label={`스위트 ${suite.name} 작업`}
-                        items={withHistory(EDIT_DELETE, historyHref("SUITE", suite.id))}
+                        items={withHistory(EDIT_DELETE, suiteHistoryHref(suite.id))}
                       >
                         <FormDialog
                           menuId="edit"
