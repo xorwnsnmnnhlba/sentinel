@@ -7,6 +7,7 @@ import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
+import com.sentinel.application.InlineBackgroundRunsConfiguration;
 import com.sentinel.application.TestFixtures;
 import com.sentinel.application.TestRunService;
 import com.sentinel.domain.Environment;
@@ -32,7 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(properties = "sentinel.secret.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
 @AutoConfigureMockMvc
-@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class,
+@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class,
+		InlineBackgroundRunsConfiguration.class, TestFixtures.class,
 		TestAuthConfiguration.class })
 class EnvironmentSecretsTest {
 

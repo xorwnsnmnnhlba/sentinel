@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, test as base } from "@playwright/test";
+import { type APIRequestContext, expect, type Page, test as base } from "@playwright/test";
 
 /**
  * 느린 모드 지연(ms). E2E_SLOW_MS를 지정하면 앱 요청(화면 문서, 화면 전환 데이터(RSC), Server Action)을 그만큼 늦춤
@@ -55,6 +55,27 @@ export const test = base.extend<{ cspViolations: string[]; slowNetwork: void }>(
 
 export { expect };
 export type { Page } from "@playwright/test";
+
+/**
+ * API로 시작한 실행이 끝날 때까지 대기. 수동 실행은 요청에 바로 응답하고 백그라운드에서 진행하므로
+ * 결과를 이어서 쓰는 준비 단계(이전 실행이 필요한 비교·구조 변화 등)에서 사용
+ */
+export async function waitForRun(
+  request: APIRequestContext,
+  api: string,
+  headers: Record<string, string>,
+  runId: number,
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const response = await request.get(`${api}/api/runs/${runId}`, { headers });
+        return ((await response.json()) as { status: string }).status;
+      },
+      { message: `run ${runId} finishes`, timeout: 20_000 },
+    )
+    .not.toBe("RUNNING");
+}
 
 /** 사이드바 주요 메뉴 (넓은 화면) */
 export function mainMenu(page: Page) {

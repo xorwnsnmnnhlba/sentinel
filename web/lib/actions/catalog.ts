@@ -406,6 +406,9 @@ function failure(error: unknown): ActionState {
         return { error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다" };
       case 409:
         return { error: "이미 사용 중인 이름입니다" };
+      case 429:
+        // 동시 수동 실행 한도 (실행은 만들어지지 않음)
+        return { error: "진행 중인 실행이 많아 지금은 시작할 수 없습니다. 실행이 끝난 뒤 다시 시도해 주세요" };
     }
   }
   console.error("catalog action failed", error);

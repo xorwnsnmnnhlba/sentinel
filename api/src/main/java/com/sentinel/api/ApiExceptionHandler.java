@@ -7,6 +7,7 @@ import com.sentinel.application.auth.TooManyLoginAttemptsException;
 import com.sentinel.application.auth.UnauthenticatedException;
 import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.NotFoundException;
+import com.sentinel.application.TooManyRunsException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,6 +42,12 @@ class ApiExceptionHandler {
 	@ExceptionHandler(ForbiddenException.class)
 	ProblemDetail handleForbidden(ForbiddenException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+	}
+
+	/** 동시 수동 실행 한도. 진행 중인 실행이 끝나면 다시 시도 */
+	@ExceptionHandler(TooManyRunsException.class)
+	ProblemDetail handleTooManyRuns(TooManyRunsException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
 	}
 
 	@ExceptionHandler(ConflictException.class)

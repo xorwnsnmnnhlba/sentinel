@@ -47,6 +47,9 @@ sentinel:
     http:
       connect-timeout: 5s
       read-timeout: 30s
+    manual:
+      # 동시에 진행할 수 있는 수동 실행 수. 넘으면 새 실행을 429로 거부 (GW 동시 호출·DB 커넥션 점유 제한)
+      max-concurrent: 4
   auth:
     # 세션 유효 기간. 만료 시각은 로그인 시점에 고정
     session-validity: 12h

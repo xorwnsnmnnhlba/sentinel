@@ -7,6 +7,7 @@ import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
+import com.sentinel.application.InlineBackgroundRunsConfiguration;
 import com.sentinel.application.TestFixtures;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
@@ -29,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class,
+@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class,
+		InlineBackgroundRunsConfiguration.class, TestFixtures.class,
 		TestAuthConfiguration.class })
 class CatalogWriteTest {
 
@@ -179,7 +181,7 @@ class CatalogWriteTest {
 		executor.respond(201, Map.of(), "");
 		MvcTestResult run = post("/api/runs", """
 				{"caseId": %d, "environmentId": %d}""".formatted(caseId, environment.getId()));
-		assertThat(run).hasStatus(HttpStatus.CREATED).bodyJson().extractingPath("$.results[0].verdict").isEqualTo("PASSED");
+		assertThat(run).hasStatus(HttpStatus.ACCEPTED).bodyJson().extractingPath("$.results[0].verdict").isEqualTo("PASSED");
 		assertThat(executor.requests()).singleElement()
 			.satisfies(request -> assertThat(request.uri().toString()).isEqualTo("https://gw.dev.internal/users/42"));
 	}

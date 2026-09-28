@@ -263,6 +263,14 @@ describe("runCase", () => {
     expect(bodies).toEqual([{ caseId: 7, environmentId: 3 }]);
   });
 
+  it("asks to retry later when too many runs are in progress", async () => {
+    capture("post", "/api/runs", () => problem(429, "4 manual runs are already in progress"));
+
+    await expect(runCase(7, undefined, form({ environmentId: "3" }))).resolves.toEqual({
+      error: "진행 중인 실행이 많아 지금은 시작할 수 없습니다. 실행이 끝난 뒤 다시 시도해 주세요",
+    });
+  });
+
   it("tells when the case was deleted meanwhile", async () => {
     capture("post", "/api/runs", () => problem(404, "test case 7 not found"));
 

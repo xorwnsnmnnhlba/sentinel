@@ -1,4 +1,4 @@
-import { accessibilityViolations, expect, test, type Page } from "./fixtures";
+import { accessibilityViolations, expect, test, type Page, waitForRun } from "./fixtures";
 
 /**
  * 접근성 자동 검사 (axe-core). WCAG 2.2 A·AA 규칙과 axe 권장 규칙(best-practice: 제목 순서, 랜드마크 등). 라이트·다크 모두
@@ -47,7 +47,10 @@ test.beforeAll(async ({ request }) => {
 
   ids.failingRun = (await create("/api/runs", { suiteId: ids.suite, environmentId: environment.id })).id;
   // 실패·오류 0건 배지(흐리게 표시)가 나오도록 통과만 있는 실행도 추가
-  await create("/api/runs", { caseId: ids.passingCase, environmentId: environment.id });
+  const passingRun = (await create("/api/runs", { caseId: ids.passingCase, environmentId: environment.id })).id;
+  // 실행은 백그라운드에서 진행. 끝난 결과 화면을 검사하도록 대기
+  await waitForRun(request, api, headers, ids.failingRun);
+  await waitForRun(request, api, headers, passingRun);
 });
 
 async function login(page: Page) {

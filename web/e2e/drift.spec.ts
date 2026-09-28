@@ -1,4 +1,4 @@
-import { accessibilityViolations, expect, test } from "./fixtures";
+import { accessibilityViolations, expect, test, waitForRun } from "./fixtures";
 
 /**
  * 응답 구조 변화 (스키마 드리프트 2단계). 같은 케이스·환경의 이전 실행 지문을 기준선으로 비교
@@ -38,7 +38,9 @@ test.beforeAll(async ({ request }) => {
   });
   // 기준선: 객체 응답 3회 (판정에 필요한 최소 관측 수)
   for (let i = 0; i < 3; i++) {
-    await send("post", "/api/runs", { caseId: testCase.id, environmentId: environment.id });
+    // 앞 실행이 끝나야 다음 실행의 기준선이 됨 (실행은 백그라운드 진행)
+    const run = await send("post", "/api/runs", { caseId: testCase.id, environmentId: environment.id });
+    await waitForRun(request, api, headers, run.id);
   }
   // 같은 케이스를 배열을 돌려주는 경로로 변경
   await send("patch", `/api/cases/${testCase.id}`, {
@@ -51,6 +53,7 @@ test.beforeAll(async ({ request }) => {
     assertions: [],
   });
   runId = (await send("post", "/api/runs", { caseId: testCase.id, environmentId: environment.id })).id;
+  await waitForRun(request, api, headers, runId);
 });
 
 test("구조가 바뀐 케이스를 표시하고 펼쳐서 변화를 보여 줌", async ({ page }) => {

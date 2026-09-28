@@ -82,6 +82,9 @@ public class TestRun extends BaseEntity {
 	@Column(nullable = false)
 	private int errorCount;
 
+	/** 실행할 케이스 수 (V15). 진행 중 화면의 진행률 표시용. 이전 실행은 null */
+	private Integer plannedCount;
+
 	/** 보관기간이 지나 결과의 요청·응답 원문을 비운 시각. null이면 원문 보관 중 */
 	private Instant rawPurgedAt;
 
@@ -137,6 +140,14 @@ public class TestRun extends BaseEntity {
 	/** 여기까지 실행 여부 */
 	public boolean isThroughCase() {
 		return throughCaseId != null;
+	}
+
+	/** 실행할 케이스 수 기록. 실행 시작 시 호출 */
+	public void plan(int caseCount) {
+		if (caseCount < 0) {
+			throw new IllegalArgumentException("caseCount must not be negative: " + caseCount);
+		}
+		this.plannedCount = caseCount;
 	}
 
 	/** 결과 1건의 판정 반영. 결과 저장과 같은 트랜잭션에서 호출. 판정 없는 결과(null)는 세지 않음 */

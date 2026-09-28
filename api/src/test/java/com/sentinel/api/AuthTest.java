@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.jayway.jsonpath.JsonPath;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
+import com.sentinel.application.InlineBackgroundRunsConfiguration;
 import com.sentinel.application.MutableClock;
 import com.sentinel.application.auth.AuthService;
 import com.sentinel.domain.User;
@@ -35,7 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(properties = { "sentinel.schedule.enabled=false", "sentinel.auth.session-validity=1h" })
 @AutoConfigureMockMvc
-@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, AuthTest.ClockConfiguration.class })
+@Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class,
+		InlineBackgroundRunsConfiguration.class, AuthTest.ClockConfiguration.class })
 class AuthTest {
 
 	private static final String PASSWORD = "correct-horse-battery-staple";
