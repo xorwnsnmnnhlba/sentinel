@@ -8,6 +8,7 @@ import { captureRedirect } from "@/test/next";
 import { type CaseDraft, emptyDraft } from "@/lib/case-draft";
 
 import {
+  cancelRun,
   createCase,
   createSchedule,
   createEnvironment,
@@ -228,6 +229,31 @@ describe("runSuite", () => {
 
     await expect(captureRedirect(() => runSuite(1, undefined, form({ environmentId: "3" })))).resolves.toBe("/runs/42");
     expect(bodies).toEqual([{ suiteId: 1, environmentId: 3 }]);
+  });
+});
+
+describe("cancelRun", () => {
+  it("asks Spring to cancel the run and reloads the page", async () => {
+    const bodies = capture("patch", "/api/runs/43", () => HttpResponse.json({ id: 43, status: "CANCELED" }));
+
+    await expect(cancelRun(43)).resolves.toEqual({});
+    expect(bodies).toEqual([{ status: "CANCELED" }]);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("explains a run that finished meanwhile and reloads to show it", async () => {
+    capture("patch", "/api/runs/43", () => problem(409, "test run 43 is already COMPLETED"));
+
+    await expect(cancelRun(43)).resolves.toEqual({ error: "이미 끝난 실행입니다" });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("tells when the run is gone", async () => {
+    capture("patch", "/api/runs/43", () => problem(404, "test run 43 not found"));
+
+    await expect(cancelRun(43)).resolves.toEqual({
+      error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다",
+    });
   });
 });
 

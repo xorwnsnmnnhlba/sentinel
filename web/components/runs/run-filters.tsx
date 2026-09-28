@@ -21,6 +21,7 @@ const statusOptions: { value: RunStatus; label: string }[] = [
   { value: "COMPLETED", label: "완료" },
   { value: "RUNNING", label: "실행 중" },
   { value: "ABORTED", label: "중단" },
+  { value: "CANCELED", label: "중지" },
 ];
 
 /**

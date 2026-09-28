@@ -13,6 +13,7 @@ import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.infra.persistence.TestCaseRepository;
+import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
@@ -58,6 +59,9 @@ class SuiteSummaryServiceTest {
 
 	@Autowired
 	private TestCaseRepository testCases;
+
+	@Autowired
+	private TestRunRepository runs;
 
 	@Autowired
 	private EntityManagerFactory entityManagerFactory;
@@ -135,6 +139,23 @@ class SuiteSummaryServiceTest {
 		assertThat(summary.results()).isEqualTo(new TestRunDetail.Summary(2, 1, 1, 0));
 		assertThat(summary.lastRun().startedAt()).isEqualTo(SEPT_10.minus(Duration.ofHours(1)));
 		assertThat(summary.lastRun().summary()).isEqualTo(new TestRunDetail.Summary(2, 1, 1, 0));
+	}
+
+	@Test
+	void leavesCanceledRunsOutOfSuiteSummaries() {
+		TestSuite orders = suite("orders", "/ok", "/fail");
+		runAt(SEPT_10.minus(Duration.ofHours(1)), orders);
+		// 이후 시작했다가 중지한 실행 (일부 케이스만 실행)
+		clock.set(SEPT_10);
+		TestRun canceled = runs.save(TestRun.start(orders, environment, TestRun.Trigger.MANUAL, SEPT_10));
+		testRunService.cancel(canceled.getId(), fixtures.user().getId());
+
+		SuiteSummaryService.SuiteSummary summary = suiteSummaries.summaries(LocalDate.of(2026, 9, 10), null)
+			.suites()
+			.getFirst();
+
+		assertThat(summary.runs()).isEqualTo(1);
+		assertThat(summary.lastRun().startedAt()).isEqualTo(SEPT_10.minus(Duration.ofHours(1)));
 	}
 
 	@Test

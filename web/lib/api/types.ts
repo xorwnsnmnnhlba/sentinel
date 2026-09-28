@@ -3,7 +3,8 @@
 export type Verdict = "PASSED" | "FAILED" | "ERROR";
 export type Outcome = "RESPONDED" | "ERROR";
 export type Trigger = "MANUAL" | "SCHEDULED";
-export type RunStatus = "RUNNING" | "COMPLETED" | "ABORTED";
+/** ABORTED: 실행 중 앱 종료, CANCELED: 사용자가 중지 */
+export type RunStatus = "RUNNING" | "COMPLETED" | "ABORTED" | "CANCELED";
 
 export interface IdName {
   id: number;
@@ -117,6 +118,8 @@ export interface RunDetail {
   results: RunResult[];
   /** 수동 실행을 시작한 사용자. 스케줄 실행·이전 기록은 null */
   triggeredBy: IdName | null;
+  /** 실행을 중지한 사용자. 중지된 실행이 아니면 null (중지 시각은 finishedAt) */
+  canceledBy: IdName | null;
   /** 케이스 단건 실행의 대상. 스위트 전체 실행은 null */
   testCase: IdName | null;
   /** 여기까지 실행(스위트 처음부터 이 케이스까지)의 마지막 케이스. 그 외 실행은 null */

@@ -204,7 +204,8 @@ public class TestRunService {
 		return transactions.readOnly(status -> {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
 			List<TestResult> runResults = results.findWithTestCaseByRunId(runId);
-			return TestRunDetail.of(run, runResults, triggeredBy(run), caseName(run.getTestCaseId()),
+			return TestRunDetail.of(run, runResults, userName(run.getTriggeredBy()), userName(run.getCanceledBy()),
+					caseName(run.getTestCaseId()),
 					caseName(run.getThroughCaseId()), schemaDrift.driftOf(run, runResults), previous(run));
 		});
 	}
@@ -244,12 +245,12 @@ public class TestRunService {
 			.orElse(null);
 	}
 
-	/** 실행 주체 이름. 스케줄 실행은 null, 삭제(보관)된 사용자도 이력 표시를 위해 조회 */
-	private IdName triggeredBy(TestRun run) {
-		if (run.getTriggeredBy() == null) {
+	/** 실행·중지한 사용자 이름. 없으면(스케줄 실행, 중지되지 않은 실행) null, 삭제(보관)된 사용자도 이력 표시를 위해 조회 */
+	private IdName userName(Long userId) {
+		if (userId == null) {
 			return null;
 		}
-		return users.findById(run.getTriggeredBy())
+		return users.findById(userId)
 			.map(user -> new IdName(user.getId(), user.getEmail()))
 			.orElse(null);
 	}
@@ -324,24 +325,56 @@ public class TestRunService {
 		Map<String, String> variables = new LinkedHashMap<>(prepared.variables());
 		Set<String> secretValues = new HashSet<>(prepared.secretValues());
 		for (PreparedCase preparedCase : prepared.cases()) {
+			// 중지 요청은 케이스 사이에서 확인. 이미 보낸 요청은 되돌릴 수 없으므로 진행 중이던 케이스는 끝까지 기록
+			if (runs.findStatus(prepared.runId()) != TestRun.Status.RUNNING) {
+				break;
+			}
 			Execution execution = extract(preparedCase,
 					execute(preparedCase, variables, prepared.extractedInSuite()), variables, secretValues);
 			Set<String> masked = Set.copyOf(secretValues);
 			TestResult.Verdict verdict = transactions.write(status -> {
 				TestResult.Verdict saved = results.save(resultOf(prepared.runId(), preparedCase, execution, masked))
 					.getVerdict();
-				// 실행의 판정 수도 같은 트랜잭션에서 올려 결과와 어긋나지 않음 (중단된 실행도 저장된 결과 기준)
-				runs.findById(prepared.runId()).orElseThrow().countVerdict(saved);
+				// 실행의 판정 수도 같은 트랜잭션에서 올려 결과와 어긋나지 않음 (중단·중지된 실행도 저장된 결과 기준)
+				countVerdict(prepared.runId(), saved);
 				return saved;
 			});
 			counts.merge(verdict, 1, Integer::sum);
 		}
-		transactions.writeWithoutResult(status -> runs.findById(prepared.runId()).orElseThrow().complete(clock.instant()));
-		log.info("Run {} completed: trigger={} suite={} total={} passed={} failed={} errors={} elapsed={}ms",
-				prepared.runId(), prepared.trigger(), prepared.suiteId(), prepared.cases().size(),
+		boolean completed = transactions.write(status -> runs.completeIfRunning(prepared.runId(), clock.instant()) == 1);
+		log.info("Run {} {}: trigger={} suite={} total={} passed={} failed={} errors={} elapsed={}ms",
+				prepared.runId(), completed ? "completed" : "canceled", prepared.trigger(), prepared.suiteId(),
+				counts.values().stream().mapToInt(Integer::intValue).sum(),
 				counts.getOrDefault(TestResult.Verdict.PASSED, 0), counts.getOrDefault(TestResult.Verdict.FAILED, 0),
 				counts.getOrDefault(TestResult.Verdict.ERROR, 0), Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
 		return prepared.runId();
+	}
+
+	/** 판정 없는 결과(null)는 세지 않음 */
+	private void countVerdict(long runId, TestResult.Verdict verdict) {
+		if (verdict == null) {
+			return;
+		}
+		switch (verdict) {
+			case PASSED -> runs.incrementPassed(runId);
+			case FAILED -> runs.incrementFailed(runId);
+			case ERROR -> runs.incrementErrors(runId);
+		}
+	}
+
+	/**
+	 * 진행 중인 실행 중지. 진행 중이던 케이스는 끝까지 기록하고 이후 케이스는 보내지 않음 (수동·스케줄 실행 모두)
+	 * @param canceledBy 중지한 사용자
+	 * @throws NotFoundException 실행 미존재
+	 * @throws ConflictException 이미 끝난 실행 (완료·중단·중지)
+	 */
+	public void cancel(long runId, long canceledBy) {
+		transactions.writeWithoutResult(status -> {
+			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
+			if (runs.cancelIfRunning(runId, canceledBy, clock.instant()) == 0) {
+				throw new ConflictException("test run " + runId + " is already " + run.getStatus());
+			}
+		});
 	}
 
 	/**

@@ -63,6 +63,10 @@ public class RunResultNotifier {
 
 	private Optional<Message> messageOf(long runId) {
 		TestRun run = runs.findById(runId).orElseThrow(() -> new IllegalArgumentException("run " + runId + " not found"));
+		// 중지된 실행은 사람이 멈춘 것이라 일부 케이스만의 결과로 실패·복구를 알리지 않음
+		if (run.getStatus() != TestRun.Status.COMPLETED) {
+			return Optional.empty();
+		}
 		List<TestResult> current = results.findWithTestCaseByRunId(runId);
 		if (current.isEmpty()) {
 			return Optional.empty();

@@ -15,8 +15,11 @@ import com.sentinel.application.TestRunService;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestCase;
+import com.sentinel.domain.TestResult;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.infra.persistence.TestResultRepository;
+import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
 import org.junit.jupiter.api.AfterEach;
@@ -59,6 +62,12 @@ class RunResultNotifierTest {
 
 	@Autowired
 	private RecordingNotifier notifier;
+
+	@Autowired
+	private TestRunRepository runs;
+
+	@Autowired
+	private TestResultRepository results;
 
 	private TestSuite suite;
 
@@ -122,6 +131,17 @@ class RunResultNotifierTest {
 		// 통과를 사이에 두고 다시 실패하면 연속이 아닌 새 실패
 		assertThat(scheduled(6, Set.of("/a"))).isEqualTo(RunResultNotifier.Sent.FAILURE);
 		assertThat(lastLines()).first().asString().startsWith("[새로 실패] " + a.getName());
+	}
+
+	@Test
+	void staysSilentForCanceledRuns() {
+		// 실패 결과가 있어도 사람이 멈춘 실행이면 알리지 않음
+		TestRun run = runs.save(TestRun.start(suite, dev, TestRun.Trigger.SCHEDULED, NINE_TEN));
+		results.save(TestResult.failed(run, a, HttpMethod.GET, TestResult.ErrorReason.TIMEOUT, "timeout", null, null));
+		testRunService.cancel(run.getId(), fixtures.user().getId());
+
+		assertThat(runResultNotifier.notifyResult(run.getId())).isEqualTo(RunResultNotifier.Sent.NONE);
+		assertThat(notifier.sent()).isEmpty();
 	}
 
 	@Test
