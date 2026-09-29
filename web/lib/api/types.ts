@@ -340,7 +340,23 @@ export interface ResponseTimeChanges {
 }
 
 /** 변경 이력 대상 (api/README.md "변경 이력") */
-export type ChangeTargetType = "PROJECT" | "ENVIRONMENT" | "SUITE" | "CASE" | "SCHEDULE" | "USER" | "INVITE";
+export type ChangeTargetType =
+  "PROJECT" | "ENVIRONMENT" | "SUITE" | "CASE" | "SCHEDULE" | "MAINTENANCE_WINDOW" | "USER" | "INVITE";
+
+/** 환경 점검 시간. 점검 중에는 그 환경의 스케줄 실행을 건너뜀 (api/README.md "점검 시간") */
+export interface MaintenanceWindow {
+  id: number;
+  environment: IdName;
+  projectId: number;
+  /** 시작(포함)·끝(미포함) ISO-8601 */
+  startsAt: string;
+  endsAt: string;
+  reason: string | null;
+  /** 지금 점검 중. false면 예정 */
+  active: boolean;
+  /** 등록한 사용자. 알 수 없으면 null */
+  createdBy: IdName | null;
+}
 
 export type ChangeAction = "CREATED" | "UPDATED" | "DELETED";
 

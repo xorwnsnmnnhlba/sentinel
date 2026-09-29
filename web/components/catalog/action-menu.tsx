@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Ellipsis, History, KeyRound, Pencil, Play, Trash2 } from "lucide-react";
+import { Copy, Ellipsis, History, KeyRound, Pencil, Play, Trash2, Wrench } from "lucide-react";
 import Link from "next/link";
 import { createContext, use, useRef, useState, useTransition } from "react";
 
@@ -22,7 +22,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const icons = { edit: Pencil, delete: Trash2, key: KeyRound, run: Play, copy: Copy, history: History };
+const icons = {
+  edit: Pencil,
+  delete: Trash2,
+  key: KeyRound,
+  run: Play,
+  copy: Copy,
+  history: History,
+  maintenance: Wrench,
+};
 
 export type ActionMenuItem = {
   /** 대화상자와 연결하는 이름. 같은 메뉴 안의 대화상자는 menuId로 이 값을 지정 */

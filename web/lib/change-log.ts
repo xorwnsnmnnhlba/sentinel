@@ -8,6 +8,7 @@ export const TARGET_TYPES: ChangeTargetType[] = [
   "SUITE",
   "CASE",
   "SCHEDULE",
+  "MAINTENANCE_WINDOW",
   "USER",
   "INVITE",
 ];
@@ -18,6 +19,7 @@ export const TARGET_LABELS: Record<ChangeTargetType, string> = {
   SUITE: "스위트",
   CASE: "케이스",
   SCHEDULE: "스케줄",
+  MAINTENANCE_WINDOW: "점검 시간",
   USER: "사용자",
   INVITE: "초대",
 };
@@ -46,6 +48,9 @@ const FIELD_LABELS: Record<string, string> = {
   environment: "실행 환경",
   cron: "실행 주기(cron)",
   enabled: "활성 여부",
+  startsAt: "시작 시각",
+  endsAt: "끝 시각",
+  reason: "사유",
   password: "비밀번호",
   passwordResetLink: "비밀번호 재설정 링크 발급",
 };
@@ -77,6 +82,7 @@ export function targetHref(item: ChangeLogItem): string | null {
     case "CASE":
       return `/cases/${item.targetId}`;
     case "ENVIRONMENT":
+    case "MAINTENANCE_WINDOW":
       return item.projectId === null ? null : `/projects/${item.projectId}`;
     default:
       return null;

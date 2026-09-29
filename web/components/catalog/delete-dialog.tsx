@@ -25,11 +25,14 @@ export function DeleteDialog({
   title,
   description,
   action,
+  confirmLabel = "삭제",
 }: {
   menuId: string;
   title: string;
   description: string;
   action: () => Promise<ActionState>;
+  /** 확인 버튼 이름. 삭제가 곧 종료·취소인 대상용 (예: 점검 시간 "지금 종료") */
+  confirmLabel?: string;
 }) {
   const menu = useMenuDialog(menuId);
   const [error, setError] = useState<string>();
@@ -62,7 +65,7 @@ export function DeleteDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>취소</AlertDialogCancel>
           <Button variant="destructive" onClick={confirm} disabled={pending}>
-            {pending ? "삭제 중…" : "삭제"}
+            {pending ? `${confirmLabel} 중…` : confirmLabel}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

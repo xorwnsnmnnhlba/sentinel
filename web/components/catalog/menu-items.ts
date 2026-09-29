@@ -16,6 +16,24 @@ export const EDIT_DUPLICATE_DELETE: ActionMenuItem[] = [
   { id: "delete", label: "삭제", icon: "delete", destructive: true },
 ];
 
+/** 환경 행 메뉴: 수정 · 복제 · 점검 시간 등록 · 삭제 */
+export const ENVIRONMENT_MENU: ActionMenuItem[] = [
+  ...EDIT_DUPLICATE_DELETE.filter((item) => !item.destructive),
+  { id: "maintenance", label: "점검 시간 등록", icon: "maintenance" },
+  ...EDIT_DUPLICATE_DELETE.filter((item) => item.destructive),
+];
+
+/**
+ * 점검 시간 행 메뉴: 수정 · 종료(진행 중) 또는 취소(예정). 둘 다 삭제로 처리
+ * @param active 지금 점검 중
+ */
+export function maintenanceMenu(active: boolean): ActionMenuItem[] {
+  return [
+    { id: "edit", label: "수정", icon: "edit" },
+    { id: "delete", label: active ? "지금 종료" : "취소", icon: "delete", destructive: true },
+  ];
+}
+
 /**
  * "변경 이력" 항목 추가. 되돌릴 수 없는 동작(삭제) 앞에 두어 구분선 아래에는 삭제만 남김
  * @param href 변경 이력 화면 주소 (lib/change-log.ts historyHref·projectHistoryHref)

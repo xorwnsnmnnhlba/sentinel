@@ -28,6 +28,31 @@ async function openDelete(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("DeleteDialog", () => {
+  it("names the confirm button after what deleting means", async () => {
+    const user = userEvent.setup();
+    let finish: (state: ActionState) => void = () => {};
+    const action = vi.fn<() => Promise<ActionState>>(() => new Promise<ActionState>((resolve) => (finish = resolve)));
+    render(
+      <ActionMenu label="dev 점검 시간 작업" items={EDIT_DELETE}>
+        <DeleteDialog
+          menuId="delete"
+          title="dev 점검 지금 종료"
+          description="다음 스케줄부터 다시 실행합니다."
+          confirmLabel="지금 종료"
+          action={action}
+        />
+      </ActionMenu>,
+    );
+
+    await openMenu(user, "dev 점검 시간 작업");
+    await user.click(await screen.findByRole("menuitem", { name: "삭제" }));
+    await user.click(screen.getByRole("button", { name: "지금 종료" }));
+
+    expect(await screen.findByRole("button", { name: "지금 종료 중…" })).toBeDisabled();
+    finish({});
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+
   it("asks for confirmation from the menu before deleting", async () => {
     const user = userEvent.setup();
     const action = vi.fn<() => Promise<ActionState>>(async () => ({}));
