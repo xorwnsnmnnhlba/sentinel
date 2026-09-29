@@ -27,7 +27,9 @@ public class ChangeLog extends BaseEntity {
 
 	public enum TargetType {
 
-		PROJECT, ENVIRONMENT, SUITE, CASE, SCHEDULE, USER, INVITE
+		PROJECT, ENVIRONMENT, SUITE, CASE, SCHEDULE, USER, INVITE,
+		/** 점검 시간. 이름은 환경 이름 */
+		MAINTENANCE_WINDOW
 
 	}
 

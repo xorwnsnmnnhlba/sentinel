@@ -8,6 +8,7 @@ import java.util.List;
 import com.sentinel.application.notification.Notification;
 import com.sentinel.application.notification.RecordingNotifier;
 import com.sentinel.application.notification.RunResultNotifier;
+import com.sentinel.infra.persistence.MaintenanceWindowRepository;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ class SchedulePollerDatabaseOutageTest {
 		when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
 		poller = new SchedulePoller(schedules, mock(TestRunService.class), mock(RunResultNotifier.class), notifier,
 				new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60)), clock,
-				new Transactions(transactionManager));
+				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class));
 	}
 
 	@Test
@@ -109,7 +110,7 @@ class SchedulePollerDatabaseOutageTest {
 				mock(RunResultNotifier.class), notification -> {
 					throw new IllegalStateException("webhook down");
 				}, new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60)), clock,
-				new Transactions(transactionManager));
+				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class));
 		databaseDown();
 
 		assertThat(failingNotifierPoller.poll()).isEmpty();
