@@ -9,6 +9,7 @@ function run(patch: Partial<RunDetail>, changes: (RunChange | null)[] = []): Run
   return {
     testCase: null,
     throughCase: null,
+    rerunOf: null,
     previousRun: { id: 41, startedAt: "2026-09-27T00:00:00Z" },
     results: changes.map((change) => ({ change }) as RunResult),
     ...patch,
@@ -37,7 +38,11 @@ describe("ChangeSummary", () => {
     expect(screen.getByText(/완료된 이전 실행이 없어 비교하지 않습니다/)).toBeInTheDocument();
     unmount();
 
-    for (const partial of [{ testCase: { id: 1, name: "a" } }, { throughCase: { id: 1, name: "a" } }]) {
+    for (const partial of [
+      { testCase: { id: 1, name: "a" } },
+      { throughCase: { id: 1, name: "a" } },
+      { rerunOf: 40 },
+    ]) {
       const rendered = render(<ChangeSummary run={run({ ...partial, previousRun: null })} />);
       expect(rendered.container).toBeEmptyDOMElement();
       rendered.unmount();

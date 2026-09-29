@@ -31,6 +31,7 @@ const responded: RunResult = {
   responseSchema: { fields: { $: ["object"], "$.orderId": ["number"] }, complete: true },
   drift: { status: "COMPARED", observations: 3, changes: [] },
   change: null,
+  supporting: false,
 };
 
 /** 보관기간 경과 후 API가 돌려주는 형태. 헤더·본문만 null */

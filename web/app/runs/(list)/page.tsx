@@ -90,6 +90,7 @@ export default async function RunsPage(props: PageProps<"/runs">) {
                       {run.project.name}
                       {run.testCase && <> · 케이스 단건: {run.testCase.name}</>}
                       {run.throughCase && <> · {run.throughCase.name}까지</>}
+                      {run.rerunOf !== null && <> · #{run.rerunOf} 실패 다시 실행</>}
                     </div>
                   </TableCell>
                   <TableCell>{run.environment.name}</TableCell>

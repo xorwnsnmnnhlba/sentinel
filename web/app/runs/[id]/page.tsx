@@ -1,12 +1,15 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Empty, SectionHeader } from "@/components/catalog/section";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import {
+  RerunBadge,
   RunCountBadges,
   SingleCaseBadge,
   StatusBadge,
+  SupportingBadge,
   ThroughCaseBadge,
   TriggerBadge,
   VerdictBadge,
@@ -14,10 +17,11 @@ import {
 import { DriftBadge, highestLevel } from "@/components/runs/drift";
 import { CancelRunButton } from "@/components/runs/cancel-run-button";
 import { ChangeBadge, ChangeSummary } from "@/components/runs/run-change";
+import { RerunFailedForm } from "@/components/runs/rerun-failed-form";
 import { RunProgress } from "@/components/runs/run-progress";
 import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { cancelRun } from "@/lib/actions/catalog";
+import { cancelRun, rerunFailed } from "@/lib/actions/catalog";
 import { apiGetOrNotFound } from "@/lib/api/server";
 import type { RunDetail } from "@/lib/api/types";
 import { formatDateTime, formatElapsed, formatProgress, formatRunDuration } from "@/lib/format";
@@ -45,6 +49,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
   const openByDefault = run.results
     .filter((result) => result.verdict !== "PASSED" || highestLevel(result.drift) === "BREAKING")
     .map((result) => String(result.id));
+  const failing = run.summary.failed + run.summary.errors;
 
   return (
     <div className="space-y-6">
@@ -59,14 +64,31 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
               <TriggerBadge trigger={run.trigger} />
               {run.testCase && <SingleCaseBadge />}
               {run.throughCase && <ThroughCaseBadge />}
+              {run.rerunOf !== null && <RerunBadge />}
               <StatusBadge status={run.status} />
             </span>
           }
-          actions={run.status === "RUNNING" && <CancelRunButton action={cancelRun.bind(null, run.id)} />}
+          actions={
+            run.status === "RUNNING" ? (
+              <CancelRunButton action={cancelRun.bind(null, run.id)} />
+            ) : (
+              failing > 0 && <RerunFailedForm action={rerunFailed.bind(null, run.id)} />
+            )
+          }
         />
         <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
           {run.testCase && <Meta label="케이스" value={run.testCase.name} />}
           {run.throughCase && <Meta label="마지막 케이스" value={run.throughCase.name} />}
+          {run.rerunOf !== null && (
+            <Meta
+              label="원래 실행"
+              value={
+                <Link href={`/runs/${run.rerunOf}`} className="underline-offset-4 hover:underline">
+                  #{run.rerunOf}
+                </Link>
+              }
+            />
+          )}
           <Meta label="환경" value={run.environmentName} />
           {run.triggeredBy && <Meta label="실행" value={run.triggeredBy.name} />}
           {run.canceledBy && <Meta label="중지" value={run.canceledBy.name} />}
@@ -109,7 +131,11 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
         <SectionHeader
           title="케이스별 결과"
           count={run.results.length}
-          description="실행 순서대로 표시. 실패·오류 케이스는 펼친 상태"
+          description={
+            run.rerunOf === null
+              ? "실행 순서대로 표시. 실패·오류 케이스는 펼친 상태"
+              : "원래 실행에서 실패·오류가 난 케이스를 실행 순서대로 다시 실행. '함께 실행'은 그 케이스가 쓰는 추출 값을 만드는 앞 케이스"
+          }
         />
         {run.results.length === 0 ? (
           <Empty message={run.status === "RUNNING" ? "아직 끝난 케이스가 없습니다" : "실행된 케이스가 없습니다"} />
@@ -122,6 +148,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <VerdictBadge verdict={result.verdict} />
                     <span className="truncate font-medium">{result.testCaseName}</span>
+                    {result.supporting && <SupportingBadge />}
                     <ChangeBadge change={result.change} />
                     <DriftBadge drift={result.drift} />
                     <span className="ml-auto flex shrink-0 items-center gap-3 font-mono text-xs text-muted-foreground">
@@ -147,7 +174,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex gap-1.5">
       <dt>{label}</dt>
