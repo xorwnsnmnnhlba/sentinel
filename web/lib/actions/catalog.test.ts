@@ -22,6 +22,7 @@ import {
   deleteSchedule,
   duplicateCase,
   reorderCases,
+  rerunFailed,
   setScheduleEnabled,
   updateCase,
   updateEnvironment,
@@ -253,6 +254,35 @@ describe("cancelRun", () => {
 
     await expect(cancelRun(43)).resolves.toEqual({
       error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다",
+    });
+  });
+});
+
+describe("rerunFailed", () => {
+  it("reruns the failed cases in the run's environment and opens the new run", async () => {
+    const bodies = capture("post", "/api/runs", () => HttpResponse.json({ id: 45 }, { status: 202 }));
+
+    await expect(captureRedirect(() => rerunFailed(43))).resolves.toBe("/runs/45");
+    expect(bodies).toEqual([{ rerunOf: 43 }]);
+  });
+
+  it.each([
+    ["test run 43 is still running", "아직 진행 중인 실행입니다. 끝난 뒤 다시 실행해 주세요"],
+    [
+      "test run 43 has no failed cases to rerun",
+      "다시 실행할 실패 케이스가 없습니다. 실패한 케이스가 모두 삭제되었을 수 있습니다",
+    ],
+  ])("explains why the run cannot be rerun: %s", async (detail, message) => {
+    capture("post", "/api/runs", () => problem(409, detail));
+
+    await expect(rerunFailed(43)).resolves.toEqual({ error: message });
+  });
+
+  it("tells when the limit of manual runs is reached", async () => {
+    capture("post", "/api/runs", () => problem(429, "4 manual runs are already in progress"));
+
+    await expect(rerunFailed(43)).resolves.toEqual({
+      error: "진행 중인 실행이 많아 지금은 시작할 수 없습니다. 실행이 끝난 뒤 다시 시도해 주세요",
     });
   });
 });

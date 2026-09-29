@@ -310,6 +310,28 @@ export async function cancelRun(runId: number): Promise<ActionState> {
   return {};
 }
 
+/**
+ * 이 실행에서 판정 실패·오류가 난 케이스만 같은 환경에서 다시 실행. 그 케이스가 쓰는 추출 값을 만드는 앞 케이스는 함께 실행.
+ * 시작하면 새 실행의 결과 화면으로 이동
+ */
+export async function rerunFailed(runId: number): Promise<ActionState> {
+  let run: RunDetail | null;
+  try {
+    run = await apiSend<RunDetail>("POST", "/api/runs", { rerunOf: id(runId) });
+  } catch (error) {
+    // 이름 중복이 아닌, 다시 실행할 수 없는 상태
+    if (isApiError(error) && error.status === 409) {
+      return {
+        error: error.detail.includes("still running")
+          ? "아직 진행 중인 실행입니다. 끝난 뒤 다시 실행해 주세요"
+          : "다시 실행할 실패 케이스가 없습니다. 실패한 케이스가 모두 삭제되었을 수 있습니다",
+      };
+    }
+    return failure(error);
+  }
+  redirect(`/runs/${run!.id}`);
+}
+
 /** 실행이 끝나면 결과 상세로 이동 */
 async function startRun(
   target: { suiteId: number } | { caseId: number } | { throughCaseId: number },

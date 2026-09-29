@@ -34,6 +34,20 @@ export function ThroughCaseBadge() {
   return <Badge variant="outline">여기까지</Badge>;
 }
 
+/** 한 실행에서 실패한 케이스만 다시 실행한 기록. 스위트 전체 실행과 구분 */
+export function RerunBadge() {
+  return <Badge variant="outline">실패 다시 실행</Badge>;
+}
+
+/** 실패 다시 실행에서 다시 실행하는 케이스가 쓰는 추출 값을 만들기 위해 함께 실행한 케이스 (원래 실행에서 실패하지 않음) */
+export function SupportingBadge() {
+  return (
+    <Badge variant="outline" className="text-muted-foreground">
+      함께 실행
+    </Badge>
+  );
+}
+
 const statusLabel: Record<RunStatus, string> = {
   RUNNING: "실행 중",
   COMPLETED: "완료",

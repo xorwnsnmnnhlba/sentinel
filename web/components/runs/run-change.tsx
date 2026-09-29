@@ -25,11 +25,11 @@ export function ChangeBadge({ change }: { change: RunChange | null }) {
 }
 
 /**
- * 결과 상단의 직전 실행 대비 요약. 스위트 전체 실행만 비교하므로 단건·여기까지 실행은 표시 없음
+ * 결과 상단의 직전 실행 대비 요약. 스위트 전체 실행만 비교하므로 단건·여기까지·실패 다시 실행은 표시 없음
  * 직전 실행이 없으면 첫 실행이라는 안내
  */
 export function ChangeSummary({ run }: { run: RunDetail }) {
-  if (run.testCase || run.throughCase) {
+  if (run.testCase || run.throughCase || run.rerunOf !== null) {
     return null;
   }
   if (!run.previousRun) {

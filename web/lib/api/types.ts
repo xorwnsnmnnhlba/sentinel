@@ -45,6 +45,8 @@ export interface RunSummary {
   throughCase: IdName | null;
   /** 실행할 케이스 수. 진행 중이면 summary.total과 비교해 진행률 표시. 이전 실행은 null */
   plannedCount: number | null;
+  /** 실패 다시 실행의 원래 실행 ID. 그 외 실행은 null */
+  rerunOf: number | null;
 }
 
 export interface AssertionResult {
@@ -72,8 +74,10 @@ export interface RunResult {
   responseSchema: ResponseSchema | null;
   /** 같은 케이스·환경의 이전 실행 대비 구조 변화. 지문이 없으면 null */
   drift: ResultDrift | null;
-  /** 직전 실행 대비 판정 변화. 비교하지 않는 실행(직전 실행 없음, 단건·여기까지 실행)은 null */
+  /** 직전 실행 대비 판정 변화. 비교하지 않는 실행(직전 실행 없음, 단건·여기까지·실패 다시 실행)은 null */
   change: RunChange | null;
+  /** 실패 다시 실행에서 원래 실행에 실패하지 않았지만 다시 실행하는 케이스가 쓰는 추출 값을 만들기 위해 함께 실행한 케이스 */
+  supporting: boolean;
 }
 
 /** 직전 실행 대비 판정 변화. 실패는 판정 실패·오류 (api/README.md "직전 실행 대비 변화") */
@@ -132,6 +136,8 @@ export interface RunDetail {
   plannedCount: number | null;
   /** 비교 기준인 직전 실행 (같은 스위트·환경의 완료된 스위트 전체 실행). 없거나 스위트 전체 실행이 아니면 null */
   previousRun: { id: number; startedAt: string } | null;
+  /** 실패 다시 실행의 원래 실행 ID. 그 외 실행은 null */
+  rerunOf: number | null;
 }
 
 export interface SuiteItem {

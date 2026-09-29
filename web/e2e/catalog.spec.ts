@@ -372,6 +372,8 @@ test("케이스만 따로 실행하면 단건 실행으로 기록", async ({ pag
   await expect(page.getByRole("heading", { level: 1 })).toContainText("케이스 단건");
   await expect(page.getByRole("heading", { name: /케이스별 결과\s*1/ })).toBeVisible();
   await expect(page.getByText("통과 1")).toBeVisible();
+  // 실패가 없으면 다시 실행할 것이 없음
+  await expect(page.getByRole("button", { name: "실패만 다시 실행" })).toHaveCount(0);
   const runUrl = page.url();
 
   // 실행 이력에는 스위트 실행과 구분하여 표시
