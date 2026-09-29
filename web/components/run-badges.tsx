@@ -48,6 +48,18 @@ export function SupportingBadge() {
   );
 }
 
+/** 응답을 받지 못해 다시 보낸 케이스. 잦으면 GW·네트워크가 불안정하다는 신호. 0회는 표시 없음 */
+export function RetryBadge({ retries }: { retries: number }) {
+  if (retries === 0) {
+    return null;
+  }
+  return (
+    <Badge variant="outline" className="text-muted-foreground">
+      재시도 {retries}회
+    </Badge>
+  );
+}
+
 const statusLabel: Record<RunStatus, string> = {
   RUNNING: "실행 중",
   COMPLETED: "완료",

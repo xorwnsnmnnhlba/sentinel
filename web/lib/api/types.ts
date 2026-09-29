@@ -76,6 +76,8 @@ export interface RunResult {
   drift: ResultDrift | null;
   /** 직전 실행 대비 판정 변화. 비교하지 않는 실행(직전 실행 없음, 단건·여기까지·실패 다시 실행)은 null */
   change: RunChange | null;
+  /** 응답을 받지 못해 다시 보낸 횟수 (api/README.md "전송 오류 재시도"). 결과는 재시도 뒤의 응답 또는 마지막 오류 */
+  retries: number;
   /** 실패 다시 실행에서 원래 실행에 실패하지 않았지만 다시 실행하는 케이스가 쓰는 추출 값을 만들기 위해 함께 실행한 케이스 */
   supporting: boolean;
 }
