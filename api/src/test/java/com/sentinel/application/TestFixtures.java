@@ -12,6 +12,7 @@ import com.sentinel.domain.TestSuite;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.ChangeLogRepository;
 import com.sentinel.infra.persistence.EnvironmentRepository;
+import com.sentinel.infra.persistence.MaintenanceWindowRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestResultRepository;
@@ -49,6 +50,8 @@ public class TestFixtures {
 	private final UserRepository users;
 
 	private final ChangeLogRepository changeLogs;
+
+	private final MaintenanceWindowRepository maintenanceWindows;
 
 	/** 수동 실행 주체 등 사용자 필요한 테스트용 계정 */
 	public User user() {
@@ -99,6 +102,7 @@ public class TestFixtures {
 	/** 사용자는 삭제하지 않음. 기본 로그인 계정(TestAuthConfiguration)이 함께 지워지면 이후 요청이 401 */
 	public void deleteAll() {
 		changeLogs.deleteAllInBatch();
+		maintenanceWindows.deleteAllInBatch();
 		schedules.deleteAllInBatch();
 		results.deleteAllInBatch();
 		runs.deleteAllInBatch();

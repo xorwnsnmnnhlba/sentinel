@@ -371,6 +371,7 @@ curl -i -X POST localhost:8080/api/runs \
 | 케이스 | `GET /api/cases?suiteId=&q=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
 | 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&failing=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs`, `PATCH /api/runs/{id}`(중지) | |
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
+| 점검 시간 | `GET /api/maintenance-windows?environmentId=` | | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
 | 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
 | 응답시간 변화 | `GET /api/response-time-changes?from=&to=&limit=5` | | | |
@@ -533,17 +534,17 @@ curl -i -X POST localhost:8080/api/runs \
 
 | 대상 (`targetType`) | 기록 시점 | 변경한 사용자 (`actor`) |
 |------|------|------|
-| `PROJECT`·`ENVIRONMENT`·`SUITE`·`CASE`·`SCHEDULE` | 등록·수정·삭제 (케이스 가져오기는 케이스마다 등록) | 요청한 사용자 |
+| `PROJECT`·`ENVIRONMENT`·`SUITE`·`CASE`·`SCHEDULE`·`MAINTENANCE_WINDOW` | 등록·수정·삭제 (케이스 가져오기는 케이스마다 등록) | 요청한 사용자 |
 | `INVITE` | 초대 링크 발급 (`targetName`은 이메일) | 관리자 |
 | `USER` | 가입(초대 수락), 비밀번호 변경·재설정, 재설정 링크 발급, 삭제 | 가입·비밀번호는 본인, 링크 발급·삭제는 관리자 |
 
 - 항목: `{id, occurredAt, actor: {id, name(이메일)}, targetType, targetId, targetName, projectId, action, fields}`
   - `action`: `CREATED` / `UPDATED` / `DELETED`
-  - `targetName`: 변경 당시 이름. 항목을 삭제해도 표시 가능. 스케줄은 스위트 이름
+  - `targetName`: 변경 당시 이름. 항목을 삭제해도 표시 가능. 스케줄은 스위트 이름, 점검 시간은 환경 이름
   - `projectId`: 소속 프로젝트. 사용자·초대는 `null`
   - `suiteId`: 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 `null`
   - `fields`: 수정에서 값이 실제로 바뀐 항목 이름. 등록·삭제는 빈 목록
-- `fields` 값: 프로젝트·스위트 `name`·`description`, 스위트 `caseOrder`, 환경 `name`·`baseUrl`·`variables.<키>`·`secrets.<이름>`, 케이스 `name`·`request`·`assertions`·`extractors`, 스케줄 `environment`·`cron`·`enabled`, 사용자 `password`·`passwordResetLink`
+- `fields` 값: 프로젝트·스위트 `name`·`description`, 스위트 `caseOrder`, 환경 `name`·`baseUrl`·`variables.<키>`·`secrets.<이름>`, 케이스 `name`·`request`·`assertions`·`extractors`, 스케줄 `environment`·`cron`·`enabled`, 점검 시간 `startsAt`·`endsAt`·`reason`, 사용자 `password`·`passwordResetLink`
 - 값은 남기지 않음 (변수 값, 시크릿, 비밀번호, 링크 토큰 모두). 시크릿은 암호화 값을 비교할 수 없어 요청에 있던 이름을 모두 변경으로 기록
 - 같은 값으로 저장한 수정은 기록하지 않음. 삭제는 대상 1건만 기록 (프로젝트 삭제 시 함께 보관되는 환경·스위트·케이스·스케줄은 따로 기록하지 않음)
 - 스케줄러가 다음 실행 시각을 옮기는 것과 실행 자체는 기록하지 않음 (실행은 실행 이력)
@@ -563,6 +564,7 @@ curl -i -X POST localhost:8080/api/runs \
 - 노트북 절전 등으로 놓친 실행은 1회만 실행 후 다음 시각으로 이동
 - 기동 시 `RUNNING`으로 남은 실행은 `ABORTED` 처리
 - DB 접속 실패 시 해당 주기 건너뜀. 연결 실패 시 1회, 복구 시 1회 알림
+- 환경이 점검 중이면 그 환경의 스케줄은 실행하지 않고 다음 실행 시각으로 넘어감 (아래 "점검 시간")
 - 실행 완료 시 INFO 로그 1줄 (수동·스케줄 공통)
 
 ```
@@ -578,6 +580,28 @@ docker compose logs sentinel-api | grep "completed:"
 | `sentinel.schedule.enabled` | `true` | 폴링 동작 여부 |
 | `sentinel.schedule.zone` | `Asia/Seoul` | cron 해석 시간대 |
 | `sentinel.schedule.poll-interval` | `60s` | 폴링 주기 |
+
+### 점검 시간
+
+배포·점검으로 실패가 예상되는 동안 환경의 스케줄 실행을 건너뜀. 실행 기록이 없으므로 실패 알림·스위트 요약·직전 실행 비교에 점검 중 실패가 섞이지 않고, 끝나면 따로 조치 없이 다시 실행
+
+| API | 설명 |
+|-----|------|
+| `POST /api/maintenance-windows` | 등록. 본문 `{"environmentId": 1, "startsAt": "2026-09-29T10:00:00+09:00", "endsAt": "2026-09-29T11:00:00+09:00", "reason": "GW 배포"}`. 201 + `Location` |
+| `GET /api/maintenance-windows?environmentId=` | 끝나지 않은 점검(진행 중·예정), 시작 순. `environmentId` 생략 시 전체. 삭제된 환경의 점검은 제외 |
+| `PATCH /api/maintenance-windows/{id}` | 부분 변경(연장·단축·사유). 생략한 필드는 유지, `"reason": ""`은 사유 삭제. 이미 끝난 점검은 409 |
+| `DELETE /api/maintenance-windows/{id}` | 삭제. 예정된 점검은 취소, 진행 중인 점검은 바로 끝나 다음 스케줄부터 실행. 204 |
+
+- 항목: `{id, environment: {id, name}, projectId, startsAt, endsAt, reason, active, createdBy: {id, name(이메일)}}`. `active`는 지금 점검 중(스케줄 건너뜀), `false`는 예정
+- 기간: `startsAt` 이상 `endsAt` 미만. `endsAt`은 `startsAt` 뒤이고 현재 이후, 기간은 최대 7일 (끄고 잊어 모니터링이 멈추는 것 방지). 이미 시작한 시각으로도 등록 가능(지금부터 점검). 어기면 400
+- `reason`: 선택, 앞뒤 공백 제거 후 200자 이하
+- 건너뛴 스케줄은 `nextRunAt`만 다음 시각으로 옮기고 `lastTriggeredAt`(마지막 실행 시각)은 그대로. INFO 로그 1줄
+- 겹치는 점검 허용 (하나라도 진행 중이면 건너뜀). 수동 실행은 점검 중에도 가능 (점검 중 상태 확인용)
+- 등록·변경·삭제는 변경 이력(`MAINTENANCE_WINDOW`)에 기록 (누가 스케줄을 멈췄는지)
+
+```
+Skipped schedule 4 (suite 3) at 2026-09-29T01:10:00Z: environment 2 is under maintenance until 2026-09-29T02:00:00Z
+```
 
 ## 결과 원문 보관기간
 

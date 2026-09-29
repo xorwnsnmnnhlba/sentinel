@@ -83,6 +83,17 @@ public class TestSchedule extends BaseEntity {
 	}
 
 	/**
+	 * 이번 실행 건너뜀 (환경 점검 중). 다음 실행 시각만 옮기고 마지막 실행 시각은 그대로
+	 * @throws IllegalStateException 실행 시각 미도달
+	 */
+	public void skip(Instant now, ZoneId zone) {
+		if (!isDue(now)) {
+			throw new IllegalStateException("schedule " + getId() + " is not due at " + now);
+		}
+		this.nextRunAt = nextAfter(now, zone);
+	}
+
+	/**
 	 * cron 변경. 활성 상태면 현재 시각 기준 다음 실행 시각 재계산. 비활성 상태에서도 실행 시각이 없는 cron은 거부
 	 */
 	public void changeCron(String cron, Instant now, ZoneId zone) {

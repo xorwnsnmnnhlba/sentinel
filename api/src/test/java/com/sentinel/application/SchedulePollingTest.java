@@ -68,6 +68,9 @@ class SchedulePollingTest {
 	@Autowired
 	private RecordingNotifier notifier;
 
+	@Autowired
+	private MaintenanceWindowService maintenanceWindows;
+
 	private TestSuite suite;
 
 	private Environment environment;
@@ -133,6 +136,54 @@ class SchedulePollingTest {
 
 		ScheduleDetail enabled = scheduleService.update(schedule.id(), true, null, null, ACTOR);
 		assertThat(enabled.nextRunAt()).isEqualTo("2026-09-19T00:10:00Z");
+	}
+
+	@Test
+	void skipsSchedulesOfAnEnvironmentUnderMaintenanceAndResumesAfterIt() {
+		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "*/10 * * * *", ACTOR);
+		// 다른 환경의 스케줄은 그대로 실행
+		Environment other = fixtures.environment(suite.getProject(), "other", Map.of());
+		scheduleService.create(suite.getId(), other.getId(), "*/10 * * * *", ACTOR);
+		// 09:10 ~ 09:30 점검
+		maintenanceWindows.create(environment.getId(), Instant.parse("2026-09-18T00:10:00Z"),
+				Instant.parse("2026-09-18T00:30:00Z"), "GW 배포", ACTOR);
+
+		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
+		List<Long> duringMaintenance = poller.poll();
+
+		// 점검 중인 환경은 실행 기록 없이 다음 실행 시각으로 넘어가고 마지막 실행 시각은 그대로
+		assertThat(duringMaintenance).hasSize(1);
+		assertThat(testRunService.getRun(duringMaintenance.getFirst()).environmentId()).isEqualTo(other.getId());
+		ScheduleDetail skipped = scheduleService.get(schedule.id());
+		assertThat(skipped.nextRunAt()).isEqualTo("2026-09-18T00:20:00Z");
+		assertThat(skipped.lastTriggeredAt()).isNull();
+		assertThat(notifier.sent()).isEmpty();
+
+		// 끝 시각부터는 다시 실행 (끝은 미포함)
+		clock.set(Instant.parse("2026-09-18T00:30:00Z"));
+		assertThat(poller.poll()).hasSize(2);
+		assertThat(scheduleService.get(schedule.id()).lastTriggeredAt()).isEqualTo("2026-09-18T00:30:00Z");
+	}
+
+	@Test
+	void runsBeforeAPlannedMaintenanceAndAfterItIsDeleted() {
+		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "*/10 * * * *", ACTOR);
+		MaintenanceWindowItem window = maintenanceWindows.create(environment.getId(),
+				Instant.parse("2026-09-18T00:20:00Z"), Instant.parse("2026-09-18T01:00:00Z"), null, ACTOR);
+
+		// 시작 전
+		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
+		assertThat(poller.poll()).hasSize(1);
+
+		// 시작 시각부터 건너뜀 (시작은 포함)
+		clock.set(Instant.parse("2026-09-18T00:20:00Z"));
+		assertThat(poller.poll()).isEmpty();
+
+		// 점검을 삭제하면 바로 다음 스케줄부터 실행
+		maintenanceWindows.delete(window.id(), ACTOR);
+		clock.set(Instant.parse("2026-09-18T00:30:00Z"));
+		assertThat(poller.poll()).hasSize(1);
+		assertThat(scheduleService.get(schedule.id()).nextRunAt()).isEqualTo("2026-09-18T00:40:00Z");
 	}
 
 	@Test
