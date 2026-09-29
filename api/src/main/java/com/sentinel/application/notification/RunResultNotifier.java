@@ -167,7 +167,11 @@ public class RunResultNotifier {
 				.map(RunResultNotifier::describe)
 				.collect(Collectors.joining("; "));
 		}
-		return reason.length() <= MAX_REASON_LENGTH ? reason : reason.substring(0, MAX_REASON_LENGTH) + "…";
+		if (reason.length() > MAX_REASON_LENGTH) {
+			reason = reason.substring(0, MAX_REASON_LENGTH) + "…";
+		}
+		// 일시적인 흔들림이 아니라 다시 보내도 응답이 없었음을 알림
+		return result.getRetryCount() == 0 ? reason : reason + " (" + result.getRetryCount() + "회 다시 보낸 뒤)";
 	}
 
 	private static String describe(AssertionResult assertion) {

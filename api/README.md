@@ -247,6 +247,7 @@ curl -i -X POST localhost:8080/api/runs \
 | `verdict: FAILED` | 응답 수신 후 판정 규칙 실패. 규칙별 결과는 `assertionResults` (`description`, `passed`, `message`) |
 | `verdict: ERROR` | 응답 미수신 또는 전송 전 실패. 사유는 `errorReason` |
 | `outcome` | 응답 수신 여부. `RESPONDED`(4xx·5xx 포함) / `ERROR` |
+| `retries` | 응답을 받지 못해 다시 보낸 횟수 ("전송 오류 재시도"). 대부분 0 |
 | `errorReason` | `UNRESOLVED_VARIABLE`(변수 누락, 미전송) / `INVALID_REQUEST`(잘못된 URL·헤더) / `TIMEOUT` / `CONNECTION_FAILED` / `IO_ERROR` / `BLOCKED_DESTINATION`(링크 로컬·클라우드 메타데이터 주소, 미전송) / `UNEXPECTED` |
 
 - 저장되는 요청·응답 헤더 중 `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` 값은 `****`로 마스킹. 실제 전송 값은 원본 사용
@@ -305,11 +306,27 @@ curl -i -X POST localhost:8080/api/runs \
 - HTTP 클라이언트는 Apache HttpClient 5.6 (`RestClient` + `HttpComponentsClientHttpRequestFactory`). 연결할 주소를 직접 해석·확인하는 해석기(`DnsResolver`)를 지정할 수 있어서 사용 (JDK HttpClient는 미지원)
 - 서버 응답을 그대로 기록하도록 클라이언트의 자동 처리 미사용
   - 리다이렉트 미추적 (3xx 그대로 기록)
-  - 재시도 없음. 기본 설정은 429·503(`Retry-After`)과 일부 전송 오류를 다시 보내 첫 응답이 가려짐
+  - 클라이언트 재시도 끔. 기본 설정은 429·503(`Retry-After`)과 일부 전송 오류를 다시 보내 첫 응답이 가려짐. 응답을 받지 못한 경우만 앱이 따로 재시도하고 기록 (아래 "전송 오류 재시도")
   - 압축 요청(`Accept-Encoding`) 없음, 쿠키 저장·자동 전송 없음 (케이스에 적은 헤더만 전송)
 - 연결 재사용. 1초 이상 쉰 연결은 사용 전 확인, 30초 이상 쉰 연결은 정리. 동시 연결 한도 200 (Tomcat 기본 요청 스레드 수)
 - 제한 시간: 연결 `sentinel.runner.http.connect-timeout`(기본 5초) 초과 시 `CONNECTION_FAILED`, 응답 대기 `read-timeout`(기본 30초) 초과 시 `TIMEOUT`
 - 수동 실행은 실행마다 가상 스레드 하나에서 진행 (대부분 GW 응답 대기이므로 스레드를 점유하지 않음). 동시 수동 실행 수는 `sentinel.runner.manual.max-concurrent`(기본 4, 1 미만이면 기동 실패)
+
+### 전송 오류 재시도
+
+GW·네트워크가 잠깐 흔들린 것만으로 실패가 기록·알림되지 않도록, 응답을 받지 못한 케이스는 잠시 기다렸다가 다시 보냄
+
+| 오류 | 재시도 |
+|------|--------|
+| `CONNECTION_FAILED` (연결 실패·연결 시간 초과) | 모든 메서드. 요청이 서버에 닿지 않음 |
+| `TIMEOUT`·`IO_ERROR` (응답 대기 시간 초과·연결 끊김) | `GET`·`HEAD`·`OPTIONS`만. 서버가 이미 처리했을 수 있어 등록·삭제 요청은 두 번 보내지 않음 |
+| `BLOCKED_DESTINATION`, 전송 전 오류(`UNRESOLVED_VARIABLE`·`INVALID_REQUEST`) | 없음. 다시 보내도 같음 |
+
+- 응답을 받은 뒤의 판정 실패(`FAILED`)는 재시도하지 않음 (실제 문제일 가능성이 큼)
+- 설정: `sentinel.runner.retry.max-retries`(기본 1, 0~3, 0이면 끔), `sentinel.runner.retry.delay`(기본 1초)
+- 결과는 재시도 뒤의 응답 또는 마지막 오류. 다시 보낸 횟수는 결과의 `retries`(`test_result.retry_count`, V20). 소요 시간은 마지막 전송 기준
+- 재시도 뒤에도 응답이 없어 실패 알림을 보내면 사유 끝에 "(N회 다시 보낸 뒤)"
+- 재시도한 케이스는 INFO 로그 1줄 (`Run 12 case 5 was sent 1 more time(s) after no response: responded`)
 
 ## 인증
 

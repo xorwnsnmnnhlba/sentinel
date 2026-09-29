@@ -121,13 +121,14 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 	 * @param responseSchema 응답 JSON의 구조 지문. 원문 보관기간이 지나도 유지. JSON이 아닌 응답·응답 없음은 null
 	 * @param drift 이전 실행 대비 구조 변화. 지문이 없으면 null
 	 * @param change 직전 실행 대비 판정 변화. 비교하지 않는 실행(직전 실행 없음, 단건·여기까지·실패 다시 실행)은 null
+	 * @param retries 응답을 받지 못해 다시 보낸 횟수. 결과는 재시도 뒤의 응답 또는 마지막 오류
 	 * @param supporting 실패 다시 실행에서 원래 실행에 실패하지 않았지만 다시 실행하는 케이스가 쓰는 추출 값을 만들기 위해
 	 *     함께 실행한 케이스. 그 외는 false
 	 */
 	public record Result(long id, long testCaseId, String testCaseName, Verdict verdict, Outcome outcome,
 			List<AssertionResult> assertionResults, ErrorReason errorReason, String errorMessage, Long elapsedMs,
 			Request request, Response response, ResponseSchema responseSchema, ResultDrift drift, Change change,
-			boolean supporting) {
+			int retries, boolean supporting) {
 
 		static Result of(TestResult result, ResultDrift drift, Change change, boolean supporting) {
 			Response response = result.getOutcome() == Outcome.RESPONDED
@@ -139,7 +140,7 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 					result.getAssertionResults(), result.getErrorReason(), result.getErrorMessage(), result.getElapsedMs(),
 					new Request(result.getRequestMethod(), result.getRequestUrl(), result.getRequestHeaders(),
 							result.getRequestBody()),
-					response, result.getResponseSchema(), drift, change, supporting);
+					response, result.getResponseSchema(), drift, change, result.getRetryCount(), supporting);
 		}
 
 	}
