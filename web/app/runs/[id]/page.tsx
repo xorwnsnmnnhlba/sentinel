@@ -6,6 +6,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import {
   RerunBadge,
+  RetryBadge,
   RunCountBadges,
   SingleCaseBadge,
   StatusBadge,
@@ -149,6 +150,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
                     <VerdictBadge verdict={result.verdict} />
                     <span className="truncate font-medium">{result.testCaseName}</span>
                     {result.supporting && <SupportingBadge />}
+                    <RetryBadge retries={result.retries} />
                     <ChangeBadge change={result.change} />
                     <DriftBadge drift={result.drift} />
                     <span className="ml-auto flex shrink-0 items-center gap-3 font-mono text-xs text-muted-foreground">

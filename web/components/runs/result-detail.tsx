@@ -8,7 +8,7 @@ import { type ExtractionResult, splitExtractions } from "@/lib/extraction";
 import { prettyBody } from "@/lib/format";
 
 /**
- * 케이스 1건의 결과. 오류 사유, 판정 규칙별 결과, 응답 값 추출 결과, 요청·응답 원문, 응답 구조
+ * 케이스 1건의 결과. 오류 사유, 응답을 받지 못해 다시 보낸 경우 그 횟수, 판정 규칙별 결과, 응답 값 추출 결과, 요청·응답 원문, 응답 구조
  * 다른 케이스가 추출하는 변수가 비어 전송하지 못했으면 해결 방법 안내 (단건 실행은 "여기까지 실행", 그 외는 실행 순서 확인)
  * 보관기간이 지나 원문을 삭제한 실행(rawPurged)은 원문 대신 안내 문구 표시. 응답 구조는 원문과 달리 계속 표시
  */
@@ -29,10 +29,17 @@ export function ResultDetail({
         {result.request.method} {result.request.url ?? "(전송 전 실패)"}
       </p>
 
+      {result.retries > 0 && result.response && (
+        <p className="text-xs text-muted-foreground">
+          처음에 응답을 받지 못해 {result.retries}회 다시 보낸 뒤 받은 응답입니다 (소요 시간은 마지막 전송 기준)
+        </p>
+      )}
+
       {result.errorReason && (
         <div className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
           <span className="font-semibold">{result.errorReason}</span>
           {result.errorMessage && <span className="ml-2 break-all">{result.errorMessage}</span>}
+          {result.retries > 0 && <p className="mt-2">{result.retries}회 다시 보냈지만 응답을 받지 못했습니다</p>}
           {missesExtractedValue(result) && (
             <p className="mt-2">
               {singleCase

@@ -31,6 +31,7 @@ const responded: RunResult = {
   responseSchema: { fields: { $: ["object"], "$.orderId": ["number"] }, complete: true },
   drift: { status: "COMPARED", observations: 3, changes: [] },
   change: null,
+  retries: 0,
   supporting: false,
 };
 
@@ -86,6 +87,38 @@ describe("ResultDetail", () => {
     // 구조 지문은 원문과 달리 보관기간이 지나도 표시
     expect(screen.getByRole("heading", { name: "응답 구조" })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: "$.orderId number" })).toBeInTheDocument();
+  });
+
+  it("says when the response came only after sending again", () => {
+    render(<ResultDetail result={{ ...responded, retries: 1 }} />);
+
+    expect(screen.getByText(/처음에 응답을 받지 못해 1회 다시 보낸 뒤 받은 응답입니다/)).toBeInTheDocument();
+  });
+
+  it("says when sending again still got no response", () => {
+    render(
+      <ResultDetail
+        result={{
+          ...responded,
+          verdict: "ERROR",
+          outcome: "ERROR",
+          assertionResults: [],
+          errorReason: "TIMEOUT",
+          errorMessage: "TIMEOUT: GET https://gw.dev.internal/orders",
+          response: null,
+          retries: 2,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("2회 다시 보냈지만 응답을 받지 못했습니다")).toBeInTheDocument();
+    expect(screen.queryByText(/다시 보낸 뒤 받은 응답/)).not.toBeInTheDocument();
+  });
+
+  it("mentions nothing about sending again when the first attempt responded", () => {
+    render(<ResultDetail result={responded} />);
+
+    expect(screen.queryByText(/다시 보/)).not.toBeInTheDocument();
   });
 
   it("shows only the error for a request that was never sent", () => {
