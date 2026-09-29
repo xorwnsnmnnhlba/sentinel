@@ -12,8 +12,10 @@ import {
   createCase,
   createSchedule,
   createEnvironment,
+  createMaintenanceWindow,
   createProject,
   deleteCase,
+  deleteMaintenanceWindow,
   deleteProject,
   deleteSuite,
   runCase,
@@ -26,6 +28,7 @@ import {
   setScheduleEnabled,
   updateCase,
   updateEnvironment,
+  updateMaintenanceWindow,
   updateSchedule,
   updateProject,
 } from "./catalog";
@@ -255,6 +258,62 @@ describe("cancelRun", () => {
     await expect(cancelRun(43)).resolves.toEqual({
       error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다",
     });
+  });
+});
+
+describe("maintenance windows", () => {
+  // 끝 시각이 지나지 않도록 먼 미래
+  const period = { startsAt: "2099-09-29T10:00", endsAt: "2099-09-29T11:30", reason: "  GW 배포 " };
+
+  it("registers the window in KST and reloads the page", async () => {
+    const bodies = capture("post", "/api/maintenance-windows", () => HttpResponse.json({ id: 9 }, { status: 201 }));
+
+    await expect(createMaintenanceWindow(4, undefined, form(period))).resolves.toEqual({});
+    expect(bodies).toEqual([
+      {
+        environmentId: 4,
+        startsAt: "2099-09-29T01:00:00.000Z",
+        endsAt: "2099-09-29T02:30:00.000Z",
+        reason: "GW 배포",
+      },
+    ]);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [{ ...period, endsAt: "" }, "시작·끝 시각을 입력해 주세요"],
+    [{ ...period, endsAt: "2099-09-29T10:00" }, "끝 시각은 시작 시각보다 뒤여야 합니다"],
+    [{ ...period, endsAt: "2099-10-07T10:00" }, "점검 시간은 최대 7일입니다"],
+  ])("explains an invalid period without calling Spring: %j", async (fields, message) => {
+    const bodies = capture("post", "/api/maintenance-windows", () => HttpResponse.json({ id: 9 }, { status: 201 }));
+
+    await expect(createMaintenanceWindow(4, undefined, form(fields))).resolves.toEqual({ error: message });
+    expect(bodies).toEqual([]);
+  });
+
+  it("changes the window, sending an empty reason to clear it", async () => {
+    const bodies = capture("patch", "/api/maintenance-windows/9", () => HttpResponse.json({ id: 9 }));
+
+    await expect(updateMaintenanceWindow(9, undefined, form({ ...period, reason: "" }))).resolves.toEqual({});
+    expect(bodies).toEqual([{ startsAt: "2099-09-29T01:00:00.000Z", endsAt: "2099-09-29T02:30:00.000Z", reason: "" }]);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("explains a window that ended meanwhile and reloads to show it", async () => {
+    capture("patch", "/api/maintenance-windows/9", () => problem(409, "maintenance window 9 has already ended"));
+
+    await expect(updateMaintenanceWindow(9, undefined, form(period))).resolves.toEqual({
+      error: "이미 끝난 점검입니다",
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("ends or cancels the window by deleting it", async () => {
+    const bodies = capture("delete", "/api/maintenance-windows/9", () => new HttpResponse(null, { status: 204 }));
+
+    await expect(deleteMaintenanceWindow(9)).resolves.toEqual({});
+    expect(bodies).toEqual([undefined]);
+    expect(refresh).toHaveBeenCalledOnce();
   });
 });
 

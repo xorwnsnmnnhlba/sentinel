@@ -32,6 +32,8 @@ describe("fieldLabel", () => {
   it.each([
     ["name", "이름"],
     ["caseOrder", "실행 순서"],
+    ["endsAt", "끝 시각"],
+    ["reason", "사유"],
     ["passwordResetLink", "비밀번호 재설정 링크 발급"],
     ["variables.userId", "변수 userId"],
     ["secrets.token", "시크릿 token"],
@@ -58,6 +60,8 @@ describe("targetHref", () => {
     expect(targetHref(log({ targetType: "CASE", targetId: 7 }))).toBe("/cases/7");
     // 환경은 소속 프로젝트 화면
     expect(targetHref(log({ targetType: "ENVIRONMENT", targetId: 9, projectId: 3 }))).toBe("/projects/3");
+    // 점검 시간도 환경이 있는 프로젝트 화면
+    expect(targetHref(log({ targetType: "MAINTENANCE_WINDOW", targetId: 2, projectId: 3 }))).toBe("/projects/3");
   });
 
   it("offers no link for deletions and targets without a screen", () => {

@@ -4,9 +4,10 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { apiGet, apiSend, isApiError } from "@/lib/api/server";
-import type { CaseItem, EnvironmentItem, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
+import type { CaseItem, EnvironmentItem, MaintenanceWindow, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
 import { copyName, MAX_CASE_NAME_LENGTH } from "@/lib/copy-name";
 import { type CaseDraft, isCaseDraft, validateDraft } from "@/lib/case-draft";
+import { fromKstInput, periodError } from "@/lib/maintenance";
 
 /**
  * 프로젝트·환경·스위트·케이스 등록·수정·삭제, 스위트 실행. Spring 호출 후 refresh()로 현재 화면 재조회 또는 redirect.
@@ -273,6 +274,57 @@ export async function setScheduleEnabled(scheduleId: number, enabled: boolean): 
 
 export async function deleteSchedule(scheduleId: number): Promise<ActionState> {
   return mutate("DELETE", `/api/schedules/${id(scheduleId)}`);
+}
+
+/** 환경 점검 시간 등록. 점검 중에는 그 환경의 스케줄 실행을 건너뜀 */
+export async function createMaintenanceWindow(
+  environmentId: number,
+  _: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const period = maintenanceForm(form);
+  if ("error" in period) {
+    return period;
+  }
+  return mutate("POST", "/api/maintenance-windows", { environmentId: id(environmentId), ...period });
+}
+
+/** 점검 시간 변경 (연장·단축·사유). 그사이 끝난 점검은 안내 후 화면 재조회 */
+export async function updateMaintenanceWindow(windowId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  const period = maintenanceForm(form);
+  if ("error" in period) {
+    return period;
+  }
+  try {
+    await apiSend<MaintenanceWindow>("PATCH", `/api/maintenance-windows/${id(windowId)}`, period);
+  } catch (error) {
+    if (isApiError(error) && error.status === 409) {
+      refresh();
+      return { error: "이미 끝난 점검입니다" };
+    }
+    return failure(error);
+  }
+  refresh();
+  return {};
+}
+
+/** 점검 시간 삭제. 예정된 점검은 취소, 진행 중인 점검은 바로 끝나 다음 스케줄부터 실행 */
+export async function deleteMaintenanceWindow(windowId: number): Promise<ActionState> {
+  return mutate("DELETE", `/api/maintenance-windows/${id(windowId)}`);
+}
+
+/** 입력값(KST)을 API 요청으로. 빈 사유는 사유 없음(수정 시 삭제) */
+function maintenanceForm(form: FormData): { startsAt: string; endsAt: string; reason: string } | { error: string } {
+  const startsAt = fromKstInput(String(form.get("startsAt") ?? ""));
+  const endsAt = fromKstInput(String(form.get("endsAt") ?? ""));
+  if (!startsAt || !endsAt) {
+    return { error: "시작·끝 시각을 입력해 주세요" };
+  }
+  const error = periodError(startsAt, endsAt, new Date());
+  if (error) {
+    return { error };
+  }
+  return { startsAt, endsAt, reason: String(form.get("reason") ?? "").trim() };
 }
 
 /**

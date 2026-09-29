@@ -8,7 +8,7 @@ import { RunCountBadges, StatusBadge, TriggerBadge } from "@/components/run-badg
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiGet } from "@/lib/api/server";
-import type { Page, ResponseTimeChanges, RunSummary, SuiteSummaries } from "@/lib/api/types";
+import type { MaintenanceWindow, Page, ResponseTimeChanges, RunSummary, SuiteSummaries } from "@/lib/api/types";
 import {
   byPassRate,
   DASHBOARD_PERIODS,
@@ -22,6 +22,7 @@ import {
   totals,
 } from "@/lib/dashboard";
 import { formatDateTime, formatProgress } from "@/lib/format";
+import { formatEnd } from "@/lib/maintenance";
 import { formatMs, kstDateRange } from "@/lib/response-times";
 import { cn } from "@/lib/utils";
 
@@ -41,13 +42,16 @@ export default async function Dashboard(props: PageProps<"/">) {
   const previous = previousRange(current.from, days);
   const range = (period: { from: string; to: string }) => `from=${period.from}&to=${period.to}`;
 
-  const [summaries, previousSummaries, failingRuns, changes, running] = await Promise.all([
+  const [summaries, previousSummaries, failingRuns, changes, running, windows] = await Promise.all([
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
     apiGet<Page<RunSummary>>(`/api/runs?failing=true&size=5&${range(current)}`),
     apiGet<ResponseTimeChanges>(`/api/response-time-changes?limit=5&${range(current)}`),
     apiGet<Page<RunSummary>>(`/api/runs?status=RUNNING&size=${RUNNING_LIMIT}`),
+    apiGet<MaintenanceWindow[]>("/api/maintenance-windows"),
   ]);
+  const maintenance = windows.filter((window) => window.active);
+  const at = new Date();
   const now = totals(summaries.suites);
   const before = totals(previousSummaries.suites);
   const comparedTo = `이전 ${days}일 대비`;
@@ -62,6 +66,26 @@ export default async function Dashboard(props: PageProps<"/">) {
         description={`${current.from} ~ ${current.to} (KST) 실행 현황`}
         actions={<PeriodLinks days={days} />}
       />
+
+      {maintenance.length > 0 && (
+        <section className="space-y-3">
+          <SectionTitle
+            title={`점검 중인 환경 ${maintenance.length}곳`}
+            description="점검이 끝날 때까지 이 환경의 스케줄 실행을 건너뜀 (실행 기록·실패 알림 없음)"
+          />
+          <ul className="divide-y rounded-xl border text-sm">
+            {maintenance.map((window) => (
+              <li key={window.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+                <Link href={`/projects/${window.projectId}`} className="font-medium hover:underline">
+                  {window.environment.name}
+                </Link>
+                <span className="text-muted-foreground">~{formatEnd(window.endsAt, at)} (KST)</span>
+                {window.reason && <span className="text-muted-foreground">· {window.reason}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {running.totalElements > 0 && (
         <section className="space-y-3">

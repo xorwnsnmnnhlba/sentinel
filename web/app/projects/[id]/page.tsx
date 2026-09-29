@@ -6,25 +6,31 @@ import { ActionMenu } from "@/components/catalog/action-menu";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { EnvironmentFields, ProjectFields, SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
-import { EDIT_DELETE, EDIT_DUPLICATE_DELETE, withHistory } from "@/components/catalog/menu-items";
+import { EDIT_DELETE, ENVIRONMENT_MENU, maintenanceMenu, withHistory } from "@/components/catalog/menu-items";
 import { Empty, SectionHeader, TableFrame } from "@/components/catalog/section";
+import { MaintenanceBadge } from "@/components/maintenance/maintenance-badge";
+import { MaintenanceFields } from "@/components/maintenance/maintenance-fields";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   createEnvironment,
+  createMaintenanceWindow,
   createSuite,
   deleteEnvironment,
+  deleteMaintenanceWindow,
   deleteProject,
   deleteSuite,
   updateEnvironment,
+  updateMaintenanceWindow,
   updateProject,
   updateSuite,
 } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
-import type { EnvironmentItem, ProjectItem, SuiteItem } from "@/lib/api/types";
+import type { EnvironmentItem, MaintenanceWindow, ProjectItem, SuiteItem } from "@/lib/api/types";
 import { historyHref, projectHistoryHref, suiteHistoryHref } from "@/lib/change-log";
 import { copyName, MAX_ENVIRONMENT_NAME_LENGTH } from "@/lib/copy-name";
+import { formatPeriod, maintenanceOf } from "@/lib/maintenance";
 
 export async function generateMetadata(props: PageProps<"/projects/[id]">) {
   const { id } = await props.params;
@@ -37,10 +43,13 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
     notFound();
   }
   const project = await apiGetOrNotFound<ProjectItem>(`/api/projects/${id}`);
-  const [environments, suites] = await Promise.all([
+  const [environments, suites, allWindows] = await Promise.all([
     apiGet<EnvironmentItem[]>(`/api/environments?projectId=${project.id}`),
     apiGet<SuiteItem[]>(`/api/suites?projectId=${project.id}`),
+    apiGet<MaintenanceWindow[]>("/api/maintenance-windows"),
   ]);
+  const windows = allWindows.filter((window) => window.projectId === project.id);
+  const now = new Date();
 
   return (
     <div className="space-y-10">
@@ -109,52 +118,142 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {environments.map((environment) => (
-                  <TableRow key={environment.id}>
-                    <TableCell className="font-medium">{environment.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{environment.baseUrl}</TableCell>
-                    <TableCell className="font-mono text-xs whitespace-normal text-muted-foreground">
-                      {Object.keys(environment.variables).join(", ") || "-"}
+                {environments.map((environment) => {
+                  const maintenance = maintenanceOf(windows, environment.id);
+                  return (
+                    <TableRow key={environment.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {environment.name}
+                          {maintenance && <MaintenanceBadge window={maintenance} now={now} />}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{environment.baseUrl}</TableCell>
+                      <TableCell className="font-mono text-xs whitespace-normal text-muted-foreground">
+                        {Object.keys(environment.variables).join(", ") || "-"}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs whitespace-normal text-muted-foreground">
+                        {environment.secretNames.join(", ") || "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <ActionMenu
+                          label={`환경 ${environment.name} 작업`}
+                          items={withHistory(ENVIRONMENT_MENU, historyHref("ENVIRONMENT", environment.id))}
+                        >
+                          <FormDialog
+                            menuId="edit"
+                            title="환경 수정"
+                            submitLabel="저장"
+                            action={updateEnvironment.bind(null, environment.id)}
+                          >
+                            <EnvironmentFields environment={environment} />
+                          </FormDialog>
+                          <FormDialog
+                            menuId="duplicate"
+                            title="환경 복제"
+                            description={`${environment.name}의 기본 URL·변수를 채운 새 환경을 등록합니다. 원본은 바뀌지 않습니다.`}
+                            submitLabel="등록"
+                            action={createEnvironment.bind(null, project.id)}
+                          >
+                            <EnvironmentFields
+                              copy={{
+                                from: environment,
+                                name: copyName(
+                                  environment.name,
+                                  environments.map((other) => other.name),
+                                  MAX_ENVIRONMENT_NAME_LENGTH,
+                                ),
+                              }}
+                            />
+                          </FormDialog>
+                          <FormDialog
+                            menuId="maintenance"
+                            title={`${environment.name} 점검 시간 등록`}
+                            description="점검 중에는 이 환경의 스케줄 실행을 건너뜁니다 (실행 기록·실패 알림 없음). 수동 실행은 할 수 있습니다."
+                            submitLabel="등록"
+                            action={createMaintenanceWindow.bind(null, environment.id)}
+                          >
+                            <MaintenanceFields now={now} />
+                          </FormDialog>
+                          <DeleteDialog
+                            menuId="delete"
+                            title={`환경 "${environment.name}" 삭제`}
+                            description="이 환경을 쓰는 스케줄도 함께 삭제합니다. 실행 이력은 유지됩니다."
+                            action={deleteEnvironment.bind(null, environment.id)}
+                          />
+                        </ActionMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableFrame>
+        )}
+      </section>
+
+      {windows.length > 0 && (
+        <section className="space-y-3">
+          <SectionHeader
+            title="점검 시간"
+            count={windows.length}
+            description="점검 중에는 그 환경의 스케줄 실행을 건너뜀. 끝나면 따로 조치 없이 다시 실행 (KST)"
+          />
+          <TableFrame>
+            <Table aria-label="점검 시간">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>환경</TableHead>
+                  <TableHead>기간</TableHead>
+                  <TableHead>사유</TableHead>
+                  <TableHead>등록</TableHead>
+                  <TableHead className="w-12">
+                    <span className="sr-only">작업</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {windows.map((window) => (
+                  <TableRow key={window.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {window.environment.name}
+                        <MaintenanceBadge window={window} now={now} />
+                      </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs whitespace-normal text-muted-foreground">
-                      {environment.secretNames.join(", ") || "-"}
-                    </TableCell>
+                    <TableCell className="font-mono text-xs">{formatPeriod(window.startsAt, window.endsAt)}</TableCell>
+                    <TableCell className="whitespace-normal text-muted-foreground">{window.reason ?? "-"}</TableCell>
+                    <TableCell className="text-muted-foreground">{window.createdBy?.name ?? "-"}</TableCell>
                     <TableCell className="text-right">
                       <ActionMenu
-                        label={`환경 ${environment.name} 작업`}
-                        items={withHistory(EDIT_DUPLICATE_DELETE, historyHref("ENVIRONMENT", environment.id))}
+                        label={`${window.environment.name} 점검 시간 작업`}
+                        items={withHistory(
+                          maintenanceMenu(window.active),
+                          historyHref("MAINTENANCE_WINDOW", window.id),
+                        )}
                       >
                         <FormDialog
                           menuId="edit"
-                          title="환경 수정"
+                          title={`${window.environment.name} 점검 시간 수정`}
                           submitLabel="저장"
-                          action={updateEnvironment.bind(null, environment.id)}
+                          action={updateMaintenanceWindow.bind(null, window.id)}
                         >
-                          <EnvironmentFields environment={environment} />
-                        </FormDialog>
-                        <FormDialog
-                          menuId="duplicate"
-                          title="환경 복제"
-                          description={`${environment.name}의 기본 URL·변수를 채운 새 환경을 등록합니다. 원본은 바뀌지 않습니다.`}
-                          submitLabel="등록"
-                          action={createEnvironment.bind(null, project.id)}
-                        >
-                          <EnvironmentFields
-                            copy={{
-                              from: environment,
-                              name: copyName(
-                                environment.name,
-                                environments.map((other) => other.name),
-                                MAX_ENVIRONMENT_NAME_LENGTH,
-                              ),
-                            }}
-                          />
+                          <MaintenanceFields window={window} now={now} />
                         </FormDialog>
                         <DeleteDialog
                           menuId="delete"
-                          title={`환경 "${environment.name}" 삭제`}
-                          description="이 환경을 쓰는 스케줄도 함께 삭제합니다. 실행 이력은 유지됩니다."
-                          action={deleteEnvironment.bind(null, environment.id)}
+                          title={
+                            window.active
+                              ? `${window.environment.name} 점검 지금 종료`
+                              : `${window.environment.name} 점검 취소`
+                          }
+                          description={
+                            window.active
+                              ? "다음 스케줄부터 이 환경의 스케줄을 다시 실행합니다."
+                              : "예정된 점검을 취소합니다. 스케줄은 그대로 실행됩니다."
+                          }
+                          confirmLabel={window.active ? "지금 종료" : "점검 취소"}
+                          action={deleteMaintenanceWindow.bind(null, window.id)}
                         />
                       </ActionMenu>
                     </TableCell>
@@ -163,8 +262,8 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
               </TableBody>
             </Table>
           </TableFrame>
-        )}
-      </section>
+        </section>
+      )}
 
       <section className="space-y-3">
         <SectionHeader
