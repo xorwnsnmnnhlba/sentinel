@@ -11,6 +11,7 @@ import com.sentinel.runner.assertion.AssertionResult;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TestResultTest {
 
@@ -88,6 +89,17 @@ class TestResultTest {
 	private HttpExchange exchange(String body, Map<String, List<String>> headers) {
 		return new HttpExchange(ResolvedRequest.of(HttpMethod.GET, "https://gw/a"), 200, headers, body,
 				Duration.ofMillis(5));
+	}
+
+	@Test
+	void recordsHowManyTimesTheRequestWasSentAgain() {
+		TestResult result = TestResult.responded(run, testCase, exchange("{}", Map.of()), List.of());
+		assertThat(result.getRetryCount()).isZero();
+
+		result.recordRetries(2);
+
+		assertThat(result.getRetryCount()).isEqualTo(2);
+		assertThatThrownBy(() -> result.recordRetries(-1)).isInstanceOf(IllegalArgumentException.class);
 	}
 
 }

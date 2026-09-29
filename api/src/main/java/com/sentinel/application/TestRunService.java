@@ -35,6 +35,7 @@ import com.sentinel.runner.RequestExecutionException;
 import com.sentinel.runner.RequestExecutor;
 import com.sentinel.runner.RequestTemplate;
 import com.sentinel.runner.ResolvedRequest;
+import com.sentinel.runner.TransportRetry;
 import com.sentinel.runner.UnresolvedVariableException;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.assertion.AssertionEvaluator;
@@ -90,6 +91,8 @@ public class TestRunService {
 	private final BackgroundRuns backgroundRuns;
 
 	private final ManualRunSlots manualRunSlots;
+
+	private final TransportRetry transportRetry;
 
 	/**
 	 * 스위트 전체 수동 실행 시작. 실행을 만들고 바로 반환하며 케이스 실행은 백그라운드에서 진행 (진행 상황은 {@link #getRun})
@@ -390,6 +393,11 @@ public class TestRunService {
 			}
 			Execution execution = extract(preparedCase,
 					execute(preparedCase, variables, prepared.extractedInSuite()), variables, secretValues);
+			if (execution.retries() > 0) {
+				log.info("Run {} case {} was sent {} more time(s) after no response: {}", prepared.runId(),
+						preparedCase.testCaseId(), execution.retries(),
+						execution instanceof Responded ? "responded" : "still no response");
+			}
 			Set<String> masked = Set.copyOf(secretValues);
 			TestResult.Verdict verdict = transactions.write(status -> {
 				TestResult.Verdict saved = results.save(resultOf(prepared.runId(), preparedCase, execution, masked))
@@ -463,7 +471,7 @@ public class TestRunService {
 			}
 			assertionResults.add(new AssertionResult(extractor.describe(), extraction.succeeded(), extraction.message()));
 		}
-		return new Responded(responded.exchange(), assertionResults);
+		return new Responded(responded.exchange(), assertionResults, responded.retries());
 	}
 
 	private Execution execute(PreparedCase preparedCase, Map<String, String> variables, Set<String> extractedInSuite) {
@@ -472,39 +480,44 @@ public class TestRunService {
 			request = preparedCase.template().resolve(variables);
 		}
 		catch (UnresolvedVariableException ex) {
-			return new Failed(ErrorReason.UNRESOLVED_VARIABLE, unresolvedMessage(ex, extractedInSuite), null, null);
+			return new Failed(ErrorReason.UNRESOLVED_VARIABLE, unresolvedMessage(ex, extractedInSuite), null, null, 0);
 		}
 		catch (IllegalArgumentException ex) {
-			return new Failed(ErrorReason.INVALID_REQUEST, ex.getMessage(), null, null);
+			return new Failed(ErrorReason.INVALID_REQUEST, ex.getMessage(), null, null, 0);
 		}
 
 		long startedAt = System.nanoTime();
 		try {
-			HttpExchange exchange = executor.execute(request);
-			return new Responded(exchange, AssertionEvaluator.evaluate(preparedCase.assertions(), exchange));
-		}
-		catch (RequestExecutionException ex) {
-			return new Failed(ErrorReason.valueOf(ex.reason().name()), messageOf(ex), request, ex.elapsed());
+			TransportRetry.Sent sent = transportRetry.send(request, executor);
+			if (sent.failure() != null) {
+				RequestExecutionException ex = sent.failure();
+				return new Failed(ErrorReason.valueOf(ex.reason().name()), messageOf(ex), request, ex.elapsed(),
+						sent.retries());
+			}
+			return new Responded(sent.exchange(),
+					AssertionEvaluator.evaluate(preparedCase.assertions(), sent.exchange()), sent.retries());
 		}
 		catch (IllegalArgumentException ex) {
 			// JDK HttpClient 제한 헤더(Host, Content-Length 등) 지정 시
-			return new Failed(ErrorReason.INVALID_REQUEST, ex.getMessage(), request, null);
+			return new Failed(ErrorReason.INVALID_REQUEST, ex.getMessage(), request, null, 0);
 		}
 		catch (RuntimeException ex) {
 			return new Failed(ErrorReason.UNEXPECTED, messageOf(ex), request,
-					Duration.ofNanos(System.nanoTime() - startedAt));
+					Duration.ofNanos(System.nanoTime() - startedAt), 0);
 		}
 	}
 
 	private TestResult resultOf(long runId, PreparedCase preparedCase, Execution execution, Set<String> secretValues) {
 		TestRun run = runs.getReferenceById(runId);
 		TestCase testCase = testCases.getReferenceById(preparedCase.testCaseId());
-		return switch (execution) {
+		TestResult result = switch (execution) {
 			case Responded responded -> TestResult.responded(run, testCase, responded.exchange(),
 					responded.assertionResults(), secretValues);
 			case Failed failed -> TestResult.failed(run, testCase, preparedCase.template().method(), failed.reason(),
 					failed.message(), failed.request(), failed.elapsed(), secretValues);
 		};
+		result.recordRetries(execution.retries());
+		return result;
 	}
 
 	/** 다른 케이스가 추출하는 변수가 빠졌으면 추출하는 케이스를 앞에서 함께 실행해야 한다는 안내 추가 */
@@ -539,13 +552,18 @@ public class TestRunService {
 			List<Extractor> extractors) {
 	}
 
+	/** 케이스 1건의 전송 결과. {@code retries}는 응답을 받지 못해 다시 보낸 횟수 */
 	private sealed interface Execution permits Responded, Failed {
+
+		int retries();
+
 	}
 
-	private record Responded(HttpExchange exchange, List<AssertionResult> assertionResults) implements Execution {
+	private record Responded(HttpExchange exchange, List<AssertionResult> assertionResults, int retries)
+			implements Execution {
 	}
 
-	private record Failed(ErrorReason reason, String message, ResolvedRequest request, Duration elapsed)
+	private record Failed(ErrorReason reason, String message, ResolvedRequest request, Duration elapsed, int retries)
 			implements Execution {
 	}
 

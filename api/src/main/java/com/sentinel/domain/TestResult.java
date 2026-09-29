@@ -137,6 +137,10 @@ public class TestResult extends BaseEntity {
 
 	private Long elapsedMs;
 
+	/** 응답을 받지 못해 다시 보낸 횟수 (V20). 재시도 뒤의 응답·마지막 오류를 기록 */
+	@Column(nullable = false)
+	private int retryCount;
+
 	private TestResult(TestRun run, TestCase testCase, Outcome outcome, HttpMethod requestMethod) {
 		this.run = Objects.requireNonNull(run, "run");
 		this.testCase = Objects.requireNonNull(testCase, "testCase");
@@ -236,6 +240,17 @@ public class TestResult extends BaseEntity {
 
 	public List<AssertionResult> getAssertionResults() {
 		return assertionResults == null ? List.of() : List.copyOf(assertionResults);
+	}
+
+	/**
+	 * 다시 보낸 횟수 기록. 저장 전에 호출
+	 * @throws IllegalArgumentException 음수
+	 */
+	public void recordRetries(int retries) {
+		if (retries < 0) {
+			throw new IllegalArgumentException("retries must not be negative: " + retries);
+		}
+		this.retryCount = retries;
 	}
 
 }

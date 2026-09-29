@@ -20,7 +20,9 @@ import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
+import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.HttpMethod;
+import com.sentinel.runner.RequestExecutionException;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 스케줄 실행 결과 알림의 연속 실패·복구 판단. 같은 스위트·환경의 이전 스케줄 실행과 비교
  */
-@SpringBootTest(properties = "sentinel.schedule.enabled=false")
+@SpringBootTest(properties = { "sentinel.schedule.enabled=false", "sentinel.runner.retry.delay=0s" })
 @Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class,
 		RunResultNotifierTest.TestBeans.class })
 class RunResultNotifierTest {
@@ -155,6 +157,22 @@ class RunResultNotifierTest {
 	}
 
 	/** 09:10 + hours 시각의 스케줄 실행 후 알림 */
+	@Test
+	void saysWhenACaseStillGotNoResponseAfterBeingSentAgain() {
+		clock.set(NINE_TEN);
+		executor.respondWith(request -> {
+			if (request.uri().getPath().equals("/a")) {
+				throw new RequestExecutionException(RequestExecutionException.Reason.TIMEOUT, request,
+						Duration.ofSeconds(30), null);
+			}
+			return new HttpExchange(request, 200, Map.of(), "", Duration.ofMillis(5));
+		});
+		long runId = testRunService.runSuite(suite.getId(), dev.getId(), TestRun.Trigger.SCHEDULED, null);
+
+		assertThat(runResultNotifier.notifyResult(runId)).isEqualTo(RunResultNotifier.Sent.FAILURE);
+		assertThat(lastLines()).first().asString().endsWith("(1회 다시 보낸 뒤)");
+	}
+
 	private RunResultNotifier.Sent scheduled(int hours, Set<String> failingPaths) {
 		long runId = run(Duration.ofHours(hours), dev, TestRun.Trigger.SCHEDULED, failingPaths);
 		return runResultNotifier.notifyResult(runId);
