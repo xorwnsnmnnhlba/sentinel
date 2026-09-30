@@ -172,6 +172,8 @@ test("홈 대시보드에서 실행 현황 확인", async ({ page }) => {
   const row = page.getByRole("table", { name: "스위트별 통과율" }).getByRole("row", { name: new RegExp(suite) });
   await expect(row).toContainText("100%");
   await expect(row.getByRole("meter", { name: `${suite} 통과율` })).toHaveAttribute("aria-valuenow", "100");
+  // 불안정 케이스는 스케줄 실행 기준. 방금 수동으로 실행한 케이스는 해당 없음
+  await expect(page.getByRole("heading", { name: /^불안정 케이스/ })).toBeVisible();
 
   // 기간은 주소에 남음
   await page.getByRole("link", { name: "최근 30일" }).click();

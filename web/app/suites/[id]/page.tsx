@@ -16,6 +16,7 @@ import { ScheduleFields } from "@/components/catalog/schedule-fields";
 import { ScheduleToggle } from "@/components/catalog/schedule-toggle";
 import { Empty, SectionHeader, TableFrame } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
+import { UnstableBadge } from "@/components/run-badges";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -32,9 +33,10 @@ import {
   updateSuite,
 } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
-import type { CaseItem, EnvironmentItem, ProjectItem, ScheduleDetail, SuiteItem } from "@/lib/api/types";
+import type { CaseItem, EnvironmentItem, ProjectItem, ScheduleDetail, SuiteItem, UnstableCases } from "@/lib/api/types";
 import { historyHref, suiteHistoryHref } from "@/lib/change-log";
 import { formatDateTime } from "@/lib/format";
+import { unstableByCase, unstableDetail } from "@/lib/unstable";
 
 import { ResponseTimes } from "./response-times";
 
@@ -50,12 +52,15 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
   }
   const searchParams = await props.searchParams;
   const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${id}`);
-  const [project, environments, cases, schedules] = await Promise.all([
+  const [project, environments, cases, schedules, unstable] = await Promise.all([
     apiGetOrNotFound<ProjectItem>(`/api/projects/${suite.projectId}`),
     apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`),
     apiGet<CaseItem[]>(`/api/cases?suiteId=${suite.id}`),
     apiGet<ScheduleDetail[]>(`/api/schedules?suiteId=${suite.id}`),
+    // 최근 7일 스케줄 실행 기준
+    apiGet<UnstableCases>(`/api/unstable-cases?suiteId=${suite.id}`),
   ]);
+  const unstableCases = unstableByCase(unstable.cases);
   const environmentNames = new Map(environments.map((environment) => [environment.id, environment.name]));
 
   return (
@@ -163,9 +168,14 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                   <TableRow key={testCase.id}>
                     <TableCell className="text-muted-foreground tabular-nums">{index + 1}</TableCell>
                     <TableCell className="font-medium whitespace-normal">
-                      <Link href={`/cases/${testCase.id}`} className="hover:underline">
-                        {testCase.name}
-                      </Link>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href={`/cases/${testCase.id}`} className="hover:underline">
+                          {testCase.name}
+                        </Link>
+                        {unstableCases.has(testCase.id) && (
+                          <UnstableBadge detail={`최근 7일 ${unstableDetail(unstableCases.get(testCase.id)!)}`} />
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="min-w-72 whitespace-normal">
                       <div className="flex items-start gap-2 font-mono text-xs">

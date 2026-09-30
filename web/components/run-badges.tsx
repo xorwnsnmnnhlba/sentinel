@@ -60,6 +60,19 @@ export function RetryBadge({ retries }: { retries: number }) {
   );
 }
 
+/**
+ * 최근 스케줄 실행에서 실패했다 통과했다를 반복하거나 재시도가 잦은 케이스
+ * @param detail 환경별 이유. 화면 낭독기에도 읽히도록 배지 안에 숨김 글자로
+ */
+export function UnstableBadge({ detail }: { detail: string }) {
+  return (
+    <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-400" title={detail}>
+      불안정
+      <span className="sr-only"> ({detail})</span>
+    </Badge>
+  );
+}
+
 const statusLabel: Record<RunStatus, string> = {
   RUNNING: "실행 중",
   COMPLETED: "완료",

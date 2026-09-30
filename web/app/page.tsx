@@ -4,11 +4,19 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import { PassRateMeter } from "@/components/dashboard/pass-rate-meter";
 import { StatTile } from "@/components/dashboard/stat-tile";
+import { UnstableCaseTable } from "@/components/dashboard/unstable-case-table";
 import { RunCountBadges, StatusBadge, TriggerBadge } from "@/components/run-badges";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiGet } from "@/lib/api/server";
-import type { MaintenanceWindow, Page, ResponseTimeChanges, RunSummary, SuiteSummaries } from "@/lib/api/types";
+import type {
+  MaintenanceWindow,
+  Page,
+  ResponseTimeChanges,
+  RunSummary,
+  SuiteSummaries,
+  UnstableCases,
+} from "@/lib/api/types";
 import {
   byPassRate,
   DASHBOARD_PERIODS,
@@ -28,6 +36,9 @@ import { cn } from "@/lib/utils";
 
 export const metadata = { title: "대시보드 · Sentinel" };
 
+/** 불안정 케이스 표시 수 (실패 구간·재시도가 많은 순) */
+const UNSTABLE_LIMIT = 10;
+
 /** 진행 중인 실행 표시 수와 새로 고침 주기 */
 const RUNNING_LIMIT = 10;
 const RUNNING_REFRESH_MS = 3000;
@@ -42,13 +53,14 @@ export default async function Dashboard(props: PageProps<"/">) {
   const previous = previousRange(current.from, days);
   const range = (period: { from: string; to: string }) => `from=${period.from}&to=${period.to}`;
 
-  const [summaries, previousSummaries, failingRuns, changes, running, windows] = await Promise.all([
+  const [summaries, previousSummaries, failingRuns, changes, running, windows, unstable] = await Promise.all([
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
     apiGet<Page<RunSummary>>(`/api/runs?failing=true&size=5&${range(current)}`),
     apiGet<ResponseTimeChanges>(`/api/response-time-changes?limit=5&${range(current)}`),
     apiGet<Page<RunSummary>>(`/api/runs?status=RUNNING&size=${RUNNING_LIMIT}`),
     apiGet<MaintenanceWindow[]>("/api/maintenance-windows"),
+    apiGet<UnstableCases>(`/api/unstable-cases?${range(current)}`),
   ]);
   const maintenance = windows.filter((window) => window.active);
   const at = new Date();
@@ -304,6 +316,18 @@ export default async function Dashboard(props: PageProps<"/">) {
           )}
         </section>
       </div>
+
+      <section className="space-y-3">
+        <SectionTitle
+          title={`불안정 케이스${unstable.cases.length > 0 ? ` ${unstable.cases.length}건` : ""}`}
+          description="스케줄 실행에서 실패했다 통과했다를 2번 이상 반복했거나 응답이 없어 다시 보낸 일이 2번 이상 (한 번의 장애는 제외)"
+        />
+        {unstable.cases.length === 0 ? (
+          <Empty message="기간 안에 불안정한 케이스가 없습니다" />
+        ) : (
+          <UnstableCaseTable cases={unstable.cases} from={current.from} to={current.to} limit={UNSTABLE_LIMIT} />
+        )}
+      </section>
     </div>
   );
 }
