@@ -49,6 +49,17 @@ class DashboardApiTest {
 	}
 
 	@Test
+	void listsUnstableCasesOfThePeriod() {
+		var body = assertThat(mvc.get().uri("/api/unstable-cases?from=2026-09-01&to=2026-09-07")).hasStatusOk()
+			.bodyJson();
+		body.extractingPath("$.from").isEqualTo("2026-09-01");
+		body.extractingPath("$.to").isEqualTo("2026-09-07");
+		body.extractingPath("$.cases").asArray().isEmpty();
+		assertThat(mvc.get().uri("/api/unstable-cases?from=2026-09-07&to=2026-09-01"))
+			.hasStatus(HttpStatus.BAD_REQUEST);
+	}
+
+	@Test
 	void returnsSuiteSummariesWithPassRateAndLastRun() {
 		Project project = fixtures.project();
 		Environment environment = fixtures.environment(project, Map.of());

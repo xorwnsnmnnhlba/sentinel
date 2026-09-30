@@ -10,6 +10,7 @@ import com.sentinel.domain.Environment;
 import com.sentinel.domain.TestResult;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.RequestExecutionException;
@@ -33,6 +34,9 @@ class RunRetryTest {
 
 	@Autowired
 	private FakeRequestExecutor executor;
+
+	@Autowired
+	private TestRunRepository runs;
 
 	@Autowired
 	private TestFixtures fixtures;
@@ -71,6 +75,8 @@ class RunRetryTest {
 		assertThat(result.verdict()).isEqualTo(TestResult.Verdict.PASSED);
 		assertThat(result.retries()).isEqualTo(1);
 		assertThat(result.elapsedMs()).isEqualTo(7);
+		// 실행 행에도 재시도한 결과 수 (불안정 케이스 조회용)
+		assertThat(runs.findAll()).singleElement().extracting(TestRun::getRetriedCount).isEqualTo(1);
 		assertThat(executor.requests()).hasSize(2);
 	}
 
@@ -124,6 +130,7 @@ class RunRetryTest {
 
 		assertThat(runOnlyResult().retries()).isZero();
 		assertThat(executor.requests()).hasSize(1);
+		assertThat(runs.findAll()).singleElement().extracting(TestRun::getRetriedCount).isEqualTo(0);
 	}
 
 	private TestRunDetail.Result runOnlyResult() {

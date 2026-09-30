@@ -4,6 +4,7 @@
 
 - 실제 로컬 DB·팀 서버 DB에 사용 금지. `docker-compose.e2e.yml`의 `e2e-postgres`(외부 포트 없음, `down -v`로 삭제)에만 사용
 - 로그인은 E2E 스택의 테스트 계정(`admin@sentinel.test`) 사용
+- 1년치(DB 약 5.3GB)에 대량 UPDATE(수십만 행 이상)를 하지 않음. 2026-09-30 실행·결과 분포를 바꾸는 UPDATE 중 Docker Desktop이 멈춤 (추정: Docker VM 디스크 부족). 분포를 바꿔 보려면 45일치에서, 1년치는 조회만. Docker 디스크가 부족하면 `docker system df`로 확인하고 빌드 캐시 정리(`docker builder prune`)
 
 ## 절차
 

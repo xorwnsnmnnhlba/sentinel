@@ -10,7 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * 응답시간 백분위({@code PERCENTILE_CONT})·구조 지문 기준선({@code LATERAL})은 JPQL로 표현할 수 없어 네이티브 SQL (SQL 표준 문법).
+ * 응답시간 백분위({@code PERCENTILE_CONT})·구조 지문 기준선({@code LATERAL})·판정 흐름({@code LAG})은 JPQL로 표현할 수 없어
+ * 네이티브 SQL (SQL 표준 문법).
  * 그 외 조건 조회·일괄 변경은 {@link TestResultQueries} (QueryDSL)
  */
 public interface TestResultRepository extends JpaRepository<TestResult, Long>, TestResultQueries {
@@ -92,6 +93,59 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long>, T
 			GROUP BY w.test_case_id, w.environment_id, w.current_window
 			""")
 	List<Object[]> p95ByWindow(@Param("from") Instant from, @Param("middle") Instant middle, @Param("to") Instant to);
+
+	/**
+	 * 기간 안 스케줄 실행(완료)의 케이스·환경별 판정 흐름. 불안정 케이스 판단용
+	 * <p>
+	 * 실패 구간은 통과(또는 기간 첫 실행)에서 실패로 바뀐 횟수. 한 번의 장애는 1, 간헐 실패는 여러 번.
+	 * 결과 테이블 전체를 읽지 않도록 실행 행의 판정 수(V10)·재시도 수(V22)로 실패·재시도가 있던 실행만 골라 그 실행의 결과만 읽음
+	 * <ul>
+	 * <li>실행: 기간 안 스케줄 실행을 스위트·환경별 시작 순으로 놓고 SQL 표준 창 함수 {@code LAG}로 바로 앞 실행을 구함
+	 * ({@code idx_run_time})</li>
+	 * <li>결과: 실패·재시도가 있던 실행마다 {@code LATERAL}로 {@code idx_result_run}을 읽음. {@code OFFSET 0 ROWS}는 하위 쿼리가
+	 * 풀려 결과 테이블 전체를 읽는 계획이 되지 않도록 막는 경계 (창 함수 뒤 조건은 행 수를 추정하지 못해 전체 읽기를 고름)</li>
+	 * <li>실패 구간: 실패한 결과 중 바로 앞 실행에서 같은 케이스가 실패하지 않은 것 (앞 실행에 실패가 없으면 결과를 읽지 않음)</li>
+	 * </ul>
+	 * 1년치(결과 1천만 건, 실행의 34%에 실패가 있는 최악 분포) 30일 362ms (결과 전체에 창 함수 1.2초)
+	 * @return [케이스 ID, 환경 ID, 스위트·환경의 스케줄 실행 수, 실패 수, 실패 구간 수, 재시도한 실행 수].
+	 *     실패 구간 {@code minEpisodes} 이상 또는 재시도한 실행 {@code minRetried} 이상만
+	 */
+	@Query(nativeQuery = true, value = """
+			SELECT m.test_case_id, m.environment_id, MAX(m.suite_runs), SUM(m.failing), SUM(m.episode), SUM(m.retried)
+			FROM (
+			    SELECT r.test_case_id, runs.environment_id, runs.suite_runs,
+			           CASE WHEN r.verdict IN ('FAILED', 'ERROR') THEN 1 ELSE 0 END AS failing,
+			           CASE WHEN r.verdict IN ('FAILED', 'ERROR') AND (runs.previous_failing = 0 OR NOT EXISTS (
+			               SELECT 1 FROM {h-schema}test_result p
+			               WHERE p.run_id = runs.previous_id AND p.test_case_id = r.test_case_id
+			                 AND p.verdict IN ('FAILED', 'ERROR'))) THEN 1 ELSE 0 END AS episode,
+			           CASE WHEN r.retry_count > 0 THEN 1 ELSE 0 END AS retried
+			    FROM (
+			        SELECT t.id, t.environment_id, t.failed_count + t.error_count AS failing, t.retried_count,
+			               COUNT(*) OVER (PARTITION BY t.suite_id, t.environment_id) AS suite_runs,
+			               LAG(t.id) OVER (PARTITION BY t.suite_id, t.environment_id ORDER BY t.started_at, t.id) AS previous_id,
+			               LAG(t.failed_count + t.error_count, 1, 0)
+			                   OVER (PARTITION BY t.suite_id, t.environment_id ORDER BY t.started_at, t.id) AS previous_failing
+			        FROM {h-schema}test_run t
+			        WHERE t.started_at >= :from
+			          AND t.started_at < :to
+			          AND t.trigger_type = 'SCHEDULED'
+			          AND t.status = 'COMPLETED'
+			    ) runs
+			    CROSS JOIN LATERAL (
+			        SELECT r.test_case_id, r.verdict, r.retry_count
+			        FROM {h-schema}test_result r
+			        WHERE r.run_id = runs.id
+			          AND (r.verdict IN ('FAILED', 'ERROR') OR r.retry_count > 0)
+			        OFFSET 0 ROWS
+			    ) r
+			    WHERE runs.failing > 0 OR runs.retried_count > 0
+			) m
+			GROUP BY m.test_case_id, m.environment_id
+			HAVING SUM(m.episode) >= :minEpisodes OR SUM(m.retried) >= :minRetried
+			""")
+	List<Object[]> caseStability(@Param("from") Instant from, @Param("to") Instant to,
+			@Param("minEpisodes") int minEpisodes, @Param("minRetried") int minRetried);
 
 	/**
 	 * 케이스별 이전 구조 지문 최근 {@code window}건 (같은 환경, {@code runId}보다 앞선 실행). 구조 변화 판정의 기준선

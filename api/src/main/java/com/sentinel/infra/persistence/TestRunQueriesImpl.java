@@ -122,6 +122,11 @@ class TestRunQueriesImpl implements TestRunQueries {
 	}
 
 	@Override
+	public void incrementRetried(long runId) {
+		queries.update(run).set(run.retriedCount, run.retriedCount.add(1)).where(run.id.eq(runId)).execute();
+	}
+
+	@Override
 	public long completeIfRunning(long runId, Instant finishedAt) {
 		return queries.update(run)
 			.set(run.status, TestRun.Status.COMPLETED)
