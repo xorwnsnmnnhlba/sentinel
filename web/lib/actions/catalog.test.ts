@@ -23,8 +23,11 @@ import {
   runThroughCase,
   deleteSchedule,
   duplicateCase,
+  removeProjectWebhook,
   reorderCases,
   rerunFailed,
+  sendTestNotification,
+  setProjectWebhook,
   setScheduleEnabled,
   updateCase,
   updateEnvironment,
@@ -257,6 +260,55 @@ describe("cancelRun", () => {
 
     await expect(cancelRun(43)).resolves.toEqual({
       error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다",
+    });
+  });
+});
+
+describe("project webhook", () => {
+  it("saves the trimmed address and reloads the page", async () => {
+    const bodies = capture("patch", "/api/projects/3", () => HttpResponse.json({ id: 3, webhookConfigured: true }));
+
+    await expect(
+      setProjectWebhook(3, undefined, form({ webhookUrl: "  https://hooks.example.com/services/T1  " })),
+    ).resolves.toEqual({});
+    expect(bodies).toEqual([{ webhookUrl: "https://hooks.example.com/services/T1" }]);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("explains an invalid address without calling Spring", async () => {
+    const bodies = capture("patch", "/api/projects/3", () => HttpResponse.json({ id: 3 }));
+
+    await expect(setProjectWebhook(3, undefined, form({ webhookUrl: "hooks.example.com" }))).resolves.toEqual({
+      error: "http:// 또는 https://로 시작하는 주소를 입력해 주세요",
+    });
+    expect(bodies).toEqual([]);
+  });
+
+  it("goes back to the default channel by clearing the address", async () => {
+    const bodies = capture("patch", "/api/projects/3", () => HttpResponse.json({ id: 3, webhookConfigured: false }));
+
+    await expect(removeProjectWebhook(3)).resolves.toEqual({});
+    expect(bodies).toEqual([{ webhookUrl: "" }]);
+  });
+
+  it("returns how the test notification went", async () => {
+    capture("post", "/api/projects/3/test-notifications", () =>
+      HttpResponse.json({ delivered: false, statusCode: 404, error: null }),
+    );
+
+    await expect(sendTestNotification(3)).resolves.toEqual({
+      delivery: { delivered: false, statusCode: 404, error: null },
+    });
+  });
+
+  it("explains a missing or unreadable webhook", async () => {
+    capture("post", "/api/projects/3/test-notifications", () => problem(409, "project 3 has no webhook"));
+    await expect(sendTestNotification(3)).resolves.toEqual({ error: "지정된 Webhook이 없습니다" });
+    expect(refresh).toHaveBeenCalledOnce();
+
+    capture("post", "/api/projects/3/test-notifications", () => problem(400, "webhook of project 3 cannot be read"));
+    await expect(sendTestNotification(3)).resolves.toEqual({
+      error: "Webhook 주소를 읽을 수 없습니다. 서버 암호화 키가 바뀌었다면 주소를 다시 지정해 주세요",
     });
   });
 });

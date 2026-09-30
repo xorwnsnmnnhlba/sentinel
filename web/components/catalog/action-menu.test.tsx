@@ -35,7 +35,7 @@ describe("ActionMenu", () => {
     render(
       <ActionMenu label="프로젝트 billing 작업" items={EDIT_DELETE}>
         <FormDialog menuId="edit" title="프로젝트 수정" submitLabel="저장" action={update}>
-          <ProjectFields project={{ id: 1, name: "billing", description: null }} />
+          <ProjectFields project={{ id: 1, name: "billing", description: null, webhookConfigured: false }} />
         </FormDialog>
         <DeleteDialog menuId="delete" title="삭제" description="삭제합니다" action={async () => ({})} />
       </ActionMenu>,
