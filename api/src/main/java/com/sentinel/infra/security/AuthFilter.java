@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import com.sentinel.application.auth.AccessTokenService;
 import com.sentinel.application.auth.AuthService;
 import com.sentinel.application.auth.AuthenticatedUser;
 import jakarta.servlet.FilterChain;
@@ -21,6 +22,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * {@code Authorization: Bearer <토큰>} 헤더만 받음.
  * <p>
  * 로그인 API만 인증 없이 허용하고 나머지 {@code /api/**}는 세션 필요. 확인된 사용자는 요청 속성에 담아 컨트롤러에 전달.
+ * <p>
+ * API 토큰({@code snt_} 접두어, CI 등 자동화용)은 실행 시작({@code POST /api/runs})과 그 결과 조회({@code GET /api/runs/{id}})만
+ * 허용하고 그 외는 403. 토큰이 새도 케이스·환경 수정, 변수 조회, 사용자 관리, 토큰 발급은 불가
  */
 @RequiredArgsConstructor
 public class AuthFilter extends OncePerRequestFilter {
@@ -41,16 +45,30 @@ public class AuthFilter extends OncePerRequestFilter {
 	 */
 	private static final Pattern AMBIGUOUS_PATH = Pattern.compile("(^|/)\\.{1,2}(/|$)|;|%2[eEfF]|%5[cC]|//");
 
+	/** API 토큰으로 부를 수 있는 요청. 숫자 ID만 (다른 경로 표기로 우회 불가) */
+	private static final Pattern RUN_DETAIL = Pattern.compile("^/api/runs/\\d+$");
+
 	private final AuthService authService;
+
+	private final AccessTokenService accessTokens;
 
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws ServletException, IOException {
-		Optional<AuthenticatedUser> user = authService.authenticate(bearerToken(request));
+		String token = bearerToken(request);
+		// 접두어로 먼저 구분하여 세션 요청마다 토큰 조회 트랜잭션을 열지 않음
+		Optional<AuthenticatedUser> viaAccessToken = token != null && token.startsWith(AccessTokenService.PREFIX)
+				? accessTokens.authenticate(token) : Optional.empty();
+		Optional<AuthenticatedUser> user = viaAccessToken.isPresent() ? viaAccessToken
+				: authService.authenticate(token);
 		user.ifPresent(authenticated -> request.setAttribute(USER_ATTRIBUTE, authenticated));
 
 		if (user.isEmpty() && requiresAuthentication(request)) {
 			writeUnauthorized(response);
+			return;
+		}
+		if (viaAccessToken.isPresent() && !allowedForAccessToken(request)) {
+			writeProblem(response, HttpStatus.FORBIDDEN, "access tokens can only start runs and read them");
 			return;
 		}
 		chain.doFilter(request, response);
@@ -76,14 +94,28 @@ public class AuthFilter extends OncePerRequestFilter {
 		return header.substring(7).trim();
 	}
 
-	/** ProblemDetail 형식은 ApiExceptionHandler와 동일하게 유지 */
+	private static boolean allowedForAccessToken(HttpServletRequest request) {
+		String path = request.getRequestURI();
+		return switch (request.getMethod()) {
+			case "POST" -> "/api/runs".equals(path);
+			case "GET" -> RUN_DETAIL.matcher(path).matches();
+			default -> false;
+		};
+	}
+
 	private static void writeUnauthorized(HttpServletResponse response) throws IOException {
-		response.setStatus(HttpStatus.UNAUTHORIZED.value());
+		writeProblem(response, HttpStatus.UNAUTHORIZED, "authentication required");
+	}
+
+	/** ProblemDetail 형식은 ApiExceptionHandler와 동일하게 유지 */
+	private static void writeProblem(HttpServletResponse response, HttpStatus status, String detail)
+			throws IOException {
+		response.setStatus(status.value());
 		response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
 		response.setCharacterEncoding("UTF-8");
 		response.getWriter()
-			.write("{\"type\":\"about:blank\",\"title\":\"Unauthorized\",\"status\":401,"
-					+ "\"detail\":\"authentication required\"}");
+			.write("{\"type\":\"about:blank\",\"title\":\"" + status.getReasonPhrase() + "\",\"status\":"
+					+ status.value() + ",\"detail\":\"" + detail + "\"}");
 	}
 
 }
