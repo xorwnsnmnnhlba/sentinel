@@ -382,7 +382,7 @@ GW·네트워크가 잠깐 흔들린 것만으로 실패가 기록·알림되지
 
 | 리소스 | 목록 | 단건 | 생성·수정 | 삭제 |
 |--------|------|------|-----------|------|
-| 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | `POST /api/projects`, `PATCH /api/projects/{id}` | `DELETE /api/projects/{id}` |
+| 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | `POST /api/projects`, `PATCH /api/projects/{id}`, `POST /api/projects/{id}/test-notifications`(알림 연결 확인) | `DELETE /api/projects/{id}` |
 | 환경 | `GET /api/environments?projectId=` | `GET /api/environments/{id}` | `POST /api/environments`, `PATCH /api/environments/{id}` | `DELETE /api/environments/{id}` |
 | 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | `POST /api/suites`, `PATCH /api/suites/{id}` | `DELETE /api/suites/{id}` |
 | 케이스 | `GET /api/cases?suiteId=&q=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
@@ -561,7 +561,7 @@ GW·네트워크가 잠깐 흔들린 것만으로 실패가 기록·알림되지
   - `projectId`: 소속 프로젝트. 사용자·초대는 `null`
   - `suiteId`: 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 `null`
   - `fields`: 수정에서 값이 실제로 바뀐 항목 이름. 등록·삭제는 빈 목록
-- `fields` 값: 프로젝트·스위트 `name`·`description`, 스위트 `caseOrder`, 환경 `name`·`baseUrl`·`variables.<키>`·`secrets.<이름>`, 케이스 `name`·`request`·`assertions`·`extractors`, 스케줄 `environment`·`cron`·`enabled`, 점검 시간 `startsAt`·`endsAt`·`reason`, 사용자 `password`·`passwordResetLink`
+- `fields` 값: 프로젝트·스위트 `name`·`description`, 스위트 `caseOrder`, 환경 `name`·`baseUrl`·`variables.<키>`·`secrets.<이름>`, 케이스 `name`·`request`·`assertions`·`extractors`, 프로젝트 `webhook`, 스케줄 `environment`·`cron`·`enabled`, 점검 시간 `startsAt`·`endsAt`·`reason`, 사용자 `password`·`passwordResetLink`
 - 값은 남기지 않음 (변수 값, 시크릿, 비밀번호, 링크 토큰 모두). 시크릿은 암호화 값을 비교할 수 없어 요청에 있던 이름을 모두 변경으로 기록
 - 같은 값으로 저장한 수정은 기록하지 않음. 삭제는 대상 1건만 기록 (프로젝트 삭제 시 함께 보관되는 환경·스위트·케이스·스케줄은 따로 기록하지 않음)
 - 스케줄러가 다음 실행 시각을 옮기는 것과 실행 자체는 기록하지 않음 (실행은 실행 이력)
@@ -696,6 +696,20 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 - Webhook 주소는 자격증명이므로 환경변수로 주입하고 로그·git에 남기지 않음 (`sentinel.env`)
 - 발송 실패(4xx·5xx, 타임아웃, 연결 실패)는 WARN 로그만 남기고 실행·폴링은 계속
 - 다른 형식이 필요하면 `com.sentinel.application.notification.Notifier` 구현체 추가 후 `NotificationConfig`의 빈 교체
+
+### 프로젝트별 채널
+
+스케줄 실행 실패·복구 알림을 프로젝트마다 다른 Webhook으로 보냄. 지정하지 않은 프로젝트와 스케줄러 알림(스케줄 실행 오류, DB 연결 실패·복구)은 위 기본 채널
+
+| API | 설명 |
+|-----|------|
+| `PATCH /api/projects/{id}` `{"webhookUrl": "https://..."}` | 지정. http(s) 절대 주소, 1000자 이하. `""`이면 삭제(기본 채널로). 암호화 키(`sentinel.secret.key`) 미설정이면 400 |
+| `POST /api/projects/{id}/test-notifications` | 연결 확인 알림 발송. 200 `{delivered, statusCode, error}` (`statusCode`는 받은 응답, `error`는 응답이 없는 사유 예: `CONNECTION_FAILED`·`BLOCKED_DESTINATION`). Webhook이 없으면 409, 주소를 읽을 수 없으면(키 변경) 400 |
+
+- 주소는 자격증명이므로 환경 시크릿과 같은 키로 암호화해 저장(`project.webhook_url_cipher`, V21). 조회 응답에는 지정 여부(`webhookConfigured`)만, 변경 이력에는 항목 이름(`webhook`)만. 로그·오류 응답에도 주소를 넣지 않음
+- 로그인한 사용자 누구나 지정할 수 있는 주소라 실행기와 같은 목적지 확인을 거침: 링크 로컬·클라우드 메타데이터 주소로는 보내지 않고(`BLOCKED_DESTINATION`) 리다이렉트를 따라가지 않음 (서버 기본 채널은 운영자가 환경변수로 지정하므로 기존 방식)
+- 주소를 읽을 수 없으면(암호화 키 변경·미설정) 알림을 잃지 않도록 기본 채널로 보내고 WARN 로그. 연결 확인 알림은 기본 채널로 대신 보내지 않음
+- 발송 실패는 기본 채널과 같이 WARN 로그만 (프로젝트 ID·알림 제목·상태 코드 또는 사유, 주소 없음)
 
 ## 패키지 구조 (계획)
 

@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
  * <li>모두 통과했고 직전 스케줄 실행에 실패가 있었으면 복구 알림</li>
  * <li>그 외(계속 통과)는 발송하지 않음</li>
  * </ul>
+ * 프로젝트에 Webhook이 있으면 그 채널로, 없으면 서버 기본 채널로 발송 ({@link NotificationChannels}).
  * 비교 대상은 같은 스위트·환경의 이전 스케줄 실행(완료만). 수동 실행은 수정 확인용인 경우가 많아 제외하며, 넣으면 복구 알림이 누락될 수 있음
  */
 @Component
@@ -40,7 +41,7 @@ public class RunResultNotifier {
 
 	private final TestResultRepository results;
 
-	private final Notifier notifier;
+	private final NotificationChannels channels;
 
 	private final NotificationProperties properties;
 
@@ -57,7 +58,7 @@ public class RunResultNotifier {
 	 */
 	public Sent notifyResult(long runId) {
 		Optional<Message> message = transactions.readOnly(status -> messageOf(runId));
-		message.ifPresent(found -> notifier.send(found.notification()));
+		message.ifPresent(found -> found.channel().send(found.notification()));
 		return message.map(Message::kind).orElse(Sent.NONE);
 	}
 
@@ -79,13 +80,15 @@ public class RunResultNotifier {
 		String suite = run.getSuite().getName();
 		String environment = run.getEnvironment().getName();
 		String runUrl = properties.runUrl(runId);
+		// 프로젝트 Webhook이 있으면 그 채널. 암호문 조회는 이 트랜잭션에서, 발송은 트랜잭션 밖에서
+		Notifier channel = channels.forProject(run.getSuite().getProject());
 		if (!failing.isEmpty()) {
 			List<RunReport.FailedCase> failures = failing.stream()
 				.map(result -> failedCase(result, run, previous, failedByRun))
 				.sorted(Comparator.comparingInt(RunReport.FailedCase::streak))
 				.toList();
 			return Optional.of(new Message(Sent.FAILURE, new RunReport(suite, environment, current.size(), failures,
-					runUrl, scheduleProperties.zone()).toNotification()));
+					runUrl, scheduleProperties.zone()).toNotification(), channel));
 		}
 
 		if (previous.isEmpty() || !failedByRun.getOrDefault(previous.getFirst().getId(), Map.of()).containsValue(true)) {
@@ -110,7 +113,8 @@ public class RunResultNotifier {
 				new RecoveryReport(suite, environment, current.size(), recovered, failingRuns,
 						failingRuns == previous.size() && previous.size() == LOOKBACK, firstFailing.getStartedAt(),
 						run.getStartedAt(), runUrl, scheduleProperties.zone())
-					.toNotification()));
+					.toNotification(),
+				channel));
 	}
 
 	/**
@@ -179,7 +183,7 @@ public class RunResultNotifier {
 				: assertion.description() + ": " + assertion.message();
 	}
 
-	private record Message(Sent kind, Notification notification) {
+	private record Message(Sent kind, Notification notification, Notifier channel) {
 	}
 
 }

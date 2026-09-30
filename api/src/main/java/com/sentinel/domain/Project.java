@@ -20,6 +20,10 @@ public class Project extends ArchivableEntity {
 	@Column(length = 500)
 	private String description;
 
+	/** 실패 알림을 보낼 Webhook 주소의 암호문 (V21). 없으면 서버 기본 채널. 평문은 보관하지 않음 */
+	@Column(length = 4000)
+	private String webhookUrlCipher;
+
 	public Project(String name, String description) {
 		this.name = Preconditions.requireText(name, "name", 100);
 		this.description = Preconditions.optionalText(description, "description", 500);
@@ -31,6 +35,19 @@ public class Project extends ArchivableEntity {
 
 	public void describe(String description) {
 		this.description = Preconditions.optionalText(description, "description", 500);
+	}
+
+	/** @param cipherText 암호화한 Webhook 주소 */
+	public void changeWebhook(String cipherText) {
+		this.webhookUrlCipher = Preconditions.requireText(cipherText, "webhookUrlCipher", 4000);
+	}
+
+	public void removeWebhook() {
+		this.webhookUrlCipher = null;
+	}
+
+	public boolean hasWebhook() {
+		return webhookUrlCipher != null;
 	}
 
 }
