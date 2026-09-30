@@ -6,8 +6,8 @@ import type { EnvironmentItem, ProjectItem, SuiteItem } from "@/lib/api/types";
 import { RunFilters } from "./run-filters";
 
 const projects: ProjectItem[] = [
-  { id: 1, name: "결제", description: null },
-  { id: 2, name: "회원", description: null },
+  { id: 1, name: "결제", description: null, webhookConfigured: false },
+  { id: 2, name: "회원", description: null, webhookConfigured: false },
 ];
 
 const suites: SuiteItem[] = [

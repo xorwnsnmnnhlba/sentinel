@@ -6,10 +6,18 @@ import { ActionMenu } from "@/components/catalog/action-menu";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { EnvironmentFields, ProjectFields, SuiteFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
-import { EDIT_DELETE, ENVIRONMENT_MENU, maintenanceMenu, withHistory } from "@/components/catalog/menu-items";
+import {
+  EDIT_DELETE,
+  ENVIRONMENT_MENU,
+  maintenanceMenu,
+  WEBHOOK_MENU,
+  withHistory,
+} from "@/components/catalog/menu-items";
 import { Empty, SectionHeader, TableFrame } from "@/components/catalog/section";
 import { MaintenanceBadge } from "@/components/maintenance/maintenance-badge";
 import { MaintenanceFields } from "@/components/maintenance/maintenance-fields";
+import { TestNotificationButton } from "@/components/notification/test-notification-button";
+import { WebhookFields } from "@/components/notification/webhook-fields";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +29,9 @@ import {
   deleteMaintenanceWindow,
   deleteProject,
   deleteSuite,
+  removeProjectWebhook,
+  sendTestNotification,
+  setProjectWebhook,
   updateEnvironment,
   updateMaintenanceWindow,
   updateProject,
@@ -339,6 +350,60 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
             </Table>
           </TableFrame>
         )}
+      </section>
+
+      <section className="space-y-3">
+        <SectionHeader
+          title="알림 채널"
+          description="스케줄 실행 실패·복구 알림을 보낼 곳"
+          action={
+            project.webhookConfigured ? (
+              <ActionMenu label="알림 채널 작업" items={WEBHOOK_MENU}>
+                <FormDialog
+                  menuId="edit"
+                  title="Webhook 변경"
+                  submitLabel="저장"
+                  action={setProjectWebhook.bind(null, project.id)}
+                >
+                  <WebhookFields configured />
+                </FormDialog>
+                <DeleteDialog
+                  menuId="delete"
+                  title="기본 채널로 되돌리기"
+                  description="프로젝트 Webhook을 삭제합니다. 이후 알림은 서버 기본 채널로 보냅니다."
+                  confirmLabel="되돌리기"
+                  action={removeProjectWebhook.bind(null, project.id)}
+                />
+              </ActionMenu>
+            ) : (
+              <FormDialog
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <Plus /> Webhook 지정
+                  </Button>
+                }
+                title="Webhook 지정"
+                description="이 프로젝트의 스케줄 실행 실패·복구 알림을 이 채널로 보냅니다."
+                submitLabel="저장"
+                action={setProjectWebhook.bind(null, project.id)}
+              >
+                <WebhookFields configured={false} />
+              </FormDialog>
+            )
+          }
+        />
+        <div className="space-y-3 rounded-xl border p-4 text-sm">
+          {project.webhookConfigured ? (
+            <>
+              <p>이 프로젝트 전용 Webhook으로 보냅니다 (주소는 보안상 표시하지 않음)</p>
+              <TestNotificationButton action={sendTestNotification.bind(null, project.id)} />
+            </>
+          ) : (
+            <p className="text-muted-foreground">
+              서버 기본 채널로 보냅니다. 이 프로젝트를 담당하는 채널이 따로 있으면 Webhook을 지정해 주세요
+            </p>
+          )}
+        </div>
       </section>
     </div>
   );

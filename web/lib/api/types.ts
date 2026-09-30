@@ -156,6 +156,8 @@ export interface ProjectItem {
   id: number;
   name: string;
   description: string | null;
+  /** 실패 알림을 프로젝트 Webhook으로 보냄. 주소는 자격증명이라 응답에 없음 */
+  webhookConfigured: boolean;
 }
 
 export interface EnvironmentItem {

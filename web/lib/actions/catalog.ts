@@ -8,6 +8,7 @@ import type { CaseItem, EnvironmentItem, MaintenanceWindow, ProjectItem, RunDeta
 import { copyName, MAX_CASE_NAME_LENGTH } from "@/lib/copy-name";
 import { type CaseDraft, isCaseDraft, validateDraft } from "@/lib/case-draft";
 import { fromKstInput, periodError } from "@/lib/maintenance";
+import { type Delivery, webhookUrlError } from "@/lib/webhook";
 
 /**
  * 프로젝트·환경·스위트·케이스 등록·수정·삭제, 스위트 실행. Spring 호출 후 refresh()로 현재 화면 재조회 또는 redirect.
@@ -37,6 +38,40 @@ export async function updateProject(projectId: number, _: ActionState, form: For
     name: raw(form, "name"),
     description: raw(form, "description"),
   });
+}
+
+/** 실패 알림을 보낼 프로젝트 Webhook 지정·변경. 주소는 서버에서 암호화하여 저장 */
+export async function setProjectWebhook(projectId: number, _: ActionState, form: FormData): Promise<ActionState> {
+  const url = String(form.get("webhookUrl") ?? "").trim();
+  const error = webhookUrlError(url);
+  if (error) {
+    return { error };
+  }
+  return mutate("PATCH", `/api/projects/${id(projectId)}`, { webhookUrl: url });
+}
+
+/** 프로젝트 Webhook 삭제. 이후 알림은 서버 기본 채널로 */
+export async function removeProjectWebhook(projectId: number): Promise<ActionState> {
+  return mutate("PATCH", `/api/projects/${id(projectId)}`, { webhookUrl: "" });
+}
+
+export type TestNotificationState = { delivery?: Delivery; error?: string } | undefined;
+
+/** 프로젝트 Webhook으로 연결 확인 알림 발송. 결과(받았는지·상태 코드·사유)를 그대로 반환 */
+export async function sendTestNotification(projectId: number): Promise<TestNotificationState> {
+  try {
+    const delivery = await apiSend<Delivery>("POST", `/api/projects/${id(projectId)}/test-notifications`);
+    return { delivery: delivery ?? undefined };
+  } catch (error) {
+    if (isApiError(error) && error.status === 409) {
+      refresh();
+      return { error: "지정된 Webhook이 없습니다" };
+    }
+    if (isApiError(error) && error.status === 400) {
+      return { error: "Webhook 주소를 읽을 수 없습니다. 서버 암호화 키가 바뀌었다면 주소를 다시 지정해 주세요" };
+    }
+    return failure(error);
+  }
 }
 
 export async function deleteProject(projectId: number): Promise<ActionState> {

@@ -23,6 +23,12 @@ export const ENVIRONMENT_MENU: ActionMenuItem[] = [
   ...EDIT_DUPLICATE_DELETE.filter((item) => item.destructive),
 ];
 
+/** 프로젝트 알림 채널 메뉴: 주소 변경 · 기본 채널로 되돌리기(Webhook 삭제) */
+export const WEBHOOK_MENU: ActionMenuItem[] = [
+  { id: "edit", label: "Webhook 변경", icon: "edit" },
+  { id: "delete", label: "기본 채널로 되돌리기", icon: "delete", destructive: true },
+];
+
 /**
  * 점검 시간 행 메뉴: 수정 · 종료(진행 중) 또는 취소(예정). 둘 다 삭제로 처리
  * @param active 지금 점검 중
