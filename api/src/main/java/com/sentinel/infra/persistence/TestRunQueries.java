@@ -65,6 +65,9 @@ public interface TestRunQueries {
 
 	void incrementErrors(long runId);
 
+	/** 응답을 받지 못해 다시 보낸 결과 1건 추가 */
+	void incrementRetried(long runId);
+
 	/** 진행 중이면 완료 처리 @return 갱신한 행 수. 그사이 중지됐으면 0 */
 	long completeIfRunning(long runId, Instant finishedAt);
 

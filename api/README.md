@@ -393,6 +393,7 @@ GW·네트워크가 잠깐 흔들린 것만으로 실패가 기록·알림되지
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
 | 응답시간 변화 | `GET /api/response-time-changes?from=&to=&limit=5` | | | |
 | 스위트 요약 | `GET /api/suite-summaries?from=&to=` | | | |
+| 불안정 케이스 | `GET /api/unstable-cases?from=&to=&suiteId=` | | | |
 | 변경 이력 | `GET /api/change-logs?targetType=&targetId=&projectId=&suiteId=&page=0&size=20` | | | |
 
 - 케이스 검색 `q`: 이름·경로 부분 일치 (대소문자 무시, 앞뒤 공백 제거, `%`·`_`는 문자 그대로). 스위트별 실행 순서, 최대 100건. `suiteId`와 함께 쓰면 그 스위트 안에서만. 빈 검색어·200자 초과는 400
@@ -462,6 +463,20 @@ GW·네트워크가 잠깐 흔들린 것만으로 실패가 기록·알림되지
 - 항목: `suite`·`project`, 기간 안 실행 수 `runs`, 그중 실패·오류가 있는 실행 수 `failingRuns`, 판정별 결과 수 `results`, 통과 결과 비율 `passRate`(0~1, 결과 없으면 `null`), 기간과 무관한 최근 실행 `lastRun`(없으면 `null`)
 - 모든 값은 스위트 전체 실행 기준. 케이스 단건 실행·여기까지 실행·실패 다시 실행·중지된 실행은 제외 (일부 케이스만 통과해도 스위트가 통과한 것처럼 보이지 않도록)
 - 스위트 수와 무관하게 쿼리 3회. 실행 행의 판정 수(V10)를 합산하여 결과 테이블을 읽지 않음
+
+### 불안정 케이스
+
+`GET /api/unstable-cases?from=&to=&suiteId=`: 기간 안 스케줄 실행에서 실패했다 통과했다를 반복하거나 응답이 없어 다시 보낸 일이 잦은 케이스·환경. 기간 생략 시 최근 7일, 최대 90일. `suiteId`는 그 스위트만
+
+| 기준 | 설명 |
+|------|------|
+| 실패 구간 2회 이상 | 통과(또는 기간 첫 실행)에서 판정 실패·오류로 바뀐 횟수. 실패가 이어지다 복구된 한 번의 장애는 1이라 제외 |
+| 재시도한 실행 2회 이상 | 응답이 없어 다시 보낸 실행 수 ("전송 오류 재시도"). 재시도로 통과해 가려진 흔들림 포함 |
+
+- 항목: `testCase`·`suite`·`environment`(`{id, name}`), 기간 안 스위트·환경의 스케줄 실행 수 `runs`, 실패 수 `failures`, 실패 구간 수 `failureEpisodes`, 재시도한 실행 수 `retriedRuns`
+- 실패 구간·재시도가 많은 순. 환경마다 따로 판단 (dev와 staging에서 번갈아 실패해도 각각 1)
+- 스케줄 실행(완료)만. 수동 실행은 수정 확인용이 많아 제외. 삭제된 케이스·환경은 제외
+- 결과 테이블 전체를 읽지 않음: 실행 행의 판정 수(V10)·재시도 수(`test_run.retried_count`, V22)로 실패·재시도가 있던 실행만 골라 그 결과만 읽음 (1년치 최악 분포 30일 362ms, 결과 전체를 읽으면 1.2초)
 
 ### 케이스 가져오기 (OpenAPI 3, Postman)
 

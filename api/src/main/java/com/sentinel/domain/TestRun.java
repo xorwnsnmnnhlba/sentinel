@@ -84,6 +84,10 @@ public class TestRun extends BaseEntity {
 	@Column(nullable = false)
 	private int errorCount;
 
+	/** 응답을 받지 못해 다시 보낸 결과 수 (V22). 판정 수와 같이 결과 저장 시 올림 */
+	@Column(nullable = false)
+	private int retriedCount;
+
 	/** 실패 다시 실행의 원래 실행 (V18). 그 외 실행은 null */
 	private Long rerunOfRunId;
 

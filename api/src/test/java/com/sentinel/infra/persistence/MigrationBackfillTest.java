@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <li>V10: 실행별 판정 수</li>
  * <li>V12: 케이스 실행 순서</li>
  * <li>V17: 변경 이력의 소속 스위트</li>
+ * <li>V22: 실행별 재시도 수</li>
  * </ul>
  * <p>
  * Flyway는 자체 연결을 쓰므로 넣은 이력이 보이도록 테스트 트랜잭션 없이 실행
@@ -122,6 +123,28 @@ class MigrationBackfillTest {
 				VALUES (?, ?, ?, 'GET', '/a', '{}', %s, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 				""".formatted(SCHEMA, archivedAt == null ? "NULL" : archivedAt), id, suiteId, "case-" + id,
 				archivedAt == null ? 0 : id);
+	}
+
+	@Test
+	void fillsTheRetriedCountsOfExistingRuns() {
+		migrateTo("21");
+		JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+		long retried = insertRun(jdbc, 1);
+		long plain = insertRun(jdbc, 2);
+		insertResult(jdbc, retried, "PASSED");
+		jdbc.update("UPDATE %s.test_result SET retry_count = 1 WHERE run_id = ?".formatted(SCHEMA), retried);
+		insertResult(jdbc, retried, "ERROR");
+		jdbc.update("UPDATE %s.test_result SET retry_count = 2 WHERE run_id = ? AND verdict = 'ERROR'"
+			.formatted(SCHEMA), retried);
+		insertResult(jdbc, retried, "PASSED");
+		insertResult(jdbc, plain, "FAILED");
+
+		migrateTo("22");
+
+		// 재시도한 결과 수 (횟수 합이 아님). 재시도가 없던 실행은 0
+		assertThat(jdbc.queryForList("SELECT id, retried_count FROM %s.test_run ORDER BY id".formatted(SCHEMA)))
+			.containsExactly(Map.<String, Object>of("id", retried, "retried_count", 2),
+					Map.<String, Object>of("id", plain, "retried_count", 0));
 	}
 
 	private void migrateTo(String version) {

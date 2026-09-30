@@ -402,8 +402,11 @@ public class TestRunService {
 			TestResult.Verdict verdict = transactions.write(status -> {
 				TestResult.Verdict saved = results.save(resultOf(prepared.runId(), preparedCase, execution, masked))
 					.getVerdict();
-				// 실행의 판정 수도 같은 트랜잭션에서 올려 결과와 어긋나지 않음 (중단·중지된 실행도 저장된 결과 기준)
+				// 실행의 판정 수·재시도 수도 같은 트랜잭션에서 올려 결과와 어긋나지 않음 (중단·중지된 실행도 저장된 결과 기준)
 				countVerdict(prepared.runId(), saved);
+				if (execution.retries() > 0) {
+					runs.incrementRetried(prepared.runId());
+				}
 				return saved;
 			});
 			counts.merge(verdict, 1, Integer::sum);
