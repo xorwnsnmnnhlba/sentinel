@@ -382,3 +382,23 @@ export interface ChangeLogItem {
   /** 수정에서 값이 바뀐 항목 이름. 예: name, variables.userId, secrets.token */
   fields: string[];
 }
+
+/**
+ * 불안정 케이스 (api/README.md "불안정 케이스"). 기간 안 스케줄 실행에서 실패 구간 2회 이상 또는 재시도한 실행 2회 이상
+ * runs는 스위트·환경의 스케줄 실행 수, failureEpisodes는 통과(또는 기간 첫 실행)에서 실패로 바뀐 횟수
+ */
+export interface UnstableCase {
+  testCase: IdName;
+  suite: IdName;
+  environment: IdName;
+  runs: number;
+  failures: number;
+  failureEpisodes: number;
+  retriedRuns: number;
+}
+
+export interface UnstableCases {
+  from: string;
+  to: string;
+  cases: UnstableCase[];
+}
