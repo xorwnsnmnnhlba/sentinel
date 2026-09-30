@@ -129,10 +129,13 @@ public class CatalogQueryService {
 		return CaseItem.of(testCases.findByIdAndArchivedAtIsNull(caseId).orElseThrow(() -> new NotFoundException("test case", caseId)));
 	}
 
-	public record ProjectItem(long id, String name, String description) {
+	/**
+	 * @param webhookConfigured 실패 알림을 프로젝트 Webhook으로 보냄. 주소는 자격증명이라 응답에 넣지 않음
+	 */
+	public record ProjectItem(long id, String name, String description, boolean webhookConfigured) {
 
 		static ProjectItem of(Project project) {
-			return new ProjectItem(project.getId(), project.getName(), project.getDescription());
+			return new ProjectItem(project.getId(), project.getName(), project.getDescription(), project.hasWebhook());
 		}
 
 	}

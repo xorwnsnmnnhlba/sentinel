@@ -5,6 +5,8 @@ import java.util.List;
 
 import com.sentinel.application.CatalogCommandService;
 import com.sentinel.application.CatalogQueryService;
+import com.sentinel.application.ProjectNotificationService;
+import com.sentinel.application.notification.WebhookSender;
 import com.sentinel.application.CatalogQueryService.ProjectItem;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,8 @@ class ProjectController {
 	private final CatalogQueryService catalog;
 
 	private final CatalogCommandService commands;
+
+	private final ProjectNotificationService projectNotifications;
 
 	private final CurrentUser currentUser;
 
@@ -53,7 +57,17 @@ class ProjectController {
 	 */
 	@PatchMapping("/{projectId}")
 	ProjectItem update(@PathVariable long projectId, @RequestBody UpdateProjectRequest request) {
-		return commands.updateProject(projectId, request.name(), request.description(), currentUser.get().id());
+		return commands.updateProject(projectId, request.name(), request.description(), request.webhookUrl(),
+				currentUser.get().id());
+	}
+
+	/**
+	 * 프로젝트 Webhook으로 연결 확인 알림 발송. 발송 결과(성공 여부·상태 코드·응답이 없는 사유)를 200으로 응답.
+	 * Webhook이 없으면 409
+	 */
+	@PostMapping("/{projectId}/test-notifications")
+	WebhookSender.Delivery sendTestNotification(@PathVariable long projectId) {
+		return projectNotifications.sendTest(projectId, currentUser.get().id());
 	}
 
 	/**

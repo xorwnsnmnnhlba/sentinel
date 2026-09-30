@@ -1,5 +1,6 @@
 package com.sentinel.application.notification;
 
+import com.sentinel.infra.http.RestClientRequestExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -21,6 +22,12 @@ class NotificationConfig {
 		}
 		log.info("Notifications are sent to the configured webhook");
 		return new WebhookNotifier(properties.webhookUrl(), properties.connectTimeout(), properties.readTimeout());
+	}
+
+	/** 프로젝트 Webhook 발송. 실행기와 같은 목적지 확인, 알림 제한 시간 */
+	@Bean
+	WebhookSender webhookSender(NotificationProperties properties) {
+		return new WebhookSender(new RestClientRequestExecutor(properties.connectTimeout(), properties.readTimeout()));
 	}
 
 }

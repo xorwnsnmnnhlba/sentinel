@@ -33,6 +33,7 @@ import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
+import com.sentinel.application.notification.WebhookUrls;
 import com.sentinel.application.secret.SecretCipher;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.extract.Extractor;
@@ -91,7 +92,12 @@ public class CatalogCommandService {
 		return ProjectItem.of(project);
 	}
 
-	public ProjectItem updateProject(long projectId, String name, String description, long actorId) {
+	/**
+	 * @param webhookUrl 실패 알림 Webhook. 빈 문자열이면 삭제(서버 기본 채널), null이면 유지. 암호화하여 저장
+	 * @throws InvalidRequestException 잘못된 Webhook 주소, 암호화 키 미설정
+	 */
+	public ProjectItem updateProject(long projectId, String name, String description, String webhookUrl,
+			long actorId) {
 		Project project = findProject(projectId);
 		ProjectItem before = ProjectItem.of(project);
 		if (name != null) {
@@ -101,11 +107,18 @@ public class CatalogCommandService {
 		if (description != null) {
 			change(() -> project.describe(description));
 		}
+		// 암호문은 비교할 수 없어 지정·삭제한 요청을 변경으로 기록 (시크릿과 같음). 값은 남기지 않음
+		boolean webhookChanged = webhookUrl != null && (!webhookUrl.isBlank() || project.hasWebhook());
+		if (webhookUrl != null) {
+			applyWebhook(project, webhookUrl);
+		}
 		ProjectItem after = ProjectItem.of(project);
-		changeLog.record(actorId, target(project), Action.UPDATED,
-				new Changes().compare("name", before.name(), after.name())
-					.compare("description", before.description(), after.description())
-					.fields());
+		Changes changes = new Changes().compare("name", before.name(), after.name())
+			.compare("description", before.description(), after.description());
+		if (webhookChanged) {
+			changes.add("webhook");
+		}
+		changeLog.record(actorId, target(project), Action.UPDATED, changes.fields());
 		return after;
 	}
 
@@ -343,6 +356,20 @@ public class CatalogCommandService {
 	private static Target target(TestCase testCase) {
 		return new Target(TargetType.CASE, testCase.getId(), testCase.getName(),
 				testCase.getSuite().getProject().getId(), testCase.getSuite().getId());
+	}
+
+	/** Webhook 지정·삭제. 주소는 암호화하여 저장하고 평문은 보관하지 않음 */
+	private void applyWebhook(Project project, String webhookUrl) {
+		if (webhookUrl.isBlank()) {
+			project.removeWebhook();
+			return;
+		}
+		String url = valid(() -> WebhookUrls.validate(webhookUrl));
+		if (!secretCipher.isEnabled()) {
+			throw new InvalidRequestException(
+					"secrets are disabled: set sentinel.secret.key (SENTINEL_SECRET_KEY) to use them");
+		}
+		project.changeWebhook(secretCipher.encrypt(url));
 	}
 
 	/**
