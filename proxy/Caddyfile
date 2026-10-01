@@ -1,7 +1,9 @@
 # HTTPS 앞단. TLS를 종료하고 sentinel-web으로 전달 (Spring API는 web의 BFF 프록시를 거쳐서만 접근)
+# 예외: CI 등이 API 토큰(Bearer snt_…)으로 부르는 실행 시작·결과 조회만 Spring으로 직접 전달 (토큰 권한은 Spring이 다시 확인)
 #
 # SENTINEL_SITE_ADDRESS  접속 주소. 예: sentinel.example.com, localhost
 # SENTINEL_UPSTREAM      전달 대상 (기본 sentinel-web:3000, E2E 스택은 e2e-web:3000)
+# SENTINEL_API_UPSTREAM  API 토큰 요청 전달 대상 (기본 sentinel-api:8080, E2E 스택은 e2e-api:8080)
 # SENTINEL_HSTS_MAX_AGE  HSTS 유지 시간(초). 0이면 미사용(기본). 팀원 PC가 이미 신뢰하는 인증서(회사·Let's Encrypt)일 때만 사용
 # SENTINEL_TLS           인증서 방식
 #   internal                           Caddy 내부 인증 기관 (사내 주소용, 기본값). 루트 인증서를 PC마다 신뢰 등록
@@ -31,8 +33,21 @@
 	@hsts not host localhost
 	header @hsts Strict-Transport-Security "max-age={$SENTINEL_HSTS_MAX_AGE:0}"
 
+	# API 토큰으로 부르는 실행 시작(POST /api/runs)·결과 조회(GET /api/runs/{id})만 Spring으로. web의 BFF는 쓰기를 열지 않고
+	# 쿠키 세션만 쓰므로 CI가 거칠 수 없음. 브라우저는 다른 사이트에서 Authorization 헤더를 붙여 보낼 수 없어(CORS 사전 요청을
+	# Spring이 허용하지 않음) 쿠키로 인증되는 쓰기 경로는 생기지 않음. 그 외 경로·메서드는 Spring의 AuthFilter가 403
+	@api_token {
+		header Authorization "Bearer snt_*"
+		path /api/runs /api/runs/*
+	}
+	handle @api_token {
+		reverse_proxy {$SENTINEL_API_UPSTREAM:sentinel-api:8080}
+	}
+
 	# Host 헤더를 그대로 전달하므로 Next.js Server Action의 출처 확인(Origin과 Host 비교)이 그대로 동작
-	reverse_proxy {$SENTINEL_UPSTREAM:sentinel-web:3000}
+	handle {
+		reverse_proxy {$SENTINEL_UPSTREAM:sentinel-web:3000}
+	}
 }
 
 # 컨테이너 안에서만 쓰는 상태 확인용 (포트 미공개)

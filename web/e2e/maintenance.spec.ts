@@ -92,6 +92,8 @@ test("환경 메뉴에서 점검 시간을 등록하고 연장·종료, 대시�
   await expect(page.getByRole("heading", { name: projectName, level: 1 })).toBeVisible();
   await chooseAction(page, `${dev} 점검 시간 작업`, "지금 종료");
   await page.getByRole("alertdialog").getByRole("button", { name: "지금 종료" }).click();
+  // 확인 창이 열려 있는 동안은 나머지 화면이 접근성 트리에서 숨겨져 "없음" 확인이 바로 통과하므로, 처리가 끝나 창이 닫힐 때까지 대기
+  await expect(page.getByRole("alertdialog")).toBeHidden();
   await expect(windows.getByRole("row", { name: new RegExp(dev) })).toHaveCount(0);
 
   // 변경 이력: 등록·수정·삭제를 "점검 시간"으로

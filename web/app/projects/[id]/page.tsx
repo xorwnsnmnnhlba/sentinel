@@ -136,6 +136,8 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                       <TableCell className="font-medium">
                         <div className="flex flex-wrap items-center gap-2">
                           {environment.name}
+                          {/* CI 명령(scripts/sentinel-run.sh --environment)에 쓰는 번호 */}
+                          <span className="font-mono text-xs font-normal text-muted-foreground">#{environment.id}</span>
                           {maintenance && <MaintenanceBadge window={maintenance} now={now} />}
                         </div>
                       </TableCell>

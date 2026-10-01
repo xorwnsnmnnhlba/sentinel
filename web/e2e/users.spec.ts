@@ -105,6 +105,8 @@ test("관리자가 사용자를 삭제하면 로그인할 수 없음", async ({ 
   await page.goto("/users");
   await chooseAction(page, `${member.email} 작업`, "삭제");
   await page.getByRole("alertdialog").getByRole("button", { name: "삭제" }).click();
+  // 확인 창이 열려 있는 동안은 나머지 화면이 접근성 트리에서 숨겨져 "없음" 확인이 바로 통과하므로, 처리가 끝나 창이 닫힐 때까지 대기
+  await expect(page.getByRole("alertdialog")).toBeHidden();
 
   await expect(page.getByRole("row", { name: new RegExp(member.email) })).toHaveCount(0);
 

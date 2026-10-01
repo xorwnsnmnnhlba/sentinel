@@ -345,7 +345,7 @@ export interface ResponseTimeChanges {
 
 /** 변경 이력 대상 (api/README.md "변경 이력") */
 export type ChangeTargetType =
-  "PROJECT" | "ENVIRONMENT" | "SUITE" | "CASE" | "SCHEDULE" | "MAINTENANCE_WINDOW" | "USER" | "INVITE";
+  "PROJECT" | "ENVIRONMENT" | "SUITE" | "CASE" | "SCHEDULE" | "MAINTENANCE_WINDOW" | "ACCESS_TOKEN" | "USER" | "INVITE";
 
 /** 환경 점검 시간. 점검 중에는 그 환경의 스케줄 실행을 건너뜀 (api/README.md "점검 시간") */
 export interface MaintenanceWindow {
@@ -401,4 +401,20 @@ export interface UnstableCases {
   from: string;
   to: string;
   cases: UnstableCase[];
+}
+
+/** API 토큰 (api/README.md "API 토큰"). 원문은 발급 응답에만 있고 목록에는 앞부분(prefix)만 */
+export interface AccessTokenItem {
+  id: number;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  expired: boolean;
+}
+
+export interface IssuedAccessToken {
+  token: string;
+  accessToken: AccessTokenItem;
 }

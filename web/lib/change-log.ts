@@ -9,6 +9,7 @@ export const TARGET_TYPES: ChangeTargetType[] = [
   "CASE",
   "SCHEDULE",
   "MAINTENANCE_WINDOW",
+  "ACCESS_TOKEN",
   "USER",
   "INVITE",
 ];
@@ -20,6 +21,7 @@ export const TARGET_LABELS: Record<ChangeTargetType, string> = {
   CASE: "케이스",
   SCHEDULE: "스케줄",
   MAINTENANCE_WINDOW: "점검 시간",
+  ACCESS_TOKEN: "API 토큰",
   USER: "사용자",
   INVITE: "초대",
 };
