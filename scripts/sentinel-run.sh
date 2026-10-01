@@ -2,7 +2,9 @@
 # Sentinel 스위트를 실행하고 끝날 때까지 기다림. 배포 파이프라인의 확인 단계용 (api/README.md "API 토큰")
 #
 #   SENTINEL_URL=https://sentinel.example.com SENTINEL_TOKEN=snt_... \
-#     scripts/sentinel-run.sh --suite 3 --environment 2 [--timeout 600] [--interval 5]
+#     scripts/sentinel-run.sh --suite 3 --environment 2 [--timeout 600] [--interval 5] [--junit sentinel.xml]
+#
+# --junit  끝난 실행의 결과를 JUnit XML로 저장 (CI 도구의 테스트 결과 화면용). 통과·실패·중지 모두 저장, 시간 초과는 저장하지 않음
 #
 # 종료 코드
 #   0  모든 케이스 통과
@@ -18,7 +20,8 @@
 set -euo pipefail
 
 usage() {
-  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+  # 맨 위 주석 블록(사용법)만 출력
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
   exit 2
 }
 
@@ -26,12 +29,14 @@ suite=""
 environment=""
 timeout=600
 interval=5
+junit=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --suite) suite="${2:-}"; shift 2 ;;
     --environment) environment="${2:-}"; shift 2 ;;
     --timeout) timeout="${2:-}"; shift 2 ;;
     --interval) interval="${2:-}"; shift 2 ;;
+    --junit) junit="${2:-}"; shift 2 ;;
     -h | --help) usage ;;
     *) echo "알 수 없는 인자: $1" >&2; usage ;;
   esac
@@ -61,7 +66,7 @@ for tool in curl jq; do
 done
 
 base="${SENTINEL_URL%/}"
-curl_options=(--silent --show-error --max-time 30 -H "Accept: application/json")
+curl_options=(--silent --show-error --max-time 30)
 if [[ -n "${SENTINEL_CA_CERT:-}" ]]; then
   curl_options+=(--cacert "$SENTINEL_CA_CERT")
 fi
@@ -77,7 +82,8 @@ request() {
     extra=(-H "Content-Type: application/json" --data "$data")
   fi
   if ! response=$(printf 'header = "Authorization: Bearer %s"\n' "$SENTINEL_TOKEN" |
-    curl "${curl_options[@]}" --config - -X "$method" ${extra[@]+"${extra[@]}"} -w '\n%{http_code}' "$base$path"); then
+    curl "${curl_options[@]}" --config - -H "Accept: application/json" -X "$method" ${extra[@]+"${extra[@]}"} \
+      -w '\n%{http_code}' "$base$path"); then
     echo "Sentinel에 연결하지 못했습니다: $base" >&2
     exit 2
   fi
@@ -123,6 +129,28 @@ while true; do
   echo "진행 중: $(jq -r '"\(.results | length)/\(.plannedCount // "?")건"' <<<"$body")"
   sleep "$interval"
 done
+
+# 결과를 JUnit XML로 저장. 저장하지 못해도 종료 코드는 실행 결과 기준 (경고만)
+save_junit() {
+  if [[ -z "$junit" ]]; then
+    return 0
+  fi
+  local code
+  if ! code=$(printf 'header = "Authorization: Bearer %s"\n' "$SENTINEL_TOKEN" |
+    curl "${curl_options[@]}" --config - -H "Accept: application/xml" -o "$junit" -w '%{http_code}' \
+      "$base/api/runs/$run_id"); then
+    echo "경고: JUnit XML을 받지 못했습니다" >&2
+    return 0
+  fi
+  if [[ "$code" != "200" ]]; then
+    rm -f "$junit"
+    echo "경고: JUnit XML을 받지 못했습니다: HTTP $code" >&2
+    return 0
+  fi
+  echo "JUnit XML: $junit"
+}
+
+save_junit
 
 summary=$(jq -r '.summary | "전체 \(.total)건, 통과 \(.passed), 실패 \(.failed), 오류 \(.errors)"' <<<"$body")
 failing=$(jq -r '.summary.failed + .summary.errors' <<<"$body")

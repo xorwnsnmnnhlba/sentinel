@@ -124,6 +124,11 @@ class AccessTokenApiTest {
 		run.extractingPath("$.status").isEqualTo("COMPLETED");
 		// 토큰을 발급한 사용자가 실행한 것으로 기록
 		run.extractingPath("$.triggeredBy.id").isEqualTo(user.getId().intValue());
+		// CI 도구용 JUnit XML도 같은 주소라 토큰으로 조회 가능
+		assertThat(mvc.get()
+			.uri("/api/runs/{id}", runId)
+			.header("Authorization", "Bearer " + token)
+			.accept(MediaType.APPLICATION_XML)).hasStatusOk().hasContentTypeCompatibleWith(MediaType.APPLICATION_XML);
 
 		for (String path : List.of("/api/runs", "/api/projects", "/api/environments?projectId=1", "/api/access-tokens",
 				"/api/sessions/current", "/api/runs/" + runId + "/x")) {

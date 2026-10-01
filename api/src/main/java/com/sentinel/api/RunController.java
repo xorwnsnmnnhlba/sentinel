@@ -4,16 +4,19 @@ import java.net.URI;
 import java.time.LocalDate;
 
 import com.sentinel.application.InvalidRequestException;
+import com.sentinel.application.JUnitReport;
 import com.sentinel.application.PageResponse;
 import com.sentinel.application.RunFilter;
 import com.sentinel.application.RunQueryService;
 import com.sentinel.application.RunSummary;
 import com.sentinel.application.TestRunDetail;
 import com.sentinel.application.TestRunService;
+import com.sentinel.application.notification.NotificationProperties;
 import com.sentinel.domain.TestRun;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -35,6 +38,8 @@ class RunController {
 
 	private final CurrentUser currentUser;
 
+	private final NotificationProperties notificationProperties;
+
 	/**
 	 * 최신순 실행 목록. size는 1~100으로 보정, 지정하지 않은 필터는 조건에서 제외
 	 *
@@ -53,9 +58,19 @@ class RunController {
 				page, size);
 	}
 
-	@GetMapping("/{runId}")
+	/** 결과 상세 (JSON). Accept를 지정하지 않으면 이 형식 */
+	@GetMapping(value = "/{runId}", produces = MediaType.APPLICATION_JSON_VALUE)
 	TestRunDetail get(@PathVariable long runId) {
 		return testRunService.getRun(runId);
+	}
+
+	/**
+	 * 결과 상세의 JUnit XML ({@code Accept: application/xml}). CI 도구가 결과를 표로 보여 주도록.
+	 * 주소가 같아 API 토큰으로도 조회 가능 ({@link JUnitReport})
+	 */
+	@GetMapping(value = "/{runId}", produces = MediaType.APPLICATION_XML_VALUE)
+	String getAsJUnit(@PathVariable long runId) {
+		return JUnitReport.of(testRunService.getRun(runId), notificationProperties.runUrl(runId));
 	}
 
 	/**
