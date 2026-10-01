@@ -1,5 +1,3 @@
-import { headers } from "next/headers";
-
 import { InviteDialog } from "@/components/auth/invite-dialog";
 import { ResetLinkDialog } from "@/components/auth/reset-link-dialog";
 import { ActionMenu, type ActionMenuItem } from "@/components/catalog/action-menu";
@@ -13,6 +11,7 @@ import { apiGet } from "@/lib/api/server";
 import type { AuthenticatedUser, UserSummary } from "@/lib/api/types";
 import { historyHref } from "@/lib/change-log";
 import { formatDateTime } from "@/lib/format";
+import { siteUrl } from "@/lib/site-url";
 
 export const metadata = { title: "사용자 · Sentinel" };
 
@@ -88,13 +87,6 @@ export default async function UsersPage() {
 }
 
 /** 초대·재설정 링크에 쓸 주소. 요청 헤더 기준이라 배포 주소를 따로 설정하지 않아도 됨 */
-async function siteUrl(): Promise<string> {
-  const header = await headers();
-  const host = header.get("x-forwarded-host") ?? header.get("host") ?? "localhost:3000";
-  const protocol = header.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${protocol}://${host}`;
-}
-
 /** 본인 계정은 삭제 불가 */
 function userMenu(userId: number, deletable: boolean): ActionMenuItem[] {
   const reset: ActionMenuItem = { id: "reset", label: "비밀번호 재설정 링크", icon: "key" };

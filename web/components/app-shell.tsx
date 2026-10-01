@@ -1,4 +1,4 @@
-import { KeyRound } from "lucide-react";
+import { KeyRound, Terminal } from "lucide-react";
 import Link from "next/link";
 
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -58,7 +58,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** 사이드바 아래 계정 영역: 테마 선택, 비밀번호 변경 화면으로 가는 계정 링크, 로그아웃 */
+/** 사이드바 아래 계정 영역: 테마 선택, 비밀번호 변경 화면으로 가는 계정 링크, API 토큰, 로그아웃 */
 function AccountFooter({ email, theme }: { email: string; theme: Theme }) {
   return (
     <div>
@@ -71,6 +71,13 @@ function AccountFooter({ email, theme }: { email: string; theme: Theme }) {
         >
           <KeyRound aria-hidden className="size-4 shrink-0" />
           <span className="truncate">{email}</span>
+        </Link>
+        <Link
+          href="/settings/access-tokens"
+          className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          <Terminal aria-hidden className="size-4 shrink-0" />
+          <span className="truncate">API 토큰</span>
         </Link>
         <LogoutButton />
       </div>

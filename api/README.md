@@ -362,6 +362,45 @@ GW·네트워크가 잠깐 흔들린 것만으로 실패가 기록·알림되지
 - 유효 기간은 발급 때 30·90·180·365일 중 선택 (만료 없는 토큰 없음, 그 외 400). 만료 시각이 지나면 401. 이름은 1~100자
 - 토큰으로 시작한 실행은 발급한 사용자가 실행한 것으로 기록 (`triggeredBy`). 사용할 때마다 `lastUsedAt` 갱신. 사용자를 삭제하면 그 사용자의 토큰도 401
 - 발급·폐기는 변경 이력(`ACCESS_TOKEN`, 이름만)에 기록
+- 화면: 사이드바 아래 계정 영역의 "API 토큰" (`/settings/access-tokens`). 발급 직후 한 번만 표시
+
+#### 네트워크 경로
+
+Spring은 같은 PC(`127.0.0.1:8080`)에서만 열려 있고 web의 BFF 프록시는 조회만·쿠키 세션만 받으므로, HTTPS 앞단(Caddy)이 토큰 요청만 Spring으로 직접 전달 (`proxy/Caddyfile`)
+
+- `Authorization: Bearer snt_…` 헤더가 있는 `/api/runs`, `/api/runs/*` 요청 → `sentinel-api:8080` (`SENTINEL_API_UPSTREAM`). 그 외는 지금처럼 web
+- 토큰 권한은 Spring이 다시 확인 (허용 외 경로·메서드는 403). 브라우저는 다른 사이트에서 `Authorization` 헤더를 붙여 보낼 수 없어(CORS 사전 요청 미허용) 쿠키로 인증되는 쓰기 경로는 생기지 않음
+- 헤더는 `Bearer`(대소문자 그대로)로 보내야 함. 다르게 쓰면 web으로 전달되어 401
+
+#### CI에서 실행하고 결과 기다리기
+
+`scripts/sentinel-run.sh`: 실행을 시작하고 끝날 때까지 기다림. 모두 통과하면 0, 판정 실패·오류가 있으면 1(실패한 케이스 목록 출력), 실행하지 못했거나(토큰·권한·없는 스위트·동시 실행 한도) 중지·중단·시간 초과면 2. bash·curl·jq 필요
+
+```bash
+SENTINEL_URL=https://sentinel.example.com SENTINEL_TOKEN=snt_... \
+  scripts/sentinel-run.sh --suite 3 --environment 2 --timeout 600 --interval 5
+```
+
+- 스위트 ID는 스위트 화면 주소(`/suites/3`)의 번호, 환경 ID는 프로젝트 화면 환경 이름 옆의 `#번호`
+- 사내 인증 기관(Caddy `internal`) 인증서를 쓰면 `SENTINEL_CA_CERT`에 그 루트 인증서 경로. 회사 인증서처럼 러너가 이미 신뢰하면 생략
+- 토큰은 표준 입력의 curl 설정으로 넘겨 프로세스 목록·출력에 남기지 않음. 시간 초과여도 실행은 서버에서 계속됨
+- 테스트: `bash scripts/sentinel-run.test.sh` (흉내 낸 API 서버로 시나리오별 종료 코드·출력 확인, CI의 scripts 작업)
+
+GitHub Actions 예시. Sentinel이 사내망에 있으면 사내망에 둔 러너(self-hosted)에서 실행 (GitHub 호스팅 러너는 사내 주소에 닿지 않음). 스크립트는 배포하는 저장소에 복사해 두고 사용
+
+```yaml
+deploy-check:
+  needs: deploy
+  runs-on: [self-hosted]
+  steps:
+    - uses: actions/checkout@v4
+    - name: Sentinel 스모크 검사
+      env:
+        SENTINEL_URL: https://sentinel.example.com
+        SENTINEL_TOKEN: ${{ secrets.SENTINEL_TOKEN }}
+        SENTINEL_CA_CERT: /etc/ssl/sentinel-root.crt
+      run: bash scripts/sentinel-run.sh --suite 3 --environment 2 --timeout 600
+```
 ### 사용자 관리
 
 | API | 권한 | 설명 |

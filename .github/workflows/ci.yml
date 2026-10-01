@@ -79,6 +79,8 @@ jobs:
       # 배포 전 점검 스크립트. 러너에 기본 설치된 shellcheck·OpenSSL 사용
       - run: shellcheck scripts/*.sh
       - run: bash scripts/preflight.test.sh
+      # CI 연동 스크립트 (실행 대기). 흉내 낸 API 서버에 시나리오별로 실행
+      - run: bash scripts/sentinel-run.test.sh
 
   api:
     name: api (test)

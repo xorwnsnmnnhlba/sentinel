@@ -71,6 +71,7 @@ services:
       # sentinel.e2e.test는 사내 이름 역할 (HSTS 확인용, 브라우저가 127.0.0.1로 해석하도록 테스트에서 지정)
       SENTINEL_SITE_ADDRESS: localhost:13443, sentinel.e2e.test:13443
       SENTINEL_UPSTREAM: e2e-web:3000
+      SENTINEL_API_UPSTREAM: e2e-api:8080
       SENTINEL_TLS: internal
       SENTINEL_HSTS_MAX_AGE: 300
     ports:
