@@ -2,6 +2,7 @@ package com.sentinel.application;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -70,6 +71,9 @@ class SchedulePollingTest {
 
 	@Autowired
 	private MaintenanceWindowService maintenanceWindows;
+
+	@Autowired
+	private MonitoringGapService monitoringGaps;
 
 	private TestSuite suite;
 
@@ -184,6 +188,110 @@ class SchedulePollingTest {
 		clock.set(Instant.parse("2026-09-18T00:30:00Z"));
 		assertThat(poller.poll()).hasSize(1);
 		assertThat(scheduleService.get(schedule.id()).nextRunAt()).isEqualTo("2026-09-18T00:40:00Z");
+	}
+
+	@Test
+	void recordsAndNotifiesMonitoringGapWhenSchedulesRunLate() {
+		scheduleService.create(suite.getId(), environment.getId(), "*/10 * * * *", ACTOR);
+		scheduleService.create(suite.getId(), environment.getId(), "30 9 * * *", ACTOR);
+		// 11:35 예정은 5분 늦어 공백에 넣지 않음
+		scheduleService.create(suite.getId(), environment.getId(), "35 11 * * *", ACTOR);
+		// 09:10 이후 폴링이 멈췄다가 11:40에 재개 (Sentinel 중지·서버 절전 등)
+		clock.set(Instant.parse("2026-09-18T02:40:00Z"));
+
+		assertThat(poller.poll()).hasSize(3);
+
+		assertThat(notifier.sent()).singleElement().satisfies(notification -> {
+			assertThat(notification.title()).isEqualTo("[Sentinel] 모니터링 공백 - 스케줄이 제때 실행되지 않음");
+			assertThat(notification.lines()).containsExactly(
+					"기간: 2026-09-18 09:10 (Asia/Seoul) ~ 2026-09-18 11:40 (Asia/Seoul) (2시간 30분)",
+					"제때 실행되지 않은 스케줄: 2건", "놓친 실행은 스케줄마다 1회씩 지금 실행합니다", "원인 예: Sentinel 중지, 서버 절전, 오래 걸린 앞 실행");
+		});
+		assertThat(monitoringGaps.list(LocalDate.of(2026, 9, 18), LocalDate.of(2026, 9, 18)).gaps())
+			.singleElement()
+			.satisfies(gap -> {
+				assertThat(gap.startedAt()).isEqualTo("2026-09-18T00:10:00Z");
+				assertThat(gap.endedAt()).isEqualTo("2026-09-18T02:40:00Z");
+				assertThat(gap.missedSchedules()).isEqualTo(2);
+			});
+	}
+
+	@Test
+	void ignoresDelaysWithinTheGapThreshold() {
+		scheduleService.create(suite.getId(), environment.getId(), "*/10 * * * *", ACTOR);
+		scheduleService.create(suite.getId(), environment.getId(), "20 9 * * *", ACTOR);
+		// 09:10 예정이 정확히 10분(기준) 늦음. 09:20 예정은 늦지 않음
+		clock.set(Instant.parse("2026-09-18T00:20:00Z"));
+
+		assertThat(poller.poll()).hasSize(2);
+
+		assertThat(notifier.sent()).isEmpty();
+		assertThat(monitoringGaps.list(null, null).gaps()).isEmpty();
+	}
+
+	@Test
+	void countsOnlyLateSchedulesAndStartsGapAtTheEarliestMissedTime() {
+		scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", ACTOR);
+		scheduleService.create(suite.getId(), environment.getId(), "40 9 * * *", ACTOR);
+		// 09:10 예정은 40분, 09:40 예정은 10분 늦음 (기준 이하)
+		clock.set(Instant.parse("2026-09-18T00:50:00Z"));
+
+		assertThat(poller.poll()).hasSize(2);
+
+		assertThat(monitoringGaps.list(null, null).gaps()).singleElement().satisfies(gap -> {
+			assertThat(gap.startedAt()).isEqualTo("2026-09-18T00:10:00Z");
+			assertThat(gap.missedSchedules()).isEqualTo(1);
+		});
+	}
+
+	@Test
+	void extendsGapThatResumesWithinTheThresholdWithoutNotifyingAgain() {
+		scheduleService.create(suite.getId(), environment.getId(), "*/10 * * * *", ACTOR);
+		clock.set(Instant.parse("2026-09-18T01:00:00Z"));
+		poller.poll();
+		// 밀린 실행 처리로 다음 폴링이 늦어져 01:10 예정이 01:25에 실행 (앞 공백이 끝난 뒤 10분 안에 시작)
+		clock.set(Instant.parse("2026-09-18T01:25:00Z"));
+		poller.poll();
+
+		assertThat(notifier.sent()).hasSize(1);
+		assertThat(monitoringGaps.list(null, null).gaps()).singleElement().satisfies(gap -> {
+			assertThat(gap.startedAt()).isEqualTo("2026-09-18T00:10:00Z");
+			assertThat(gap.endedAt()).isEqualTo("2026-09-18T01:25:00Z");
+		});
+
+		// 제때 실행 뒤 끝난 시각 + 기준 시간(01:35)이 지나 시작된 공백은 새 공백
+		clock.set(Instant.parse("2026-09-18T01:30:00Z"));
+		poller.poll();
+		clock.set(Instant.parse("2026-09-18T03:00:00Z"));
+		poller.poll();
+
+		assertThat(notifier.sent()).hasSize(2);
+		assertThat(monitoringGaps.list(null, null).gaps()).extracting(MonitoringGapService.Gap::startedAt)
+			.containsExactly(Instant.parse("2026-09-18T01:40:00Z"), Instant.parse("2026-09-18T00:10:00Z"));
+
+		// 가장 최근 공백(03:00에 끝남)에 이어짐. 오래된 공백과는 비교하지 않음
+		clock.set(Instant.parse("2026-09-18T03:25:00Z"));
+		poller.poll();
+
+		assertThat(notifier.sent()).hasSize(2);
+		assertThat(monitoringGaps.list(null, null).gaps()).extracting(MonitoringGapService.Gap::endedAt)
+			.containsExactly(Instant.parse("2026-09-18T03:25:00Z"), Instant.parse("2026-09-18T01:25:00Z"));
+	}
+
+	@Test
+	void doesNotRecordGapForSchedulesSkippedDuringMaintenance() {
+		scheduleService.create(suite.getId(), environment.getId(), "*/10 * * * *", ACTOR);
+		maintenanceWindows.create(environment.getId(), Instant.parse("2026-09-18T00:10:00Z"),
+				Instant.parse("2026-09-18T02:00:00Z"), null, ACTOR);
+
+		for (Instant at = Instant.parse("2026-09-18T00:10:00Z"); !at.isAfter(Instant.parse("2026-09-18T02:10:00Z")); at = at
+			.plus(Duration.ofMinutes(1))) {
+			clock.set(at);
+			poller.poll();
+		}
+
+		assertThat(notifier.sent()).isEmpty();
+		assertThat(monitoringGaps.list(null, null).gaps()).isEmpty();
 	}
 
 	@Test

@@ -13,6 +13,7 @@ import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.ChangeLogRepository;
 import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.MaintenanceWindowRepository;
+import com.sentinel.infra.persistence.MonitoringGapRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.infra.persistence.TestResultRepository;
@@ -52,6 +53,8 @@ public class TestFixtures {
 	private final ChangeLogRepository changeLogs;
 
 	private final MaintenanceWindowRepository maintenanceWindows;
+
+	private final MonitoringGapRepository monitoringGaps;
 
 	/** 수동 실행 주체 등 사용자 필요한 테스트용 계정 */
 	public User user() {
@@ -103,6 +106,7 @@ public class TestFixtures {
 	public void deleteAll() {
 		changeLogs.deleteAllInBatch();
 		maintenanceWindows.deleteAllInBatch();
+		monitoringGaps.deleteAllInBatch();
 		schedules.deleteAllInBatch();
 		results.deleteAllInBatch();
 		runs.deleteAllInBatch();
