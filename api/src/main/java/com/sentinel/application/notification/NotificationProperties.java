@@ -28,6 +28,11 @@ public record NotificationProperties(
 		return webhookUrl != null && !webhookUrl.isBlank();
 	}
 
+	/** 대시보드 주소. webBaseUrl 미지정 시 null */
+	public String dashboardUrl() {
+		return webBaseUrl == null || webBaseUrl.isEmpty() ? null : webBaseUrl + "/";
+	}
+
 	/** 실행 결과 화면 주소. webBaseUrl 미지정 시 null */
 	public String runUrl(long runId) {
 		return webBaseUrl == null || webBaseUrl.isEmpty() ? null : webBaseUrl + "/runs/" + runId;
