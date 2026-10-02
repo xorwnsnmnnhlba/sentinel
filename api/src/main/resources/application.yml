@@ -36,6 +36,8 @@ sentinel:
     enabled: true
     zone: Asia/Seoul
     poll-interval: 60s
+    # 스케줄이 예정 시각보다 이 시간 넘게 늦게 실행되면 모니터링 공백으로 기록·알림 (Sentinel 중지·서버 절전 등)
+    gap-threshold: 10m
   retention:
     enabled: true
     # 요청·응답 원문(헤더·본문) 보관 기간. 지나면 원문만 비우고 실행·판정 기록은 유지

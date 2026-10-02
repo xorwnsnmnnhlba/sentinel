@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +32,10 @@ import org.springframework.transaction.TransactionException;
  * DB 접속 실패(VPN 끊김 등)는 즉시 재시도해도 복구되지 않으므로 해당 주기를 건너뛰고 다음 주기 대기.
  * 접속 실패는 최초 1회, 복구 시 1회 알림 발송. 스케줄 실행 결과에 실패가 있으면 실패 알림 발송.
  * 알림 발송 실패는 로그만 남기고 폴링 계속.
+ * <p>
+ * 예정 시각보다 기준 시간({@link ScheduleProperties#gapThreshold()}) 넘게 늦은 스케줄이 있으면 폴링이 멈췄던 기간을
+ * 모니터링 공백으로 기록하고 알림 (Sentinel 중지·서버 절전 등은 재개 후에야 알 수 있음). 앞 공백에 이어 붙인 경우와
+ * DB 연결 복구 알림을 보낸 경우(같은 기간을 알림)는 공백 알림 생략. 기록 실패는 로그만 남기고 알림 발송
  */
 @Component
 @RequiredArgsConstructor
@@ -56,6 +61,8 @@ public class SchedulePoller {
 
 	private final MaintenanceWindowRepository maintenanceWindows;
 
+	private final MonitoringGapService monitoringGaps;
+
 	/** DB 접속 실패 시작 시각. 정상 시 null. 스케줄러 단일 스레드에서만 갱신 */
 	private volatile Instant databaseUnavailableSince;
 
@@ -64,12 +71,12 @@ public class SchedulePoller {
 	 */
 	public List<Long> poll() {
 		Instant now = clock.instant();
-		List<Long> dueIds;
+		List<Due> due;
 		try {
-			dueIds = transactions.write(status -> schedules
+			due = transactions.write(status -> schedules
 				.findByEnabledTrueAndNextRunAtLessThanEqualOrderByNextRunAt(now)
 				.stream()
-				.map(TestSchedule::getId)
+				.map(schedule -> new Due(schedule.getId(), schedule.getNextRunAt()))
 				.toList());
 		}
 		catch (DataAccessException | TransactionException ex) {
@@ -78,10 +85,11 @@ public class SchedulePoller {
 			onDatabaseUnavailable(now, reason);
 			return List.of();
 		}
-		onDatabaseAvailable(now);
+		boolean recovered = onDatabaseAvailable(now);
+		checkGap(due, now, recovered);
 
 		List<Long> runIds = new ArrayList<>();
-		for (Long scheduleId : dueIds) {
+		for (Long scheduleId : due.stream().map(Due::scheduleId).toList()) {
 			try {
 				Trigger trigger = transactions.write(status -> claim(scheduleId, now));
 				if (trigger != null) {
@@ -118,6 +126,32 @@ public class SchedulePoller {
 		return new Trigger(schedule.getSuite().getId(), schedule.getEnvironment().getId());
 	}
 
+	/** 예정 시각보다 기준 시간 넘게 늦은 스케줄이 있으면 공백 기록·알림 */
+	private void checkGap(List<Due> due, Instant now, boolean recovered) {
+		Instant onTime = now.minus(properties.gapThreshold());
+		List<Instant> late = due.stream().map(Due::nextRunAt).filter(nextRunAt -> nextRunAt.isBefore(onTime)).toList();
+		if (late.isEmpty()) {
+			return;
+		}
+		Instant startedAt = Collections.min(late);
+		boolean started;
+		try {
+			started = monitoringGaps.record(startedAt, now, late.size());
+		}
+		catch (RuntimeException ex) {
+			log.error("Failed to record monitoring gap from {} to {}", startedAt, now, ex);
+			started = true;
+		}
+		log.warn("Monitoring gap from {} to {}: {} schedules ran late", startedAt, now, late.size());
+		if (!started || recovered) {
+			return;
+		}
+		send(new Notification("[Sentinel] 모니터링 공백 - 스케줄이 제때 실행되지 않음",
+				List.of("기간: " + format(startedAt) + " ~ " + format(now) + " ("
+						+ formatDuration(Duration.between(startedAt, now)) + ")", "제때 실행되지 않은 스케줄: " + late.size() + "건",
+						"놓친 실행은 스케줄마다 1회씩 지금 실행합니다", "원인 예: Sentinel 중지, 서버 절전, 오래 걸린 앞 실행")));
+	}
+
 	private void onDatabaseUnavailable(Instant now, String reason) {
 		if (databaseUnavailableSince != null) {
 			return;
@@ -127,15 +161,17 @@ public class SchedulePoller {
 				List.of("발생 시각: " + format(now), "사유: " + reason, "복구될 때까지 스케줄 실행을 건너뜁니다")));
 	}
 
-	private void onDatabaseAvailable(Instant now) {
+	/** @return 접속 실패에서 복구됨 (복구 알림 발송) */
+	private boolean onDatabaseAvailable(Instant now) {
 		Instant since = databaseUnavailableSince;
 		if (since == null) {
-			return;
+			return false;
 		}
 		databaseUnavailableSince = null;
 		send(new Notification("[Sentinel] DB 연결 복구 - 스케줄 실행 재개",
 				List.of("중단 기간: " + format(since) + " ~ " + format(now) + " (" + formatDuration(Duration.between(since, now))
 						+ ")", "중단 기간 중 놓친 스케줄은 1회씩 실행됩니다")));
+		return true;
 	}
 
 	private void notifyRunResult(long runId) {
@@ -162,6 +198,9 @@ public class SchedulePoller {
 
 	static String formatDuration(Duration duration) {
 		return NotificationFormat.duration(duration);
+	}
+
+	private record Due(long scheduleId, Instant nextRunAt) {
 	}
 
 	private record Trigger(long suiteId, long environmentId) {
