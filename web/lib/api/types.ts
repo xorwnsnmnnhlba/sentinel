@@ -403,6 +403,23 @@ export interface UnstableCases {
   cases: UnstableCase[];
 }
 
+/**
+ * 모니터링 공백 (api/README.md "모니터링 공백"). 스케줄이 예정 시각보다 크게 늦게 실행된 기간
+ * startedAt: 늦은 스케줄 중 가장 이른 예정 시각, endedAt: 폴링 재개 시각
+ */
+export interface MonitoringGap {
+  id: number;
+  startedAt: string;
+  endedAt: string;
+  missedSchedules: number;
+}
+
+export interface MonitoringGaps {
+  from: string;
+  to: string;
+  gaps: MonitoringGap[];
+}
+
 /** API 토큰 (api/README.md "API 토큰"). 원문은 발급 응답에만 있고 목록에는 앞부분(prefix)만 */
 export interface AccessTokenItem {
   id: number;
