@@ -38,6 +38,11 @@ sentinel:
     poll-interval: 60s
     # 스케줄이 예정 시각보다 이 시간 넘게 늦게 실행되면 모니터링 공백으로 기록·알림 (Sentinel 중지·서버 절전 등)
     gap-threshold: 10m
+  digest:
+    # 주간 요약 알림 (기본 채널). 발송일 전날까지 7일의 실행·통과율·불안정 케이스·응답시간·모니터링 공백
+    enabled: true
+    # 발송 시각 (초 분 시 일 월 요일). sentinel.schedule.zone 기준. 꺼져 있었으면 켜진 뒤 1회 발송 (7일 이내)
+    cron: "0 0 9 * * MON"
   retention:
     enabled: true
     # 요청·응답 원문(헤더·본문) 보관 기간. 지나면 원문만 비우고 실행·판정 기록은 유지
