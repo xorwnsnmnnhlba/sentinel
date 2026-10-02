@@ -64,11 +64,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self.record()
-        state["polls"] += 1
         name = scenario()
+        if self.headers.get("Accept") == "application/xml":
+            if name == "xml-broken":
+                return self.reply(500, {"detail": "boom"})
+            body = b'<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="Sentinel"/>\n'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+        state["polls"] += 1
         if name == "slow" or state["polls"] < 2:
             return self.reply(200, run("RUNNING", [PASS]))
-        if name == "pass":
+        if name in ("pass", "xml-broken"):
             return self.reply(200, run("COMPLETED", [PASS, PASS]))
         if name == "fail":
             return self.reply(200, run("COMPLETED", [PASS, FAIL, ERROR]))
@@ -133,6 +142,44 @@ if [[ "$code" == 2 && "$output" == *"Sentinel에 연결하지 못했습니다"* 
 else
   failed=$((failed + 1))
   echo "FAIL 연결 실패: $output"
+fi
+
+# --junit: 끝난 실행은 통과·실패 모두 저장, 시간 초과는 저장하지 않음, 받지 못하면 경고만 (종료 코드는 실행 결과)
+junit_check() {
+  local name="$1" scenario="$2" expected="$3" saved="$4" needle="$5"
+  shift 5
+  echo "$scenario" >"$WORK/scenario"
+  rm -f "$WORK/report.xml"
+  local output code
+  output=$(SENTINEL_URL="$URL" SENTINEL_TOKEN="$TOKEN" "$BASH" "$SCRIPT" --suite 3 --environment 2 --interval 0 \
+    --junit "$WORK/report.xml" "$@" 2>&1)
+  code=$?
+  local exists=no
+  if [[ -s "$WORK/report.xml" ]] && grep -q '<testsuites name="Sentinel"/>' "$WORK/report.xml"; then
+    exists=yes
+  fi
+  if [[ "$code" == "$expected" && "$exists" == "$saved" && "$output" == *"$needle"* ]]; then
+    passed=$((passed + 1))
+  else
+    failed=$((failed + 1))
+    printf 'FAIL %s: exit %s (expected %s), saved %s (expected %s)\n%s\n' "$name" "$code" "$expected" "$exists" \
+      "$saved" "$output"
+  fi
+}
+
+junit_check "통과도 저장" pass 0 yes "JUnit XML: $WORK/report.xml"
+junit_check "실패도 저장" fail 1 yes "JUnit XML: $WORK/report.xml"
+junit_check "중지도 저장" canceled 2 yes "JUnit XML: $WORK/report.xml"
+junit_check "시간 초과는 저장 안 함" slow 2 no "시간 초과" --timeout 1 --interval 0.2
+junit_check "받지 못하면 경고만" xml-broken 0 no "경고: JUnit XML을 받지 못했습니다: HTTP 500"
+
+# 사용법은 맨 위 주석만
+usage=$("$BASH" "$SCRIPT" --help 2>&1)
+if [[ "$usage" == *"종료 코드"* && "$usage" != *"set -euo"* ]]; then
+  passed=$((passed + 1))
+else
+  failed=$((failed + 1))
+  echo "FAIL 사용법: $usage"
 fi
 
 # 요청 내용: 본문, 토큰 헤더 (주소 끝의 /는 제거)

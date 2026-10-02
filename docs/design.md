@@ -622,6 +622,7 @@ docker compose up -d --build --wait
   - 네트워크 경로 (사용자 결정): Spring은 같은 PC에서만, web BFF는 조회·쿠키 세션만이라 다른 PC의 CI가 닿을 수 없었음. HTTPS 앞단(Caddy)이 `Bearer snt_` 헤더가 있는 `/api/runs` 요청만 Spring으로 직접 전달. web에 CI 전용 전달 경로를 두는 방안은 "쓰기는 Server Action으로만" 원칙의 예외가 생겨 제외
   - 실행 대기 스크립트 `scripts/sentinel-run.sh` (bash·curl·jq): 종료 코드 0 통과, 1 실패, 2 실행 불가·중지·시간 초과. CI 도구와 무관하게 쓰도록 스크립트로 제공하고 GitHub Actions는 예시만
   - 화면: 계정 영역의 "API 토큰" (발급 직후 한 번만 표시·폐기·마지막 사용 시각). 프로젝트 화면 환경 이름 옆에 ID 표시 (스크립트 인자)
+  - JUnit XML (2026-10-01): `GET /api/runs/{id}`의 `Accept: application/xml` 응답, 스크립트 `--junit`. 배포 단계 화면에서 어떤 케이스가 왜 실패했는지 CI 도구가 표로 보여 줌. 새 주소 대신 같은 주소의 다른 형식이라 토큰 권한·HTTPS 앞단 경로를 바꾸지 않음. 원문은 넣지 않음 (CI 로그·산출물은 볼 수 있는 사람이 더 많음)
 - 결과 데이터 보관기간 파기 배치 (2026-09-23 구현). 실행·결과 행은 유지, 요청·응답 헤더·본문만 30일 경과 후 삭제 (`api/README.md` "결과 원문 보관기간")
 
 ---

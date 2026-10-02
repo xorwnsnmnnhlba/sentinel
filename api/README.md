@@ -384,7 +384,17 @@ SENTINEL_URL=https://sentinel.example.com SENTINEL_TOKEN=snt_... \
 - 스위트 ID는 스위트 화면 주소(`/suites/3`)의 번호, 환경 ID는 프로젝트 화면 환경 이름 옆의 `#번호`
 - 사내 인증 기관(Caddy `internal`) 인증서를 쓰면 `SENTINEL_CA_CERT`에 그 루트 인증서 경로. 회사 인증서처럼 러너가 이미 신뢰하면 생략
 - 토큰은 표준 입력의 curl 설정으로 넘겨 프로세스 목록·출력에 남기지 않음. 시간 초과여도 실행은 서버에서 계속됨
+- `--junit 파일`: 끝난 실행의 결과를 JUnit XML로 저장 (통과·실패·중지 모두, 시간 초과는 저장하지 않음). 받지 못하면 경고만 하고 종료 코드는 실행 결과 기준
 - 테스트: `bash scripts/sentinel-run.test.sh` (흉내 낸 API 서버로 시나리오별 종료 코드·출력 확인, CI의 scripts 작업)
+
+#### JUnit XML
+
+`GET /api/runs/{id}`에 `Accept: application/xml`이면 결과를 JUnit XML로 응답 (지정하지 않거나 `*/*`면 지금처럼 JSON). 주소가 같아 API 토큰으로도 조회 가능. CI 도구(GitHub Actions의 테스트 결과 액션, Jenkins, GitLab)가 결과를 표로 보여 주는 용도
+
+- 실행 1건 = `testsuite` 1개 (이름 `스위트 (환경)`, 시작 시각 `timestamp`), 케이스 = `testcase` (`classname`은 스위트 이름, `time`은 소요 초)
+- 판정 실패 = `failure` (실패한 규칙, 첫 규칙이 `message`), 오류 = `error` (`type`은 사유, 재시도했으면 "(N회 다시 보낸 뒤)")
+- `properties`: 실행 ID·상태·환경, 결과 화면 주소(`sentinel.notification.web-base-url` 지정 시)
+- 요청·응답 원문은 넣지 않음 (CI 로그·산출물은 볼 수 있는 사람이 더 많음). 판정 메시지는 저장 시 이미 시크릿을 가린 값. XML에 넣을 수 없는 제어 문자는 제거
 
 GitHub Actions 예시. Sentinel이 사내망에 있으면 사내망에 둔 러너(self-hosted)에서 실행 (GitHub 호스팅 러너는 사내 주소에 닿지 않음). 스크립트는 배포하는 저장소에 복사해 두고 사용
 
@@ -399,7 +409,15 @@ deploy-check:
         SENTINEL_URL: https://sentinel.example.com
         SENTINEL_TOKEN: ${{ secrets.SENTINEL_TOKEN }}
         SENTINEL_CA_CERT: /etc/ssl/sentinel-root.crt
-      run: bash scripts/sentinel-run.sh --suite 3 --environment 2 --timeout 600
+      run: bash scripts/sentinel-run.sh --suite 3 --environment 2 --timeout 600 --junit sentinel.xml
+    # 실패해도 결과 표를 남기도록 always(). JUnit XML을 읽는 액션은 팀이 쓰는 것으로 (예: dorny/test-reporter)
+    - name: Sentinel 결과 표
+      if: always()
+      uses: dorny/test-reporter@v1
+      with:
+        name: Sentinel
+        path: sentinel.xml
+        reporter: java-junit
 ```
 ### 사용자 관리
 

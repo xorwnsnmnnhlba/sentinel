@@ -15,6 +15,7 @@ import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.infra.persistence.TestCaseRepository;
 import com.sentinel.runner.HttpMethod;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,9 @@ class RunControllerTest {
 
 	@Autowired
 	private TestFixtures fixtures;
+
+	@Autowired
+	private TestCaseRepository testCases;
 
 	@AfterEach
 	void cleanUp() {
@@ -151,6 +155,33 @@ class RunControllerTest {
 			.bodyJson()
 			.extractingPath("$.detail")
 			.isEqualTo("test run -1 not found");
+	}
+
+	@Test
+	void servesTheResultAsJUnitXmlWhenAsked() throws Exception {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		TestCase testCase = fixtures.testCase(suite, HttpMethod.GET, "/health", null, null);
+		testCase.rename("상태 확인");
+		testCases.save(testCase);
+		long runId = id(createRun("{\"suiteId\": %d, \"environmentId\": %d}".formatted(suite.getId(),
+				environment.getId())));
+
+		MvcTestResult xml = mvc.get().uri("/api/runs/{id}", runId).accept(MediaType.APPLICATION_XML).exchange();
+
+		assertThat(xml).hasStatusOk();
+		assertThat(xml.getResponse().getContentType()).startsWith("application/xml");
+		String body = xml.getResponse().getContentAsString(StandardCharsets.UTF_8);
+		assertThat(body).startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+			.contains("<testcase name=\"상태 확인\" classname=\"" + suite.getName() + "\"");
+		// Accept를 지정하지 않거나 모든 형식(curl 기본 */*)이면 지금처럼 JSON
+		assertThat(mvc.get().uri("/api/runs/{id}", runId)).hasStatusOk()
+			.hasContentTypeCompatibleWith(MediaType.APPLICATION_JSON);
+		assertThat(mvc.get().uri("/api/runs/{id}", runId).accept(MediaType.ALL)).hasStatusOk()
+			.hasContentTypeCompatibleWith(MediaType.APPLICATION_JSON);
+		assertThat(mvc.get().uri("/api/runs/{id}", -1).accept(MediaType.APPLICATION_XML))
+			.hasStatus(HttpStatus.NOT_FOUND);
 	}
 
 	@Test
