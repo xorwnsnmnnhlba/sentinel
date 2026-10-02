@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import { PassRateMeter } from "@/components/dashboard/pass-rate-meter";
+import { MonitoringGapList } from "@/components/dashboard/monitoring-gap-list";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { UnstableCaseTable } from "@/components/dashboard/unstable-case-table";
 import { RunCountBadges, StatusBadge, TriggerBadge } from "@/components/run-badges";
@@ -11,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { apiGet } from "@/lib/api/server";
 import type {
   MaintenanceWindow,
+  MonitoringGaps,
   Page,
   ResponseTimeChanges,
   RunSummary,
@@ -31,6 +33,7 @@ import {
 } from "@/lib/dashboard";
 import { formatDateTime, formatProgress } from "@/lib/format";
 import { formatEnd } from "@/lib/maintenance";
+import { formatGapDuration, totalGapDuration } from "@/lib/monitoring-gap";
 import { formatMs, kstDateRange } from "@/lib/response-times";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +41,9 @@ export const metadata = { title: "대시보드 · Sentinel" };
 
 /** 불안정 케이스 표시 수 (실패 구간·재시도가 많은 순) */
 const UNSTABLE_LIMIT = 10;
+
+/** 모니터링 공백 표시 수 (최근 시작 순) */
+const GAP_LIMIT = 5;
 
 /** 진행 중인 실행 표시 수와 새로 고침 주기 */
 const RUNNING_LIMIT = 10;
@@ -53,15 +59,18 @@ export default async function Dashboard(props: PageProps<"/">) {
   const previous = previousRange(current.from, days);
   const range = (period: { from: string; to: string }) => `from=${period.from}&to=${period.to}`;
 
-  const [summaries, previousSummaries, failingRuns, changes, running, windows, unstable] = await Promise.all([
-    apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
-    apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
-    apiGet<Page<RunSummary>>(`/api/runs?failing=true&size=5&${range(current)}`),
-    apiGet<ResponseTimeChanges>(`/api/response-time-changes?limit=5&${range(current)}`),
-    apiGet<Page<RunSummary>>(`/api/runs?status=RUNNING&size=${RUNNING_LIMIT}`),
-    apiGet<MaintenanceWindow[]>("/api/maintenance-windows"),
-    apiGet<UnstableCases>(`/api/unstable-cases?${range(current)}`),
-  ]);
+  const [summaries, previousSummaries, failingRuns, changes, running, windows, unstable, monitoringGaps] =
+    await Promise.all([
+      apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
+      apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
+      apiGet<Page<RunSummary>>(`/api/runs?failing=true&size=5&${range(current)}`),
+      apiGet<ResponseTimeChanges>(`/api/response-time-changes?limit=5&${range(current)}`),
+      apiGet<Page<RunSummary>>(`/api/runs?status=RUNNING&size=${RUNNING_LIMIT}`),
+      apiGet<MaintenanceWindow[]>("/api/maintenance-windows"),
+      apiGet<UnstableCases>(`/api/unstable-cases?${range(current)}`),
+      apiGet<MonitoringGaps>(`/api/monitoring-gaps?${range(current)}`),
+    ]);
+  const gaps = monitoringGaps.gaps;
   const maintenance = windows.filter((window) => window.active);
   const at = new Date();
   const now = totals(summaries.suites);
@@ -153,6 +162,17 @@ export default async function Dashboard(props: PageProps<"/">) {
               진행 중인 실행 모두 보기
             </Link>
           )}
+        </section>
+      )}
+
+      {/* 요약 수치를 읽기 전에 빠진 기간이 있음을 알림. 공백이 없으면 표시하지 않음 */}
+      {gaps.length > 0 && (
+        <section className="space-y-3">
+          <SectionTitle
+            title={`모니터링 공백 ${gaps.length}건 · ${formatGapDuration(totalGapDuration(gaps))}`}
+            description="스케줄이 예정 시각보다 크게(기본 10분 넘게) 늦게 실행된 기간 (KST, Sentinel 중지·서버 절전 등). 이 동안의 장애는 실패 알림이 없었을 수 있음"
+          />
+          <MonitoringGapList gaps={gaps} limit={GAP_LIMIT} />
         </section>
       )}
 
