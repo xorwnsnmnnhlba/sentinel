@@ -111,7 +111,7 @@ class WeeklyDigestServiceTest {
 
 	private WeeklyDigestService service(String webBaseUrl) {
 		return new WeeklyDigestService(suiteSummaries, unstableCases, responseTimes, monitoringGaps,
-				new NotificationProperties(null, webBaseUrl, Duration.ofSeconds(3), Duration.ofSeconds(5)));
+				new NotificationProperties(null, webBaseUrl, Duration.ofSeconds(3), Duration.ofSeconds(5), Duration.ofHours(1)));
 	}
 
 	private void suites(LocalDate from, LocalDate to, SuiteSummaryService.SuiteSummary... suites) {

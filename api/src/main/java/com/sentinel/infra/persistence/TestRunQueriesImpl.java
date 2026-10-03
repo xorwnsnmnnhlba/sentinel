@@ -57,6 +57,16 @@ class TestRunQueriesImpl implements TestRunQueries {
 	}
 
 	@Override
+	public boolean existsFailureNotifiedSince(long suiteId, long environmentId, Instant startedAfter,
+			long beforeRunId) {
+		return queries.selectOne()
+			.from(run)
+			.where(run.suite.id.eq(suiteId), run.startedAt.gt(startedAfter), run.environment.id.eq(environmentId),
+					run.id.lt(beforeRunId), run.failureNotifiedAt.isNotNull())
+			.fetchFirst() != null;
+	}
+
+	@Override
 	public List<TestRun> findPreviousWholeRuns(long suiteId, long environmentId, TestRun.Status status,
 			Instant startedAt, long runId, int limit) {
 		return queries.selectFrom(run)

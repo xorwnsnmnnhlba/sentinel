@@ -10,8 +10,10 @@ import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.MutableClock;
+import com.sentinel.application.ScheduleProperties;
 import com.sentinel.application.TestFixtures;
 import com.sentinel.application.TestRunService;
+import com.sentinel.application.Transactions;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestCase;
@@ -70,6 +72,15 @@ class RunResultNotifierTest {
 
 	@Autowired
 	private TestResultRepository results;
+
+	@Autowired
+	private NotificationChannels channels;
+
+	@Autowired
+	private ScheduleProperties scheduleProperties;
+
+	@Autowired
+	private Transactions transactions;
 
 	private TestSuite suite;
 
@@ -156,6 +167,85 @@ class RunResultNotifierTest {
 		assertThat(lastLines()).first().asString().startsWith("[21회 이상 · 09-24 09:10부터] " + a.getName());
 	}
 
+	@Test
+	void remindsOngoingFailuresOncePerRepeatInterval() {
+		// 10분 간격 스케줄. 처음 실패는 바로 (폴링이 늦어 실행 시작이 30초 밀림)
+		long first = run(Duration.ofSeconds(30), dev, TestRun.Trigger.SCHEDULED, Set.of("/a"));
+		assertThat(runResultNotifier.notifyResult(first)).isEqualTo(RunResultNotifier.Sent.FAILURE);
+		assertThat(lastLines()).contains("계속 실패하면 1시간마다 다시 알림 (새로 실패·복구는 바로)");
+
+		// 같은 케이스가 계속 실패하는 동안은 1시간까지 생략
+		for (int minutes = 10; minutes <= 50; minutes += 10) {
+			assertThat(every10(minutes, Set.of("/a"))).isEqualTo(RunResultNotifier.Sent.SUPPRESSED);
+		}
+		assertThat(notifier.sent()).hasSize(1);
+
+		// 1시간 뒤 다시 알림. 앞 발송 실행이 늦게 시작했어도 폴링 주기만큼 여유를 두어 제때
+		assertThat(every10(60, Set.of("/a"))).isEqualTo(RunResultNotifier.Sent.FAILURE);
+		assertThat(lastTitle()).endsWith("2건 중 1건 실패 (계속 실패 중)");
+		assertThat(lastLines()).first().asString().startsWith("[7회째 · 09-24 09:10부터] " + a.getName());
+
+		// 발송한 실행에만 기록
+		assertThat(runs.findAll()).filteredOn(run -> run.getFailureNotifiedAt() != null)
+			.extracting(TestRun::getStartedAt)
+			.containsExactlyInAnyOrder(NINE_TEN.plusSeconds(30), NINE_TEN.plus(Duration.ofMinutes(60)));
+		assertThat(every10(70, Set.of("/a"))).isEqualTo(RunResultNotifier.Sent.SUPPRESSED);
+	}
+
+	@Test
+	void sendsNewFailuresAndRecoveryRightAwayWhileOngoingFailuresAreQuiet() {
+		assertThat(every10(0, Set.of("/a"))).isEqualTo(RunResultNotifier.Sent.FAILURE);
+		// 계속 실패 중에 다른 케이스가 새로 실패하면 바로
+		assertThat(every10(10, Set.of("/a", "/b"))).isEqualTo(RunResultNotifier.Sent.FAILURE);
+		assertThat(lastTitle()).endsWith("2건 중 2건 실패 (새로 실패 1건)");
+		// 재알림 간격은 마지막 발송부터
+		assertThat(every10(20, Set.of("/a", "/b"))).isEqualTo(RunResultNotifier.Sent.SUPPRESSED);
+		// 일부 복구는 알리지 않고 다음 재알림에 남은 실패만
+		assertThat(every10(30, Set.of("/a"))).isEqualTo(RunResultNotifier.Sent.SUPPRESSED);
+		assertThat(every10(70, Set.of("/a"))).isEqualTo(RunResultNotifier.Sent.FAILURE);
+		assertThat(lastTitle()).endsWith("2건 중 1건 실패 (계속 실패 중)");
+		// 모두 통과하면 바로 복구
+		assertThat(every10(80, Set.of())).isEqualTo(RunResultNotifier.Sent.RECOVERY);
+		assertThat(notifier.sent()).hasSize(4);
+	}
+
+	@Test
+	void suppressesOnlyWithinTheSameSuiteAndEnvironment() {
+		// staging은 70분 전에 알린 뒤 계속 실패, dev는 방금 알림
+		long staging1 = run(Duration.ofMinutes(-70), staging, TestRun.Trigger.SCHEDULED, Set.of("/a"));
+		assertThat(runResultNotifier.notifyResult(staging1)).isEqualTo(RunResultNotifier.Sent.FAILURE);
+		assertThat(every10(0, Set.of("/a"))).isEqualTo(RunResultNotifier.Sent.FAILURE);
+
+		// dev의 알림과 무관하게 staging은 간격이 지나 다시 알림
+		long staging2 = run(Duration.ofMinutes(5), staging, TestRun.Trigger.SCHEDULED, Set.of("/a"));
+		assertThat(runResultNotifier.notifyResult(staging2)).isEqualTo(RunResultNotifier.Sent.FAILURE);
+		assertThat(lastTitle()).startsWith("[Sentinel] staging ").endsWith("(계속 실패 중)");
+	}
+
+	@Test
+	void allowsOnePollIntervalOfSlackBeforeReminding() {
+		assertThat(every10(0, Set.of("/a"))).isEqualTo(RunResultNotifier.Sent.FAILURE);
+
+		// 간격(1시간)에서 폴링 주기(60초)를 뺀 59분부터 다시 알림
+		long early = run(Duration.ofMinutes(59).minusSeconds(1), dev, TestRun.Trigger.SCHEDULED, Set.of("/a"));
+		assertThat(runResultNotifier.notifyResult(early)).isEqualTo(RunResultNotifier.Sent.SUPPRESSED);
+		long due = run(Duration.ofMinutes(59), dev, TestRun.Trigger.SCHEDULED, Set.of("/a"));
+		assertThat(runResultNotifier.notifyResult(due)).isEqualTo(RunResultNotifier.Sent.FAILURE);
+	}
+
+	@Test
+	void sendsEveryRunWhenTheRepeatIntervalIsZero() {
+		RunResultNotifier everyRun = new RunResultNotifier(runs, results, channels,
+				new NotificationProperties(null, null, Duration.ofSeconds(3), Duration.ofSeconds(5), Duration.ZERO),
+				scheduleProperties, transactions, clock);
+		assertThat(everyRun.notifyResult(run(Duration.ZERO, dev, TestRun.Trigger.SCHEDULED, Set.of("/a"))))
+			.isEqualTo(RunResultNotifier.Sent.FAILURE);
+		assertThat(everyRun.notifyResult(run(Duration.ofMinutes(10), dev, TestRun.Trigger.SCHEDULED, Set.of("/a"))))
+			.isEqualTo(RunResultNotifier.Sent.FAILURE);
+		// 간격이 없으면 안내 줄도 없음
+		assertThat(lastLines()).noneMatch(line -> line.startsWith("계속 실패하면"));
+	}
+
 	/** 09:10 + hours 시각의 스케줄 실행 후 알림 */
 	@Test
 	void saysWhenACaseStillGotNoResponseAfterBeingSentAgain() {
@@ -171,6 +261,12 @@ class RunResultNotifierTest {
 
 		assertThat(runResultNotifier.notifyResult(runId)).isEqualTo(RunResultNotifier.Sent.FAILURE);
 		assertThat(lastLines()).first().asString().endsWith("(1회 다시 보낸 뒤)");
+	}
+
+	/** 09:10 + minutes 시각의 스케줄 실행 후 알림 */
+	private RunResultNotifier.Sent every10(int minutes, Set<String> failingPaths) {
+		long runId = run(Duration.ofMinutes(minutes), dev, TestRun.Trigger.SCHEDULED, failingPaths);
+		return runResultNotifier.notifyResult(runId);
 	}
 
 	private RunResultNotifier.Sent scheduled(int hours, Set<String> failingPaths) {

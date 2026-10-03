@@ -82,3 +82,5 @@ sentinel:
     web-base-url: ${SENTINEL_WEB_URL:}
     connect-timeout: 3s
     read-timeout: 5s
+    # 같은 케이스가 계속 실패하는 동안 실패 알림을 다시 보내는 간격. 새로 실패·복구는 바로 발송. 0s이면 실행마다 발송
+    repeat-interval: 1h
