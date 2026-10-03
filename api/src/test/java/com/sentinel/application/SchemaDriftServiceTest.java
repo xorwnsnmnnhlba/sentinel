@@ -26,7 +26,8 @@ import org.springframework.context.annotation.Import;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = { "spring.jpa.properties.hibernate.generate_statistics=true",
+// 쿼리 수를 세므로 같은 컨텍스트에서 쿼리를 보내는 스케줄 폴링·주간 요약 확인을 끔 (통계는 SessionFactory 전체 기준)
+@SpringBootTest(properties = { "sentinel.schedule.enabled=false", "spring.jpa.properties.hibernate.generate_statistics=true",
 		"sentinel.schema-drift.window=4", "sentinel.schema-drift.min-observations=2" })
 @Import({ TestcontainersConfiguration.class, FakeRequestExecutorConfiguration.class, TestFixtures.class })
 class SchemaDriftServiceTest {
