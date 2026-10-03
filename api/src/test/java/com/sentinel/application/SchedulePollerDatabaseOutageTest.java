@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sentinel.application.notification.Notification;
 import com.sentinel.application.notification.RecordingNotifier;
@@ -39,6 +40,10 @@ class SchedulePollerDatabaseOutageTest {
 
 	private final MonitoringGapService monitoringGaps = mock(MonitoringGapService.class);
 
+	private final AtomicInteger beats = new AtomicInteger();
+
+	private final Heartbeat heartbeat = beats::incrementAndGet;
+
 	private SchedulePoller poller;
 
 	@BeforeEach
@@ -47,7 +52,7 @@ class SchedulePollerDatabaseOutageTest {
 		when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
 		poller = new SchedulePoller(schedules, mock(TestRunService.class), mock(RunResultNotifier.class), notifier,
 				new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60), Duration.ofMinutes(10)), clock,
-				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), monitoringGaps);
+				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), monitoringGaps, heartbeat);
 	}
 
 	@Test
@@ -115,6 +120,42 @@ class SchedulePollerDatabaseOutageTest {
 	}
 
 	@Test
+	void sendsTheHeartbeatOnlyWhileTheDatabaseIsReachable() {
+		databaseUp();
+		poller.poll();
+		databaseDown();
+		poller.poll();
+		poller.poll();
+
+		// DB 접속 실패 중에는 보내지 않아 외부 감시 서비스가 알림
+		assertThat(beats).hasValue(1);
+
+		databaseUp();
+		poller.poll();
+
+		assertThat(beats).hasValue(2);
+	}
+
+	@Test
+	void keepsPollingWhenTheHeartbeatThrows() {
+		PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+		when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+		SchedulePoller failingHeartbeatPoller = new SchedulePoller(schedules, mock(TestRunService.class),
+				mock(RunResultNotifier.class), notifier,
+				new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60), Duration.ofMinutes(10)), clock,
+				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), monitoringGaps, () -> {
+					throw new IllegalStateException("broken");
+				});
+		dueSchedule(Instant.parse("2026-09-18T23:00:00Z"));
+		when(monitoringGaps.record(any(), any(), anyInt())).thenReturn(true);
+
+		failingHeartbeatPoller.poll();
+
+		// 생존 신호 오류와 관계없이 공백 확인·실행은 계속
+		verify(monitoringGaps).record(any(), any(), anyInt());
+	}
+
+	@Test
 	void reportsMostSpecificCauseOfDatabaseFailure() {
 		doThrow(new DataAccessResourceFailureException("Could not open JPA EntityManager for transaction",
 				new java.sql.SQLTransientConnectionException("Connection is not available, request timed out after 10009ms")))
@@ -152,7 +193,8 @@ class SchedulePollerDatabaseOutageTest {
 				mock(RunResultNotifier.class), notification -> {
 					throw new IllegalStateException("webhook down");
 				}, new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60), Duration.ofMinutes(10)), clock,
-				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), mock(MonitoringGapService.class));
+				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), mock(MonitoringGapService.class),
+				Heartbeat.NONE);
 		databaseDown();
 
 		assertThat(failingNotifierPoller.poll()).isEmpty();

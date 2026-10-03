@@ -16,9 +16,10 @@ trap 'rm -rf "$WORK"' EXIT
 passed=0
 failed=0
 
-# 출력에 나오면 안 되는 값 (비밀번호·Webhook 주소·암호화 키)
+# 출력에 나오면 안 되는 값 (비밀번호·Webhook 주소·생존 신호 주소·암호화 키)
 DB_PASSWORD_VALUE="db-password-must-not-appear"
 WEBHOOK_VALUE="https://hooks.example.com/services/must-not-appear"
+HEARTBEAT_VALUE="https://hc-ping.example.com/heartbeat-must-not-appear"
 SECRET_KEY_VALUE=$(printf '0123456789abcdef0123456789abcdef' | openssl base64 -A)
 
 # ---------- 인증서 ----------
@@ -86,6 +87,7 @@ DB_URL=jdbc:postgresql://dev.abc123.ap-northeast-2.rds.amazonaws.com:5432/app?cu
 DB_USERNAME=sentinel
 DB_PASSWORD=$DB_PASSWORD_VALUE
 SENTINEL_WEBHOOK_URL=$WEBHOOK_VALUE
+SENTINEL_HEARTBEAT_URL=$HEARTBEAT_VALUE
 SENTINEL_WEB_URL=https://sentinel.team.internal
 SENTINEL_ADMIN_EMAIL=admin@example.com
 SENTINEL_SECRET_KEY=$SECRET_KEY_VALUE
@@ -132,6 +134,7 @@ check "주소를 인증서가 포함" 'contains "✔ 인증서가 sentinel.team.
 check "중간 인증서 포함 확인" 'contains "✔ cert.pem에 중간 인증서 포함 (2개)"'
 check "비밀번호는 출력하지 않음" '! contains "$DB_PASSWORD_VALUE"'
 check "Webhook 주소는 출력하지 않음" '! contains "$WEBHOOK_VALUE" && ! contains "must-not-appear"'
+check "생존 신호 주소는 출력하지 않음" '! contains "$HEARTBEAT_VALUE" && ! contains "heartbeat-must-not-appear"'
 check "암호화 키는 출력하지 않음" '! contains "$SECRET_KEY_VALUE"'
 
 valid_setup "$D"
@@ -236,6 +239,11 @@ valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_WEB_URL "https://localhost"
 run "$D"
 check "알림 링크 주소가 접속 주소와 다르면 경고" 'contains "! SENTINEL_WEB_URL(localhost)이 접속 주소에 없음"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" SENTINEL_HEARTBEAT_URL ""
+run "$D"
+check "생존 신호 주소가 없으면 경고" '[ "$status" -eq 0 ] && contains "! SENTINEL_HEARTBEAT_URL 없음"'
 
 printf '%d 통과, %d 실패\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

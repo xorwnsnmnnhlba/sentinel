@@ -41,6 +41,7 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
    - `SENTINEL_ADMIN_EMAIL`·`SENTINEL_ADMIN_PASSWORD`: 사용자가 없을 때 1회 생성되는 최초 관리자
    - `SENTINEL_WEB_URL=https://sentinel.<사내 도메인>`: 실패 알림의 결과 링크
    - `SENTINEL_WEBHOOK_URL`: Slack·Teams 수신 Webhook (주소 자체가 자격증명)
+   - `SENTINEL_HEARTBEAT_URL`: 외부 감시 서비스의 생존 신호 주소 (주소 자체가 자격증명). 서버가 멈추면 외부 서비스가 알림 (`api/README.md` "외부 생존 신호")
 4. 점검: `scripts/preflight.sh`에서 실패 0 확인. 값은 출력하지 않음
 5. 기동: `docker compose up -d --build --wait`
 6. 확인 (다른 PC 브라우저)

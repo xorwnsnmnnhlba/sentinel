@@ -34,7 +34,7 @@ import org.springframework.transaction.TransactionException;
  * 알림 발송 실패는 로그만 남기고 폴링 계속.
  * <p>
  * 예정 시각보다 기준 시간({@link ScheduleProperties#gapThreshold()}) 넘게 늦은 스케줄이 있으면 폴링이 멈췄던 기간을
- * 모니터링 공백으로 기록하고 알림 (Sentinel 중지·서버 절전 등은 재개 후에야 알 수 있음). 앞 공백에 이어 붙인 경우와
+ * 모니터링 공백으로 기록하고 알림 (Sentinel 중지·서버 절전 등은 재개 후에야 알 수 있음. 멈춘 즉시 알려면 {@link Heartbeat}). 앞 공백에 이어 붙인 경우와
  * DB 연결 복구 알림을 보낸 경우(같은 기간을 알림)는 공백 알림 생략. 기록 실패는 로그만 남기고 알림 발송
  */
 @Component
@@ -63,6 +63,8 @@ public class SchedulePoller {
 
 	private final MonitoringGapService monitoringGaps;
 
+	private final Heartbeat heartbeat;
+
 	/** DB 접속 실패 시작 시각. 정상 시 null. 스케줄러 단일 스레드에서만 갱신 */
 	private volatile Instant databaseUnavailableSince;
 
@@ -86,6 +88,8 @@ public class SchedulePoller {
 			return List.of();
 		}
 		boolean recovered = onDatabaseAvailable(now);
+		// 실행 전에 보냄. 스위트 실행이 길어도 다음 신호가 실행 시간만큼만 늦어짐
+		beat();
 		checkGap(due, now, recovered);
 
 		List<Long> runIds = new ArrayList<>();
@@ -180,6 +184,15 @@ public class SchedulePoller {
 		}
 		catch (RuntimeException ex) {
 			log.error("Failed to send result notification for run {}", runId, ex);
+		}
+	}
+
+	private void beat() {
+		try {
+			heartbeat.beat();
+		}
+		catch (RuntimeException ex) {
+			log.error("Heartbeat failed unexpectedly", ex);
 		}
 	}
 

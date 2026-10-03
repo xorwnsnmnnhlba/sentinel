@@ -2,7 +2,9 @@ package com.sentinel.application;
 
 import java.time.Clock;
 
+import com.sentinel.infra.http.HttpHeartbeat;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,7 +16,8 @@ import org.springframework.scheduling.support.CronTrigger;
 
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
-@EnableConfigurationProperties({ ScheduleProperties.class, RetentionProperties.class, DigestProperties.class })
+@EnableConfigurationProperties({ ScheduleProperties.class, RetentionProperties.class, DigestProperties.class,
+		HeartbeatProperties.class })
 @RequiredArgsConstructor
 class SchedulingConfig implements SchedulingConfigurer {
 
@@ -44,6 +47,16 @@ class SchedulingConfig implements SchedulingConfigurer {
 			registrar.addCronTask(new CronTask(retention::purgeExpired,
 					new CronTrigger(retentionProperties.cron(), properties.zone())));
 		}
+	}
+
+	/** 외부 생존 신호. 주소 미지정 시 보내지 않음. 주소는 자격증명이므로 로그에 남기지 않음 */
+	@Bean
+	static Heartbeat heartbeat(HeartbeatProperties properties) {
+		if (!properties.enabled()) {
+			return Heartbeat.NONE;
+		}
+		LoggerFactory.getLogger(SchedulingConfig.class).info("Heartbeat pings are sent to the configured URL on each poll");
+		return new HttpHeartbeat(properties.url(), properties.timeout());
 	}
 
 	@Bean
