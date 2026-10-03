@@ -4,6 +4,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.Map;
 
+import com.sentinel.infra.http.HttpFailures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -49,7 +50,8 @@ public class WebhookNotifier implements Notifier {
 				.toBodilessEntity();
 		}
 		catch (RestClientException ex) {
-			log.warn("Notification delivery failed: {} ({})", notification.title(), ex.getMessage());
+			// 예외 메시지에는 주소가 들어 있으므로 상태 코드·실패 종류만
+			log.warn("Notification delivery failed: {} ({})", notification.title(), HttpFailures.describe(ex));
 		}
 	}
 

@@ -235,6 +235,10 @@ check_app_env() {
   if [ -z "$(value_of "$APP_ENV_FILE" SENTINEL_WEBHOOK_URL)" ]; then
     warn "SENTINEL_WEBHOOK_URL 없음. 실패 알림은 로그로만 기록"
   fi
+
+  if [ -z "$(value_of "$APP_ENV_FILE" SENTINEL_HEARTBEAT_URL)" ]; then
+    warn "SENTINEL_HEARTBEAT_URL 없음. Sentinel이 멈추면 다시 켜질 때까지 알 수 없음"
+  fi
 }
 
 check_proxy_env
