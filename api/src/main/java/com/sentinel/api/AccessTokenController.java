@@ -3,6 +3,7 @@ package com.sentinel.api;
 import java.net.URI;
 import java.util.List;
 
+import com.sentinel.api.request.CreateAccessTokenRequest;
 import com.sentinel.application.auth.AccessTokenService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

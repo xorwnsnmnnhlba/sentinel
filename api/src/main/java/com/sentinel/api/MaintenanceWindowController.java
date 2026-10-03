@@ -3,6 +3,8 @@ package com.sentinel.api;
 import java.net.URI;
 import java.util.List;
 
+import com.sentinel.api.request.CreateMaintenanceWindowRequest;
+import com.sentinel.api.request.UpdateMaintenanceWindowRequest;
 import com.sentinel.application.MaintenanceWindowItem;
 import com.sentinel.application.MaintenanceWindowService;
 import jakarta.validation.Valid;

@@ -3,6 +3,8 @@ package com.sentinel.api;
 import java.net.URI;
 import java.time.LocalDate;
 
+import com.sentinel.api.request.CreateRunRequest;
+import com.sentinel.api.request.UpdateRunRequest;
 import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.JUnitReport;
 import com.sentinel.application.PageResponse;

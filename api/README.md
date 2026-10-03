@@ -878,7 +878,9 @@ com.sentinel
  ├─ runner/          RequestExecutor, VariableResolver (Spring 의존성 없는 순수 자바)
  │   └─ assertion/   AssertionEvaluator + 구현체
  ├─ application/     TestRunService, SuiteService
- ├─ api/             Controller, DTO
+ ├─ api/             Controller, 예외 응답 (ApiExceptionHandler)
+ │   ├─ request/     요청 본문 (Create·Update…Request). 입력 검증 어노테이션 포함
+ │   └─ response/    컨트롤러에서만 만드는 응답 (세션·링크 발급 등). 조회 결과는 application의 타입을 그대로 응답
  └─ infra/           Repository, 스케줄러, 암호화
 ```
 

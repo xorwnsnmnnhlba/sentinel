@@ -1,4 +1,4 @@
-package com.sentinel.api;
+package com.sentinel.api.request;
 
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -11,7 +11,7 @@ import jakarta.validation.constraints.AssertTrue;
  *
  * @param environmentId rerunOf 외에는 필수. rerunOf는 원래 실행의 환경을 쓰므로 지정하지 않음
  */
-record CreateRunRequest(Long suiteId, Long caseId, Long throughCaseId, Long rerunOf, Long environmentId) {
+public record CreateRunRequest(Long suiteId, Long caseId, Long throughCaseId, Long rerunOf, Long environmentId) {
 
 	@AssertTrue(message = "exactly one of suiteId, caseId, throughCaseId or rerunOf is required")
 	boolean isExactlyOneTarget() {
