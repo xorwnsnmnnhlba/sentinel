@@ -47,20 +47,23 @@ export default async function RunsPage(props: PageProps<"/runs">) {
     <div className="space-y-6">
       <PageHeader
         title="실행 이력"
-        description={`최신순. ${hasFilter ? "조건에 맞는 실행" : "전체"} ${runs.totalElements}건${
-          running ? ". 진행 중인 실행이 있어 3초마다 새로 고침" : ""
-        }`}
+        description={
+          <span className="font-mono text-xs">
+            {hasFilter ? "조건에 맞는 실행" : "전체"} {runs.totalElements}건 · 최신순
+            {running && " · 3초마다 새로 고침"}
+          </span>
+        }
       />
       {running && <AutoRefresh intervalMs={REFRESH_MS} />}
 
       <RunFilters projects={projects} suites={suites} environments={environments} values={filters} />
 
       {runs.content.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
           {hasFilter ? "조건에 맞는 실행 이력이 없습니다" : "실행 이력이 없습니다"}
         </p>
       ) : (
-        <div className="rounded-xl border">
+        <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
               <TableRow>

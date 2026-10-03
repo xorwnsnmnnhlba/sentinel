@@ -12,7 +12,7 @@ const toneClass = {
 const toneLabel = { good: "좋아짐", bad: "나빠짐", neutral: "" } as const;
 
 /**
- * 숫자 하나를 보여주는 타일. 라벨 · 값 · 이전 기간 대비 변화
+ * 숫자 하나를 보여주는 칸 (요약 막대 안). 라벨 · 값 · 이전 기간 대비 변화
  * 변화의 색은 좋고 나쁨을 뜻하므로 화살표와 문구를 함께 표시 (색만으로 구분하지 않음)
  */
 export function StatTile({
@@ -29,9 +29,9 @@ export function StatTile({
 }) {
   const Icon = delta?.direction === "up" ? ArrowUp : delta?.direction === "down" ? ArrowDown : Minus;
   return (
-    <div className="space-y-1 rounded-xl border p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-3xl font-semibold tracking-tight">{value}</p>
+    <div className="space-y-1 px-4 py-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="font-mono text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
       {delta ? (
         <p className={cn("flex items-center gap-1 text-xs", toneClass[delta.tone])}>
           <Icon aria-hidden className="size-3.5" />

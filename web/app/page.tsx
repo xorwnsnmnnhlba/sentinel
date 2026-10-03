@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import { PassRateMeter } from "@/components/dashboard/pass-rate-meter";
+import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { MonitoringGapList } from "@/components/dashboard/monitoring-gap-list";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { UnstableCaseTable } from "@/components/dashboard/unstable-case-table";
@@ -81,105 +82,107 @@ export default async function Dashboard(props: PageProps<"/">) {
   const slower = changes.changes.filter((change) => change.change > 0);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <PageHeader
         title="대시보드"
-        description={`${current.from} ~ ${current.to} (KST) 실행 현황`}
+        description={
+          <span className="font-mono text-xs">
+            {current.from} ~ {current.to} KST
+          </span>
+        }
         actions={<PeriodLinks days={days} />}
       />
 
       {maintenance.length > 0 && (
-        <section className="space-y-3">
-          <SectionTitle
-            title={`점검 중인 환경 ${maintenance.length}곳`}
-            description="점검이 끝날 때까지 이 환경의 스케줄 실행을 건너뜀 (실행 기록·실패 알림 없음)"
-          />
-          <ul className="divide-y rounded-xl border text-sm">
+        <Panel title="점검 중인 환경" count={maintenance.length} meta="스케줄 실행 건너뜀">
+          <ul className="divide-y text-sm">
             {maintenance.map((window) => (
               <li key={window.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
                 <Link href={`/projects/${window.projectId}`} className="font-medium hover:underline">
                   {window.environment.name}
                 </Link>
-                <span className="text-muted-foreground">~{formatEnd(window.endsAt, at)} (KST)</span>
-                {window.reason && <span className="text-muted-foreground">· {window.reason}</span>}
+                <span className="font-mono text-xs text-muted-foreground">~{formatEnd(window.endsAt, at)} KST</span>
+                {window.reason && <span className="text-muted-foreground">{window.reason}</span>}
               </li>
             ))}
           </ul>
-        </section>
+        </Panel>
       )}
 
       {running.totalElements > 0 && (
-        <section className="space-y-3">
+        <Panel
+          title="진행 중인 실행"
+          count={running.totalElements}
+          action={
+            running.totalElements > RUNNING_LIMIT && (
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/runs?status=RUNNING">모두 보기</Link>
+              </Button>
+            )
+          }
+        >
           {/* 끝나면 목록에서 빠지도록 진행 중인 실행이 있는 동안만 새로 고침 */}
           <AutoRefresh intervalMs={RUNNING_REFRESH_MS} />
-          <SectionTitle
-            title={`진행 중인 실행 ${running.totalElements}건`}
-            description="스케줄·수동 실행 모두. 끝나면 자동으로 목록에서 빠짐"
-          />
-          <div className="rounded-xl border">
-            <Table aria-label="진행 중인 실행">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>스위트</TableHead>
-                  <TableHead className="hidden md:table-cell">환경</TableHead>
-                  <TableHead>주체</TableHead>
-                  <TableHead>진행</TableHead>
-                  <TableHead className="hidden md:table-cell">시작 (KST)</TableHead>
+          <Table aria-label="진행 중인 실행">
+            <TableHeader>
+              <TableRow>
+                <TableHead>스위트</TableHead>
+                <TableHead className="hidden md:table-cell">환경</TableHead>
+                <TableHead>주체</TableHead>
+                <TableHead>진행</TableHead>
+                <TableHead className="hidden md:table-cell">시작 (KST)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {running.content.map((run) => (
+                <TableRow key={run.id}>
+                  <TableCell className="whitespace-normal">
+                    <Link href={`/runs/${run.id}`} className="font-medium hover:underline">
+                      #{run.id} {run.suite.name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">
+                      {run.project.name}
+                      {run.testCase && <> · 케이스 단건: {run.testCase.name}</>}
+                      {run.throughCase && <> · {run.throughCase.name}까지</>}
+                      {run.rerunOf !== null && <> · #{run.rerunOf} 실패 다시 실행</>}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">{run.environment.name}</TableCell>
+                  <TableCell>
+                    <TriggerBadge trigger={run.trigger} />
+                    {run.triggeredBy && <div className="text-xs text-muted-foreground">{run.triggeredBy.name}</div>}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs tabular-nums">
+                    {formatProgress(run.summary.total, run.plannedCount)} 완료
+                  </TableCell>
+                  <TableCell className="hidden font-mono text-xs md:table-cell">
+                    {formatDateTime(run.startedAt)}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {running.content.map((run) => (
-                  <TableRow key={run.id}>
-                    <TableCell className="whitespace-normal">
-                      <Link href={`/runs/${run.id}`} className="font-medium hover:underline">
-                        #{run.id} {run.suite.name}
-                      </Link>
-                      <div className="text-xs text-muted-foreground">
-                        {run.project.name}
-                        {run.testCase && <> · 케이스 단건: {run.testCase.name}</>}
-                        {run.throughCase && <> · {run.throughCase.name}까지</>}
-                        {run.rerunOf !== null && <> · #{run.rerunOf} 실패 다시 실행</>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{run.environment.name}</TableCell>
-                    <TableCell>
-                      <TriggerBadge trigger={run.trigger} />
-                      {run.triggeredBy && <div className="text-xs text-muted-foreground">{run.triggeredBy.name}</div>}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {formatProgress(run.summary.total, run.plannedCount)} 완료
-                    </TableCell>
-                    <TableCell className="hidden font-mono text-xs md:table-cell">
-                      {formatDateTime(run.startedAt)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          {running.totalElements > RUNNING_LIMIT && (
-            <Link href="/runs?status=RUNNING" className="text-sm underline-offset-4 hover:underline">
-              진행 중인 실행 모두 보기
-            </Link>
-          )}
-        </section>
+              ))}
+            </TableBody>
+          </Table>
+        </Panel>
       )}
 
       {/* 요약 수치를 읽기 전에 빠진 기간이 있음을 알림. 공백이 없으면 표시하지 않음 */}
       {gaps.length > 0 && (
-        <section className="space-y-3">
-          <SectionTitle
-            title={`모니터링 공백 ${gaps.length}건 · ${formatGapDuration(totalGapDuration(gaps))}`}
-            description="스케줄이 예정 시각보다 크게(기본 10분 넘게) 늦게 실행된 기간 (KST, Sentinel 중지·서버 절전 등). 이 동안의 장애는 실패 알림이 없었을 수 있음"
-          />
+        <Panel
+          title="모니터링 공백"
+          count={gaps.length}
+          meta={`합계 ${formatGapDuration(totalGapDuration(gaps))} · 실패 알림 없었을 수 있음`}
+        >
           <MonitoringGapList gaps={gaps} limit={GAP_LIMIT} />
-        </section>
+        </Panel>
       )}
 
-      <section aria-label="요약" className="grid gap-4 sm:grid-cols-3">
+      <section
+        aria-label="요약"
+        className="grid divide-y rounded-lg border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0"
+      >
         <StatTile
           label="실행"
-          value={`${formatCount(now.runs)}회`}
+          value={formatCount(now.runs)}
           delta={comparable ? delta(now.runs, before.runs, (value) => `${formatCount(value)}회`, null) : null}
           comparedTo={comparedTo}
         />
@@ -193,7 +196,7 @@ export default async function Dashboard(props: PageProps<"/">) {
         />
         <StatTile
           label="실패·오류가 있는 실행"
-          value={`${formatCount(now.failingRuns)}회`}
+          value={formatCount(now.failingRuns)}
           delta={
             comparable ? delta(now.failingRuns, before.failingRuns, (value) => `${formatCount(value)}회`, false) : null
           }
@@ -201,75 +204,82 @@ export default async function Dashboard(props: PageProps<"/">) {
         />
       </section>
 
-      <section className="space-y-3">
-        <SectionTitle title="스위트별 통과율" description="통과율 낮은 순. 통과율은 기간 안 실행의 결과 기준" />
+      <Panel title="스위트별 통과율" count={summaries.suites.length} meta="낮은 순">
         {summaries.suites.length === 0 ? (
-          <Empty message="등록된 스위트가 없습니다" href="/projects" link="프로젝트로 이동" />
-        ) : (
-          <div className="rounded-xl border">
-            <Table aria-label="스위트별 통과율">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>스위트</TableHead>
-                  <TableHead className="text-right">실행</TableHead>
-                  {/* 좁은 화면에서는 통과율이 보이도록 결과·최근 실행 열을 숨김 */}
-                  <TableHead className="hidden md:table-cell">결과</TableHead>
-                  <TableHead className="text-right">통과율</TableHead>
-                  <TableHead className="hidden md:table-cell">최근 실행 (KST)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {byPassRate(summaries.suites).map((summary) => (
-                  <TableRow key={summary.suite.id}>
-                    <TableCell className="whitespace-normal">
-                      <Link href={`/suites/${summary.suite.id}`} className="font-medium hover:underline">
-                        {summary.suite.name}
-                      </Link>
-                      <div className="text-xs text-muted-foreground">{summary.project.name}</div>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCount(summary.runs)}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {summary.results.total > 0 ? <RunCountBadges counts={summary.results} /> : "–"}
-                    </TableCell>
-                    <TableCell>
-                      <PassRateMeter rate={summary.passRate} label={`${summary.suite.name} 통과율`} />
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {summary.lastRun ? (
-                        <Link href={`/runs/${summary.lastRun.id}`} className="flex items-center gap-2 hover:underline">
-                          <StatusBadge status={summary.lastRun.status} />
-                          <span className="font-mono text-xs">{formatDateTime(summary.lastRun.startedAt)}</span>
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">실행 전</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </section>
-
-      <div className="grid gap-8 lg:grid-cols-2">
-        <section className="space-y-3">
-          <SectionTitle
-            title="최근 실패·오류"
-            description="판정 실패나 오류가 있는 실행, 최신순"
-            action={
-              <Button asChild variant="ghost" size="sm">
-                <Link href={`/runs?failing=true&from=${current.from}&to=${current.to}`}>모두 보기</Link>
-              </Button>
+          <PanelEmpty
+            message={
+              <>
+                등록된 스위트가 없습니다{" "}
+                <Link href="/projects" className="underline">
+                  프로젝트로 이동
+                </Link>
+              </>
             }
           />
+        ) : (
+          <Table aria-label="스위트별 통과율">
+            <TableHeader>
+              <TableRow>
+                <TableHead>스위트</TableHead>
+                <TableHead className="text-right">실행</TableHead>
+                {/* 좁은 화면에서는 통과율이 보이도록 결과·최근 실행 열을 숨김 */}
+                <TableHead className="hidden md:table-cell">결과</TableHead>
+                <TableHead className="text-right">통과율</TableHead>
+                <TableHead className="hidden md:table-cell">최근 실행 (KST)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {byPassRate(summaries.suites).map((summary) => (
+                <TableRow key={summary.suite.id}>
+                  <TableCell className="whitespace-normal">
+                    <Link href={`/suites/${summary.suite.id}`} className="font-medium hover:underline">
+                      {summary.suite.name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">{summary.project.name}</div>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs tabular-nums">
+                    {formatCount(summary.runs)}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {summary.results.total > 0 ? <RunCountBadges counts={summary.results} /> : "–"}
+                  </TableCell>
+                  <TableCell>
+                    <PassRateMeter rate={summary.passRate} label={`${summary.suite.name} 통과율`} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {summary.lastRun ? (
+                      <Link href={`/runs/${summary.lastRun.id}`} className="flex items-center gap-2 hover:underline">
+                        <StatusBadge status={summary.lastRun.status} />
+                        <span className="font-mono text-xs">{formatDateTime(summary.lastRun.startedAt)}</span>
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">실행 전</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Panel>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel
+          title="최근 실패·오류"
+          meta="최신순"
+          action={
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/runs?failing=true&from=${current.from}&to=${current.to}`}>모두 보기</Link>
+            </Button>
+          }
+        >
           {failingRuns.content.length === 0 ? (
-            <Empty message="기간 안에 실패·오류가 있는 실행이 없습니다" />
+            <PanelEmpty message="기간 안에 실패·오류가 있는 실행이 없습니다" />
           ) : (
-            <ul className="divide-y rounded-xl border" aria-label="최근 실패·오류 실행">
+            <ul className="divide-y" aria-label="최근 실패·오류 실행">
               {failingRuns.content.map((run) => (
                 <li key={run.id}>
-                  <Link href={`/runs/${run.id}`} className="block space-y-1 p-3 hover:bg-muted/50">
+                  <Link href={`/runs/${run.id}`} className="block space-y-1 px-4 py-2.5 text-sm hover:bg-muted/50">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium">
                         #{run.id} {run.suite.name}
@@ -287,67 +297,57 @@ export default async function Dashboard(props: PageProps<"/">) {
               ))}
             </ul>
           )}
-        </section>
+        </Panel>
 
-        <section className="space-y-3">
-          <SectionTitle
-            title="응답시간이 나빠진 케이스"
-            description={`p95 기준, ${changes.previousFrom} ~ ${changes.previousTo} 대비 (두 기간 모두 3건 이상)`}
-          />
+        <Panel title="응답시간이 나빠진 케이스" meta={`p95 · ${changes.previousFrom} ~ ${changes.previousTo} 대비`}>
           {slower.length === 0 ? (
-            <Empty message="이전 기간보다 느려진 케이스가 없습니다" />
+            <PanelEmpty message="이전 기간보다 느려진 케이스가 없습니다" />
           ) : (
-            <div className="rounded-xl border">
-              <Table aria-label="응답시간이 나빠진 케이스">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>케이스</TableHead>
-                    <TableHead className="text-right">p95</TableHead>
-                    <TableHead className="text-right">변화</TableHead>
+            <Table aria-label="응답시간이 나빠진 케이스">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>케이스</TableHead>
+                  <TableHead className="text-right">p95</TableHead>
+                  <TableHead className="text-right">변화</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {slower.map((change) => (
+                  <TableRow key={`${change.testCase.id}-${change.environment.id}`}>
+                    <TableCell className="whitespace-normal">
+                      <Link
+                        href={`/suites/${change.suite.id}?environmentId=${change.environment.id}&days=${days}&caseId=${change.testCase.id}#response-times`}
+                        className="font-medium hover:underline"
+                      >
+                        {change.testCase.name}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">
+                        {change.suite.name} · {change.environment.name}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs whitespace-nowrap tabular-nums">
+                      <span className="text-muted-foreground">{formatMs(change.previousP95)} → </span>
+                      <span className="font-medium">{formatMs(change.currentP95)}</span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs text-(--delta-bad) tabular-nums">
+                      {formatChange(change.change)}
+                      <span className="sr-only"> 느려짐</span>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {slower.map((change) => (
-                    <TableRow key={`${change.testCase.id}-${change.environment.id}`}>
-                      <TableCell className="whitespace-normal">
-                        <Link
-                          href={`/suites/${change.suite.id}?environmentId=${change.environment.id}&days=${days}&caseId=${change.testCase.id}#response-times`}
-                          className="font-medium hover:underline"
-                        >
-                          {change.testCase.name}
-                        </Link>
-                        <div className="text-xs text-muted-foreground">
-                          {change.suite.name} · {change.environment.name}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right text-xs whitespace-nowrap tabular-nums">
-                        <span className="text-muted-foreground">{formatMs(change.previousP95)} → </span>
-                        <span className="font-medium">{formatMs(change.currentP95)}</span>
-                      </TableCell>
-                      <TableCell className="text-right text-(--delta-bad) tabular-nums">
-                        {formatChange(change.change)}
-                        <span className="sr-only"> 느려짐</span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           )}
-        </section>
+        </Panel>
       </div>
 
-      <section className="space-y-3">
-        <SectionTitle
-          title={`불안정 케이스${unstable.cases.length > 0 ? ` ${unstable.cases.length}건` : ""}`}
-          description="스케줄 실행에서 실패했다 통과했다를 2번 이상 반복했거나 응답이 없어 다시 보낸 일이 2번 이상 (한 번의 장애는 제외)"
-        />
+      <Panel title="불안정 케이스" count={unstable.cases.length} meta="실패 구간·재시도 2회 이상">
         {unstable.cases.length === 0 ? (
-          <Empty message="기간 안에 불안정한 케이스가 없습니다" />
+          <PanelEmpty message="기간 안에 불안정한 케이스가 없습니다" />
         ) : (
           <UnstableCaseTable cases={unstable.cases} from={current.from} to={current.to} limit={UNSTABLE_LIMIT} />
         )}
-      </section>
+      </Panel>
     </div>
   );
 }
@@ -355,59 +355,22 @@ export default async function Dashboard(props: PageProps<"/">) {
 /** 기간 선택. 한 줄로 화면 전체에 적용 */
 function PeriodLinks({ days }: { days: DashboardPeriod }) {
   return (
-    <nav aria-label="기간" className="flex gap-1 rounded-lg bg-muted p-1">
+    <nav aria-label="기간" className="flex rounded-md border bg-card p-0.5">
       {DASHBOARD_PERIODS.map((period) => (
         <Link
           key={period}
           href={`/?days=${period}`}
           aria-current={period === days ? "page" : undefined}
           className={cn(
-            "rounded-md px-3 py-1 text-sm",
-            period === days
-              ? "bg-background font-medium text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+            "rounded-sm px-3 py-1 font-mono text-xs",
+            period === days ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >
-          최근 {period}일
+          <span className="sr-only">최근 </span>
+          {period}일
         </Link>
       ))}
     </nav>
-  );
-}
-
-function SectionTitle({
-  title,
-  description,
-  action,
-}: {
-  title: string;
-  description: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-end justify-between gap-4">
-      <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-function Empty({ message, href, link }: { message: string; href?: string; link?: string }) {
-  return (
-    <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-      {message}
-      {href && link && (
-        <>
-          {" "}
-          <Link href={href} className="underline">
-            {link}
-          </Link>
-        </>
-      )}
-    </p>
   );
 }
 

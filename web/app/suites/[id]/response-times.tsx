@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Empty, SectionHeader } from "@/components/catalog/section";
+import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { TrendChart } from "@/components/response-times/trend-chart";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -23,18 +23,13 @@ export async function ResponseTimes({
   hasCases: boolean;
   searchParams: Record<string, string | string[] | undefined>;
 }) {
-  const header = (
-    <SectionHeader
-      title="응답시간"
-      description="응답을 받은 실행 기준 p50(중앙값)·p95. 타임아웃·연결 실패 제외, 날짜는 KST"
-    />
-  );
+  // 응답을 받은 실행만 (타임아웃·연결 실패 제외)
+  const meta = "p50·p95 · KST";
   if (environments.length === 0 || !hasCases) {
     return (
-      <section id="response-times" className="space-y-3">
-        {header}
-        <Empty message={environments.length === 0 ? "환경을 먼저 등록해 주세요" : "등록된 케이스가 없습니다"} />
-      </section>
+      <Panel id="response-times" title="응답시간" meta={meta}>
+        <PanelEmpty message={environments.length === 0 ? "환경을 먼저 등록해 주세요" : "등록된 케이스가 없습니다"} />
+      </Panel>
     );
   }
 
@@ -52,17 +47,18 @@ export async function ResponseTimes({
   const environmentName = environments.find((environment) => environment.id === environmentId)?.name;
 
   return (
-    <section id="response-times" className="space-y-4">
-      {header}
-      <Filters
-        suiteId={suiteId}
-        environments={environments}
-        environmentId={environmentId}
-        days={days}
-        caseId={selected?.caseId}
-      />
+    <Panel id="response-times" title="응답시간" meta={meta}>
+      <div className="border-b px-4 py-3">
+        <Filters
+          suiteId={suiteId}
+          environments={environments}
+          environmentId={environmentId}
+          days={days}
+          caseId={selected?.caseId}
+        />
+      </div>
 
-      <div className="rounded-xl border">
+      <div className="border-b">
         <Table aria-label="케이스별 응답시간">
           <TableHeader>
             <TableRow>
@@ -100,15 +96,17 @@ export async function ResponseTimes({
       </div>
 
       {selected && trend ? (
-        <TrendChart
-          key={`${selected.caseId}-${environmentId}-${days}`}
-          points={trend.points}
-          title={`${selected.name} · ${environmentName} · 최근 ${days}일 일별 응답시간`}
-        />
+        <div className="p-4">
+          <TrendChart
+            key={`${selected.caseId}-${environmentId}-${days}`}
+            points={trend.points}
+            title={`${selected.name} · ${environmentName} · 최근 ${days}일 일별 응답시간`}
+          />
+        </div>
       ) : (
-        <Empty message={`최근 ${days}일 동안 ${environmentName} 환경에서 응답을 받은 실행이 없습니다`} />
+        <PanelEmpty message={`최근 ${days}일 동안 ${environmentName} 환경에서 응답을 받은 실행이 없습니다`} />
       )}
-    </section>
+    </Panel>
   );
 }
 

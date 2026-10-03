@@ -31,9 +31,9 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
   --color-primary-raised: var(--primary-raised);
-  --color-brand-violet: var(--brand-violet);
-  --color-brand-violet-soft: var(--brand-violet-soft);
-  --color-brand-violet-deep: var(--brand-violet-deep);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-deep: var(--brand-deep);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -66,33 +66,35 @@
 
 :root {
   /*
-   * Sentry 참고 팔레트 (DESIGN.md "색"). light-dark(라이트, 다크)로 한 번에 정의하고
-   * 테마는 <html data-theme>의 color-scheme으로 결정 (아래 "테마")
+   * 관제 화면 팔레트 (DESIGN.md "색"). 무채색 흑연 바탕에 색은 상태·변화·링크에만.
+   * light-dark(라이트, 다크)로 한 번에 정의하고 테마는 <html data-theme>의 color-scheme으로 결정 (아래 "테마")
    */
-  --background: light-dark(#ffffff, #110c1c);
-  --foreground: light-dark(#1f1633, #ece9f3);
-  --card: light-dark(#ffffff, #181226);
-  --card-foreground: light-dark(#1f1633, #ece9f3);
-  --popover: light-dark(#ffffff, #1f1832);
-  --popover-foreground: light-dark(#1f1633, #ece9f3);
-  /* 주 버튼. 다크는 Sentry처럼 반전 (밝은 바탕 + 짙은 글자) */
-  --primary: light-dark(#150f23, #f4f2fa);
-  --primary-foreground: light-dark(#ffffff, #150f23);
+  --background: light-dark(#f3f4f6, #0c0e12);
+  --foreground: light-dark(#14171c, #e3e6ea);
+  /* 패널(구획) 바탕. 본문 바탕보다 한 단계 밝음(라이트는 흰색) */
+  --card: light-dark(#ffffff, #12151a);
+  --card-foreground: light-dark(#14171c, #e3e6ea);
+  --popover: light-dark(#ffffff, #181c22);
+  --popover-foreground: light-dark(#14171c, #e3e6ea);
+  /* 주 버튼. 다크는 반전 (밝은 바탕 + 짙은 글자) */
+  --primary: light-dark(#14171c, #e3e6ea);
+  --primary-foreground: light-dark(#ffffff, #0c0e12);
   /* 주 버튼에 붙는 보조 영역 (실행 버튼 옆 환경 선택) */
-  --primary-raised: light-dark(#2a2140, #d6d0e4);
-  --secondary: light-dark(#f1eef8, #2a2140);
-  --secondary-foreground: light-dark(#1f1633, #ece9f3);
-  --muted: light-dark(#f6f5f9, #1a1428);
-  --muted-foreground: light-dark(#6b6478, #a39db1);
-  --accent: light-dark(#f1eef8, #2a2140);
-  --accent-foreground: light-dark(#1f1633, #ece9f3);
-  --destructive: light-dark(#c3281b, #f38a81);
-  --border: light-dark(#e5e7eb, #2e2645);
-  --input: light-dark(#cfcfdb, #463d60);
-  --ring: light-dark(#3b82f6, #6ea8fe);
-  --brand-violet: light-dark(#6a5fc1, #a79ff0);
-  --brand-violet-soft: light-dark(#ece9f5, #2c2350);
-  --brand-violet-deep: light-dark(#422082, #d9d3fb);
+  --primary-raised: light-dark(#2b3139, #c4c9d0);
+  --secondary: light-dark(#eaedf1, #1d2229);
+  --secondary-foreground: light-dark(#14171c, #e3e6ea);
+  --muted: light-dark(#f1f3f5, #171b21);
+  --muted-foreground: light-dark(#59606a, #8f97a1);
+  --accent: light-dark(#eaedf1, #1d2229);
+  --accent-foreground: light-dark(#14171c, #e3e6ea);
+  --destructive: light-dark(#b42318, #f2827a);
+  --border: light-dark(#dde1e6, #262c35);
+  --input: light-dark(#9aa3ae, #4b5461);
+  --ring: light-dark(#2563eb, #6ea8fe);
+  /* 링크 강조·HTTP 메서드 배지. 상태 색(초록·빨강·주황·파랑)과 겹치지 않는 청록 */
+  --brand: light-dark(#0b6c86, #5cc6dd);
+  --brand-soft: light-dark(#e0f1f6, #10303a);
+  --brand-deep: light-dark(#0a4a5c, #a8e5f2);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -103,22 +105,23 @@
   --chart-series-2: light-dark(#eb6834, #d95926);
   /*
    * 대시보드 변화 표시(좋아짐·나빠짐). 항상 화살표·문구와 함께 사용
-   * 라이트: 흰 배경 대비 7.5:1·4.8:1, 다크: 배경 대비 5.7:1·6.0:1 (critical #d03b3b는 어두운 배경에서 대비 부족)
+   * 라이트: 흰 바탕 대비 7.5:1·4.8:1, 다크: 패널 대비 5.7:1 이상
    */
   --delta-good: light-dark(#006300, #0ca30c);
   --delta-bad: light-dark(#d03b3b, #e66767);
-  /* 통과율 막대의 빈 부분. 채움(--chart-series-1)과 대비 3:1 이상 (라이트 3.3:1, 다크 3.4:1) */
+  /* 통과율 막대의 빈 부분. 채움(--chart-series-1)과 대비 3:1 이상 */
   --meter-track: light-dark(#cde2fb, #20335a);
-  --radius: 0.5rem;
-  /* 사이드바는 두 테마 공통 (항상 짙은 보라) */
-  --sidebar: #1f1633;
-  --sidebar-foreground: rgb(255 255 255 / 72%);
-  --sidebar-primary: #c2ef4e;
-  --sidebar-primary-foreground: #150f23;
-  --sidebar-accent: rgb(255 255 255 / 10%);
+  /* 모서리는 작게 (버튼·입력칸 4px, 패널 약 6px) */
+  --radius: 0.25rem;
+  /* 사이드바는 두 테마 공통 (가장 어두운 흑연). 현재 메뉴는 흰 표시선 */
+  --sidebar: #0a0c0f;
+  --sidebar-foreground: rgb(255 255 255 / 68%);
+  --sidebar-primary: #e3e6ea;
+  --sidebar-primary-foreground: #0a0c0f;
+  --sidebar-accent: rgb(255 255 255 / 8%);
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #362d59;
-  --sidebar-ring: #9dc1f5;
+  --sidebar-border: #1d2229;
+  --sidebar-ring: #6ea8fe;
 }
 
 /*

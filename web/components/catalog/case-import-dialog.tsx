@@ -253,7 +253,7 @@ function CandidateStep({
         <span className="text-muted-foreground">{selectedCount}건 선택</span>
       </div>
 
-      <ul className="max-h-[45vh] divide-y overflow-y-auto rounded-xl border">
+      <ul className="max-h-[45vh] divide-y overflow-y-auto rounded-lg border bg-card">
         {rows.map((row, index) => {
           const issue = issues.get(index);
           return (
@@ -324,7 +324,7 @@ function Warnings({ items }: { items: string[] }) {
     return null;
   }
   return (
-    <ul className="mt-1 space-y-0.5 text-xs text-amber-700 dark:text-amber-400">
+    <ul className="mt-1 space-y-0.5 text-xs text-amber-800 dark:text-amber-400">
       {items.map((item, index) => (
         <li key={index}>{item}</li>
       ))}

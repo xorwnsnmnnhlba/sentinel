@@ -25,11 +25,7 @@ export default async function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="사용자"
-        description="가입은 초대 링크로만 가능합니다"
-        actions={<InviteDialog baseUrl={baseUrl} />}
-      />
+      <PageHeader title="사용자" actions={<InviteDialog baseUrl={baseUrl} />} />
 
       {users.length === 0 ? (
         <Empty message="사용자가 없습니다" />

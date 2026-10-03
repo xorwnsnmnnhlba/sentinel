@@ -2,9 +2,9 @@ import { Badge } from "@/components/ui/badge";
 import type { RunCounts, RunStatus, Trigger, Verdict } from "@/lib/api/types";
 
 const verdictStyle: Record<Verdict, { label: string; className: string }> = {
-  PASSED: { label: "통과", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
+  PASSED: { label: "통과", className: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400" },
   FAILED: { label: "실패", className: "bg-destructive/10 text-destructive" },
-  ERROR: { label: "오류", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
+  ERROR: { label: "오류", className: "bg-amber-500/10 text-amber-800 dark:text-amber-400" },
 };
 
 export function VerdictBadge({ verdict }: { verdict: Verdict | null }) {
@@ -66,7 +66,7 @@ export function RetryBadge({ retries }: { retries: number }) {
  */
 export function UnstableBadge({ detail }: { detail: string }) {
   return (
-    <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-400" title={detail}>
+    <Badge variant="outline" className="border-amber-500/40 text-amber-800 dark:text-amber-400" title={detail}>
       불안정
       <span className="sr-only"> ({detail})</span>
     </Badge>

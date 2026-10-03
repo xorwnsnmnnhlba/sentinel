@@ -33,10 +33,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="케이스 검색"
-        description="모든 스위트의 케이스를 이름이나 경로 일부로 찾습니다 (대소문자 무시)"
-      />
+      <PageHeader title="케이스 검색" />
 
       <form method="get" action="/search" role="search" aria-label="케이스 검색" className="flex gap-2">
         <Input
@@ -52,7 +49,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
       </form>
 
       {cases === null ? null : cases.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
           &quot;{query}&quot; 검색 결과가 없습니다. 이름이나 경로의 다른 부분으로 찾아보세요
         </p>
       ) : (
@@ -62,7 +59,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
               ? `${MAX_SEARCH_RESULTS}건까지 표시. 더 있을 수 있으니 검색어를 구체적으로 입력해 주세요`
               : `${cases.length}건`}
           </p>
-          <div className="rounded-xl border">
+          <div className="rounded-lg border bg-card">
             <Table aria-label="검색 결과">
               <TableHeader>
                 <TableRow>

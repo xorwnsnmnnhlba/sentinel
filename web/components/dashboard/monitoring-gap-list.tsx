@@ -7,8 +7,8 @@ import { formatGapDuration, gapDuration } from "@/lib/monitoring-gap";
  */
 export function MonitoringGapList({ gaps, limit }: { gaps: MonitoringGap[]; limit: number }) {
   return (
-    <div className="space-y-2">
-      <ul className="divide-y rounded-xl border text-sm" aria-label="모니터링 공백">
+    <div>
+      <ul className="divide-y text-sm" aria-label="모니터링 공백">
         {gaps.slice(0, limit).map((gap) => (
           <li key={gap.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
             <span className="font-mono">{formatPeriod(gap.startedAt, gap.endedAt)}</span>
@@ -18,7 +18,7 @@ export function MonitoringGapList({ gaps, limit }: { gaps: MonitoringGap[]; limi
         ))}
       </ul>
       {gaps.length > limit && (
-        <p className="text-xs text-muted-foreground">
+        <p className="border-t px-4 py-2 text-xs text-muted-foreground">
           {gaps.length}건 중 최근 {limit}건
         </p>
       )}

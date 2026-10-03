@@ -7,7 +7,7 @@ describe("parseTheme", () => {
     expect(parseTheme(theme)).toBe(theme);
   });
 
-  it.each([undefined, "", "DARK", "sepia", 'dark"><script>'])("falls back to system for %s", (value) => {
-    expect(parseTheme(value)).toBe("system");
+  it.each([undefined, "", "DARK", "sepia", 'dark"><script>'])("falls back to dark for %s", (value) => {
+    expect(parseTheme(value)).toBe("dark");
   });
 });

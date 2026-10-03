@@ -7,7 +7,7 @@ import { CHANGE_LABELS, countChanges, isShownChange, type ShownChange } from "@/
 
 const changeStyle: Record<ShownChange, string> = {
   NEWLY_FAILING: "border-destructive/40 text-destructive",
-  RECOVERED: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400",
+  RECOVERED: "border-emerald-500/40 text-emerald-800 dark:text-emerald-400",
   STILL_FAILING: "text-muted-foreground",
   NEW: "text-muted-foreground",
 };
