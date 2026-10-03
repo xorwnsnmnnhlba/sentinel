@@ -4,9 +4,9 @@ import Link from "next/link";
 
 import { ProjectFields } from "@/components/catalog/entity-fields";
 import { FormDialog } from "@/components/catalog/form-dialog";
-import { Empty } from "@/components/catalog/section";
+import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { createProject } from "@/lib/actions/catalog";
 import { apiGet } from "@/lib/api/server";
 import type { ProjectItem } from "@/lib/api/types";
@@ -17,7 +17,7 @@ export default async function ProjectsPage() {
   const projects = await apiGet<ProjectItem[]>("/api/projects");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="프로젝트"
         actions={
@@ -36,22 +36,39 @@ export default async function ProjectsPage() {
         }
       />
 
-      {projects.length === 0 ? (
-        <Empty message="등록된 프로젝트가 없습니다" />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {projects.map((project) => (
-            <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card className="h-full transition-colors hover:border-brand/40 hover:bg-accent/40">
-                <CardHeader>
-                  <CardTitle>{project.name}</CardTitle>
-                  <CardDescription>{project.description ?? "설명 없음"}</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
+      <Panel title="프로젝트" count={projects.length}>
+        {projects.length === 0 ? (
+          <PanelEmpty message="등록된 프로젝트가 없습니다" />
+        ) : (
+          <Table aria-label="프로젝트 목록">
+            <TableHeader>
+              <TableRow>
+                <TableHead>이름</TableHead>
+                <TableHead>설명</TableHead>
+                <TableHead>알림 채널</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {projects.map((project) => (
+                <TableRow key={project.id} className="relative">
+                  <TableCell className="font-medium">
+                    {/* 행 전체를 클릭 영역으로 사용 */}
+                    <Link href={`/projects/${project.id}`} className="after:absolute after:inset-0 hover:underline">
+                      {project.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="whitespace-normal text-muted-foreground">
+                    {project.description ?? "-"}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {project.webhookConfigured ? "프로젝트 Webhook" : "기본 채널"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Panel>
     </div>
   );
 }

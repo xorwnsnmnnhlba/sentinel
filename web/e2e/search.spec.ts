@@ -48,7 +48,8 @@ test("경로 일부로 찾은 케이스를 강조해 보여 주고 수정 화면
   await expect(page).toHaveURL(/\/search\?q=/);
   const results = page.getByRole("table", { name: "검색 결과" });
   await expect(results.getByRole("row")).toHaveCount(4);
-  await expect(page.getByText("3건", { exact: true })).toBeVisible();
+  // 건수는 결과 패널 제목 옆
+  await expect(page.getByRole("heading", { name: "검색 결과 3", level: 2 })).toBeVisible();
   await expect(results.locator("mark").first()).toHaveText(token);
   expect(await accessibilityViolations(page)).toEqual([]);
 

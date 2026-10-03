@@ -26,7 +26,13 @@ export function Panel({
       <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
         <h2 className="text-sm font-semibold">
           {title}
-          {count !== undefined && <span className="ml-2 font-mono font-normal text-muted-foreground">{count}</span>}
+          {/* 읽기 도구가 "검색 결과 3"으로 읽도록 공백 포함 */}
+          {count !== undefined && (
+            <>
+              {" "}
+              <span className="ml-1 font-mono font-normal text-muted-foreground">{count}</span>
+            </>
+          )}
         </h2>
         {(meta || action) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -43,6 +49,11 @@ export function Panel({
 /** 패널 본문 여백. 표가 아닌 내용(폼, 설명, 목록)에 사용 */
 export function PanelBody({ children }: { children: React.ReactNode }) {
   return <div className="p-4">{children}</div>;
+}
+
+/** 패널 아래 막대. 페이지 이동처럼 본문 뒤에 붙는 동작 */
+export function PanelFooter({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-sm">{children}</div>;
 }
 
 /** 패널 안의 빈 상태 */
