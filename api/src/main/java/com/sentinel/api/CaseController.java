@@ -3,6 +3,8 @@ package com.sentinel.api;
 import java.net.URI;
 import java.util.List;
 
+import com.sentinel.api.request.CreateCaseRequest;
+import com.sentinel.api.request.UpdateCaseRequest;
 import com.sentinel.application.CatalogCommandService;
 import com.sentinel.application.CatalogQueryService;
 import com.sentinel.application.CatalogQueryService.CaseItem;

@@ -1,4 +1,4 @@
-package com.sentinel.api;
+package com.sentinel.api.request;
 
 import java.util.List;
 
@@ -7,5 +7,5 @@ import java.util.List;
  *
  * @param caseOrder 케이스 실행 순서. 스위트의 사용 중인 케이스 ID 전체를 실행할 순서대로
  */
-record UpdateSuiteRequest(String name, String description, List<Long> caseOrder) {
+public record UpdateSuiteRequest(String name, String description, List<Long> caseOrder) {
 }

@@ -1,4 +1,4 @@
-package com.sentinel.api;
+package com.sentinel.api.request;
 
 import java.util.List;
 
@@ -10,5 +10,5 @@ import jakarta.validation.constraints.NotNull;
  * @param cases 등록할 케이스. 미리보기 응답의 {@code cases} 항목과 같은 형태 ({@code name}, {@code request},
  * {@code assertions}만 사용)
  */
-record CreateCaseImportRequest(@NotNull Long suiteId, @NotEmpty List<CaseImportService.NewCase> cases) {
+public record CreateCaseImportRequest(@NotNull Long suiteId, @NotEmpty List<CaseImportService.NewCase> cases) {
 }

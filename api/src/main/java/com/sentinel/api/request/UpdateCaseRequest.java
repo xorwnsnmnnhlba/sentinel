@@ -1,4 +1,4 @@
-package com.sentinel.api;
+package com.sentinel.api.request;
 
 import java.util.List;
 
@@ -13,5 +13,5 @@ import com.sentinel.runner.extract.Extractor;
  * @param assertions 지정 시 전체 교체. 빈 목록이면 기본 판정으로 복귀
  * @param extractors 지정 시 전체 교체. 빈 목록이면 추출 없음
  */
-record UpdateCaseRequest(String name, Request request, List<Assertion> assertions, List<Extractor> extractors) {
+public record UpdateCaseRequest(String name, Request request, List<Assertion> assertions, List<Extractor> extractors) {
 }

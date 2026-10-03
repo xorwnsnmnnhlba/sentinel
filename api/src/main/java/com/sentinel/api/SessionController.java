@@ -1,9 +1,10 @@
 package com.sentinel.api;
 
+import com.sentinel.api.request.CreateSessionRequest;
+import com.sentinel.api.response.SessionResponse;
 import com.sentinel.application.auth.AuthService;
 import com.sentinel.application.auth.AuthenticatedUser;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -32,9 +33,9 @@ class SessionController {
 	 */
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	LoginResponse create(@Valid @RequestBody LoginRequest request) {
+	SessionResponse create(@Valid @RequestBody CreateSessionRequest request) {
 		AuthService.Login login = authService.login(request.email(), request.password());
-		return new LoginResponse(login.token(), login.user());
+		return new SessionResponse(login.token(), login.user());
 	}
 
 	/** 현재 세션 사용자 */
@@ -51,14 +52,4 @@ class SessionController {
 			authService.logout(authorization.substring(7).trim());
 		}
 	}
-
-	record LoginRequest(@NotBlank String email, @NotBlank String password) {
-	}
-
-	/**
-	 * @param token 세션 토큰. 저장하지 않으므로 이 응답에서만 확인 가능
-	 */
-	record LoginResponse(String token, AuthenticatedUser user) {
-	}
-
 }

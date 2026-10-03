@@ -3,6 +3,8 @@ package com.sentinel.api;
 import java.net.URI;
 import java.util.List;
 
+import com.sentinel.api.request.CreateScheduleRequest;
+import com.sentinel.api.request.UpdateScheduleRequest;
 import com.sentinel.application.ScheduleDetail;
 import com.sentinel.application.ScheduleService;
 import jakarta.validation.Valid;

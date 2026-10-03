@@ -1,4 +1,4 @@
-package com.sentinel.api;
+package com.sentinel.api.request;
 
 import java.util.List;
 
@@ -14,6 +14,6 @@ import jakarta.validation.constraints.NotNull;
  * @param extractors 응답 값 추출 규칙. 생략 시 없음
  * @param afterCaseId 바로 앞에 둘 케이스 (같은 스위트). 생략 시 스위트의 마지막 순서
  */
-record CreateCaseRequest(@NotNull Long suiteId, @NotBlank String name, @NotNull Request request,
+public record CreateCaseRequest(@NotNull Long suiteId, @NotBlank String name, @NotNull Request request,
 		List<Assertion> assertions, List<Extractor> extractors, Long afterCaseId) {
 }

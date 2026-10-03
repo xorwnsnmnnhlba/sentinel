@@ -1,10 +1,9 @@
 package com.sentinel.api;
 
-import java.time.Instant;
-
+import com.sentinel.api.request.ResetPasswordRequest;
+import com.sentinel.api.response.PasswordResetResponse;
 import com.sentinel.application.auth.UserService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,22 +26,15 @@ class PasswordResetController {
 
 	/** 링크 확인. 만료·사용·위조는 모두 404 */
 	@GetMapping("/{token}")
-	ResetInfo get(@PathVariable String token) {
+	PasswordResetResponse get(@PathVariable String token) {
 		UserService.ResetInfo reset = userService.passwordReset(token);
-		return new ResetInfo(reset.email(), reset.expiresAt());
+		return new PasswordResetResponse(reset.email(), reset.expiresAt());
 	}
 
 	/** 새 비밀번호 설정. 기존 세션은 모두 종료되므로 다시 로그인 필요 */
 	@PostMapping("/{token}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	void reset(@PathVariable String token, @Valid @RequestBody ResetRequest request) {
+	void reset(@PathVariable String token, @Valid @RequestBody ResetPasswordRequest request) {
 		userService.resetPassword(token, request.password());
 	}
-
-	record ResetRequest(@NotBlank String password) {
-	}
-
-	record ResetInfo(String email, Instant expiresAt) {
-	}
-
 }

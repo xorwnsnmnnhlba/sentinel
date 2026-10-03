@@ -3,6 +3,8 @@ package com.sentinel.api;
 import java.net.URI;
 import java.util.List;
 
+import com.sentinel.api.request.CreateProjectRequest;
+import com.sentinel.api.request.UpdateProjectRequest;
 import com.sentinel.application.CatalogCommandService;
 import com.sentinel.application.CatalogQueryService;
 import com.sentinel.application.ProjectNotificationService;

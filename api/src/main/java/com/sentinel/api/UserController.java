@@ -1,14 +1,13 @@
 package com.sentinel.api;
 
-import java.time.Instant;
 import java.util.List;
 
+import com.sentinel.api.request.ChangePasswordRequest;
+import com.sentinel.api.request.CreateInviteRequest;
+import com.sentinel.api.response.IssuedLinkResponse;
 import com.sentinel.application.auth.AuthenticatedUser;
 import com.sentinel.application.auth.UserService;
-import com.sentinel.domain.User;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -43,10 +42,10 @@ class UserController {
 	 */
 	@PostMapping("/invites")
 	@ResponseStatus(HttpStatus.CREATED)
-	IssuedLink invite(@Valid @RequestBody InviteRequest request) {
+	IssuedLinkResponse invite(@Valid @RequestBody CreateInviteRequest request) {
 		AuthenticatedUser admin = currentUser.requireAdmin();
 		UserService.IssuedToken issued = userService.invite(request.email(), request.role(), admin.id());
-		return new IssuedLink(issued.token(), issued.expiresAt());
+		return new IssuedLinkResponse(issued.token(), issued.expiresAt());
 	}
 
 	/**
@@ -54,10 +53,10 @@ class UserController {
 	 */
 	@PostMapping("/{userId}/password-resets")
 	@ResponseStatus(HttpStatus.CREATED)
-	IssuedLink createPasswordReset(@PathVariable long userId) {
+	IssuedLinkResponse createPasswordReset(@PathVariable long userId) {
 		AuthenticatedUser admin = currentUser.requireAdmin();
 		UserService.IssuedToken issued = userService.createPasswordReset(userId, admin.id());
-		return new IssuedLink(issued.token(), issued.expiresAt());
+		return new IssuedLinkResponse(issued.token(), issued.expiresAt());
 	}
 
 	/** 삭제(보관). 세션과 남은 링크를 함께 정리 */
@@ -75,17 +74,4 @@ class UserController {
 		AuthenticatedUser user = currentUser.get();
 		userService.changePassword(user.id(), request.currentPassword(), request.newPassword());
 	}
-
-	record InviteRequest(@Email @NotBlank String email, User.Role role) {
-	}
-
-	record ChangePasswordRequest(@NotBlank String currentPassword, @NotBlank String newPassword) {
-	}
-
-	/**
-	 * @param token 링크에 담을 토큰. 저장하지 않으므로 이 응답에서만 확인 가능
-	 */
-	record IssuedLink(String token, Instant expiresAt) {
-	}
-
 }

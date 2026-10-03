@@ -1,4 +1,4 @@
-package com.sentinel.api;
+package com.sentinel.api.request;
 
 import java.time.Instant;
 
@@ -9,6 +9,6 @@ import jakarta.validation.constraints.NotNull;
  * @param endsAt 끝 (미포함). 시작 뒤, 현재 이후, 시작부터 최대 7일
  * @param reason 점검 사유 (선택, 200자 이하)
  */
-record CreateMaintenanceWindowRequest(@NotNull Long environmentId, @NotNull Instant startsAt,
+public record CreateMaintenanceWindowRequest(@NotNull Long environmentId, @NotNull Instant startsAt,
 		@NotNull Instant endsAt, String reason) {
 }

@@ -1,8 +1,8 @@
 package com.sentinel.api;
 
-import java.util.List;
-
-import com.sentinel.application.CatalogQueryService.CaseItem;
+import com.sentinel.api.request.CreateCaseImportPreviewRequest;
+import com.sentinel.api.request.CreateCaseImportRequest;
+import com.sentinel.api.response.CaseImportResponse;
 import com.sentinel.application.importing.CaseImportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +39,4 @@ class CaseImportController {
 	CaseImportResponse create(@Valid @RequestBody CreateCaseImportRequest request) {
 		return new CaseImportResponse(request.suiteId(), imports.importCases(request.suiteId(), request.cases(), currentUser.get().id()));
 	}
-
-	record CaseImportResponse(long suiteId, List<CaseItem> cases) {
-	}
-
 }

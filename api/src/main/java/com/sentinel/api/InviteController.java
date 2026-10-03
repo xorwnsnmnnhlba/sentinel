@@ -1,12 +1,11 @@
 package com.sentinel.api;
 
-import java.time.Instant;
-
+import com.sentinel.api.request.AcceptInviteRequest;
+import com.sentinel.api.response.InviteResponse;
+import com.sentinel.api.response.SessionResponse;
 import com.sentinel.application.auth.AuthService;
-import com.sentinel.application.auth.AuthenticatedUser;
 import com.sentinel.application.auth.UserService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,26 +28,16 @@ class InviteController {
 
 	/** 링크 확인. 만료·사용·위조는 모두 404로 동일하게 응답 */
 	@GetMapping("/{token}")
-	InviteInfo get(@PathVariable String token) {
+	InviteResponse get(@PathVariable String token) {
 		UserService.InviteInfo invite = userService.invite(token);
-		return new InviteInfo(invite.email(), invite.expiresAt());
+		return new InviteResponse(invite.email(), invite.expiresAt());
 	}
 
 	/** 수락. 계정을 만들고 바로 로그인 상태로 전환 */
 	@PostMapping("/{token}")
 	@ResponseStatus(HttpStatus.CREATED)
-	AcceptResponse accept(@PathVariable String token, @Valid @RequestBody AcceptRequest request) {
+	SessionResponse accept(@PathVariable String token, @Valid @RequestBody AcceptInviteRequest request) {
 		AuthService.Login login = userService.acceptInvite(token, request.name(), request.password());
-		return new AcceptResponse(login.token(), login.user());
+		return new SessionResponse(login.token(), login.user());
 	}
-
-	record InviteInfo(String email, Instant expiresAt) {
-	}
-
-	record AcceptRequest(@NotBlank String name, @NotBlank String password) {
-	}
-
-	record AcceptResponse(String token, AuthenticatedUser user) {
-	}
-
 }

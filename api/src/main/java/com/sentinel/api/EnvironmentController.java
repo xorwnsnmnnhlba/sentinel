@@ -3,6 +3,8 @@ package com.sentinel.api;
 import java.net.URI;
 import java.util.List;
 
+import com.sentinel.api.request.CreateEnvironmentRequest;
+import com.sentinel.api.request.UpdateEnvironmentRequest;
 import com.sentinel.application.CatalogCommandService;
 import com.sentinel.application.CatalogQueryService;
 import com.sentinel.application.CatalogQueryService.EnvironmentItem;
