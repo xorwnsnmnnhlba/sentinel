@@ -190,7 +190,7 @@ export function CaseEditor({
           </p>
         </div>
         {draft.assertions.map((assertion, index) => (
-          <div key={index} className="space-y-3 rounded-xl border p-4">
+          <div key={index} className="space-y-3 rounded-lg border bg-card p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">
                 {index + 1}. {ASSERTION_LABELS[assertion.type]}
@@ -452,7 +452,7 @@ function ExtractorRow({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border p-4">
+    <div className="space-y-3 rounded-lg border bg-card p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">
           {index + 1}.{" "}

@@ -18,10 +18,10 @@ describe("setTheme", () => {
     });
   });
 
-  it("stores system for values outside the allowed themes", async () => {
+  it("stores the default (dark) for values outside the allowed themes", async () => {
     // Server Action 인자는 브라우저에서 임의로 보낼 수 있음
     await setTheme("sepia" as Theme);
 
-    expect(testCookies.get("sentinel_theme")).toBe("system");
+    expect(testCookies.get("sentinel_theme")).toBe("dark");
   });
 });

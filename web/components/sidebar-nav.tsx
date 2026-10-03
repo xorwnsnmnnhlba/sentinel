@@ -31,7 +31,7 @@ function isActive(pathname: string, item: { href: string; match: string[] }): bo
   return [item.href, ...item.match].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-/** 사이드바 주요 메뉴. 현재 화면은 aria-current와 라임 표시선으로 구분 */
+/** 사이드바 주요 메뉴. 현재 화면은 aria-current와 흰 표시선으로 구분 */
 export function SidebarNav({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?: () => void }) {
   const current = activeHref(usePathname());
   const items = isAdmin ? [...navigation, ...adminNavigation] : navigation;
@@ -46,7 +46,7 @@ export function SidebarNav({ isAdmin, onNavigate }: { isAdmin: boolean; onNaviga
             href={item.href}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
-            className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-accent-foreground aria-[current=page]:shadow-[inset_2px_0_0_var(--sidebar-primary)]"
+            className="flex items-center gap-2.5 rounded-sm px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-accent-foreground aria-[current=page]:shadow-[inset_2px_0_0_var(--sidebar-primary)]"
           >
             <item.icon aria-hidden className="size-4" />
             {item.label}
@@ -88,9 +88,13 @@ export function MobileNav({ isAdmin, footer }: { isAdmin: boolean; footer: React
 
 export function Brand() {
   return (
-    <Link href="/" className="mb-5 flex items-center gap-2 px-6 text-base font-semibold tracking-tight text-white">
-      <span aria-hidden className="size-2 rounded-full bg-sidebar-primary" />
-      Sentinel
+    <Link href="/" className="mb-5 block px-6 py-1">
+      <Wordmark />
     </Link>
   );
+}
+
+/** 이름 표기. 고정폭 대문자(CSS), 장식 없음. 읽기 도구에는 "Sentinel" */
+export function Wordmark() {
+  return <span className="font-mono text-sm font-semibold tracking-[0.2em] text-white uppercase">Sentinel</span>;
 }

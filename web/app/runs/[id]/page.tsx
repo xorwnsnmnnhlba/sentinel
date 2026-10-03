@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { Empty, SectionHeader } from "@/components/catalog/section";
+import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -127,22 +127,13 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
         </p>
       )}
 
-      <section className="space-y-3">
-        {/* 케이스 이름(h3, 펼침 버튼)의 상위 제목. 없으면 h1 다음이 h3라 제목 순서가 끊김 */}
-        <SectionHeader
-          title="케이스별 결과"
-          count={run.results.length}
-          description={
-            run.rerunOf === null
-              ? "실행 순서대로 표시. 실패·오류 케이스는 펼친 상태"
-              : "원래 실행에서 실패·오류가 난 케이스를 실행 순서대로 다시 실행. '함께 실행'은 그 케이스가 쓰는 추출 값을 만드는 앞 케이스"
-          }
-        />
+      {/* 케이스 이름(h3, 펼침 버튼)의 상위 제목. 없으면 h1 다음이 h3라 제목 순서가 끊김 */}
+      <Panel title="케이스별 결과" count={run.results.length} meta="실행 순서">
         {run.results.length === 0 ? (
-          <Empty message={run.status === "RUNNING" ? "아직 끝난 케이스가 없습니다" : "실행된 케이스가 없습니다"} />
+          <PanelEmpty message={run.status === "RUNNING" ? "아직 끝난 케이스가 없습니다" : "실행된 케이스가 없습니다"} />
         ) : (
           // 진행 중 새로 고침은 펼침 상태를 유지하므로, 실행이 끝나면 다시 그려 실패 케이스를 펼침
-          <Accordion key={run.status} type="multiple" defaultValue={openByDefault} className="rounded-xl border px-4">
+          <Accordion key={run.status} type="multiple" defaultValue={openByDefault} className="px-4">
             {run.results.map((result) => (
               <AccordionItem key={result.id} value={String(result.id)}>
                 <AccordionTrigger className="hover:no-underline">
@@ -171,7 +162,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
             ))}
           </Accordion>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }

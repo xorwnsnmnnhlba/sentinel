@@ -176,7 +176,7 @@ function SchemaTable({ schema }: { schema: ResponseSchema }) {
         값 없이 경로와 타입만 기록합니다. 배열 요소는 []로 합치고, ID·날짜 같은 동적 키는 *로 줄입니다
       </p>
       {!schema.complete && (
-        <p className="text-xs text-amber-700 dark:text-amber-400">
+        <p className="text-xs text-amber-800 dark:text-amber-400">
           구조가 깊거나 경로가 많아 일부만 기록했습니다 (깊이 20, 경로 1,000개까지)
         </p>
       )}
@@ -226,7 +226,7 @@ function Body({ body, truncated }: { body: string | null; truncated?: boolean })
   return (
     <div className="space-y-1">
       {truncated && (
-        <Badge variant="outline" className="text-amber-700 dark:text-amber-400">
+        <Badge variant="outline" className="text-amber-800 dark:text-amber-400">
           64KB 초과로 잘림
         </Badge>
       )}

@@ -22,8 +22,8 @@ export function UnstableCaseTable({
   limit: number;
 }) {
   return (
-    <div className="space-y-2">
-      <div className="rounded-xl border">
+    <div>
+      <div>
         <Table aria-label="불안정 케이스">
           <TableHeader>
             <TableRow>
@@ -56,7 +56,7 @@ export function UnstableCaseTable({
         </Table>
       </div>
       {cases.length > limit && (
-        <p className="text-xs text-muted-foreground">
+        <p className="border-t px-4 py-2 text-xs text-muted-foreground">
           {cases.length}건 중 {limit}건 (실패 구간·재시도가 많은 순)
         </p>
       )}

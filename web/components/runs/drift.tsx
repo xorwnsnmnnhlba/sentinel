@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const levelStyle: Record<DriftLevel, { label: string; className: string }> = {
   BREAKING: { label: "호환 깨짐", className: "bg-destructive/10 text-destructive" },
-  WARNING: { label: "주의", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
+  WARNING: { label: "주의", className: "bg-amber-500/10 text-amber-800 dark:text-amber-400" },
   INFO: { label: "새 필드", className: "bg-muted text-muted-foreground" },
 };
 

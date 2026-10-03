@@ -20,7 +20,6 @@ export default async function ProjectsPage() {
     <div className="space-y-6">
       <PageHeader
         title="프로젝트"
-        description="검증 대상 서비스 단위. 환경과 스위트를 묶음"
         actions={
           <FormDialog
             trigger={
@@ -43,7 +42,7 @@ export default async function ProjectsPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           {projects.map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card className="h-full transition-colors hover:border-brand-violet/40 hover:bg-accent/40">
+              <Card className="h-full transition-colors hover:border-brand/40 hover:bg-accent/40">
                 <CardHeader>
                   <CardTitle>{project.name}</CardTitle>
                   <CardDescription>{project.description ?? "설명 없음"}</CardDescription>

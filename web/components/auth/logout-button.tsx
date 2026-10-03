@@ -14,7 +14,7 @@ export function LogoutButton() {
       type="button"
       disabled={pending}
       onClick={() => startTransition(async () => logout())}
-      className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-60"
+      className="flex w-full items-center gap-2.5 rounded-sm px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-60"
     >
       <LogOut aria-hidden className="size-4" />
       로그아웃

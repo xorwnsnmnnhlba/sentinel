@@ -66,6 +66,11 @@ for (const colorScheme of ["light", "dark"] as const) {
   test.describe(colorScheme === "light" ? "라이트" : "다크", () => {
     test.use({ colorScheme });
 
+    // 기본 테마는 다크이므로 시스템 설정을 따르도록 골라 두고 운영체제 설정으로 테마를 바꿈
+    test.beforeEach(async ({ context, baseURL }) => {
+      await context.addCookies([{ name: "sentinel_theme", value: "system", url: baseURL! }]);
+    });
+
     test("로그인 화면", async ({ page }) => {
       await page.goto("/login");
       expect(await accessibilityViolations(page)).toEqual([]);

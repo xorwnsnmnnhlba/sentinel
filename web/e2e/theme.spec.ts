@@ -1,10 +1,10 @@
 import { expect, sidebar, test, type Page } from "./fixtures";
 
 /**
- * 테마 (DESIGN.md "테마"). 기본은 운영체제 설정을 따르고, 사이드바에서 고르면 쿠키로 유지
+ * 테마 (DESIGN.md "테마"). 기본은 다크, 사이드바에서 고르면 쿠키로 유지. 시스템 설정을 고르면 운영체제 설정을 따름
  */
-const LIGHT = "rgb(255, 255, 255)";
-const DARK = "rgb(17, 12, 28)";
+const LIGHT = "rgb(243, 244, 246)";
+const DARK = "rgb(12, 14, 18)";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/login");
@@ -19,13 +19,19 @@ function background(page: Page) {
   return page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 }
 
-test("처음에는 운영체제 설정을 따름", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "dark" });
+test("처음에는 운영체제 설정과 관계없이 다크", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
   await expect.poll(() => background(page)).toBe(DARK);
+  await expect(sidebar(page).getByRole("button", { name: "다크" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("시스템 설정을 고르면 운영체제 설정을 따름", async ({ page }) => {
+  await sidebar(page).getByRole("button", { name: "시스템 설정" }).click();
 
   await page.emulateMedia({ colorScheme: "light" });
   await expect.poll(() => background(page)).toBe(LIGHT);
-  await expect(sidebar(page).getByRole("button", { name: "시스템 설정" })).toHaveAttribute("aria-pressed", "true");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect.poll(() => background(page)).toBe(DARK);
 });
 
 test("고른 테마는 운영체제 설정보다 우선하고 새로 고쳐도 유지", async ({ page }) => {

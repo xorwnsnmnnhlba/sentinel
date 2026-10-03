@@ -34,7 +34,6 @@ export default async function CasePage(props: PageProps<"/cases/[id]">) {
       <PageHeader
         back={{ href: `/suites/${suite.id}`, label: suite.name }}
         title="케이스 수정"
-        description="저장하면 요청 정의·판정 규칙·값 추출이 통째로 바뀝니다. 이전 실행 이력은 그대로 유지됩니다."
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href={historyHref("CASE", testCase.id)}>

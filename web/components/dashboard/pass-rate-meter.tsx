@@ -15,11 +15,11 @@ export function PassRateMeter({ rate, label }: { rate: number | null; label: str
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.floor(rate * 1000) / 10}
-        className="h-1.5 w-24 overflow-hidden rounded-full bg-(--meter-track)"
+        className="h-1.5 w-24 overflow-hidden bg-(--meter-track)"
       >
-        <div className="h-full rounded-full bg-(--chart-series-1)" style={{ width: `${rate * 100}%` }} />
+        <div className="h-full bg-(--chart-series-1)" style={{ width: `${rate * 100}%` }} />
       </div>
-      <span className="w-14 text-right tabular-nums">{formatPercent(rate)}</span>
+      <span className="w-14 text-right font-mono text-xs tabular-nums">{formatPercent(rate)}</span>
     </div>
   );
 }

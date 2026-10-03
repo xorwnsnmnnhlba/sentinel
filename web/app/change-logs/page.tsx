@@ -18,8 +18,8 @@ export const metadata = { title: "변경 이력 · Sentinel" };
 type Filters = { projectId?: string; suiteId?: string; targetType?: ChangeTargetType; targetId?: string };
 
 const actionStyle: Record<ChangeAction, string> = {
-  CREATED: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  UPDATED: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+  CREATED: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400",
+  UPDATED: "bg-sky-500/10 text-sky-800 dark:text-sky-400",
   DELETED: "bg-destructive/10 text-destructive",
 };
 
@@ -55,13 +55,15 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
     <div className="space-y-6">
       <PageHeader
         title="변경 이력"
-        description={`누가 언제 어떤 설정을 바꿨는지 최신순으로 표시. 값은 남기지 않고 바뀐 항목만 기록. ${
-          hasFilter ? "조건에 맞는 기록" : "전체"
-        } ${logs.totalElements}건`}
+        description={
+          <span className="font-mono text-xs">
+            {hasFilter ? "조건에 맞는 기록" : "전체"} {logs.totalElements}건 · 최신순
+          </span>
+        }
       />
 
       {scoped || suiteScoped ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-4 text-sm">
           {scoped ? (
             <p>
               {TARGET_LABELS[filters.targetType!]}{" "}
@@ -88,7 +90,7 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
           method="get"
           action="/change-logs"
           aria-label="변경 이력 필터"
-          className="flex flex-wrap items-end gap-3 rounded-xl border p-4"
+          className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         >
           <div className="space-y-1.5">
             <Label htmlFor="filter-project">프로젝트</Label>
@@ -129,11 +131,11 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
       )}
 
       {logs.content.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
           {hasFilter ? "조건에 맞는 변경 이력이 없습니다" : "변경 이력이 없습니다"}
         </p>
       ) : (
-        <div className="rounded-xl border">
+        <div className="rounded-lg border bg-card">
           <Table aria-label="변경 이력">
             <TableHeader>
               <TableRow>

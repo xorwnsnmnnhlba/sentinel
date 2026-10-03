@@ -6,7 +6,7 @@ import { formatEnd, formatPeriod } from "@/lib/maintenance";
 export function MaintenanceBadge({ window, now }: { window: MaintenanceWindow; now: Date }) {
   if (window.active) {
     return (
-      <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400">
+      <Badge className="bg-amber-500/10 text-amber-800 dark:text-amber-400">
         점검 중 ~{formatEnd(window.endsAt, now)}
       </Badge>
     );
