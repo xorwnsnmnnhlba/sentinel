@@ -1,6 +1,7 @@
 package com.sentinel.application.notification;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -9,6 +10,7 @@ import com.sentinel.runner.HttpMethod;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class RunReportTest {
 
@@ -27,7 +29,7 @@ class RunReportTest {
 				List.of(newFailure("결제 승인", HttpMethod.POST, "/billing/v1/charge", "status in [2xx]: was 500"),
 						new RunReport.FailedCase("결제 내역", HttpMethod.GET, "/billing/v1/history",
 								"response time <= 2000ms: was 3200ms", 3, false, SINCE)),
-				null, SEOUL);
+				null, SEOUL, null);
 
 		Notification notification = report.toNotification();
 
@@ -42,7 +44,7 @@ class RunReportTest {
 		RunReport report = new RunReport("결제", "dev", 12,
 				List.of(new RunReport.FailedCase("결제 승인", HttpMethod.POST, "/charge", "TIMEOUT",
 						RunResultNotifier.LOOKBACK + 1, true, SINCE)),
-				null, SEOUL);
+				null, SEOUL, null);
 
 		Notification notification = report.toNotification();
 
@@ -57,7 +59,7 @@ class RunReportTest {
 			.mapToObj(i -> newFailure("case " + i, HttpMethod.GET, "/c/" + i, "TIMEOUT"))
 			.toList();
 
-		Notification notification = new RunReport("s", "dev", 30, failures, null, SEOUL).toNotification();
+		Notification notification = new RunReport("s", "dev", 30, failures, null, SEOUL, null).toNotification();
 
 		assertThat(notification.title()).endsWith("30건 중 25건 실패 (새로 실패 25건)");
 		assertThat(notification.lines()).hasSize(RunReport.MAX_LINES + 1).last().isEqualTo("… 외 5건");
@@ -65,13 +67,39 @@ class RunReportTest {
 
 	@Test
 	void reportsNoFailuresWhenAllPassed() {
-		assertThat(new RunReport("s", "dev", 3, List.of(), null, SEOUL).hasFailures()).isFalse();
+		assertThat(new RunReport("s", "dev", 3, List.of(), null, SEOUL, null).hasFailures()).isFalse();
+	}
+
+	@Test
+	void saysHowOftenOngoingFailuresAreRepeatedBeforeTheLink() {
+		RunReport report = new RunReport("결제", "dev", 3, List.of(newFailure("a", HttpMethod.GET, "/a", "TIMEOUT")),
+				"http://sentinel.example.com/runs/12", SEOUL, Duration.ofHours(3));
+
+		assertThat(report.toNotification().lines()).endsWith("계속 실패하면 3시간마다 다시 알림 (새로 실패·복구는 바로)",
+				"결과: http://sentinel.example.com/runs/12");
+	}
+
+	@Test
+	void formatsRepeatIntervals() {
+		assertThat(NotificationFormat.interval(Duration.ofHours(1))).isEqualTo("1시간");
+		assertThat(NotificationFormat.interval(Duration.ofHours(24))).isEqualTo("24시간");
+		assertThat(NotificationFormat.interval(Duration.ofMinutes(30))).isEqualTo("30분");
+		assertThat(NotificationFormat.interval(Duration.ofSeconds(30))).isEqualTo("30초");
+		assertThat(NotificationFormat.interval(Duration.ofMinutes(90))).isEqualTo("1시간 30분");
+	}
+
+	@Test
+	void rejectsNegativeRepeatInterval() {
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> new NotificationProperties(null, null, Duration.ofSeconds(3), Duration.ofSeconds(5),
+					Duration.ofMinutes(-1)))
+			.withMessageContaining("repeat-interval");
 	}
 
 	@Test
 	void addsTheRunLinkWhenTheWebAddressIsConfigured() {
 		RunReport report = new RunReport("결제", "dev", 3, List.of(newFailure("a", HttpMethod.GET, "/a", "TIMEOUT")),
-				"http://sentinel.example.com/runs/12", SEOUL);
+				"http://sentinel.example.com/runs/12", SEOUL, null);
 
 		assertThat(report.toNotification().lines()).last().isEqualTo("결과: http://sentinel.example.com/runs/12");
 	}

@@ -100,6 +100,9 @@ public class TestRun extends BaseEntity {
 	/** 보관기간이 지나 결과의 요청·응답 원문을 비운 시각. null이면 원문 보관 중 */
 	private Instant rawPurgedAt;
 
+	/** 실패 알림 발송 시각 (V26). 계속 실패 중 재알림 간격 판단용. null이면 발송하지 않음 */
+	private Instant failureNotifiedAt;
+
 	private TestRun(TestSuite suite, Environment environment, Trigger trigger, Instant startedAt, Long triggeredBy,
 			Long testCaseId, Long throughCaseId, Long rerunOfRunId) {
 		this.suite = Objects.requireNonNull(suite, "suite");
@@ -194,6 +197,11 @@ public class TestRun extends BaseEntity {
 			throw new IllegalStateException("run " + getId() + " is still running");
 		}
 		this.rawPurgedAt = Objects.requireNonNull(purgedAt, "purgedAt");
+	}
+
+	/** 실패 알림 발송 기록 */
+	public void markFailureNotified(Instant notifiedAt) {
+		this.failureNotifiedAt = Objects.requireNonNull(notifiedAt, "notifiedAt");
 	}
 
 	public void abort(Instant abortedAt) {

@@ -26,6 +26,12 @@ public interface TestRunQueries {
 			long beforeRunId, int limit);
 
 	/**
+	 * 같은 스위트·환경에서 {@code startedAfter} 이후(미포함) 시작한 이전 실행 중 실패 알림을 보낸 실행이 있는지.
+	 * 시작 시각 하한으로 인덱스(idx_run_suite_time)에서 간격 안의 실행만 읽음
+	 */
+	boolean existsFailureNotifiedSince(long suiteId, long environmentId, Instant startedAfter, long beforeRunId);
+
+	/**
 	 * 직전 스위트 전체 실행 (같은 스위트·환경, 지정 상태). 케이스 단건 실행·여기까지 실행·실패 다시 실행 제외.
 	 * 시작 시각 상한({@code <= startedAt})을 따로 두어 인덱스를 기준 실행의 시작 시각부터 거슬러 읽음 (이력 길이와 무관).
 	 * OR 조건만 두면 상한이 인덱스 조건이 되지 못해 최신 실행부터 훑음 (45일치에서 40일 전 실행 기준 29ms → 0.06ms)

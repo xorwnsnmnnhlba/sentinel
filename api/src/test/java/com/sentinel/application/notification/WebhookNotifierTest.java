@@ -107,11 +107,11 @@ class WebhookNotifierTest {
 	}
 
 	private static NotificationProperties webProperties(String webBaseUrl) {
-		return new NotificationProperties(null, webBaseUrl, Duration.ofSeconds(3), Duration.ofSeconds(5));
+		return new NotificationProperties(null, webBaseUrl, Duration.ofSeconds(3), Duration.ofSeconds(5), Duration.ofHours(1));
 	}
 
 	private static NotificationProperties properties(String webhookUrl) {
-		return new NotificationProperties(webhookUrl, null, Duration.ofSeconds(3), Duration.ofSeconds(5));
+		return new NotificationProperties(webhookUrl, null, Duration.ofSeconds(3), Duration.ofSeconds(5), Duration.ofHours(1));
 	}
 
 	private WebhookNotifier notifier() {

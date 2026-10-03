@@ -770,6 +770,7 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 [Sentinel] dev 결제 - 12건 중 2건 실패 (새로 실패 1건)
 [새로 실패] 결제 승인 · POST /billing/v1/charge → status in [2xx]: was 500
 [3회째 · 09-24 09:10부터] 결제 내역 · GET /billing/v1/history → response time <= 2000ms: was 3200ms
+계속 실패하면 1시간마다 다시 알림 (새로 실패·복구는 바로)
 결과: https://sentinel.example.com/runs/12
 ```
 
@@ -782,7 +783,7 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 
 | 알림 | 발송 시점 |
 |------|-----------|
-| `[Sentinel] {환경} {스위트} - N건 중 M건 실패 (새로 실패 K건)` | 스케줄 실행 결과에 판정 실패(`FAILED`)·오류(`ERROR`) 존재. 모두 이전부터 실패하던 케이스면 `(계속 실패 중)` |
+| `[Sentinel] {환경} {스위트} - N건 중 M건 실패 (새로 실패 K건)` | 스케줄 실행 결과에 판정 실패(`FAILED`)·오류(`ERROR`) 존재. 모두 이전부터 실패하던 케이스면 `(계속 실패 중)`이고 1시간마다만 발송 (아래 "계속 실패 중 재알림") |
 | `[Sentinel] {환경} {스위트} - 복구, N건 모두 통과` | 모두 통과했고 직전 스케줄 실행에 실패가 있었을 때 1회 |
 | `[Sentinel] 스케줄 {id} 실행 오류` | 스케줄 실행 자체가 예외로 중단 |
 | `[Sentinel] DB 연결 실패 - 스케줄 실행 중단` | DB 접속 실패 첫 주기 1회 |
@@ -795,6 +796,23 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 - 복구 알림: 직전 실행에서 실패했다가 통과한 케이스 이름(최대 10개), 실패가 이어진 스케줄 실행 수와 기간
 - 수동 실행을 비교에서 빼는 이유: 수정 확인용으로 실행하는 경우가 많아, 넣으면 다음 스케줄 실행의 복구 알림이 누락될 수 있음
 - 계속 통과하면 발송하지 않음. 시각은 `sentinel.schedule.zone` 기준
+
+### 계속 실패 중 재알림
+
+같은 케이스가 계속 실패하는 동안 스케줄 실행마다 같은 알림이 반복되지 않도록 재알림 간격(`sentinel.notification.repeat-interval`, 기본 1시간)마다만 발송
+
+| 이번 실행 | 발송 |
+|-----------|------|
+| 새로 실패한 케이스가 있음 (계속 실패 중인 케이스와 함께여도) | 바로 |
+| 계속 실패 중인 케이스만, 같은 스위트·환경에서 간격 안에 실패 알림을 보냄 | 생략 |
+| 계속 실패 중인 케이스만, 간격이 지남 | 다시 알림 (`계속 실패 중`, 몇 회째·언제부터) |
+| 모두 통과 (직전 실행에 실패) | 바로 복구 알림 |
+
+- 일부만 복구되면 알리지 않고 다음 재알림에 남은 실패만 표시
+- 간격은 마지막으로 보낸 실패 알림의 실행 시작 시각부터. 실행 시작이 폴링 주기만큼 늦어져도 제때 다시 알리도록 폴링 주기만큼 여유
+- 보낸 실행은 `test_run.failure_notified_at` 기록. 채널 발송 실패도 기록 (다음 재알림까지 생략)
+- `0s`이면 실행마다 발송 (안내 줄 없음). 음수면 기동 실패
+- 생략하면 INFO 로그 1줄 (`Skipped failure notification for run 12: still failing and notified within PT1H`)
 
 ### 주간 요약
 
@@ -831,6 +849,7 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 | `sentinel.notification.web-base-url` | 없음 (`SENTINEL_WEB_URL`) | 결과 화면 주소. 지정 시 실패 알림 마지막 줄에 `결과: {주소}/runs/{id}` 추가 |
 | `sentinel.notification.connect-timeout` | `3s` | 연결 제한 시간 |
 | `sentinel.notification.read-timeout` | `5s` | 응답 대기 제한 시간 |
+| `sentinel.notification.repeat-interval` | `1h` | 계속 실패 중 재알림 간격 (위 "계속 실패 중 재알림"). `0s`이면 실행마다 |
 
 - 본문은 `{"text": "제목\n본문"}` 한 필드. Slack·Teams 수신 Webhook 주소를 그대로 사용 가능
 - Webhook 주소는 자격증명이므로 환경변수로 주입하고 로그·git에 남기지 않음 (`sentinel.env`)

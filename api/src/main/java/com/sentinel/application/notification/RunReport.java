@@ -1,5 +1,6 @@
 package com.sentinel.application.notification;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -13,9 +14,10 @@ import com.sentinel.runner.HttpMethod;
  * @param failures 판정 실패(FAILED)·오류(ERROR) 케이스. 새로 실패한 케이스가 앞
  * @param runUrl 결과 화면 주소. 미설정 시 null
  * @param zone 시각 표기 시간대
+ * @param repeatInterval 계속 실패 중 재알림 간격. 지정하면 안내 줄 추가. null이면 생략 (실행마다 발송)
  */
 record RunReport(String suiteName, String environmentName, int total, List<FailedCase> failures, String runUrl,
-		ZoneId zone) {
+		ZoneId zone, Duration repeatInterval) {
 
 	static final int MAX_LINES = 20;
 
@@ -28,6 +30,7 @@ record RunReport(String suiteName, String environmentName, int total, List<Faile
 	 * [Sentinel] dev 결제 - 12건 중 2건 실패 (새로 실패 1건)
 	 * [새로 실패] 결제 승인 · POST /billing/v1/charge → status in [2xx]: was 500
 	 * [3회째 · 09-24 09:10부터] 결제 내역 · GET /billing/v1/history → response time &lt;= 2000ms: was 3200ms
+	 * 계속 실패하면 1시간마다 다시 알림 (새로 실패·복구는 바로)
 	 * 결과: http://sentinel.example.com/runs/12
 	 * </pre>
 	 * 모두 이전부터 실패하던 케이스면 제목 끝이 "(계속 실패 중)"
@@ -44,6 +47,9 @@ record RunReport(String suiteName, String environmentName, int total, List<Faile
 					failure.method(), failure.path(), failure.reason())));
 		if (failures.size() > MAX_LINES) {
 			lines.add("… 외 " + (failures.size() - MAX_LINES) + "건");
+		}
+		if (repeatInterval != null) {
+			lines.add("계속 실패하면 " + NotificationFormat.interval(repeatInterval) + "마다 다시 알림 (새로 실패·복구는 바로)");
 		}
 		if (runUrl != null) {
 			lines.add("결과: " + runUrl);
