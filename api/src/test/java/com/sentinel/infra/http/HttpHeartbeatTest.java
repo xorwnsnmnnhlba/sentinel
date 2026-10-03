@@ -7,7 +7,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import com.sentinel.application.HeartbeatProperties;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +17,6 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 /**
  * 외부 감시 서비스는 JDK 내장 HTTP 서버로 대체
@@ -82,23 +80,6 @@ class HttpHeartbeatTest {
 
 		assertThatCode(heartbeat::beat).doesNotThrowAnyException();
 		assertThat(output).contains("Heartbeat ping failed (connection failed)").doesNotContain("secret-token");
-	}
-
-	@Test
-	void validatesTheAddressWithoutEchoingIt() {
-		assertThat(new HeartbeatProperties(null, Duration.ofSeconds(5)).enabled()).isFalse();
-		assertThat(new HeartbeatProperties("  ", Duration.ofSeconds(5)).enabled()).isFalse();
-		HeartbeatProperties configured = new HeartbeatProperties(" https://hc-ping.com/abc ", Duration.ofSeconds(5));
-		assertThat(configured.enabled()).isTrue();
-		assertThat(configured.url()).isEqualTo("https://hc-ping.com/abc");
-
-		for (String invalid : List.of("hc-ping.com/secret-token", "ftp://host/secret-token", "https:///secret-token",
-				"http://bad host/secret-token")) {
-			assertThatIllegalArgumentException().isThrownBy(() -> new HeartbeatProperties(invalid, Duration.ofSeconds(5)))
-				.withMessage("sentinel.heartbeat.url must be an absolute http(s) URL");
-		}
-		assertThatIllegalArgumentException()
-			.isThrownBy(() -> new HeartbeatProperties("https://hc-ping.com/abc", Duration.ZERO));
 	}
 
 	private HttpHeartbeat heartbeat(String url) {

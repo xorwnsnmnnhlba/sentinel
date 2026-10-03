@@ -187,7 +187,7 @@ class RunControllerTest {
 	@Test
 	void requiresExactlyOneTarget() {
 		assertThat(createRun("{\"environmentId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST);
-		// package-private record의 @AssertTrue 검증 적용 여부. 미적용 시 스위트 실행으로 넘어가 404
+		// 다른 패키지(api.request) 레코드의 package-private @AssertTrue 메서드도 검증되는지. 미적용 시 스위트 실행으로 넘어가 404
 		assertThat(createRun("{\"suiteId\": 1, \"caseId\": 1, \"environmentId\": 1}")).hasStatus(HttpStatus.BAD_REQUEST)
 			.bodyJson()
 			.extractingPath("$.detail")

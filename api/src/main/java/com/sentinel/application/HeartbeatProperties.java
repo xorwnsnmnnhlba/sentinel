@@ -13,7 +13,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param timeout 연결·응답 제한 시간. 폴링을 오래 붙잡지 않도록 짧게
  */
 @ConfigurationProperties("sentinel.heartbeat")
-public record HeartbeatProperties(String url, @DefaultValue("5s") Duration timeout) {
+record HeartbeatProperties(String url, @DefaultValue("5s") Duration timeout) {
 
 	public HeartbeatProperties {
 		url = url == null || url.isBlank() ? null : url.strip();

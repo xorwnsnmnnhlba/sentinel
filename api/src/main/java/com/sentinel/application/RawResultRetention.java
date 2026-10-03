@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class RawResultRetention {
+class RawResultRetention {
 
 	private static final Logger log = LoggerFactory.getLogger(RawResultRetention.class);
 

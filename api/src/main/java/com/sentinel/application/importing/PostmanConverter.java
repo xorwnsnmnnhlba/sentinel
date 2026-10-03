@@ -44,7 +44,7 @@ import static com.sentinel.application.importing.ImportDocuments.uniqueName;
  * <li>판정은 저장된 예시 응답의 2xx 코드, 없으면 {@code 2xx}. 스크립트(pre-request·test)는 미지원 경고</li>
  * </ul>
  */
-public final class PostmanConverter {
+final class PostmanConverter {
 
 	private static final Pattern SUPPORTED_SCHEMA = Pattern.compile("collection/v2\\.[01]\\.");
 

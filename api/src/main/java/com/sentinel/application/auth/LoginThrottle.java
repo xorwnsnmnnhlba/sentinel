@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * </ul>
  */
 @Component
-public class LoginThrottle {
+class LoginThrottle {
 
 	static final int MAX_FAILURES = 5;
 

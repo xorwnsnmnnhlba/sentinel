@@ -19,7 +19,7 @@ import javax.crypto.spec.SecretKeySpec;
  * GCM은 같은 키·IV 재사용 시 평문이 드러나므로 암호화마다 12바이트 IV를 새로 생성.
  * 접두어 {@code v1}은 형식 변경(키 교체·알고리즘 변경) 시 구분용.
  */
-public class AesGcmSecretCipher implements SecretCipher {
+class AesGcmSecretCipher implements SecretCipher {
 
 	private static final String PREFIX = "v1:";
 

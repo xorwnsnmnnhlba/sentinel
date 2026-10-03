@@ -11,7 +11,7 @@ import org.springframework.scheduling.support.CronExpression;
  * @param cron 발송 시각 (Spring cron, 초 포함 6자리). {@code sentinel.schedule.zone} 기준. 요약 기간은 발송일 전날까지 7일
  */
 @ConfigurationProperties("sentinel.digest")
-public record DigestProperties(
+record DigestProperties(
 		@DefaultValue("true") boolean enabled,
 		@DefaultValue("0 0 9 * * MON") String cron) {
 

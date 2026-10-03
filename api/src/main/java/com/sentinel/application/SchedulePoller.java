@@ -39,7 +39,7 @@ import org.springframework.transaction.TransactionException;
  */
 @Component
 @RequiredArgsConstructor
-public class SchedulePoller {
+class SchedulePoller {
 
 	private static final Logger log = LoggerFactory.getLogger(SchedulePoller.class);
 

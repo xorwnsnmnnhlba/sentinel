@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class StaleRunRecovery {
+class StaleRunRecovery {
 
 	private static final Logger log = LoggerFactory.getLogger(StaleRunRecovery.class);
 

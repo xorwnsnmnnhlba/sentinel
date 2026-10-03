@@ -12,5 +12,5 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param delay 다시 보내기 전 대기
  */
 @ConfigurationProperties("sentinel.runner.retry")
-public record RunnerRetryProperties(@DefaultValue("1") int maxRetries, @DefaultValue("1s") Duration delay) {
+record RunnerRetryProperties(@DefaultValue("1") int maxRetries, @DefaultValue("1s") Duration delay) {
 }

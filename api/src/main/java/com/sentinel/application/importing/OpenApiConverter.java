@@ -39,7 +39,7 @@ import static com.sentinel.application.importing.ImportDocuments.variable;
  * <li>{@code servers}는 기본 URL을 환경에서 관리하므로 케이스에 넣지 않고 참고용으로만 반환</li>
  * </ul>
  */
-public final class OpenApiConverter {
+final class OpenApiConverter {
 
 	/** 참조가 참조를 가리키는 경우의 최대 추적 횟수. 순환 참조 차단 */
 	private static final int MAX_REF_DEPTH = 10;

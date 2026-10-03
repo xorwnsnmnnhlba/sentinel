@@ -10,7 +10,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param minObservations 판정에 필요한 최소 이전 실행 수. 미만이면 기준선 수집 중
  */
 @ConfigurationProperties("sentinel.schema-drift")
-public record SchemaDriftProperties(
+record SchemaDriftProperties(
 		@DefaultValue("20") int window,
 		@DefaultValue("3") int minObservations) {
 

@@ -27,7 +27,7 @@ import org.springframework.transaction.TransactionException;
  */
 @Component
 @RequiredArgsConstructor
-public class WeeklyDigestSender {
+class WeeklyDigestSender {
 
 	private static final Logger log = LoggerFactory.getLogger(WeeklyDigestSender.class);
 
