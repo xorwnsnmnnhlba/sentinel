@@ -13,6 +13,9 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -20,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 /**
  * 수신 서버는 JDK 내장 HTTP 서버로 대체. 요청 1건만 확인하면 되므로 WireMock 컨테이너 없이 실행
  */
+@ExtendWith(OutputCaptureExtension.class)
 class WebhookNotifierTest {
 
 	private HttpServer server;
@@ -71,11 +75,12 @@ class WebhookNotifierTest {
 	}
 
 	@Test
-	void keepsRunningWhenTheChannelIsSlow() {
+	void keepsRunningWhenTheChannelIsSlow(CapturedOutput output) {
 		responseDelayMillis = 500;
 		WebhookNotifier notifier = new WebhookNotifier(url(), Duration.ofSeconds(2), Duration.ofMillis(100));
 
 		assertThatCode(() -> notifier.send(new Notification("알림", List.of()))).doesNotThrowAnyException();
+		assertThat(output).contains("Notification delivery failed: 알림 (timeout)");
 	}
 
 	@Test
@@ -84,6 +89,23 @@ class WebhookNotifierTest {
 				Duration.ofMillis(500), Duration.ofMillis(500));
 
 		assertThatCode(() -> notifier.send(new Notification("알림", List.of()))).doesNotThrowAnyException();
+	}
+
+	@Test
+	void leavesTheAddressOutOfTheLog(CapturedOutput output) {
+		// 주소는 자격증명. 연결 실패 예외 메시지에는 요청 주소가 들어 있으므로 그대로 남기지 않음
+		String secretPath = "/hook/T000-secret-token";
+		new WebhookNotifier("http://127.0.0.1:%d%s".formatted(closedPort(), secretPath), Duration.ofMillis(500),
+				Duration.ofMillis(500))
+			.send(new Notification("알림", List.of()));
+		responseStatus = 404;
+		new WebhookNotifier(url() + "?token=secret-token", Duration.ofSeconds(2), Duration.ofSeconds(2))
+			.send(new Notification("알림", List.of()));
+
+		assertThat(output).contains("Notification delivery failed: 알림 (connection failed)")
+			.contains("Notification delivery failed: 알림 (HTTP 404)")
+			.doesNotContain("secret-token")
+			.doesNotContain("127.0.0.1");
 	}
 
 	@Test
