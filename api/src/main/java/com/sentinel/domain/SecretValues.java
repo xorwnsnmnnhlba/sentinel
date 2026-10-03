@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
  * <p>
  * 시크릿이 경로·헤더·본문 어디에 치환되었는지 알 수 없으므로 값 일치로 찾아 가림.
  */
-public final class SecretValues {
+final class SecretValues {
 
 	/** 마스킹 대상 최소 길이. 1~3자 값은 무관한 문자열까지 가릴 수 있어 제외 */
 	private static final int MIN_LENGTH = 4;

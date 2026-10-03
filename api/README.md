@@ -902,6 +902,11 @@ com.sentinel
  └─ infra/           Repository, 스케줄러, 암호화
 ```
 
+접근 제한
+- 다른 패키지의 운영 코드가 쓰지 않는 타입은 package-private (컴포넌트·설정 Properties·내부 변환기 등). Spring 빈·설정 바인딩·트랜잭션 프록시는 package-private 클래스에도 동작
+- 예외로 public 유지: 실행 진입점(`SentinelApplication`), 리포지토리가 상속하는 조회 조각(`XxxQueries`), public 응답 레코드의 필드 타입(`IdName`), 다른 패키지 테스트가 고정 데이터로 만드는 판정 규칙 하위 타입(JSON 다형성)
+- 테스트는 대상과 같은 패키지에 둠 (package-private 타입을 다른 패키지 테스트를 위해 public으로 열지 않음)
+
 설계 배경 및 유의사항은 [docs/design.md](../docs/design.md) 참고
 
 ## Spring Boot 4 유의사항

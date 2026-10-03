@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class WeeklyDigestService {
+class WeeklyDigestService {
 
 	/** 줄마다 보여 줄 항목 수. 나머지는 "외 N건" */
 	static final int TOP = 3;

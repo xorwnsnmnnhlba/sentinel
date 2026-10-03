@@ -18,7 +18,7 @@ import org.springframework.web.client.RestClientException;
  * 발송 실패는 예외로 전파하지 않고 경고 로그만 남김. 알림 때문에 실행·폴링이 중단되지 않아야 함.
  * Webhook 주소는 자격증명이므로 로그에 남기지 않음.
  */
-public class WebhookNotifier implements Notifier {
+class WebhookNotifier implements Notifier {
 
 	private static final Logger log = LoggerFactory.getLogger(WebhookNotifier.class);
 

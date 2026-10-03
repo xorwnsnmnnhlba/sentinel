@@ -27,7 +27,7 @@ public final class NotificationFormat {
 	}
 
 	/** 간격 표기. 시간 단위로 나누어떨어지면 시간만. 예: 1시간, 24시간, 30분, 1시간 30분 */
-	public static String interval(Duration interval) {
+	static String interval(Duration interval) {
 		return interval.toHours() >= 1 && interval.toMinutesPart() == 0 ? interval.toHours() + "시간" : duration(interval);
 	}
 

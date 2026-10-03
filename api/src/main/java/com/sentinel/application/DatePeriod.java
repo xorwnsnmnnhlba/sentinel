@@ -11,7 +11,7 @@ import java.time.temporal.ChronoUnit;
  *
  * @param zone 날짜 해석 시간대. 경계는 시작일 00:00 ~ 종료일 다음 날 00:00 직전
  */
-public record DatePeriod(LocalDate from, LocalDate to, ZoneId zone) {
+record DatePeriod(LocalDate from, LocalDate to, ZoneId zone) {
 
 	public static final int MAX_DAYS = 90;
 

@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param maxConcurrent 동시에 진행할 수 있는 수동 실행 수. 넘으면 새 실행을 거부 (GW 동시 호출·DB 커넥션 점유 제한)
  */
 @ConfigurationProperties("sentinel.runner.manual")
-public record ManualRunProperties(@DefaultValue("4") int maxConcurrent) {
+record ManualRunProperties(@DefaultValue("4") int maxConcurrent) {
 
 	public ManualRunProperties {
 		if (maxConcurrent < 1) {

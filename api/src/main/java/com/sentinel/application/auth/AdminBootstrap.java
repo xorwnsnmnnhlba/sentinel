@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Component
 @RequiredArgsConstructor
-public class AdminBootstrap {
+class AdminBootstrap {
 
 	private static final Logger log = LoggerFactory.getLogger(AdminBootstrap.class);
 

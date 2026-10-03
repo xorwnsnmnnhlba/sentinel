@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * 환경변수로 주입하고 git·로그에 남기지 않음. 생성 예: {@code openssl rand -base64 32}
  */
 @ConfigurationProperties("sentinel.secret")
-public record SecretProperties(String key) {
+record SecretProperties(String key) {
 
 	boolean hasKey() {
 		return key != null && !key.isBlank();

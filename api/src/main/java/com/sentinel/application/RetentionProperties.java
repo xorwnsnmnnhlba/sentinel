@@ -14,7 +14,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param batchSize 한 트랜잭션에서 정리할 실행 수. 장시간 잠금 방지
  */
 @ConfigurationProperties("sentinel.retention")
-public record RetentionProperties(
+record RetentionProperties(
 		@DefaultValue("true") boolean enabled,
 		@DefaultValue("30d") Duration rawRetention,
 		@DefaultValue("0 30 3 * * *") String cron,
