@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Panel, PanelEmpty, PanelFooter } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,15 +53,8 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="변경 이력"
-        description={
-          <span className="font-mono text-xs">
-            {hasFilter ? "조건에 맞는 기록" : "전체"} {logs.totalElements}건 · 최신순
-          </span>
-        }
-      />
+    <div className="space-y-4">
+      <PageHeader title="변경 이력" />
 
       {scoped || suiteScoped ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-4 text-sm">
@@ -130,12 +124,17 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
         </form>
       )}
 
-      {logs.content.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          {hasFilter ? "조건에 맞는 변경 이력이 없습니다" : "변경 이력이 없습니다"}
-        </p>
-      ) : (
-        <div className="rounded-lg border bg-card">
+      <Panel
+        title="기록"
+        meta={
+          <>
+            {hasFilter ? "조건에 맞는 기록" : "전체"} {logs.totalElements}건 · 최신순 · 값은 남기지 않음
+          </>
+        }
+      >
+        {logs.content.length === 0 ? (
+          <PanelEmpty message={hasFilter ? "조건에 맞는 변경 이력이 없습니다" : "변경 이력이 없습니다"} />
+        ) : (
           <Table aria-label="변경 이력">
             <TableHeader>
               <TableRow>
@@ -180,20 +179,24 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
               })}
             </TableBody>
           </Table>
-        </div>
-      )}
-
-      {logs.totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
-            {logs.page + 1} / {logs.totalPages} 페이지
-          </span>
-          <div className="flex gap-2">
-            <PageLink page={logs.page - 1} filters={filters} disabled={logs.page === 0} label="이전" />
-            <PageLink page={logs.page + 1} filters={filters} disabled={logs.page + 1 >= logs.totalPages} label="다음" />
-          </div>
-        </div>
-      )}
+        )}
+        {logs.totalPages > 1 && (
+          <PanelFooter>
+            <span className="font-mono text-xs text-muted-foreground">
+              {logs.page + 1} / {logs.totalPages} 페이지
+            </span>
+            <div className="flex gap-2">
+              <PageLink page={logs.page - 1} filters={filters} disabled={logs.page === 0} label="이전" />
+              <PageLink
+                page={logs.page + 1}
+                filters={filters}
+                disabled={logs.page + 1 >= logs.totalPages}
+                label="다음"
+              />
+            </div>
+          </PanelFooter>
+        )}
+      </Panel>
     </div>
   );
 }

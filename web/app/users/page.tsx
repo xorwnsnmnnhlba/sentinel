@@ -2,7 +2,7 @@ import { InviteDialog } from "@/components/auth/invite-dialog";
 import { ResetLinkDialog } from "@/components/auth/reset-link-dialog";
 import { ActionMenu, type ActionMenuItem } from "@/components/catalog/action-menu";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
-import { Empty, TableFrame } from "@/components/catalog/section";
+import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,13 +24,13 @@ export default async function UsersPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title="사용자" actions={<InviteDialog baseUrl={baseUrl} />} />
 
-      {users.length === 0 ? (
-        <Empty message="사용자가 없습니다" />
-      ) : (
-        <TableFrame>
+      <Panel title="계정" count={users.length} meta="가입은 초대 링크로만">
+        {users.length === 0 ? (
+          <PanelEmpty message="사용자가 없습니다" />
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -76,8 +76,8 @@ export default async function UsersPage() {
               ))}
             </TableBody>
           </Table>
-        </TableFrame>
-      )}
+        )}
+      </Panel>
     </div>
   );
 }

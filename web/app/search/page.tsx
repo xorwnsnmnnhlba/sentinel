@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { MethodBadge } from "@/components/catalog/method-badge";
+import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title="케이스 검색" />
 
       <form method="get" action="/search" role="search" aria-label="케이스 검색" className="flex gap-2">
@@ -48,18 +49,19 @@ export default async function SearchPage(props: PageProps<"/search">) {
         <Button type="submit">검색</Button>
       </form>
 
-      {cases === null ? null : cases.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          &quot;{query}&quot; 검색 결과가 없습니다. 이름이나 경로의 다른 부분으로 찾아보세요
-        </p>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            {cases.length >= MAX_SEARCH_RESULTS
-              ? `${MAX_SEARCH_RESULTS}건까지 표시. 더 있을 수 있으니 검색어를 구체적으로 입력해 주세요`
-              : `${cases.length}건`}
-          </p>
-          <div className="rounded-lg border bg-card">
+      {cases === null ? null : (
+        <Panel
+          title="검색 결과"
+          count={cases.length}
+          meta={
+            cases.length >= MAX_SEARCH_RESULTS ? `${MAX_SEARCH_RESULTS}건까지 표시 · 검색어를 구체적으로` : undefined
+          }
+        >
+          {cases.length === 0 ? (
+            <PanelEmpty
+              message={<>&quot;{query}&quot; 검색 결과가 없습니다. 이름이나 경로의 다른 부분으로 찾아보세요</>}
+            />
+          ) : (
             <Table aria-label="검색 결과">
               <TableHeader>
                 <TableRow>
@@ -103,8 +105,8 @@ export default async function SearchPage(props: PageProps<"/search">) {
                 })}
               </TableBody>
             </Table>
-          </div>
-        </div>
+          )}
+        </Panel>
       )}
     </div>
   );

@@ -65,7 +65,7 @@ components/
  ├─ notification/           프로젝트 Webhook 입력, 테스트 알림 버튼
  ├─ response-times/         응답시간 일별 추세 차트 (p50·p95 선, 툴팁, 표 보기)
  ├─ run-badges.tsx          판정·상태·주체·재시도 배지
- ├─ app-shell.tsx           화면 틀. 로그인 상태는 사이드바 + 본문, 로그인 전은 짙은 바탕 가운데 카드
+ ├─ app-shell.tsx           화면 틀. 로그인 상태는 사이드바 + 본문, 로그인 전은 흑연 바탕 가운데 패널
  ├─ sidebar-nav.tsx         사이드바 메뉴(현재 화면 강조), 좁은 화면(768px 미만)의 메뉴 서랍
  ├─ theme-toggle.tsx        테마 선택 (시스템 설정·라이트·다크)
  ├─ auto-refresh.tsx        화면 주기 새로 고침 (진행 중인 실행 표시용, 기한 지정 가능)
