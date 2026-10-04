@@ -98,19 +98,28 @@ public class FailureCauseService {
 		OTHER
 	}
 
+	/** label: 알림 문구용 이름 (화면 web/lib/failure-cause.ts와 같은 이름) */
 	public enum Cause {
-		TIMEOUT(Group.NETWORK), CONNECTION_FAILED(Group.NETWORK), CONNECTION_LOST(Group.NETWORK),
-		SERVER_ERROR(Group.API), CLIENT_ERROR(Group.API), ASSERTION_MISMATCH(Group.API), CONFIGURATION(Group.SETUP),
-		OTHER(Group.OTHER);
+		TIMEOUT(Group.NETWORK, "타임아웃"), CONNECTION_FAILED(Group.NETWORK, "연결 실패"),
+		CONNECTION_LOST(Group.NETWORK, "연결 끊김"), SERVER_ERROR(Group.API, "서버 오류 5xx"),
+		CLIENT_ERROR(Group.API, "요청 거부 4xx"), ASSERTION_MISMATCH(Group.API, "응답 내용 불일치"),
+		CONFIGURATION(Group.SETUP, "설정 오류"), OTHER(Group.OTHER, "기타");
 
 		private final Group group;
 
-		Cause(Group group) {
+		private final String label;
+
+		Cause(Group group, String label) {
 			this.group = group;
+			this.label = label;
 		}
 
 		public Group group() {
 			return group;
+		}
+
+		String label() {
+			return label;
 		}
 
 	}

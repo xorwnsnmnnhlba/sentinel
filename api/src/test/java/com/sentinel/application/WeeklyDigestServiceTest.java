@@ -35,6 +35,8 @@ class WeeklyDigestServiceTest {
 
 	private final MonitoringGapService monitoringGaps = mock(MonitoringGapService.class);
 
+	private final FailureCauseService failureCauses = mock(FailureCauseService.class);
+
 	@BeforeEach
 	void setUp() {
 		suites(FROM, TO);
@@ -43,6 +45,7 @@ class WeeklyDigestServiceTest {
 		when(responseTimes.changes(FROM, TO, WeeklyDigestService.TOP)).thenReturn(
 				new ResponseTimeService.Changes(FROM, TO, PREVIOUS_FROM, PREVIOUS_TO, List.of()));
 		when(monitoringGaps.list(FROM, TO)).thenReturn(new MonitoringGapService.MonitoringGaps(FROM, TO, List.of()));
+		when(failureCauses.list(FROM, TO, null)).thenReturn(new FailureCauseService.FailureCauses(FROM, TO, 0, List.of()));
 	}
 
 	@Test
@@ -90,6 +93,35 @@ class WeeklyDigestServiceTest {
 	}
 
 	@Test
+	void namesTheMainFailureCausesWithTheirShare() {
+		suites(FROM, TO, suite(1, "결제", 100, 20, 1000, 950));
+		when(failureCauses.list(FROM, TO, null)).thenReturn(new FailureCauseService.FailureCauses(FROM, TO, 50,
+				List.of(cause(FailureCauseService.Cause.SERVER_ERROR, 37), cause(FailureCauseService.Cause.TIMEOUT, 10),
+						cause(FailureCauseService.Cause.ASSERTION_MISMATCH, 2),
+						cause(FailureCauseService.Cause.CONFIGURATION, 1))));
+		when(unstableCases.list(FROM, TO, null)).thenReturn(
+				new UnstableCaseService.UnstableCases(FROM, TO, List.of(unstable(1, "결제 승인", "dev"))));
+
+		Notification digest = service(null).build(FROM, TO);
+
+		// 통과율 다음, 불안정 케이스 앞. 많은 순 3가지까지 (74%·20%·4%), 나머지는 가짓수
+		assertThat(digest.lines()).containsExactly("실행 100회 · 통과율 95.0% · 실패·오류가 있는 실행 20회",
+				"통과율 낮은 스위트: 결제 95.0%", "실패 원인: 서버 오류 5xx 74%, 타임아웃 20%, 응답 내용 불일치 4% 외 1가지",
+				"불안정 케이스 1건: 결제 승인 (dev)");
+	}
+
+	@Test
+	void listsAllCausesWhenThereAreThreeOrFewer() {
+		suites(FROM, TO, suite(1, "결제", 10, 1, 100, 99));
+		when(failureCauses.list(FROM, TO, null)).thenReturn(new FailureCauseService.FailureCauses(FROM, TO, 4,
+				List.of(cause(FailureCauseService.Cause.TIMEOUT, 2), cause(FailureCauseService.Cause.CONNECTION_FAILED, 1),
+						cause(FailureCauseService.Cause.CLIENT_ERROR, 1))));
+
+		// 정확히 3가지면 "외" 없음
+		assertThat(service(null).build(FROM, TO).lines()).contains("실패 원인: 타임아웃 50%, 연결 실패 25%, 요청 거부 4xx 25%");
+	}
+
+	@Test
 	void asksToCheckTheSchedulerWhenNothingRan() {
 		suites(FROM, TO, suite(1, "결제", 0, 0, 0, 0));
 		when(monitoringGaps.list(FROM, TO)).thenReturn(new MonitoringGapService.MonitoringGaps(FROM, TO,
@@ -112,7 +144,7 @@ class WeeklyDigestServiceTest {
 	}
 
 	private WeeklyDigestService service(String webBaseUrl) {
-		return new WeeklyDigestService(suiteSummaries, unstableCases, responseTimes, monitoringGaps,
+		return new WeeklyDigestService(suiteSummaries, unstableCases, responseTimes, monitoringGaps, failureCauses,
 				new NotificationProperties(null, webBaseUrl, Duration.ofSeconds(3), Duration.ofSeconds(5), Duration.ofHours(1)));
 	}
 
@@ -135,6 +167,10 @@ class WeeklyDigestServiceTest {
 	private static ResponseTimeService.Change change(String name, long previousP95, long currentP95, double change) {
 		return new ResponseTimeService.Change(new IdName(name.length(), name), new IdName(1, "결제"), new IdName(7, "dev"),
 				previousP95, currentP95, change, 10, 10);
+	}
+
+	private static FailureCauseService.CauseSummary cause(FailureCauseService.Cause cause, long results) {
+		return new FailureCauseService.CauseSummary(cause, cause.group(), results, 1, List.of());
 	}
 
 	private static MonitoringGapService.Gap gap(String startedAt, String endedAt) {
