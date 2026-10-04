@@ -5,7 +5,7 @@ package com.sentinel.application;
  */
 public class TooManyRunsException extends RuntimeException {
 
-	public TooManyRunsException(int maxConcurrent) {
+	TooManyRunsException(int maxConcurrent) {
 		super(maxConcurrent + " manual runs are already in progress; try again after one finishes");
 	}
 

@@ -5,7 +5,7 @@ package com.sentinel.application.auth;
  */
 public class InvalidCredentialsException extends RuntimeException {
 
-	public InvalidCredentialsException() {
+	InvalidCredentialsException() {
 		super("email or password is incorrect");
 	}
 

@@ -8,6 +8,7 @@ import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.RequestSpec;
 import com.sentinel.domain.TestCase;
+import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.ChangeLogRepository;
@@ -59,6 +60,8 @@ public class TestFixtures {
 
 	private final SlowdownAlertRepository slowdownAlerts;
 
+	private final TestRunService testRunService;
+
 	/** 수동 실행 주체 등 사용자 필요한 테스트용 계정 */
 	public User user() {
 		return users.save(new User("tester-" + UUID.randomUUID() + "@sentinel.test", "테스터", "$2a$10$"
@@ -76,7 +79,7 @@ public class TestFixtures {
 	/** 한 프로젝트에 환경을 여러 개 만들 때는 이름 지정 (프로젝트 내 이름 유니크) */
 	public Environment environment(Project project, String name, Map<String, String> variables) {
 		Environment environment = new Environment(project, name, "https://gw.dev.internal");
-		variables.forEach(environment::putVariable);
+		environment.replaceVariables(variables);
 		return environments.save(environment);
 	}
 
@@ -106,6 +109,11 @@ public class TestFixtures {
 	}
 
 	/** 사용자는 삭제하지 않음. 기본 로그인 계정(TestAuthConfiguration)이 함께 지워지면 이후 요청이 401 */
+	/** 스위트 전체 실행 (실행 끝까지 대기). 다른 패키지 테스트의 데이터 준비용 */
+	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
+		return testRunService.runSuite(suiteId, environmentId, trigger, triggeredBy);
+	}
+
 	public void deleteAll() {
 		changeLogs.deleteAllInBatch();
 		maintenanceWindows.deleteAllInBatch();

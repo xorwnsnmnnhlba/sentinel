@@ -257,7 +257,7 @@ class RunResultNotifierTest {
 			}
 			return new HttpExchange(request, 200, Map.of(), "", Duration.ofMillis(5));
 		});
-		long runId = testRunService.runSuite(suite.getId(), dev.getId(), TestRun.Trigger.SCHEDULED, null);
+		long runId = fixtures.runSuite(suite.getId(), dev.getId(), TestRun.Trigger.SCHEDULED, null);
 
 		assertThat(runResultNotifier.notifyResult(runId)).isEqualTo(RunResultNotifier.Sent.FAILURE);
 		assertThat(lastLines()).first().asString().endsWith("(1회 다시 보낸 뒤)");
@@ -277,7 +277,7 @@ class RunResultNotifierTest {
 	private long run(Duration after, Environment environment, TestRun.Trigger trigger, Set<String> failingPaths) {
 		clock.set(NINE_TEN.plus(after));
 		executor.respondStatus(request -> failingPaths.contains(request.uri().getPath()) ? 500 : 200);
-		return testRunService.runSuite(suite.getId(), environment.getId(), trigger,
+		return fixtures.runSuite(suite.getId(), environment.getId(), trigger,
 				trigger == TestRun.Trigger.MANUAL ? fixtures.user().getId() : null);
 	}
 

@@ -24,12 +24,12 @@ public class WebhookSender implements AutoCloseable {
 
 	private final RequestExecutor executor;
 
-	public WebhookSender(RequestExecutor executor) {
+	WebhookSender(RequestExecutor executor) {
 		this.executor = executor;
 	}
 
 	/** 발송. 실패는 예외 대신 결과로 반환 (알림 때문에 실행이 멈추지 않도록) */
-	public Delivery deliver(String url, Notification notification) {
+	Delivery deliver(String url, Notification notification) {
 		ResolvedRequest request;
 		try {
 			request = new ResolvedRequest(HttpMethod.POST, URI.create(url),

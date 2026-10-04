@@ -106,7 +106,7 @@ public class AuthService {
 		sessions.deleteByUserId(userId);
 	}
 
-	public String encodePassword(String password) {
+	String encodePassword(String password) {
 		return passwordEncoder.encode(password);
 	}
 

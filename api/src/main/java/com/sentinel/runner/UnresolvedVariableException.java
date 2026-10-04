@@ -9,7 +9,7 @@ public class UnresolvedVariableException extends RuntimeException {
 
 	private final Set<String> names;
 
-	public UnresolvedVariableException(Set<String> names) {
+	UnresolvedVariableException(Set<String> names) {
 		super("Unresolved variables: " + String.join(", ", names));
 		this.names = Set.copyOf(names);
 	}

@@ -8,6 +8,7 @@ import com.sentinel.infra.persistence.UserRepository;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
@@ -19,12 +20,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @TestConfiguration(proxyBeanMethods = false)
 public class TestAuthConfiguration {
 
+	/** 저장용 비밀번호 해시. AuthService와 같은 BCrypt (테스트 계정을 직접 저장할 때) */
+	public static String passwordHash(String password) {
+		return new BCryptPasswordEncoder().encode(password);
+	}
+
 	/** 컨텍스트마다 다른 계정을 만들어 이메일 유니크 제약과 충돌하지 않도록 함 */
 	@Bean
 	MockMvcBuilderCustomizer defaultSessionToken(UserRepository users, AuthService authService) {
 		String email = "tester-" + UUID.randomUUID() + "@sentinel.test";
 		String password = UUID.randomUUID().toString();
-		users.save(new User(email, "테스터", authService.encodePassword(password), User.Role.ADMIN));
+		users.save(new User(email, "테스터", passwordHash(password), User.Role.ADMIN));
 		String token = authService.login(email, password).token();
 		return builder -> builder.defaultRequest(get("/").header("Authorization", "Bearer " + token));
 	}

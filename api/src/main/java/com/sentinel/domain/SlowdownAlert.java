@@ -63,7 +63,7 @@ public class SlowdownAlert extends BaseEntity {
 		this.detectedAt = Objects.requireNonNull(detectedAt, "detectedAt");
 	}
 
-	public boolean isOpen() {
+	boolean isOpen() {
 		return resolvedAt == null;
 	}
 

@@ -20,7 +20,7 @@ public class Transactions {
 
 	private final TransactionTemplate readOnly;
 
-	public Transactions(PlatformTransactionManager transactionManager) {
+	Transactions(PlatformTransactionManager transactionManager) {
 		this.write = new TransactionTemplate(transactionManager);
 		this.readOnly = new TransactionTemplate(transactionManager);
 		this.readOnly.setReadOnly(true);

@@ -8,7 +8,6 @@ import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.TestFixtures;
-import com.sentinel.application.TestRunService;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestCase;
@@ -43,9 +42,6 @@ class ResponseTimeControllerTest {
 	private TestFixtures fixtures;
 
 	@Autowired
-	private TestRunService testRunService;
-
-	@Autowired
 	private FakeRequestExecutor executor;
 
 	private TestSuite suite;
@@ -70,7 +66,7 @@ class ResponseTimeControllerTest {
 
 	@Test
 	void returnsDailyPointsForACase() {
-		testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
+		fixtures.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
 
 		var body = assertThat(mvc.get()
 			.uri("/api/response-time-trends?caseId={c}&environmentId={e}", testCase.getId(), environment.getId()))
