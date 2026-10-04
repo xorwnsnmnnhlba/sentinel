@@ -470,6 +470,7 @@ deploy-check:
 | 불안정 케이스 | `GET /api/unstable-cases?from=&to=&suiteId=` | | | |
 | 모니터링 공백 | `GET /api/monitoring-gaps?from=&to=` | | | |
 | 지금 느린 케이스 | `GET /api/slowdowns?suiteId=` | | | |
+| 실패 원인 | `GET /api/failure-causes?from=&to=&suiteId=` | | | |
 | 변경 이력 | `GET /api/change-logs?targetType=&targetId=&projectId=&suiteId=&page=0&size=20` | | | |
 
 - 케이스 검색 `q`: 이름·경로 부분 일치 (대소문자 무시, 앞뒤 공백 제거, `%`·`_`는 문자 그대로). 스위트별 실행 순서, 최대 100건. `suiteId`와 함께 쓰면 그 스위트 안에서만. 빈 검색어·200자 초과는 400
@@ -553,6 +554,27 @@ deploy-check:
 - 실패 구간·재시도가 많은 순. 환경마다 따로 판단 (dev와 staging에서 번갈아 실패해도 각각 1)
 - 스케줄 실행(완료)만. 수동 실행은 수정 확인용이 많아 제외. 삭제된 케이스·환경은 제외
 - 결과 테이블 전체를 읽지 않음: 실행 행의 판정 수(V10)·재시도 수(`test_run.retried_count`, V22)로 실패·재시도가 있던 실행만 골라 그 결과만 읽음 (1년치 최악 분포 30일 362ms, 결과 전체를 읽으면 1.2초)
+
+### 실패 원인
+
+`GET /api/failure-causes?from=&to=&suiteId=`: 기간 안 스케줄 실행의 실패·오류 결과를 원인별로. 알림이 왔을 때 GW·네트워크 문제인지, API 문제인지, 케이스·환경 설정 문제인지 먼저 가름. 기간 생략 시 최근 7일, 최대 90일. `suiteId`는 그 스위트만
+
+| 묶음 | 원인 (`cause`) | 기준 |
+|------|------|------|
+| `NETWORK` 응답 없음 | `TIMEOUT` 타임아웃 | 응답 대기 시간 초과 |
+| | `CONNECTION_FAILED` 연결 실패 | 연결 거부·이름 해석 실패 등 |
+| | `CONNECTION_LOST` 연결 끊김 | 주고받는 중 끊김 (`IO_ERROR`) |
+| `API` 응답은 받음 | `SERVER_ERROR` 서버 오류 | 상태 코드 5xx |
+| | `CLIENT_ERROR` 요청 거부 | 상태 코드 4xx (인증·요청 형식·API 변경) |
+| | `ASSERTION_MISMATCH` 응답 내용 불일치 | 그 외 상태 코드에서 판정 규칙 실패 (본문·JsonPath·헤더·응답 시간) |
+| `SETUP` 요청 못 만듦 | `CONFIGURATION` 설정 오류 | 없는 변수, 잘못된 요청, 막힌 목적지 |
+| `OTHER` | `OTHER` 기타 | Sentinel 내부 오류. 있을 때만 |
+
+- 항목: 원인, 묶음, 결과 수 `results`, 케이스·환경 수 `caseCount`, 결과가 많은 케이스·환경 3건 `cases`(`testCase`·`suite`·`environment`, `results`)
+- 결과가 많은 원인 순, 결과가 없는 원인은 생략. 전체 실패·오류 결과 수는 `results`
+- 스케줄 실행(완료)만. 수동 실행은 수정 확인용이 많아 원인 비율이 왜곡됨 (불안정 케이스와 같은 기준). 삭제된 케이스·환경 제외
+- 응답 시간 판정만 실패한 경우도 응답 내용 불일치 (판정 결과 JSON을 읽지 않고 기존 기록인 오류 사유·상태 코드만으로 집계)
+- 실패가 있던 실행만 골라 그 실행의 결과만 읽음 (불안정 케이스와 같은 방식). 45일치(결과 129만 건, 실행의 약 34%에 실패) 7일 29ms, 30일 200ms
 
 ### 케이스 가져오기 (OpenAPI 3, Postman)
 

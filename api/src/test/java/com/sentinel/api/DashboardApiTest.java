@@ -149,6 +149,27 @@ class DashboardApiTest {
 	}
 
 	@Test
+	void groupsFailuresOfThePeriodByCause() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		fixtures.testCase(suite, HttpMethod.GET, "/fail", null, null, List.of(new StatusCodeAssertion(List.of("201"))));
+		fixtures.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
+
+		var body = assertThat(mvc.get().uri("/api/failure-causes")).hasStatusOk().bodyJson();
+
+		body.extractingPath("$.results").isEqualTo(1);
+		body.extractingPath("$.causes[0].cause").isEqualTo("ASSERTION_MISMATCH");
+		body.extractingPath("$.causes[0].group").isEqualTo("API");
+		body.extractingPath("$.causes[0].results").isEqualTo(1);
+		body.extractingPath("$.causes[0].caseCount").isEqualTo(1);
+		body.extractingPath("$.causes[0].cases[0].suite.id").isEqualTo(suite.getId().intValue());
+		body.extractingPath("$.causes[0].cases[0].environment.id").isEqualTo(environment.getId().intValue());
+		assertThat(mvc.get().uri("/api/failure-causes?from=2026-09-07&to=2026-09-01"))
+			.hasStatus(HttpStatus.BAD_REQUEST);
+	}
+
+	@Test
 	void returnsSuiteSummariesWithPassRateAndLastRun() {
 		Project project = fixtures.project();
 		Environment environment = fixtures.environment(project, Map.of());
