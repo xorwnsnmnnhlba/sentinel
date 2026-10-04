@@ -14,7 +14,6 @@ import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.TestFixtures;
-import com.sentinel.application.TestRunService;
 import com.sentinel.application.notification.RecordingNotifier;
 import com.sentinel.application.notification.RunResultNotifier;
 import com.sentinel.domain.Environment;
@@ -64,9 +63,6 @@ class ProjectWebhookApiTest {
 
 	@Autowired
 	private ProjectRepository projects;
-
-	@Autowired
-	private TestRunService testRunService;
 
 	@Autowired
 	private RunResultNotifier runResultNotifier;
@@ -194,7 +190,7 @@ class ProjectWebhookApiTest {
 		executor.respondStatus(request -> 500);
 		patch("{\"webhookUrl\": \"%s\"}".formatted(url()));
 
-		long runId = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
+		long runId = fixtures.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
 
 		assertThat(runResultNotifier.notifyResult(runId)).isEqualTo(RunResultNotifier.Sent.FAILURE);
 		assertThat(received).singleElement().asString().contains(suite.getName()).contains("GET /broken");
@@ -208,7 +204,7 @@ class ProjectWebhookApiTest {
 		fixtures.testCase(suite, HttpMethod.GET, "/broken", null, null);
 		executor.respondStatus(request -> 500);
 
-		long runId = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
+		long runId = fixtures.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
 		runResultNotifier.notifyResult(runId);
 
 		assertThat(defaultChannel.sent()).hasSize(1);
@@ -228,7 +224,7 @@ class ProjectWebhookApiTest {
 		stored.changeWebhook("not-a-cipher-text");
 		projects.save(stored);
 
-		long runId = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
+		long runId = fixtures.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
 		runResultNotifier.notifyResult(runId);
 
 		assertThat(defaultChannel.sent()).hasSize(1);

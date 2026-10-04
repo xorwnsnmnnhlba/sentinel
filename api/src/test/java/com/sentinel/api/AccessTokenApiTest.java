@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.jayway.jsonpath.JsonPath;
+import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.InlineBackgroundRunsConfiguration;
@@ -77,7 +78,7 @@ class AccessTokenApiTest {
 	void logIn() {
 		clock.set(NOW);
 		user = users.save(new User("ci-" + UUID.randomUUID() + "@sentinel.test", "배포 담당",
-				authService.encodePassword(PASSWORD), User.Role.MEMBER));
+				TestAuthConfiguration.passwordHash(PASSWORD), User.Role.MEMBER));
 		session = authService.login(user.getEmail(), PASSWORD).token();
 	}
 
@@ -193,7 +194,7 @@ class AccessTokenApiTest {
 		issue(session, "mine", 30);
 		long mine = idOf("mine");
 		User other = users.save(new User("other-" + UUID.randomUUID() + "@sentinel.test", "다른 사람",
-				authService.encodePassword(PASSWORD), User.Role.ADMIN));
+				TestAuthConfiguration.passwordHash(PASSWORD), User.Role.ADMIN));
 		String otherSession = authService.login(other.getEmail(), PASSWORD).token();
 		// 관리자라도 다른 사용자의 토큰은 보이지 않고 폐기할 수 없음
 		assertThat(get(otherSession, "/api/access-tokens")).bodyJson().extractingPath("$.length()").isEqualTo(0);

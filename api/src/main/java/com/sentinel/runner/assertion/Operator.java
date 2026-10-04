@@ -10,7 +10,7 @@ public enum Operator {
 
 	private final String symbol;
 
-	public String symbol() {
+	String symbol() {
 		return symbol;
 	}
 

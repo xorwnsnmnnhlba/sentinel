@@ -6,11 +6,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.jayway.jsonpath.JsonPath;
+import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.InlineBackgroundRunsConfiguration;
 import com.sentinel.application.MutableClock;
-import com.sentinel.application.auth.AuthService;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.infra.persistence.UserSessionRepository;
@@ -52,9 +52,6 @@ class AuthTest {
 	private UserSessionRepository sessions;
 
 	@Autowired
-	private AuthService authService;
-
-	@Autowired
 	private MutableClock clock;
 
 	private String email;
@@ -63,7 +60,7 @@ class AuthTest {
 	void createUser() {
 		clock.set(Instant.parse("2026-09-20T00:00:00Z"));
 		email = "member-" + UUID.randomUUID() + "@sentinel.test";
-		users.save(new User(email, "구성원", authService.encodePassword(PASSWORD), User.Role.MEMBER));
+		users.save(new User(email, "구성원", TestAuthConfiguration.passwordHash(PASSWORD), User.Role.MEMBER));
 	}
 
 	@AfterEach

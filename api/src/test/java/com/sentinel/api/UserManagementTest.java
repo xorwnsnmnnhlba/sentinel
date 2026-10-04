@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.jayway.jsonpath.JsonPath;
+import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.MutableClock;
@@ -68,7 +69,7 @@ class UserManagementTest {
 	void createAdmin() {
 		clock.set(Instant.parse("2026-09-20T00:00:00Z"));
 		String email = "admin-" + UUID.randomUUID() + "@sentinel.test";
-		User admin = users.save(new User(email, "관리자", authService.encodePassword(ADMIN_PASSWORD), User.Role.ADMIN));
+		User admin = users.save(new User(email, "관리자", TestAuthConfiguration.passwordHash(ADMIN_PASSWORD), User.Role.ADMIN));
 		adminId = admin.getId();
 		adminToken = authService.login(email, ADMIN_PASSWORD).token();
 	}
@@ -144,7 +145,7 @@ class UserManagementTest {
 	@Test
 	void resetsAPasswordThroughAnAdminIssuedLink() {
 		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
-		User member = users.save(new User(email, "구성원", authService.encodePassword("old-password-1"), User.Role.MEMBER));
+		User member = users.save(new User(email, "구성원", TestAuthConfiguration.passwordHash("old-password-1"), User.Role.MEMBER));
 		String memberToken = authService.login(email, "old-password-1").token();
 
 		String token = read(post("/api/users/%d/password-resets".formatted(member.getId()), adminToken, ""), "$.token");
@@ -186,7 +187,7 @@ class UserManagementTest {
 	@Test
 	void limitsUserManagementToAdministrators() {
 		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
-		users.save(new User(email, "구성원", authService.encodePassword("member-password"), User.Role.MEMBER));
+		users.save(new User(email, "구성원", TestAuthConfiguration.passwordHash("member-password"), User.Role.MEMBER));
 		String memberToken = authService.login(email, "member-password").token();
 
 		assertThat(get("/api/users", memberToken)).hasStatus(HttpStatus.FORBIDDEN);
@@ -198,7 +199,7 @@ class UserManagementTest {
 	@Test
 	void deletesUsersButKeepsAtLeastOneAdministrator() {
 		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
-		User member = users.save(new User(email, "구성원", authService.encodePassword("member-password"), User.Role.MEMBER));
+		User member = users.save(new User(email, "구성원", TestAuthConfiguration.passwordHash("member-password"), User.Role.MEMBER));
 		String memberToken = authService.login(email, "member-password").token();
 
 		assertThat(mvc.delete().uri("/api/users/{id}", adminId).header("Authorization", "Bearer " + adminToken))

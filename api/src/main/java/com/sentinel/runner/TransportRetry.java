@@ -44,7 +44,7 @@ public final class TransportRetry {
 		this.sleeper = Objects.requireNonNull(sleeper, "sleeper");
 	}
 
-	public static boolean retryable(RequestExecutionException.Reason reason, HttpMethod method) {
+	static boolean retryable(RequestExecutionException.Reason reason, HttpMethod method) {
 		return switch (reason) {
 			case CONNECTION_FAILED -> true;
 			case TIMEOUT, IO_ERROR -> SAFE_METHODS.contains(method);

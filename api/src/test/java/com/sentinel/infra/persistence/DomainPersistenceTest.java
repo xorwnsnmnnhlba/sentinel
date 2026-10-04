@@ -3,6 +3,7 @@ package com.sentinel.infra.persistence;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -108,8 +109,10 @@ class DomainPersistenceTest {
 	void storesEnvironmentVariablesAsJson() {
 		Project project = projects.save(new Project("billing", "결제 모듈"));
 		Environment environment = new Environment(project, "dev", "https://gw.dev.internal");
-		environment.putVariable("userId", "42");
-		environment.putVariable("locale", "ko-KR");
+		Map<String, String> variables = new LinkedHashMap<>();
+		variables.put("userId", "42");
+		variables.put("locale", "ko-KR");
+		environment.replaceVariables(variables);
 		environments.save(environment);
 		flushAndClear();
 

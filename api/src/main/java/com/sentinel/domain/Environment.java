@@ -71,7 +71,7 @@ public class Environment extends ArchivableEntity {
 		this.baseUrl = normalizeBaseUrl(baseUrl);
 	}
 
-	public void putVariable(String key, String value) {
+	void putVariable(String key, String value) {
 		String validKey = Preconditions.requireText(key, "variable key", 100);
 		if (secrets().containsKey(validKey)) {
 			throw new IllegalArgumentException("'" + validKey + "' is already used as a secret");
@@ -98,10 +98,6 @@ public class Environment extends ArchivableEntity {
 			this.variables.putAll(previous);
 			throw ex;
 		}
-	}
-
-	public void removeVariable(String key) {
-		variables.remove(key);
 	}
 
 	/**

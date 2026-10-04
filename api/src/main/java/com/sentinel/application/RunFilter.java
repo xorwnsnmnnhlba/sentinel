@@ -18,7 +18,7 @@ import com.sentinel.domain.TestRun;
 public record RunFilter(Long projectId, Long suiteId, Long environmentId, TestRun.Status status, LocalDate from,
 		LocalDate to, boolean failing) {
 
-	public static RunFilter none() {
+	static RunFilter none() {
 		return new RunFilter(null, null, null, null, null, null, false);
 	}
 

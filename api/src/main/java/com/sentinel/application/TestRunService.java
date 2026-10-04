@@ -154,7 +154,7 @@ public class TestRunService {
 	 * @throws InvalidRequestException 케이스와 환경의 프로젝트 불일치
 	 * @param triggeredBy 실행을 시작한 사용자
 	 */
-	public long runTestCase(long testCaseId, long environmentId, long triggeredBy) {
+	long runTestCase(long testCaseId, long environmentId, long triggeredBy) {
 		return executeAndRecord(prepareTestCase(testCaseId, environmentId, triggeredBy));
 	}
 
@@ -175,7 +175,7 @@ public class TestRunService {
 	 * @throws InvalidRequestException 케이스와 환경의 프로젝트 불일치
 	 * @param triggeredBy 실행을 시작한 사용자
 	 */
-	public long runThroughCase(long testCaseId, long environmentId, long triggeredBy) {
+	long runThroughCase(long testCaseId, long environmentId, long triggeredBy) {
 		return executeAndRecord(prepareThroughCase(testCaseId, environmentId, triggeredBy));
 	}
 
@@ -198,7 +198,7 @@ public class TestRunService {
 	 * 실패 다시 실행 (호출 스레드에서 끝까지 실행). 동작과 예외는 {@link #startRerun}과 같음
 	 * @return 생성된 실행 ID
 	 */
-	public long runRerun(long runId, long triggeredBy) {
+	long runRerun(long runId, long triggeredBy) {
 		return executeAndRecord(prepareRerun(runId, triggeredBy));
 	}
 
@@ -252,7 +252,7 @@ public class TestRunService {
 	 * @throws InvalidRequestException 스위트와 환경의 프로젝트 불일치
 	 * @param triggeredBy 수동 실행을 시작한 사용자. 스케줄 실행은 null
 	 */
-	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
+	long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
 		return executeAndRecord(prepareSuite(suiteId, environmentId, trigger, triggeredBy));
 	}
 

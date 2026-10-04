@@ -9,7 +9,6 @@ import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.InlineBackgroundRunsConfiguration;
 import com.sentinel.application.TestFixtures;
-import com.sentinel.application.TestRunService;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestRun;
@@ -42,9 +41,6 @@ class EnvironmentSecretsTest {
 
 	@Autowired
 	private MockMvcTester mvc;
-
-	@Autowired
-	private TestRunService testRunService;
 
 	@Autowired
 	private FakeRequestExecutor executor;
@@ -130,7 +126,7 @@ class EnvironmentSecretsTest {
 				"{\"token\": \"{{token}}\"}");
 		executor.respond(200, Map.of("X-Echo", List.of(TOKEN)), "echo " + TOKEN);
 
-		long runId = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
+		long runId = fixtures.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.MANUAL, tester());
 
 		// 실제 전송에는 원래 값 사용
 		assertThat(executor.requests()).singleElement().satisfies(request -> {

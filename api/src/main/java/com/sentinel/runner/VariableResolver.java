@@ -20,7 +20,7 @@ public final class VariableResolver {
 
 	private final Map<String, String> variables;
 
-	public VariableResolver(Map<String, String> variables) {
+	VariableResolver(Map<String, String> variables) {
 		this.variables = Map.copyOf(variables);
 	}
 

@@ -2,6 +2,7 @@ package com.sentinel.application;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -138,7 +139,9 @@ class RunRerunTest {
 		caseOf("/ok", Map.of(), List.of());
 		caseOf("/{{missing}}", Map.of(), List.of());
 		long original = runSuite();
-		environment.putVariable("missing", "now-set");
+		Map<String, String> variables = new LinkedHashMap<>(environment.getVariables());
+		variables.put("missing", "now-set");
+		environment.replaceVariables(variables);
 		environments.save(environment);
 		clearRequests();
 

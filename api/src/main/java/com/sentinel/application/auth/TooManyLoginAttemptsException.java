@@ -9,7 +9,7 @@ public class TooManyLoginAttemptsException extends RuntimeException {
 
 	private final Duration retryAfter;
 
-	public TooManyLoginAttemptsException(Duration retryAfter) {
+	TooManyLoginAttemptsException(Duration retryAfter) {
 		super("too many failed login attempts; try again later");
 		this.retryAfter = retryAfter;
 	}

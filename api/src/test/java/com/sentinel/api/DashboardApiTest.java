@@ -8,7 +8,6 @@ import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.TestFixtures;
-import com.sentinel.application.TestRunService;
 import com.sentinel.application.Transactions;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.MonitoringGap;
@@ -48,9 +47,6 @@ class DashboardApiTest {
 
 	@Autowired
 	private TestFixtures fixtures;
-
-	@Autowired
-	private TestRunService testRunService;
 
 	@Autowired
 	private MonitoringGapRepository monitoringGaps;
@@ -159,7 +155,7 @@ class DashboardApiTest {
 		TestSuite suite = fixtures.suite(project);
 		fixtures.testCase(suite, HttpMethod.GET, "/ok", null, null);
 		fixtures.testCase(suite, HttpMethod.GET, "/fail", null, null, List.of(new StatusCodeAssertion(List.of("201"))));
-		long run = testRunService.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
+		long run = fixtures.runSuite(suite.getId(), environment.getId(), TestRun.Trigger.SCHEDULED, null);
 
 		var body = assertThat(mvc.get().uri("/api/suite-summaries")).hasStatusOk().bodyJson();
 

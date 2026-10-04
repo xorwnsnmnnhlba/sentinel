@@ -103,7 +103,7 @@ public class MaintenanceWindow extends BaseEntity {
 	}
 
 	/** 삭제되지 않았고 아직 끝나지 않음 (진행 중 또는 예정) */
-	public boolean isOpen(Instant now) {
+	boolean isOpen(Instant now) {
 		return !isArchived() && now.isBefore(endsAt);
 	}
 
