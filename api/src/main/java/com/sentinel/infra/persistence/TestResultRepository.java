@@ -148,6 +148,49 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long>, T
 			@Param("minEpisodes") int minEpisodes, @Param("minRetried") int minRetried);
 
 	/**
+	 * 기간 안 스케줄 실행(완료)의 실패·오류 결과를 원인별로 집계 (실패 원인 분류)
+	 * <p>
+	 * 응답이 없으면 오류 사유로, 응답을 받았으면 상태 코드로 나눔. 판정 결과(JSON)는 읽지 않음.
+	 * 결과 테이블 전체를 읽지 않도록 실행 행의 판정 수(V10)로 실패가 있던 실행만 골라 그 실행의 결과만 {@code LATERAL}로 읽음
+	 * ({@code OFFSET 0 ROWS}는 하위 쿼리가 풀리지 않도록 막는 경계, 불안정 케이스 집계와 같은 방식)
+	 * @return [원인, 케이스 ID, 환경 ID, 결과 수]. 원인은 TIMEOUT·CONNECTION_FAILED·CONNECTION_LOST·SERVER_ERROR·CLIENT_ERROR·
+	 *     ASSERTION_MISMATCH·CONFIGURATION·OTHER
+	 */
+	@Query(nativeQuery = true, value = """
+			SELECT f.cause, f.test_case_id, f.environment_id, COUNT(*)
+			FROM (
+			    SELECT CASE
+			               WHEN r.verdict = 'ERROR' AND r.error_reason = 'TIMEOUT' THEN 'TIMEOUT'
+			               WHEN r.verdict = 'ERROR' AND r.error_reason = 'CONNECTION_FAILED' THEN 'CONNECTION_FAILED'
+			               WHEN r.verdict = 'ERROR' AND r.error_reason = 'IO_ERROR' THEN 'CONNECTION_LOST'
+			               WHEN r.verdict = 'ERROR'
+			                    AND r.error_reason IN ('UNRESOLVED_VARIABLE', 'INVALID_REQUEST', 'BLOCKED_DESTINATION')
+			                   THEN 'CONFIGURATION'
+			               WHEN r.verdict = 'ERROR' THEN 'OTHER'
+			               WHEN r.status_code >= 500 THEN 'SERVER_ERROR'
+			               WHEN r.status_code >= 400 THEN 'CLIENT_ERROR'
+			               ELSE 'ASSERTION_MISMATCH'
+			           END AS cause,
+			           r.test_case_id, t.environment_id
+			    FROM {h-schema}test_run t
+			    CROSS JOIN LATERAL (
+			        SELECT r.test_case_id, r.verdict, r.error_reason, r.status_code
+			        FROM {h-schema}test_result r
+			        WHERE r.run_id = t.id
+			          AND r.verdict IN ('FAILED', 'ERROR')
+			        OFFSET 0 ROWS
+			    ) r
+			    WHERE t.started_at >= :from
+			      AND t.started_at < :to
+			      AND t.trigger_type = 'SCHEDULED'
+			      AND t.status = 'COMPLETED'
+			      AND t.failed_count + t.error_count > 0
+			) f
+			GROUP BY f.cause, f.test_case_id, f.environment_id
+			""")
+	List<Object[]> failureCauses(@Param("from") Instant from, @Param("to") Instant to);
+
+	/**
 	 * 케이스별 이전 구조 지문 최근 {@code window}건 (같은 환경, {@code runId}보다 앞선 실행). 구조 변화 판정의 기준선
 	 * <p>
 	 * 케이스마다 SQL 표준 {@code LATERAL} + {@code FETCH FIRST}로 {@code idx_result_case_time}을 최근 결과부터 읽고
