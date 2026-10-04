@@ -57,7 +57,9 @@ class WeeklyDigestServiceTest {
 		// 이번 주 2580/2616 = 98.6%, 지난주 2555/2600 = 98.3%
 		assertThat(digest.lines()).containsExactly(
 				"실행 1,008회 · 통과율 98.6% (지난주 대비 +0.4%p) · 실패·오류가 있는 실행 18회 (지난주 21회)",
-				"통과율 낮은 스위트: 결제 98.0%", "대시보드: https://sentinel.example.com/");
+				"통과율 낮은 스위트: 결제 98.0%");
+		assertThat(digest.tone()).isEqualTo(Notification.Tone.INFO);
+		assertThat(digest.links()).containsExactly(new Notification.Link("대시보드", "https://sentinel.example.com/"));
 	}
 
 	@Test

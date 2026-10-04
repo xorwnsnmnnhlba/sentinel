@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.sentinel.TestcontainersConfiguration;
+import com.sentinel.application.notification.Notification;
 import com.sentinel.application.notification.RecordingNotifier;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
@@ -305,11 +306,13 @@ class SchedulePollingTest {
 
 		assertThat(notifier.sent()).singleElement().satisfies(notification -> {
 			assertThat(notification.title()).startsWith("[Sentinel] dev suite-").endsWith(" - 2건 중 1건 실패 (새로 실패 1건)");
-			assertThat(notification.lines()).hasSize(3);
+			assertThat(notification.lines()).hasSize(2);
 			assertThat(notification.lines().getFirst()).startsWith("[새로 실패] case-")
 				.endsWith(" · POST /billing/v1/charge → status in [201]: was 200");
 			assertThat(notification.lines().get(1)).isEqualTo("계속 실패하면 1시간마다 다시 알림 (새로 실패·복구는 바로)");
-			assertThat(notification.lines().getLast()).isEqualTo("결과: http://sentinel.test/runs/" + runIds.getFirst());
+			assertThat(notification.tone()).isEqualTo(Notification.Tone.FAILURE);
+			assertThat(notification.links())
+				.containsExactly(new Notification.Link("결과", "http://sentinel.test/runs/" + runIds.getFirst()));
 		});
 	}
 

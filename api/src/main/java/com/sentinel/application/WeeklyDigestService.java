@@ -91,11 +91,8 @@ class WeeklyDigestService {
 			lines.add("모니터링 공백 " + gaps.size() + "건 · " + NotificationFormat.duration(total));
 		}
 
-		String dashboard = notificationProperties.dashboardUrl();
-		if (dashboard != null) {
-			lines.add("대시보드: " + dashboard);
-		}
-		return new Notification("[Sentinel] 주간 요약 " + DAY.format(from) + " ~ " + DAY.format(to), lines);
+		return new Notification("[Sentinel] 주간 요약 " + DAY.format(from) + " ~ " + DAY.format(to), lines,
+				Notification.Tone.INFO, Notification.linkIfPresent("대시보드", notificationProperties.dashboardUrl()));
 	}
 
 	/** 예: 실행 1,008회 · 통과율 98.2% (지난주 대비 +0.4%p) · 실패·오류가 있는 실행 18회 (지난주 21회) */

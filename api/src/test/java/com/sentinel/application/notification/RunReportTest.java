@@ -75,8 +75,8 @@ class RunReportTest {
 		RunReport report = new RunReport("결제", "dev", 3, List.of(newFailure("a", HttpMethod.GET, "/a", "TIMEOUT")),
 				"http://sentinel.example.com/runs/12", SEOUL, Duration.ofHours(3));
 
-		assertThat(report.toNotification().lines()).endsWith("계속 실패하면 3시간마다 다시 알림 (새로 실패·복구는 바로)",
-				"결과: http://sentinel.example.com/runs/12");
+		assertThat(report.toNotification().text()).endsWith(
+				"계속 실패하면 3시간마다 다시 알림 (새로 실패·복구는 바로)\n결과: http://sentinel.example.com/runs/12");
 	}
 
 	@Test
@@ -101,7 +101,13 @@ class RunReportTest {
 		RunReport report = new RunReport("결제", "dev", 3, List.of(newFailure("a", HttpMethod.GET, "/a", "TIMEOUT")),
 				"http://sentinel.example.com/runs/12", SEOUL, null);
 
-		assertThat(report.toNotification().lines()).last().isEqualTo("결과: http://sentinel.example.com/runs/12");
+		Notification notification = report.toNotification();
+		assertThat(notification.tone()).isEqualTo(Notification.Tone.FAILURE);
+		assertThat(notification.links())
+			.containsExactly(new Notification.Link("결과", "http://sentinel.example.com/runs/12"));
+		// 주소 미설정이면 링크 없음
+		assertThat(new RunReport("결제", "dev", 3, List.of(newFailure("a", HttpMethod.GET, "/a", "TIMEOUT")), null, SEOUL,
+				null).toNotification().links()).isEmpty();
 	}
 
 }

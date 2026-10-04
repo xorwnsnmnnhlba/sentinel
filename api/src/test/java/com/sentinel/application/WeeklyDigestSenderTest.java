@@ -92,7 +92,7 @@ class WeeklyDigestSenderTest {
 		assertThat(notifier.sent()).singleElement().satisfies(digest -> {
 			// 발송일 전날까지 7일
 			assertThat(digest.title()).isEqualTo("[Sentinel] 주간 요약 08-10 ~ 08-16");
-			assertThat(digest.lines()).last().isEqualTo("대시보드: http://sentinel.test/");
+			assertThat(digest.links()).containsExactly(new Notification.Link("대시보드", "http://sentinel.test/"));
 		});
 		assertThat(deliveries.findAll()).filteredOn(delivery -> delivery.getScheduledAt().equals(MONDAY_NINE))
 			.singleElement()

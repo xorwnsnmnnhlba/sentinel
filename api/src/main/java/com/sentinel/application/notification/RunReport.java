@@ -51,10 +51,7 @@ record RunReport(String suiteName, String environmentName, int total, List<Faile
 		if (repeatInterval != null) {
 			lines.add("계속 실패하면 " + NotificationFormat.interval(repeatInterval) + "마다 다시 알림 (새로 실패·복구는 바로)");
 		}
-		if (runUrl != null) {
-			lines.add("결과: " + runUrl);
-		}
-		return new Notification(title, lines);
+		return new Notification(title, lines, Notification.Tone.FAILURE, Notification.linkIfPresent("결과", runUrl));
 	}
 
 	private String tag(FailedCase failure) {

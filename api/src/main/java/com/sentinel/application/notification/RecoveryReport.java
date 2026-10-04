@@ -39,10 +39,7 @@ record RecoveryReport(String suiteName, String environmentName, int total, List<
 		lines.add("실패 지속: 스케줄 실행 %d회%s, %s부터 %s".formatted(failingRuns, capped ? " 이상" : "",
 				NotificationFormat.shortTime(failingSince, zone),
 				NotificationFormat.duration(Duration.between(failingSince, recoveredAt))));
-		if (runUrl != null) {
-			lines.add("결과: " + runUrl);
-		}
-		return new Notification(title, lines);
+		return new Notification(title, lines, Notification.Tone.SUCCESS, Notification.linkIfPresent("결과", runUrl));
 	}
 
 }
