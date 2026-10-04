@@ -151,4 +151,28 @@
   html {
     @apply font-sans;
   }
+  /*
+   * 누를 수 있는 요소는 손가락 커서 (DESIGN.md "모양"). Tailwind v4 기본 스타일은 버튼도 기본 화살표라 한곳에서 지정.
+   * 비활성(disabled·aria-disabled·data-disabled)은 제외하여 컴포넌트의 cursor-not-allowed 등을 유지.
+   * base 층이라 개별 요소의 cursor-* 유틸리티가 있으면 그쪽이 우선
+   */
+  :where(
+    button,
+    [role="button"],
+    [role="menuitem"],
+    [role="menuitemcheckbox"],
+    [role="menuitemradio"],
+    [role="option"],
+    [role="tab"],
+    [role="switch"],
+    [role="checkbox"],
+    summary,
+    select,
+    input[type="checkbox"],
+    input[type="radio"],
+    input[type="file"],
+    label:has(input[type="checkbox"], input[type="radio"])
+  ):not(:disabled, [aria-disabled="true"], [data-disabled]) {
+    cursor: pointer;
+  }
 }
