@@ -19,7 +19,7 @@ export default async function NewCasePage(props: PageProps<"/cases/new">) {
   const environments = await apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`);
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-4">
       <PageHeader back={{ href: `/suites/${suite.id}`, label: suite.name }} title="케이스 추가" />
       <CaseEditor
         initial={emptyDraft()}
