@@ -404,6 +404,22 @@ export interface UnstableCases {
 }
 
 /**
+ * 지금 느린 케이스 (api/README.md "응답시간 악화 알림"). 악화 알림 후 아직 회복하지 않은 케이스·환경. 값은 감지 당시
+ * increase: 늘어난 비율 (0.91은 91% 느려짐)
+ */
+export interface Slowdown {
+  id: number;
+  testCase: IdName;
+  suite: IdName;
+  project: IdName;
+  environment: IdName;
+  baselineP95: number;
+  detectedP95: number;
+  increase: number;
+  detectedAt: string;
+}
+
+/**
  * 모니터링 공백 (api/README.md "모니터링 공백"). 스케줄이 예정 시각보다 크게 늦게 실행된 기간
  * startedAt: 늦은 스케줄 중 가장 이른 예정 시각, endedAt: 폴링 재개 시각
  */

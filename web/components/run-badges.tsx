@@ -73,6 +73,16 @@ export function UnstableBadge({ detail }: { detail: string }) {
   );
 }
 
+/** 응답시간 악화 알림 후 아직 회복하지 않은 케이스. detail은 환경별 감지 당시 p95 변화 */
+export function SlowBadge({ detail }: { detail: string }) {
+  return (
+    <Badge variant="outline" className="border-(--delta-bad)/40 text-(--delta-bad)" title={detail}>
+      느림
+      <span className="sr-only"> ({detail})</span>
+    </Badge>
+  );
+}
+
 const statusLabel: Record<RunStatus, string> = {
   RUNNING: "실행 중",
   COMPLETED: "완료",
