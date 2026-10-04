@@ -4,6 +4,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import { PassRateMeter } from "@/components/dashboard/pass-rate-meter";
 import { Panel, PanelEmpty } from "@/components/catalog/section";
+import { FailureCauseList } from "@/components/dashboard/failure-cause-list";
 import { MonitoringGapList } from "@/components/dashboard/monitoring-gap-list";
 import { SlowdownTable } from "@/components/dashboard/slowdown-table";
 import { StatTile } from "@/components/dashboard/stat-tile";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiGet } from "@/lib/api/server";
 import type {
+  FailureCauses,
   MaintenanceWindow,
   MonitoringGaps,
   Page,
@@ -65,18 +67,29 @@ export default async function Dashboard(props: PageProps<"/">) {
   const previous = previousRange(current.from, days);
   const range = (period: { from: string; to: string }) => `from=${period.from}&to=${period.to}`;
 
-  const [summaries, previousSummaries, failingRuns, changes, running, windows, unstable, monitoringGaps, slowdowns] =
-    await Promise.all([
-      apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
-      apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
-      apiGet<Page<RunSummary>>(`/api/runs?failing=true&size=5&${range(current)}`),
-      apiGet<ResponseTimeChanges>(`/api/response-time-changes?limit=5&${range(current)}`),
-      apiGet<Page<RunSummary>>(`/api/runs?status=RUNNING&size=${RUNNING_LIMIT}`),
-      apiGet<MaintenanceWindow[]>("/api/maintenance-windows"),
-      apiGet<UnstableCases>(`/api/unstable-cases?${range(current)}`),
-      apiGet<MonitoringGaps>(`/api/monitoring-gaps?${range(current)}`),
-      apiGet<Slowdown[]>("/api/slowdowns"),
-    ]);
+  const [
+    summaries,
+    previousSummaries,
+    failingRuns,
+    changes,
+    running,
+    windows,
+    unstable,
+    monitoringGaps,
+    slowdowns,
+    failureCauses,
+  ] = await Promise.all([
+    apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
+    apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
+    apiGet<Page<RunSummary>>(`/api/runs?failing=true&size=5&${range(current)}`),
+    apiGet<ResponseTimeChanges>(`/api/response-time-changes?limit=5&${range(current)}`),
+    apiGet<Page<RunSummary>>(`/api/runs?status=RUNNING&size=${RUNNING_LIMIT}`),
+    apiGet<MaintenanceWindow[]>("/api/maintenance-windows"),
+    apiGet<UnstableCases>(`/api/unstable-cases?${range(current)}`),
+    apiGet<MonitoringGaps>(`/api/monitoring-gaps?${range(current)}`),
+    apiGet<Slowdown[]>("/api/slowdowns"),
+    apiGet<FailureCauses>(`/api/failure-causes?${range(current)}`),
+  ]);
   const gaps = monitoringGaps.gaps;
   const maintenance = windows.filter((window) => window.active);
   const at = new Date();
@@ -273,6 +286,19 @@ export default async function Dashboard(props: PageProps<"/">) {
               ))}
             </TableBody>
           </Table>
+        )}
+      </Panel>
+
+      <Panel title="실패 원인" meta={`스케줄 실행 · 실패·오류 ${formatCount(failureCauses.results)}건`}>
+        {failureCauses.causes.length === 0 ? (
+          <PanelEmpty message="기간 안 스케줄 실행에 실패·오류가 없습니다" />
+        ) : (
+          <FailureCauseList
+            causes={failureCauses.causes}
+            total={failureCauses.results}
+            from={current.from}
+            to={current.to}
+          />
         )}
       </Panel>
 
