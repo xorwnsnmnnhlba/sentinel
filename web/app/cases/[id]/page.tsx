@@ -30,7 +30,7 @@ export default async function CasePage(props: PageProps<"/cases/[id]">) {
   ]);
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-4">
       <PageHeader
         back={{ href: `/suites/${suite.id}`, label: suite.name }}
         title="케이스 수정"

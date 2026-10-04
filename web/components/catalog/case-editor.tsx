@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { KeyValueRows } from "@/components/catalog/key-value-rows";
+import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,206 +107,228 @@ export function CaseEditor({
   }
 
   return (
-    <form method="post" onSubmit={submit} className="space-y-8" noValidate>
-      <section className="space-y-2">
-        <Label htmlFor="case-name">이름</Label>
-        <Input
-          id="case-name"
-          value={draft.name}
-          maxLength={200}
-          placeholder="결제 내역 조회"
-          onChange={(event) => update({ name: event.target.value })}
-        />
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">요청</h2>
-        <div className="flex gap-2">
-          <NativeSelect
-            aria-label="메서드"
-            value={draft.method}
-            onChange={(event) => update({ method: event.target.value as HttpMethod })}
-            className="w-32"
-          >
-            {HTTP_METHODS.map((method) => (
-              <NativeSelectOption key={method} value={method}>
-                {method}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-          <Input
-            aria-label="경로"
-            aria-describedby="case-path-hint"
-            value={draft.path}
-            maxLength={2000}
-            placeholder="/billing/v1/history?userId={{userId}}"
-            onChange={(event) => update({ path: event.target.value })}
-            className="font-mono"
-          />
-        </div>
-        <p id="case-path-hint" className="text-xs text-muted-foreground">
-          환경의 기본 URL 뒤에 붙는 경로. / 또는 <code className="font-mono">{"{{변수}}"}</code>로 시작.
-          경로·헤더·본문에 변수 사용 가능 (변수로 시작하면 치환 결과가 /로 시작해야 함)
-        </p>
-
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">
-            헤더 <span className="font-normal text-muted-foreground">(선택)</span>
-          </legend>
-          <KeyValueRows
-            label="헤더"
-            rows={draft.headers}
-            onChange={(headers) => update({ headers })}
-            nameMaxLength={200}
-            namePlaceholder="Accept"
-            valuePlaceholder="application/json"
-          />
-        </fieldset>
-
-        <div className="space-y-2">
-          <div className="flex items-end justify-between">
-            <Label htmlFor="case-body">
-              본문 <span className="font-normal text-muted-foreground">(선택)</span>
-            </Label>
-            <Button type="button" variant="ghost" size="sm" onClick={() => update({ body: prettyBody(draft.body) })}>
-              JSON 정렬
-            </Button>
-          </div>
-          <Textarea
-            id="case-body"
-            rows={8}
-            value={draft.body}
-            placeholder='{"userId": "{{userId}}", "amount": 1000}'
-            onChange={(event) => update({ body: event.target.value })}
-            className="font-mono text-xs"
-          />
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">판정 규칙</h2>
-          <p className="text-sm text-muted-foreground">
-            모든 규칙을 통과하면 통과. 규칙이 없으면 상태 코드 2xx를 통과로 판정
-          </p>
-        </div>
-        {draft.assertions.map((assertion, index) => (
-          <div key={index} className="space-y-3 rounded-lg border bg-card p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">
-                {index + 1}. {ASSERTION_LABELS[assertion.type]}
-              </h3>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`판정 규칙 ${index + 1} 삭제`}
-                onClick={() => update({ assertions: draft.assertions.filter((_, i) => i !== index) })}
-              >
-                <Trash2 />
-              </Button>
-            </div>
-            <AssertionFields
-              label={`판정 규칙 ${index + 1}`}
-              assertion={assertion}
-              onChange={(next) => updateAssertion(index, next)}
+    <form method="post" onSubmit={submit} className="space-y-4" noValidate>
+      <Panel title="요청">
+        <div className="space-y-5 p-4">
+          <div className="space-y-2">
+            <Label htmlFor="case-name">이름</Label>
+            <Input
+              id="case-name"
+              value={draft.name}
+              maxLength={200}
+              placeholder="결제 내역 조회"
+              onChange={(event) => update({ name: event.target.value })}
             />
           </div>
-        ))}
-        <div className="flex gap-2">
-          <NativeSelect
-            aria-label="추가할 판정 규칙"
-            value={newType}
-            onChange={(event) => setNewType(event.target.value as AssertionType)}
-          >
-            {ASSERTION_TYPES.map((type) => (
-              <NativeSelectOption key={type} value={type}>
-                {ASSERTION_LABELS[type]}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => update({ assertions: [...draft.assertions, newAssertion(newType)] })}
-          >
-            <Plus /> 규칙 추가
-          </Button>
-        </div>
-      </section>
 
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">
-            값 추출 <span className="text-sm font-normal text-muted-foreground">(선택)</span>
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            응답 값을 변수로 저장하여 같은 스위트 실행에서 뒤에 실행하는 케이스가{" "}
-            <code className="font-mono">{"{{변수}}"}</code>로 사용 (예: 로그인 토큰, 등록한 ID). 스위트 전체 실행에서
-            스위트의 실행 순서대로 전달되며, 이 케이스만 실행하면 뒤 케이스에 전달되지 않음
-          </p>
-        </div>
-        {draft.extractors.map((extractor, index) => (
-          <ExtractorRow
-            key={index}
-            index={index}
-            extractor={extractor}
-            onChange={(next) => updateExtractor(index, next)}
-            onRemove={() => update({ extractors: draft.extractors.filter((_, i) => i !== index) })}
-          />
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          disabled={draft.extractors.length >= MAX_EXTRACTORS}
-          onClick={() => update({ extractors: [...draft.extractors, newExtractor()] })}
-        >
-          <Plus /> 추출 추가
-        </Button>
-      </section>
-
-      {errors.length > 0 && (
-        <ul role="alert" className="space-y-1 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {errors.map((error) => (
-            <li key={error}>{error}</li>
-          ))}
-        </ul>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" name="intent" value="save" disabled={pending}>
-          {pending && intent === "save" ? "저장 중…" : submitLabel}
-        </Button>
-        {environments.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            {environments.length > 1 && (
+          <div className="space-y-2">
+            <div className="flex gap-2">
               <NativeSelect
-                aria-label="실행 환경"
-                value={environmentId}
-                onChange={(event) => setEnvironmentId(Number(event.target.value))}
+                aria-label="메서드"
+                value={draft.method}
+                onChange={(event) => update({ method: event.target.value as HttpMethod })}
+                className="w-32"
               >
-                {environments.map((environment) => (
-                  <NativeSelectOption key={environment.id} value={environment.id}>
-                    {environment.name}
+                {HTTP_METHODS.map((method) => (
+                  <NativeSelectOption key={method} value={method}>
+                    {method}
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
-            )}
-            <Button type="submit" name="intent" value="run" variant="outline" disabled={pending}>
-              <Play />
-              {pending && intent === "run" ? "실행 중…" : `${submitLabel} 후 실행`}
-            </Button>
-            {runThrough && (
-              <Button type="submit" name="intent" value="run-through" variant="outline" disabled={pending}>
-                <Play />
-                {pending && intent === "run-through" ? "실행 중…" : `${submitLabel} 후 여기까지 실행`}
+              <Input
+                aria-label="경로"
+                aria-describedby="case-path-hint"
+                value={draft.path}
+                maxLength={2000}
+                placeholder="/billing/v1/history?userId={{userId}}"
+                onChange={(event) => update({ path: event.target.value })}
+                className="font-mono"
+              />
+            </div>
+            <p id="case-path-hint" className="text-xs text-muted-foreground">
+              환경의 기본 URL 뒤에 붙는 경로. / 또는 <code className="font-mono">{"{{변수}}"}</code>로 시작.
+              경로·헤더·본문에 변수 사용 가능 (변수로 시작하면 치환 결과가 /로 시작해야 함)
+            </p>
+          </div>
+
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">
+              헤더 <span className="font-normal text-muted-foreground">(선택)</span>
+            </legend>
+            <KeyValueRows
+              label="헤더"
+              rows={draft.headers}
+              onChange={(headers) => update({ headers })}
+              nameMaxLength={200}
+              namePlaceholder="Accept"
+              valuePlaceholder="application/json"
+            />
+          </fieldset>
+
+          <div className="space-y-2">
+            <div className="flex items-end justify-between">
+              <Label htmlFor="case-body">
+                본문 <span className="font-normal text-muted-foreground">(선택)</span>
+              </Label>
+              <Button type="button" variant="ghost" size="sm" onClick={() => update({ body: prettyBody(draft.body) })}>
+                JSON 정렬
               </Button>
-            )}
+            </div>
+            <Textarea
+              id="case-body"
+              rows={8}
+              value={draft.body}
+              placeholder='{"userId": "{{userId}}", "amount": 1000}'
+              onChange={(event) => update({ body: event.target.value })}
+              className="font-mono text-xs"
+            />
+          </div>
+        </div>
+      </Panel>
+
+      <Panel
+        title="판정 규칙"
+        count={draft.assertions.length}
+        meta="모두 통과해야 통과"
+        action={
+          <div className="flex gap-2">
+            <NativeSelect
+              aria-label="추가할 판정 규칙"
+              value={newType}
+              onChange={(event) => setNewType(event.target.value as AssertionType)}
+            >
+              {ASSERTION_TYPES.map((type) => (
+                <NativeSelectOption key={type} value={type}>
+                  {ASSERTION_LABELS[type]}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => update({ assertions: [...draft.assertions, newAssertion(newType)] })}
+            >
+              <Plus /> 규칙 추가
+            </Button>
+          </div>
+        }
+      >
+        {draft.assertions.length === 0 ? (
+          <PanelEmpty message="규칙이 없으면 상태 코드 2xx를 통과로 판정" />
+        ) : (
+          <div className="divide-y">
+            {draft.assertions.map((assertion, index) => (
+              <div key={index} className="space-y-3 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">
+                    {index + 1}. {ASSERTION_LABELS[assertion.type]}
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`판정 규칙 ${index + 1} 삭제`}
+                    onClick={() => update({ assertions: draft.assertions.filter((_, i) => i !== index) })}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+                <AssertionFields
+                  label={`판정 규칙 ${index + 1}`}
+                  assertion={assertion}
+                  onChange={(next) => updateAssertion(index, next)}
+                />
+              </div>
+            ))}
           </div>
         )}
-        <Button asChild variant="ghost">
-          <Link href={cancelHref}>취소</Link>
-        </Button>
+      </Panel>
+
+      <Panel
+        title="값 추출"
+        count={draft.extractors.length}
+        meta="스위트 실행 순서대로 뒤 케이스에 전달"
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={draft.extractors.length >= MAX_EXTRACTORS}
+            onClick={() => update({ extractors: [...draft.extractors, newExtractor()] })}
+          >
+            <Plus /> 추출 추가
+          </Button>
+        }
+      >
+        {draft.extractors.length === 0 ? (
+          <PanelEmpty
+            message={
+              <>
+                응답 값(로그인 토큰, 등록한 ID 등)을 변수로 저장하면 뒤 케이스가{" "}
+                <code className="font-mono">{"{{변수}}"}</code>로 사용. 이 케이스만 실행하면 전달되지 않음
+              </>
+            }
+          />
+        ) : (
+          <div className="divide-y">
+            {draft.extractors.map((extractor, index) => (
+              <ExtractorRow
+                key={index}
+                index={index}
+                extractor={extractor}
+                onChange={(next) => updateExtractor(index, next)}
+                onRemove={() => update({ extractors: draft.extractors.filter((_, i) => i !== index) })}
+              />
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      {/* 긴 양식에서도 저장·실행 버튼이 보이도록 화면 아래에 붙임 */}
+      <div className="sticky bottom-0 z-10 space-y-3 border-t bg-background py-3">
+        {errors.length > 0 && (
+          <ul role="alert" className="space-y-1 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" name="intent" value="save" disabled={pending}>
+            {pending && intent === "save" ? "저장 중…" : submitLabel}
+          </Button>
+          {environments.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              {environments.length > 1 && (
+                <NativeSelect
+                  aria-label="실행 환경"
+                  value={environmentId}
+                  onChange={(event) => setEnvironmentId(Number(event.target.value))}
+                >
+                  {environments.map((environment) => (
+                    <NativeSelectOption key={environment.id} value={environment.id}>
+                      {environment.name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              )}
+              <Button type="submit" name="intent" value="run" variant="outline" disabled={pending}>
+                <Play />
+                {pending && intent === "run" ? "실행 중…" : `${submitLabel} 후 실행`}
+              </Button>
+              {runThrough && (
+                <Button type="submit" name="intent" value="run-through" variant="outline" disabled={pending}>
+                  <Play />
+                  {pending && intent === "run-through" ? "실행 중…" : `${submitLabel} 후 여기까지 실행`}
+                </Button>
+              )}
+            </div>
+          )}
+          <Button asChild variant="ghost">
+            <Link href={cancelHref}>취소</Link>
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -452,7 +475,7 @@ function ExtractorRow({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border bg-card p-4">
+    <div className="space-y-3 px-4 py-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">
           {index + 1}.{" "}
