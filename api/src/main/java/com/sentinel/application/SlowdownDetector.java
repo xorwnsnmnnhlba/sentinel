@@ -143,27 +143,24 @@ class SlowdownDetector {
 		}
 
 		List<Message> messages = new ArrayList<>();
-		byProject(slowed).forEach(lines -> messages.add(message(lines, "응답시간 악화", Line::slowedText)));
-		byProject(recovered).forEach(lines -> messages.add(message(lines, "응답시간 회복", Line::recoveredText)));
+		byProject(slowed)
+			.forEach(lines -> messages.add(message(lines, "응답시간 악화", Notification.Tone.WARNING, Line::slowedText)));
+		byProject(recovered)
+			.forEach(lines -> messages.add(message(lines, "응답시간 회복", Notification.Tone.SUCCESS, Line::recoveredText)));
 		return new Evaluation(messages, new Outcome(slowed.size(), recovered.size()));
 	}
 
 	/** 프로젝트 하나의 알림. 프로젝트 Webhook이 있으면 그 채널 (암호문 조회는 이 트랜잭션에서) */
-	private Message message(List<Line> lines, String kind, Function<Line, String> text) {
+	private Message message(List<Line> lines, String kind, Notification.Tone tone, Function<Line, String> text) {
 		Project project = lines.getFirst().testCase().getSuite().getProject();
-		return new Message(channels.forProject(project), notification(project, kind, lines, text));
+		return new Message(channels.forProject(project), notification(project, kind, tone, lines, text));
 	}
 
-	private Notification notification(Project project, String kind, List<Line> lines, Function<Line, String> text) {
-		List<String> body = new ArrayList<>(lines.stream()
-			.sorted(Comparator.comparingDouble(Line::increase).reversed())
-			.map(text)
-			.toList());
-		String dashboard = notificationProperties.dashboardUrl();
-		if (dashboard != null) {
-			body.add("대시보드: " + dashboard);
-		}
-		return new Notification("[Sentinel] " + project.getName() + " - " + kind + " " + lines.size() + "건", body);
+	private Notification notification(Project project, String kind, Notification.Tone tone, List<Line> lines,
+			Function<Line, String> text) {
+		List<String> body = lines.stream().sorted(Comparator.comparingDouble(Line::increase).reversed()).map(text).toList();
+		return new Notification("[Sentinel] " + project.getName() + " - " + kind + " " + lines.size() + "건", body, tone,
+				Notification.linkIfPresent("대시보드", notificationProperties.dashboardUrl()));
 	}
 
 	/** 프로젝트별로 묶음. 프로젝트 이름 순 (같은 확인 안에서 알림 순서를 일정하게) */

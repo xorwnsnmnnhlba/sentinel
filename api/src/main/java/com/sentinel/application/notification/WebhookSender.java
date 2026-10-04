@@ -34,7 +34,7 @@ public class WebhookSender implements AutoCloseable {
 		try {
 			request = new ResolvedRequest(HttpMethod.POST, URI.create(url),
 					Map.of("Content-Type", List.of("application/json")),
-					JSON.writeValueAsString(Map.of("text", notification.text())));
+					JSON.writeValueAsString(WebhookPayload.of(url, notification)));
 		}
 		catch (IllegalArgumentException ex) {
 			return new Delivery(false, null, "INVALID_URL");

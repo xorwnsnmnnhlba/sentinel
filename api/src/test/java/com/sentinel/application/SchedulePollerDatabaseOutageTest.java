@@ -77,6 +77,7 @@ class SchedulePollerDatabaseOutageTest {
 
 		List<Notification> sent = notifier.sent();
 		assertThat(sent).hasSize(2);
+		assertThat(sent).extracting(Notification::tone).containsExactly(Notification.Tone.FAILURE, Notification.Tone.SUCCESS);
 		assertThat(sent.get(1).title()).isEqualTo("[Sentinel] DB 연결 복구 - 스케줄 실행 재개");
 		assertThat(sent.get(1).lines()).first()
 			.isEqualTo("중단 기간: 2026-09-19 09:00 (Asia/Seoul) ~ 2026-09-19 09:30 (Asia/Seoul) (30분)");
@@ -104,9 +105,10 @@ class SchedulePollerDatabaseOutageTest {
 
 		poller.poll();
 
-		assertThat(notifier.sent()).singleElement()
-			.extracting(Notification::title)
-			.isEqualTo("[Sentinel] 모니터링 공백 - 스케줄이 제때 실행되지 않음");
+		assertThat(notifier.sent()).singleElement().satisfies(notification -> {
+			assertThat(notification.title()).isEqualTo("[Sentinel] 모니터링 공백 - 스케줄이 제때 실행되지 않음");
+			assertThat(notification.tone()).isEqualTo(Notification.Tone.WARNING);
+		});
 	}
 
 	@Test

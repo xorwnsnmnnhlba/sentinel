@@ -915,7 +915,17 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 | `sentinel.notification.read-timeout` | `5s` | 응답 대기 제한 시간 |
 | `sentinel.notification.repeat-interval` | `1h` | 계속 실패 중 재알림 간격 (위 "계속 실패 중 재알림"). `0s`이면 실행마다 |
 
-- 본문은 `{"text": "제목\n본문"}` 한 필드. Slack·Teams 수신 Webhook 주소를 그대로 사용 가능
+- 본문 서식은 Webhook 주소로 판별 (기본 채널·프로젝트별 채널 공통)
+
+  | 주소 | 서식 |
+  |------|------|
+  | `hooks.slack.com` | Slack Block Kit: 굵은 제목 머리, 본문, 링크 버튼(`결과 보기`·`대시보드 보기`), 성격별 색 막대 |
+  | `*.logic.azure.com`·`*.powerplatform.com`(Teams 워크플로), `*.webhook.office.com`(기존 커넥터) | Teams Adaptive Card: 성격별 제목 색, 줄마다 글 상자, 링크 버튼 |
+  | 그 외 (사내 중계 등) | `{"text": "제목\n본문\n결과: 주소"}` 한 필드 (예전과 같음) |
+
+  - 성격: 실패·장애(빨강), 악화·공백(주황), 복구·회복(초록), 요약·확인(회색). Teams는 Attention·Warning·Good·Default
+  - 두 서식 모두 알림 미리보기용 `text`(제목)를 함께 보냄. Slack 본문은 서식 문법(`*`, `_`)으로 해석되지 않도록 일반 텍스트로 보내고 블록 글자 수 제한(머리 150자, 본문 3,000자)을 넘으면 자름
+  - Teams의 새 워크플로 Webhook("Webhook 요청을 받으면 채널에 게시")은 카드 형식이 필요하여, 예전 텍스트 한 필드로는 게시되지 않을 수 있음
 - Webhook 주소는 자격증명이므로 환경변수로 주입하고 로그·git에 남기지 않음 (`sentinel.env`)
 - 발송 실패(4xx·5xx, 타임아웃, 연결 실패)는 WARN 로그만 남기고 실행·폴링은 계속
 - 다른 형식이 필요하면 `com.sentinel.application.notification.Notifier` 구현체 추가 후 `NotificationConfig`의 빈 교체

@@ -2,7 +2,6 @@ package com.sentinel.application.notification;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
-import java.util.Map;
 
 import com.sentinel.infra.http.HttpFailures;
 import org.slf4j.Logger;
@@ -45,7 +44,7 @@ class WebhookNotifier implements Notifier {
 			restClient.post()
 				.uri(url)
 				.contentType(MediaType.APPLICATION_JSON)
-				.body(Map.of("text", notification.text()))
+				.body(WebhookPayload.of(url, notification))
 				.retrieve()
 				.toBodilessEntity();
 		}

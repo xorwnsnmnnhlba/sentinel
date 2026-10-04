@@ -26,7 +26,10 @@ class RecoveryReportTest {
 
 		assertThat(notification.title()).isEqualTo("[Sentinel] dev 결제 - 복구, 12건 모두 통과");
 		assertThat(notification.lines()).containsExactly("다시 통과: 결제 승인, 결제 내역",
-				"실패 지속: 스케줄 실행 3회, 09-24 09:10부터 2시간 0분", "결과: http://sentinel.example.com/runs/15");
+				"실패 지속: 스케줄 실행 3회, 09-24 09:10부터 2시간 0분");
+		assertThat(notification.tone()).isEqualTo(Notification.Tone.SUCCESS);
+		// 일반 텍스트에서는 지금과 같이 본문 끝에 링크 줄
+		assertThat(notification.text()).endsWith("2시간 0분\n결과: http://sentinel.example.com/runs/15");
 	}
 
 	@Test

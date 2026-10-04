@@ -104,8 +104,9 @@ class SlowdownDetectorTest {
 		assertThat(notifier.sent()).singleElement().satisfies(notification -> {
 			assertThat(notification.title()).isEqualTo("[Sentinel] " + project.getName() + " - 응답시간 악화 1건");
 			assertThat(notification.lines()).containsExactly(
-					suite.getName() + " · " + payment.getName() + " (dev) p95 200ms → 350ms (+75%, 최근 응답 5건)",
-					"대시보드: http://sentinel.test/");
+					suite.getName() + " · " + payment.getName() + " (dev) p95 200ms → 350ms (+75%, 최근 응답 5건)");
+			assertThat(notification.tone()).isEqualTo(Notification.Tone.WARNING);
+			assertThat(notification.links()).containsExactly(new Notification.Link("대시보드", "http://sentinel.test/"));
 		});
 
 		// 느린 동안은 다시 알리지 않음
@@ -120,6 +121,7 @@ class SlowdownDetectorTest {
 		assertThat(detector.check()).isEqualTo(new SlowdownDetector.Outcome(0, 1));
 		assertThat(notifier.sent().getLast()).satisfies(notification -> {
 			assertThat(notification.title()).isEqualTo("[Sentinel] " + project.getName() + " - 응답시간 회복 1건");
+			assertThat(notification.tone()).isEqualTo(Notification.Tone.SUCCESS);
 			assertThat(notification.lines()).first()
 				.isEqualTo(suite.getName() + " · " + payment.getName() + " (dev) p95 220ms로 회복 (악화 당시 350ms, 기준 200ms)");
 		});

@@ -107,7 +107,7 @@ class SchedulePoller {
 			catch (RuntimeException ex) {
 				log.error("Scheduled run failed for schedule {}", scheduleId, ex);
 				send(new Notification("[Sentinel] 스케줄 " + scheduleId + " 실행 오류",
-						List.of("시각: " + format(now), "사유: " + ex.getMessage())));
+						List.of("시각: " + format(now), "사유: " + ex.getMessage()), Notification.Tone.FAILURE, List.of()));
 			}
 		}
 		return runIds;
@@ -153,7 +153,7 @@ class SchedulePoller {
 		send(new Notification("[Sentinel] 모니터링 공백 - 스케줄이 제때 실행되지 않음",
 				List.of("기간: " + format(startedAt) + " ~ " + format(now) + " ("
 						+ formatDuration(Duration.between(startedAt, now)) + ")", "제때 실행되지 않은 스케줄: " + late.size() + "건",
-						"놓친 실행은 스케줄마다 1회씩 지금 실행합니다", "원인 예: Sentinel 중지, 서버 절전, 오래 걸린 앞 실행")));
+						"놓친 실행은 스케줄마다 1회씩 지금 실행합니다", "원인 예: Sentinel 중지, 서버 절전, 오래 걸린 앞 실행"), Notification.Tone.WARNING, List.of()));
 	}
 
 	private void onDatabaseUnavailable(Instant now, String reason) {
@@ -162,7 +162,7 @@ class SchedulePoller {
 		}
 		databaseUnavailableSince = now;
 		send(new Notification("[Sentinel] DB 연결 실패 - 스케줄 실행 중단",
-				List.of("발생 시각: " + format(now), "사유: " + reason, "복구될 때까지 스케줄 실행을 건너뜁니다")));
+				List.of("발생 시각: " + format(now), "사유: " + reason, "복구될 때까지 스케줄 실행을 건너뜁니다"), Notification.Tone.FAILURE, List.of()));
 	}
 
 	/** @return 접속 실패에서 복구됨 (복구 알림 발송) */
@@ -174,7 +174,7 @@ class SchedulePoller {
 		databaseUnavailableSince = null;
 		send(new Notification("[Sentinel] DB 연결 복구 - 스케줄 실행 재개",
 				List.of("중단 기간: " + format(since) + " ~ " + format(now) + " (" + formatDuration(Duration.between(since, now))
-						+ ")", "중단 기간 중 놓친 스케줄은 1회씩 실행됩니다")));
+						+ ")", "중단 기간 중 놓친 스케줄은 1회씩 실행됩니다"), Notification.Tone.SUCCESS, List.of()));
 		return true;
 	}
 
