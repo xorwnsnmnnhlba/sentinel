@@ -45,3 +45,38 @@ test("주입된 인라인 스크립트는 실행되지 않음", async ({ page, c
   // 의도한 위반이므로 공통 확인 대상에서 제외
   cspViolations.length = 0;
 });
+
+test("선택 상자·대화상자가 넣는 <style>에도 nonce가 있어 위반 없음", async ({ page, request, cspViolations }) => {
+  // Radix 선택 목록은 스크롤바를 숨기는 <style>을, 대화상자는 스크롤 잠금 <style>을 그림. nonce가 없으면 차단되어 위반
+  const api = process.env.E2E_API_URL ?? "http://localhost:18080";
+  const session = await request.post(`${api}/api/sessions`, {
+    data: { email: "admin@sentinel.test", password: "e2e-admin-password" },
+  });
+  const headers = { Authorization: `Bearer ${(await session.json()).token}` };
+  const create = async (path: string, data: object) =>
+    (await (await request.post(`${api}${path}`, { headers, data })).json()) as { id: number };
+  const project = await create("/api/projects", { name: `csp-${Date.now()}` });
+  await create("/api/environments", { projectId: project.id, name: "dev", baseUrl: "http://localhost" });
+  await create("/api/environments", { projectId: project.id, name: "staging", baseUrl: "http://localhost" });
+  const suite = await create("/api/suites", { projectId: project.id, name: "csp-suite" });
+
+  await page.goto("/login");
+  await page.getByLabel("이메일").fill("admin@sentinel.test");
+  await page.getByLabel("비밀번호").fill("e2e-admin-password");
+  await page.getByRole("button", { name: "로그인" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto(`/suites/${suite.id}`);
+
+  const select = page.getByRole("combobox", { name: "실행 환경" });
+  await select.click();
+  await page.getByRole("option", { name: "staging" }).click();
+  await expect(select).toHaveText("staging");
+
+  await page.getByRole("button", { name: "스케줄 추가" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  // 공통 확인(fixtures.ts)과 별개로 여기서도 명시
+  expect(cspViolations).toEqual([]);
+});
