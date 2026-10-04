@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주간 요약 알림 문구. 대시보드와 같은 집계(스위트 요약·불안정 케이스·응답시간 변화·모니터링 공백)를 한 알림으로.
+ * 주간 요약 알림 문구. 대시보드와 같은 집계(스위트 요약·실패 원인·불안정 케이스·응답시간 변화·모니터링 공백)를 한 알림으로.
  * 해당 항목이 없는 줄은 생략. 기간에 실행이 없으면 스케줄이 멈췄는지 확인하도록 안내
  */
 @Service
@@ -36,6 +36,8 @@ class WeeklyDigestService {
 	private final ResponseTimeService responseTimes;
 
 	private final MonitoringGapService monitoringGaps;
+
+	private final FailureCauseService failureCauses;
 
 	private final NotificationProperties notificationProperties;
 
@@ -64,6 +66,11 @@ class WeeklyDigestService {
 				lines.add("통과율 낮은 스위트: "
 						+ top(lowest, suite -> suite.suite().name() + " " + percent(suite.passRate())));
 			}
+		}
+
+		FailureCauseService.FailureCauses causes = failureCauses.list(from, to, null);
+		if (causes.results() > 0) {
+			lines.add("실패 원인: " + causeText(causes));
 		}
 
 		List<UnstableCaseService.UnstableCase> unstable = unstableCases.list(from, to, null).cases();
@@ -109,6 +116,18 @@ class WeeklyDigestService {
 			line.append(" (지난주 ").append(count(previous.failingRuns())).append("회)");
 		}
 		return line.toString();
+	}
+
+	/** 예: 서버 오류 5xx 74%, 타임아웃 26% (전체 실패·오류 대비, 많은 순 3가지까지) */
+	private static String causeText(FailureCauseService.FailureCauses causes) {
+		List<FailureCauseService.CauseSummary> all = causes.causes();
+		String shown = String.join(", ",
+				all.stream()
+					.limit(TOP)
+					.map(cause -> cause.cause().label() + " " + Math.round(100.0 * cause.results() / causes.results())
+							+ "%")
+					.toList());
+		return all.size() > TOP ? shown + " 외 " + (all.size() - TOP) + "가지" : shown;
 	}
 
 	private static <T> String top(List<T> items, Function<T, String> label) {
