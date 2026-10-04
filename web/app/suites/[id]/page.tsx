@@ -16,7 +16,7 @@ import { ScheduleFields } from "@/components/catalog/schedule-fields";
 import { ScheduleToggle } from "@/components/catalog/schedule-toggle";
 import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
-import { UnstableBadge } from "@/components/run-badges";
+import { SlowBadge, UnstableBadge } from "@/components/run-badges";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -33,9 +33,18 @@ import {
   updateSuite,
 } from "@/lib/actions/catalog";
 import { apiGet, apiGetOrNotFound } from "@/lib/api/server";
-import type { CaseItem, EnvironmentItem, ProjectItem, ScheduleDetail, SuiteItem, UnstableCases } from "@/lib/api/types";
+import type {
+  CaseItem,
+  EnvironmentItem,
+  ProjectItem,
+  ScheduleDetail,
+  Slowdown,
+  SuiteItem,
+  UnstableCases,
+} from "@/lib/api/types";
 import { historyHref, suiteHistoryHref } from "@/lib/change-log";
 import { formatDateTime } from "@/lib/format";
+import { slowdownDetail, slowdownsByCase } from "@/lib/slowdown";
 import { unstableByCase, unstableDetail } from "@/lib/unstable";
 
 import { ResponseTimes } from "./response-times";
@@ -52,15 +61,18 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
   }
   const searchParams = await props.searchParams;
   const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${id}`);
-  const [project, environments, cases, schedules, unstable] = await Promise.all([
+  const [project, environments, cases, schedules, unstable, slowdowns] = await Promise.all([
     apiGetOrNotFound<ProjectItem>(`/api/projects/${suite.projectId}`),
     apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`),
     apiGet<CaseItem[]>(`/api/cases?suiteId=${suite.id}`),
     apiGet<ScheduleDetail[]>(`/api/schedules?suiteId=${suite.id}`),
     // 최근 7일 스케줄 실행 기준
     apiGet<UnstableCases>(`/api/unstable-cases?suiteId=${suite.id}`),
+    // 응답시간 악화 알림 후 아직 회복하지 않은 케이스
+    apiGet<Slowdown[]>(`/api/slowdowns?suiteId=${suite.id}`),
   ]);
   const unstableCases = unstableByCase(unstable.cases);
+  const slowCases = slowdownsByCase(slowdowns);
   const environmentNames = new Map(environments.map((environment) => [environment.id, environment.name]));
 
   return (
@@ -163,6 +175,9 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                       </Link>
                       {unstableCases.has(testCase.id) && (
                         <UnstableBadge detail={`최근 7일 ${unstableDetail(unstableCases.get(testCase.id)!)}`} />
+                      )}
+                      {slowCases.has(testCase.id) && (
+                        <SlowBadge detail={`p95 ${slowdownDetail(slowCases.get(testCase.id)!)}`} />
                       )}
                     </div>
                   </TableCell>

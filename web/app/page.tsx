@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { PassRateMeter } from "@/components/dashboard/pass-rate-meter";
 import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { MonitoringGapList } from "@/components/dashboard/monitoring-gap-list";
+import { SlowdownTable } from "@/components/dashboard/slowdown-table";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { UnstableCaseTable } from "@/components/dashboard/unstable-case-table";
 import { RunCountBadges, StatusBadge, TriggerBadge } from "@/components/run-badges";
@@ -17,6 +18,7 @@ import type {
   Page,
   ResponseTimeChanges,
   RunSummary,
+  Slowdown,
   SuiteSummaries,
   UnstableCases,
 } from "@/lib/api/types";
@@ -43,6 +45,9 @@ export const metadata = { title: "대시보드 · Sentinel" };
 /** 불안정 케이스 표시 수 (실패 구간·재시도가 많은 순) */
 const UNSTABLE_LIMIT = 10;
 
+/** 지금 느린 케이스 표시 수 (늘어난 비율이 큰 순) */
+const SLOWDOWN_LIMIT = 10;
+
 /** 모니터링 공백 표시 수 (최근 시작 순) */
 const GAP_LIMIT = 5;
 
@@ -60,7 +65,7 @@ export default async function Dashboard(props: PageProps<"/">) {
   const previous = previousRange(current.from, days);
   const range = (period: { from: string; to: string }) => `from=${period.from}&to=${period.to}`;
 
-  const [summaries, previousSummaries, failingRuns, changes, running, windows, unstable, monitoringGaps] =
+  const [summaries, previousSummaries, failingRuns, changes, running, windows, unstable, monitoringGaps, slowdowns] =
     await Promise.all([
       apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
       apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
@@ -70,6 +75,7 @@ export default async function Dashboard(props: PageProps<"/">) {
       apiGet<MaintenanceWindow[]>("/api/maintenance-windows"),
       apiGet<UnstableCases>(`/api/unstable-cases?${range(current)}`),
       apiGet<MonitoringGaps>(`/api/monitoring-gaps?${range(current)}`),
+      apiGet<Slowdown[]>("/api/slowdowns"),
     ]);
   const gaps = monitoringGaps.gaps;
   const maintenance = windows.filter((window) => window.active);
@@ -162,6 +168,13 @@ export default async function Dashboard(props: PageProps<"/">) {
               ))}
             </TableBody>
           </Table>
+        </Panel>
+      )}
+
+      {/* 응답시간 악화 알림 후 아직 회복하지 않은 케이스. 기간과 무관한 지금 상태라 없으면 표시하지 않음 */}
+      {slowdowns.length > 0 && (
+        <Panel title="지금 느린 케이스" count={slowdowns.length} meta="응답시간 악화 알림 후 회복 전">
+          <SlowdownTable slowdowns={slowdowns} limit={SLOWDOWN_LIMIT} />
         </Panel>
       )}
 
