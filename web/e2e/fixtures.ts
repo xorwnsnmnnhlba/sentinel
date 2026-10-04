@@ -54,7 +54,7 @@ export const test = base.extend<{ cspViolations: string[]; slowNetwork: void }>(
 });
 
 export { expect };
-export type { Page } from "@playwright/test";
+export type { Locator, Page } from "@playwright/test";
 
 /**
  * API로 시작한 실행이 끝날 때까지 대기. 수동 실행은 요청에 바로 응답하고 백그라운드에서 진행하므로

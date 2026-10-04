@@ -1,4 +1,4 @@
-import { expect, mainMenu, sidebar, test } from "./fixtures";
+import { expect, mainMenu, sidebar, test, type Locator } from "./fixtures";
 
 /**
  * 화면 틀 (DESIGN.md "배치"). 넓은 화면은 왼쪽 사이드바, 좁은 화면은 위쪽 막대의 메뉴 서랍
@@ -57,4 +57,35 @@ test("로그인 전 화면에는 사이드바·메뉴가 없음", async ({ page,
   await expect(sidebar(page)).toHaveCount(0);
   await expect(mainMenu(page)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "메뉴 열기" })).toHaveCount(0);
+});
+
+test("누를 수 있는 요소는 손가락 커서, 비활성·입력칸은 그대로", async ({ page }) => {
+  const cursor = (locator: Locator) => locator.evaluate((element) => getComputedStyle(element).cursor);
+
+  await page.goto("/runs");
+  expect(await cursor(page.getByRole("button", { name: "조회" }))).toBe("pointer");
+  expect(await cursor(sidebar(page).getByRole("button", { name: "다크" }))).toBe("pointer");
+  expect(await cursor(page.getByLabel("프로젝트"))).toBe("pointer");
+  const failingOnly = page.getByRole("checkbox", { name: "실패·오류만" });
+  expect(await cursor(failingOnly)).toBe("pointer");
+  expect(await cursor(page.locator("label", { has: failingOnly }))).toBe("pointer");
+  expect(await cursor(page.getByLabel("시작일 (KST)"))).not.toBe("pointer");
+
+  // 파일 선택(문서 가져오기)은 손가락, 비활성 버튼은 그대로
+  const cursorOf = (html: string) =>
+    page.evaluate((markup) => {
+      const holder = document.createElement("div");
+      holder.innerHTML = markup;
+      document.body.append(holder);
+      const value = getComputedStyle(holder.firstElementChild!).cursor;
+      holder.remove();
+      return value;
+    }, html);
+  expect(await cursorOf('<input type="file">')).toBe("pointer");
+  expect(await cursorOf("<button disabled>비활성</button>")).toBe("default");
+
+  // 떠 있는 메뉴의 항목
+  await page.goto("/users");
+  await page.getByRole("button", { name: `${email} 작업` }).click();
+  expect(await cursor(page.getByRole("menuitem", { name: "비밀번호 재설정 링크" }))).toBe("pointer");
 });
