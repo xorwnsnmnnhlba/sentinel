@@ -404,6 +404,44 @@ export interface UnstableCases {
 }
 
 /**
+ * 실패 원인 (api/README.md "실패 원인"). 기간 안 스케줄 실행의 실패·오류 결과를 원인별로
+ * group: NETWORK(응답 없음), API(응답은 받음), SETUP(요청 못 만듦), OTHER(Sentinel 내부 오류)
+ */
+export type FailureCause =
+  | "TIMEOUT"
+  | "CONNECTION_FAILED"
+  | "CONNECTION_LOST"
+  | "SERVER_ERROR"
+  | "CLIENT_ERROR"
+  | "ASSERTION_MISMATCH"
+  | "CONFIGURATION"
+  | "OTHER";
+
+export type FailureCauseGroup = "NETWORK" | "API" | "SETUP" | "OTHER";
+
+export interface FailureCauseCase {
+  testCase: IdName;
+  suite: IdName;
+  environment: IdName;
+  results: number;
+}
+
+export interface FailureCauseSummary {
+  cause: FailureCause;
+  group: FailureCauseGroup;
+  results: number;
+  caseCount: number;
+  cases: FailureCauseCase[];
+}
+
+export interface FailureCauses {
+  from: string;
+  to: string;
+  results: number;
+  causes: FailureCauseSummary[];
+}
+
+/**
  * 지금 느린 케이스 (api/README.md "응답시간 악화 알림"). 악화 알림 후 아직 회복하지 않은 케이스·환경. 값은 감지 당시
  * increase: 늘어난 비율 (0.91은 91% 느려짐)
  */
