@@ -190,6 +190,7 @@ proxy.ts                    모든 화면 요청의 앞단 (로그인 확인, CS
 - 개발 서버(`next dev`)는 `script-src`에 `'unsafe-eval'`, 스타일에 `'unsafe-inline'`, `connect-src`에 `ws:`·`wss:`(HMR) 추가. 운영 빌드에는 없음
 - `upgrade-insecure-requests` 미사용: `http://localhost:3000` 직접 접속 시 자원 요청이 HTTPS로 바뀌어 화면이 깨짐. HTTPS 강제는 Caddy가 담당
 - Radix 대화상자의 스크롤 잠금이 넣는 `<style>`은 `get-nonce`로 nonce를 받음. 서버 렌더링마다 nonce가 바뀌므로(`router.refresh` 등) 처음 받은 문서의 스크립트에서 읽어 설정 (`app/providers.tsx`)
+- 직접 `<style>`을 그리는 컴포넌트는 같은 값(`getNonce()`)을 `nonce`로 전달. 현재 선택 상자 목록(`components/ui/select.tsx`, 스크롤바 숨김)이 해당. 빠뜨리면 차단되어 위반 (2026-10-04 수정, 선택 상자를 여는 E2E가 없어 놓쳤음)
 - 링크 미리 불러오기(`next-router-prefetch`) 요청은 문서가 아니므로 CSP 생략. 로그인 확인은 동일하게 적용
 - 외부 스크립트·폰트·이미지를 추가하면 정책도 함께 수정. 위반은 E2E 공통 확인에서 실패로 드러남
 
@@ -283,7 +284,7 @@ npm run e2e:up && npm run e2e && npm run e2e:down
   - 테스트는 운영과 같은 HTTPS 앞단(`proxy/Caddyfile`)을 거쳐 접속. 내부 인증서라 Playwright에서 신뢰 검사 생략(`ignoreHTTPSErrors`)
   - `e2e/https.spec.ts`: HTTP→HTTPS 이동, 보안 헤더, 앞단을 거친 로그인과 Secure 쿠키
 - 모든 테스트는 `e2e/fixtures.ts`의 `test`를 사용. 테스트 중 CSP 위반(`securitypolicyviolation`)이 1건이라도 있으면 실패
-  - `e2e/csp.spec.ts`: 요청별 nonce, 모든 스크립트의 nonce, 주입된 인라인 이벤트 속성 차단
+  - `e2e/csp.spec.ts`: 요청별 nonce, 모든 스크립트의 nonce, 주입된 인라인 이벤트 속성 차단, 선택 상자·대화상자를 열어도 위반 없음
   - 공통 위치 지정: `mainMenu`(사이드바 주요 메뉴), `sidebar`(계정 영역 포함), `chooseAction`("⋯" 메뉴 열고 항목 선택)
 - `e2e/layout.spec.ts`: 넓은 화면 사이드바·현재 메뉴 강조, 좁은 화면 메뉴 서랍·가로 스크롤 없음, 로그인 전 화면
 - `e2e/accessibility.spec.ts`: 접근성(axe-core, WCAG 2.2 A·AA와 권장 규칙)을 라이트·다크 모두에서 주요 화면·열린 메뉴·대화상자·메뉴 서랍 대상으로 검사. 통과·실패·오류가 섞인 실행을 API로 만들어 배지·차트까지 포함

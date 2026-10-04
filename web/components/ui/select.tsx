@@ -3,6 +3,7 @@
 import * as React from "react"
 import { cn } from "cn"
 import { Select as SelectPrimitive } from "radix-ui"
+import { getNonce } from "get-nonce"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
 function Select({
@@ -74,7 +75,9 @@ function SelectContent({
         {...props}
       >
         <SelectScrollUpButton />
+        {/* 스크롤바를 숨기는 <style>을 함께 그리므로 CSP nonce 전달 (app/providers.tsx에서 설정한 문서의 nonce) */}
         <SelectPrimitive.Viewport
+          nonce={getNonce()}
           data-position={position}
           className={cn(
             "data-[position=popper]:h-(--radix-select-trigger-height) data-[position=popper]:w-full data-[position=popper]:min-w-(--radix-select-trigger-width)",
