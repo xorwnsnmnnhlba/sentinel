@@ -43,6 +43,17 @@ sentinel:
     enabled: true
     # 발송 시각 (초 분 시 일 월 요일). sentinel.schedule.zone 기준. 꺼져 있었으면 켜진 뒤 1회 발송 (7일 이내)
     cron: "0 0 9 * * MON"
+  slowdown:
+    # 응답시간 악화 알림 (프로젝트 채널). 케이스·환경별 최근 24시간 p95가 그 전 7일보다 50% 이상이면서 100ms 이상 느리면 1회, 회복도 1회
+    enabled: true
+    # 확인 시각 (초 분 시 일 월 요일). sentinel.schedule.zone 기준
+    cron: "0 5 * * * *"
+    increase-ratio: 0.5
+    min-increase: 100ms
+    recent-window: 24h
+    baseline-window: 7d
+    # 두 기간 각각 필요한 최소 응답 수
+    min-samples: 5
   heartbeat:
     # 외부 생존 신호 주소. 스케줄 폴링이 DB까지 정상일 때마다 GET. 미지정 시 보내지 않음. 자격증명이므로 환경변수로 주입
     url: ${SENTINEL_HEARTBEAT_URL:}

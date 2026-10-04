@@ -17,7 +17,7 @@ import org.springframework.scheduling.support.CronTrigger;
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
 @EnableConfigurationProperties({ ScheduleProperties.class, RetentionProperties.class, DigestProperties.class,
-		HeartbeatProperties.class })
+		HeartbeatProperties.class, SlowdownProperties.class })
 @RequiredArgsConstructor
 class SchedulingConfig implements SchedulingConfigurer {
 
@@ -33,6 +33,10 @@ class SchedulingConfig implements SchedulingConfigurer {
 
 	private final WeeklyDigestSender digestSender;
 
+	private final SlowdownProperties slowdownProperties;
+
+	private final SlowdownDetector slowdownDetector;
+
 	@Override
 	public void configureTasks(ScheduledTaskRegistrar registrar) {
 		if (properties.enabled()) {
@@ -40,6 +44,11 @@ class SchedulingConfig implements SchedulingConfigurer {
 			// cron 작업 대신 주기 확인: 예정 시각에 꺼져 있었으면 켜진 뒤 발송 (스케줄과 같은 방식)
 			if (digestProperties.enabled()) {
 				registrar.addFixedDelayTask(digestSender::sendIfDue, properties.pollInterval());
+			}
+			// 놓친 확인은 다음 시각에 같은 기간으로 다시 보므로 cron 작업으로 충분
+			if (slowdownProperties.enabled()) {
+				registrar.addCronTask(new CronTask(slowdownDetector::check,
+						new CronTrigger(slowdownProperties.cron(), properties.zone())));
 			}
 		}
 		if (retentionProperties.enabled()) {
