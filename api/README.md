@@ -469,6 +469,7 @@ deploy-check:
 | 스위트 요약 | `GET /api/suite-summaries?from=&to=` | | | |
 | 불안정 케이스 | `GET /api/unstable-cases?from=&to=&suiteId=` | | | |
 | 모니터링 공백 | `GET /api/monitoring-gaps?from=&to=` | | | |
+| 지금 느린 케이스 | `GET /api/slowdowns?suiteId=` | | | |
 | 변경 이력 | `GET /api/change-logs?targetType=&targetId=&projectId=&suiteId=&page=0&size=20` | | | |
 
 - 케이스 검색 `q`: 이름·경로 부분 일치 (대소문자 무시, 앞뒤 공백 제거, `%`·`_`는 문자 그대로). 스위트별 실행 순서, 최대 100건. `suiteId`와 함께 쓰면 그 스위트 안에서만. 빈 검색어·200자 초과는 400
@@ -858,6 +859,14 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 - 최근 24시간 응답이 5건 미만이면(스케줄 중지 등) 판단하지 않고 열어 둠. 삭제된 케이스·환경의 열린 알림은 알리지 않고 닫음
 - 프로젝트별로 묶어 1건씩, 프로젝트 Webhook이 있으면 그 채널 ("프로젝트별 채널"). 늘어난 비율이 큰 순
 - 스케줄 폴링(`sentinel.schedule.enabled`)이 꺼져 있으면 함께 꺼짐. 확인 시각에 꺼져 있었으면 다음 시각에 같은 방식으로 다시 확인
+
+`GET /api/slowdowns?suiteId=`: 지금 느린 케이스·환경 (알림 후 아직 회복하지 않음), 감지 당시 늘어난 비율이 큰 순. `suiteId`는 그 스위트만. 삭제된 케이스·환경 제외
+
+```json
+[{"id": 3, "testCase": {"id": 12, "name": "결제 승인"}, "suite": {"id": 3, "name": "결제"}, "project": {"id": 1, "name": "결제"}, "environment": {"id": 2, "name": "dev"}, "baselineP95": 320, "detectedP95": 610, "increase": 0.906, "detectedAt": "2026-10-04T02:05:00Z"}]
+```
+
+- `baselineP95`·`detectedP95`·`increase`는 감지 당시 값 (지금 값은 대시보드 응답시간 변화·스위트 응답시간에서 확인)
 
 | 설정 | 기본값 | 설명 |
 |------|--------|------|
