@@ -18,6 +18,7 @@ describe("activeHref", () => {
     expect(activeHref("/runs/5")).toBe("/runs");
     expect(activeHref("/users")).toBe("/users");
     expect(activeHref("/holidays")).toBe("/holidays");
+    expect(activeHref("/notifications")).toBe("/notifications");
   });
 
   it("highlights nothing for screens outside the menu or paths that only share a prefix", () => {

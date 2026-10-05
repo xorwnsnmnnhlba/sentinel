@@ -42,6 +42,7 @@ import type { EnvironmentItem, MaintenanceWindow, ProjectItem, SuiteItem } from 
 import { historyHref, projectHistoryHref, suiteHistoryHref } from "@/lib/change-log";
 import { copyName, MAX_ENVIRONMENT_NAME_LENGTH } from "@/lib/copy-name";
 import { formatPeriod, maintenanceOf } from "@/lib/maintenance";
+import { notificationsHref } from "@/lib/notification-delivery";
 
 export async function generateMetadata(props: PageProps<"/projects/[id]">) {
   const { id } = await props.params;
@@ -383,6 +384,13 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
               서버 기본 채널로 보냅니다. 이 프로젝트를 담당하는 채널이 따로 있으면 Webhook을 지정해 주세요
             </p>
           )}
+          {/* 기본 채널로 간 알림은 프로젝트로 나누지 않으므로 Webhook이 없으면 전체 이력 */}
+          <Link
+            href={notificationsHref(project.webhookConfigured ? project.id : undefined)}
+            className="inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            발송 이력 보기
+          </Link>
         </div>
       </Panel>
     </div>
