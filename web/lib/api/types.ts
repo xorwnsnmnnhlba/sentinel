@@ -508,3 +508,24 @@ export interface IssuedAccessToken {
   token: string;
   accessToken: AccessTokenItem;
 }
+
+/** 알림 발송 1건 (api/README.md "발송 이력"). 주소·본문은 없음 */
+export interface NotificationDeliveryItem {
+  id: number;
+  sentAt: string;
+  /** DEFAULT: 서버 기본 채널(project null), PROJECT: 프로젝트 Webhook */
+  channel: "DEFAULT" | "PROJECT";
+  project: IdName | null;
+  /** LOG: 기본 채널 주소 미설정, 서버 로그에만 기록 */
+  format: "SLACK" | "TEAMS" | "TEXT" | "LOG";
+  title: string;
+  tone: NotificationTone;
+  /** 2xx 응답을 받음 (LOG는 true) */
+  delivered: boolean;
+  statusCode: number | null;
+  /** 응답을 받지 못한 사유 (TIMEOUT·CONNECTION_FAILED·BLOCKED_DESTINATION 등) */
+  error: string | null;
+}
+
+/** FAILURE: 실패·장애, WARNING: 악화·공백, SUCCESS: 복구·회복, INFO: 요약·확인 */
+export type NotificationTone = "FAILURE" | "WARNING" | "SUCCESS" | "INFO";

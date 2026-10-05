@@ -47,6 +47,10 @@ export function deliveryMessage(delivery: Delivery): string {
   if (delivery.statusCode !== null) {
     return `채널이 받지 않았습니다 (HTTP ${delivery.statusCode}). 주소와 채널 설정을 확인해 주세요`;
   }
-  const reason = delivery.error ? (ERROR_LABELS[delivery.error] ?? delivery.error) : "알 수 없는 이유";
-  return `테스트 알림을 보내지 못했습니다: ${reason}`;
+  return `테스트 알림을 보내지 못했습니다: ${failureReason(delivery.error)}`;
+}
+
+/** 응답을 받지 못한 사유 문구. 모르는 값은 그대로 */
+export function failureReason(error: string | null): string {
+  return error ? (ERROR_LABELS[error] ?? error) : "알 수 없는 이유";
 }
