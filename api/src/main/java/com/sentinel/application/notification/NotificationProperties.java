@@ -30,7 +30,7 @@ public record NotificationProperties(
 		webBaseUrl = webBaseUrl == null ? null : webBaseUrl.strip().replaceAll("/+$", "");
 	}
 
-	boolean hasWebhook() {
+	public boolean hasWebhook() {
 		return webhookUrl != null && !webhookUrl.isBlank();
 	}
 
