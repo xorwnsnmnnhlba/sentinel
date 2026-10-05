@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { problem, server, springUrl } from "@/test/msw";
 
-import { createHoliday, deleteHoliday } from "./holidays";
+import { createHoliday, deleteHoliday, importHolidays } from "./holidays";
 
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 
@@ -107,5 +107,52 @@ describe("deleteHoliday", () => {
     capture("delete", "/api/holidays/4", () => problem(403, "administrator role is required"));
 
     await expect(deleteHoliday(4)).resolves.toEqual({ error: "휴일은 관리자만 등록·삭제할 수 있습니다" });
+  });
+});
+
+describe("importHolidays", () => {
+  it("sends the pasted lines as holidays and reports what was skipped", async () => {
+    const bodies = capture("post", "/api/holiday-imports", () =>
+      HttpResponse.json(
+        {
+          created: [{ id: 2, date: "2026-12-25", name: "성탄절" }],
+          skipped: [{ id: 1, date: "2027-01-01", name: "신정" }],
+        },
+        { status: 201 },
+      ),
+    );
+
+    await expect(importHolidays(undefined, form({ lines: "2026.12.25 성탄절\n\n2027-01-01 새해" }))).resolves.toEqual({
+      created: [{ id: 2, date: "2026-12-25", name: "성탄절" }],
+      skipped: [{ id: 1, date: "2027-01-01", name: "신정" }],
+    });
+    expect(bodies).toEqual([
+      {
+        holidays: [
+          { date: "2026-12-25", name: "성탄절" },
+          { date: "2027-01-01", name: "새해" },
+        ],
+      },
+    ]);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("explains a line it cannot read without calling Spring", async () => {
+    const bodies = capture("post", "/api/holiday-imports", () => HttpResponse.json({}, { status: 201 }));
+
+    await expect(importHolidays(undefined, form({ lines: "2026-12-25 성탄절\n신정" }))).resolves.toEqual({
+      error: "2번째 줄: 날짜를 읽을 수 없습니다 (예: 2026-12-25 성탄절)",
+    });
+    await expect(importHolidays(undefined, form({}))).resolves.toEqual({ error: "붙여 넣은 휴일이 없습니다" });
+    expect(bodies).toEqual([]);
+  });
+
+  it("shows what Spring rejected", async () => {
+    capture("post", "/api/holiday-imports", () => problem(403, "administrator role is required"));
+
+    await expect(importHolidays(undefined, form({ lines: "2026-12-25 성탄절" }))).resolves.toEqual({
+      error: "휴일은 관리자만 등록·삭제할 수 있습니다",
+    });
+    expect(refresh).not.toHaveBeenCalled();
   });
 });

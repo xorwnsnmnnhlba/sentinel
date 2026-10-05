@@ -42,10 +42,11 @@ describe("TestNotificationButton", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "테스트 알림 보내기" }));
-    expect(screen.getByRole("button", { name: "보내는 중…" })).toBeDisabled();
+    // 전송 중 표시는 다음 렌더에서 나타나므로 기다림 (전체 테스트 부하에서 바로 확인하면 간헐 실패)
+    expect(await screen.findByRole("button", { name: "보내는 중…" })).toBeDisabled();
 
     finish({ error: "지정된 Webhook이 없습니다" });
     expect(await screen.findByText("지정된 Webhook이 없습니다")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "테스트 알림 보내기" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "테스트 알림 보내기" })).toBeEnabled();
   });
 });
