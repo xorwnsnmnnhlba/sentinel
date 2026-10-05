@@ -1,6 +1,6 @@
 "use client";
 
-import { FileClock, FolderKanban, History, LayoutDashboard, Menu, Search, UsersRound } from "lucide-react";
+import { CalendarOff, FileClock, FolderKanban, History, LayoutDashboard, Menu, Search, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -15,6 +15,7 @@ const navigation = [
   { href: "/search", label: "케이스 검색", icon: Search, match: [] as string[] },
   { href: "/runs", label: "실행 이력", icon: History, match: [] as string[] },
   { href: "/change-logs", label: "변경 이력", icon: FileClock, match: [] as string[] },
+  { href: "/holidays", label: "휴일", icon: CalendarOff, match: [] as string[] },
 ];
 
 const adminNavigation = [{ href: "/users", label: "사용자", icon: UsersRound, match: [] as string[] }];

@@ -203,6 +203,8 @@ export interface ScheduleDetail {
   cron: string;
   zone: string;
   enabled: boolean;
+  /** 등록한 휴일에는 실행하지 않음 */
+  skipHolidays: boolean;
   /** 비활성 시 null */
   nextRunAt: string | null;
   lastTriggeredAt: string | null;
@@ -345,7 +347,24 @@ export interface ResponseTimeChanges {
 
 /** 변경 이력 대상 (api/README.md "변경 이력") */
 export type ChangeTargetType =
-  "PROJECT" | "ENVIRONMENT" | "SUITE" | "CASE" | "SCHEDULE" | "MAINTENANCE_WINDOW" | "ACCESS_TOKEN" | "USER" | "INVITE";
+  | "PROJECT"
+  | "ENVIRONMENT"
+  | "SUITE"
+  | "CASE"
+  | "SCHEDULE"
+  | "MAINTENANCE_WINDOW"
+  | "HOLIDAY"
+  | "ACCESS_TOKEN"
+  | "USER"
+  | "INVITE";
+
+/** 휴일. 휴일 건너뛰기를 켠 스케줄은 이날 실행하지 않음 (api/README.md "휴일") */
+export interface Holiday {
+  id: number;
+  /** YYYY-MM-DD (KST) */
+  date: string;
+  name: string;
+}
 
 /** 환경 점검 시간. 점검 중에는 그 환경의 스케줄 실행을 건너뜀 (api/README.md "점검 시간") */
 export interface MaintenanceWindow {

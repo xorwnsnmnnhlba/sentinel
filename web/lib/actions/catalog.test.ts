@@ -563,8 +563,16 @@ describe("schedules", () => {
 
     await expect(createSchedule(2, undefined, form({ environmentId: "3", cron: "10 9 * * 1-5" }))).resolves.toEqual({});
 
-    expect(bodies).toEqual([{ suiteId: 2, environmentId: 3, cron: "10 9 * * 1-5" }]);
+    expect(bodies).toEqual([{ suiteId: 2, environmentId: 3, cron: "10 9 * * 1-5", skipHolidays: false }]);
     expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("creates a schedule that skips holidays when checked", async () => {
+    const bodies = capture("post", "/api/schedules", () => HttpResponse.json({ id: 5 }, { status: 201 }));
+
+    await createSchedule(2, undefined, form({ environmentId: "3", cron: "10 9 * * 1-5", skipHolidays: "true" }));
+
+    expect(bodies).toEqual([{ suiteId: 2, environmentId: 3, cron: "10 9 * * 1-5", skipHolidays: true }]);
   });
 
   it("requires an environment", async () => {
@@ -584,9 +592,14 @@ describe("schedules", () => {
   it("sends cron and environment when editing", async () => {
     const bodies = capture("patch", "/api/schedules/5", () => HttpResponse.json({ id: 5 }));
 
+    await updateSchedule(5, undefined, form({ cron: "30 17 * * 1-5", environmentId: "4", skipHolidays: "true" }));
+    // 체크 해제된 상자는 폼에 없음
     await updateSchedule(5, undefined, form({ cron: "30 17 * * 1-5", environmentId: "4" }));
 
-    expect(bodies).toEqual([{ cron: "30 17 * * 1-5", environmentId: 4 }]);
+    expect(bodies).toEqual([
+      { cron: "30 17 * * 1-5", environmentId: 4, skipHolidays: true },
+      { cron: "30 17 * * 1-5", environmentId: 4, skipHolidays: false },
+    ]);
   });
 
   it("requires an environment when editing", async () => {

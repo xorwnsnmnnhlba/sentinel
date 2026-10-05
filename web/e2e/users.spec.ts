@@ -59,6 +59,10 @@ test("초대 링크로 계정을 만들면 바로 로그인 상태", async ({ pa
   await expect(sidebar(page).getByText(member.email)).toBeVisible();
   // 구성원에게는 사용자 메뉴 미표시
   await expect(mainMenu(page).getByRole("link", { name: "사용자" })).toHaveCount(0);
+  // 휴일은 조회만 (추가·삭제는 관리자)
+  await mainMenu(page).getByRole("link", { name: "휴일" }).click();
+  await expect(page.getByRole("heading", { name: "휴일", level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: "휴일 추가" })).toHaveCount(0);
 });
 
 test("사용한 초대 링크는 다시 쓸 수 없음", async ({ page }) => {
