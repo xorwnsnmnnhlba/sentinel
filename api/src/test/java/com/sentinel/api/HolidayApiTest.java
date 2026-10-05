@@ -3,8 +3,11 @@ package com.sentinel.api;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import com.jayway.jsonpath.JsonPath;
 import com.sentinel.TestAuthConfiguration;
@@ -113,6 +116,82 @@ class HolidayApiTest {
 	}
 
 	@Test
+	void importsManyHolidaysAndSkipsDatesAlreadyRegistered() {
+		create("2027-01-01", "신정");
+
+		MvcTestResult imported = importHolidays("""
+				[{"date": "2026-12-25", "name": " 성탄절 "},
+				 {"date": "2027-01-01", "name": "새해"},
+				 {"date": "2027-02-07", "name": "설날"}]""");
+
+		assertThat(imported).hasStatus(HttpStatus.CREATED);
+		var body = assertThat(imported).bodyJson();
+		body.extractingPath("$.created[*].date").isEqualTo(List.of("2026-12-25", "2027-02-07"));
+		body.extractingPath("$.created[0].name").isEqualTo("성탄절");
+		// 이미 등록된 날짜는 기존 이름 그대로
+		body.extractingPath("$.skipped[*].name").isEqualTo(List.of("신정"));
+		assertThat(mvc.get().uri("/api/holidays?year=2027")).bodyJson()
+			.extractingPath("$[*].name")
+			.isEqualTo(List.of("신정", "설날"));
+
+		// 같은 목록을 다시 보내면 모두 건너뜀
+		assertThat(importHolidays("[{\"date\": \"2026-12-25\", \"name\": \"성탄절\"}]")).hasStatus(HttpStatus.CREATED)
+			.bodyJson()
+			.extractingPath("$.created.length()")
+			.isEqualTo(0);
+
+		// 등록한 휴일마다 변경 이력
+		long christmas = ((Number) JsonPath.read(body(imported), "$.created[0].id")).longValue();
+		assertThat(mvc.get().uri("/api/change-logs?targetType=HOLIDAY&targetId={id}", christmas)).bodyJson()
+			.extractingPath("$.content[0].targetName")
+			.isEqualTo("2026-12-25 성탄절");
+	}
+
+	@Test
+	void importsNothingWhenAnyHolidayIsInvalid() {
+		create("2027-01-01", "신정");
+
+		// 이미 등록된 날짜여도 이름은 확인
+		assertThat(importHolidays("""
+				[{"date": "2026-12-25", "name": "성탄절"}, {"date": "2027-01-01", "name": " "}]"""))
+			.hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("holidays[1] 2027-01-01: name must not be blank");
+		assertThat(importHolidays("""
+				[{"date": "2026-12-25", "name": "성탄절"}, {"date": "2026-12-25", "name": "크리스마스"}]"""))
+			.hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("holidays[1] 2026-12-25: appears more than once");
+		assertThat(importHolidays("[{\"name\": \"성탄절\"}]")).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("holidays[0]: date is required");
+		assertThat(importHolidays("[]")).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("holidays must not be empty");
+		assertThat(mvc.post().uri("/api/holiday-imports").contentType(MediaType.APPLICATION_JSON).content("{}"))
+			.hasStatus(HttpStatus.BAD_REQUEST);
+
+		assertThat(mvc.get().uri("/api/holidays?year=2026")).bodyJson().extractingPath("$.length()").isEqualTo(0);
+	}
+
+	@Test
+	void limitsTheNumberOfHolidaysPerImport() {
+		LocalDate first = LocalDate.parse("2026-01-01");
+		assertThat(importHolidays(holidays(first, 101))).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("at most 100 holidays can be imported at once");
+		assertThat(importHolidays(holidays(first, 100))).hasStatus(HttpStatus.CREATED)
+			.bodyJson()
+			.extractingPath("$.created.length()")
+			.isEqualTo(100);
+	}
+
+	@Test
 	void onlyAdministratorsCanCreateOrDelete() {
 		long hangul = id(create("2026-10-09", "한글날"));
 		String password = UUID.randomUUID().toString();
@@ -130,6 +209,12 @@ class HolidayApiTest {
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("{\"date\": \"2026-10-03\", \"name\": \"개천절\"}")).hasStatus(HttpStatus.FORBIDDEN);
 		assertThat(mvc.delete().uri("/api/holidays/{id}", hangul).header("Authorization", session))
+			.hasStatus(HttpStatus.FORBIDDEN);
+		assertThat(mvc.post()
+			.uri("/api/holiday-imports")
+			.header("Authorization", session)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"holidays\": [{\"date\": \"2026-10-03\", \"name\": \"개천절\"}]}"))
 			.hasStatus(HttpStatus.FORBIDDEN);
 		assertThat(mvc.get().uri("/api/holidays?year=2026")).bodyJson().extractingPath("$.length()").isEqualTo(1);
 	}
@@ -151,14 +236,32 @@ class HolidayApiTest {
 		return post("{\"date\": \"%s\", \"name\": \"%s\"}".formatted(date, name));
 	}
 
+	private MvcTestResult importHolidays(String holidays) {
+		return mvc.post()
+			.uri("/api/holiday-imports")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"holidays\": " + holidays + "}")
+			.exchange();
+	}
+
+	/** {@code from}부터 하루씩 {@code count}건 */
+	private static String holidays(LocalDate from, int count) {
+		return IntStream.range(0, count)
+			.mapToObj(i -> "{\"date\": \"%s\", \"name\": \"휴일 %d\"}".formatted(from.plusDays(i), i))
+			.collect(Collectors.joining(",", "[", "]"));
+	}
+
 	private MvcTestResult post(String body) {
 		return mvc.post().uri("/api/holidays").contentType(MediaType.APPLICATION_JSON).content(body).exchange();
 	}
 
 	private static long id(MvcTestResult result) {
+		return ((Number) JsonPath.read(body(result), "$.id")).longValue();
+	}
+
+	private static String body(MvcTestResult result) {
 		try {
-			return ((Number) JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.id"))
-				.longValue();
+			return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
 		}
 		catch (UnsupportedEncodingException ex) {
 			throw new IllegalStateException(ex);

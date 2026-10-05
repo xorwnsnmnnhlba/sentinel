@@ -3,6 +3,7 @@ package com.sentinel.api;
 import java.net.URI;
 import java.util.List;
 
+import com.sentinel.api.request.CreateHolidayImportRequest;
 import com.sentinel.api.request.CreateHolidayRequest;
 import com.sentinel.application.HolidayService;
 import com.sentinel.application.auth.AuthenticatedUser;
@@ -24,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 휴일. "휴일 건너뛰기"를 켠 스케줄은 이 날짜에 실행하지 않음. 모든 스케줄에 영향을 주므로 등록·삭제는 관리자만
  */
 @RestController
-@RequestMapping("/api/holidays")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 class HolidayController {
 
@@ -33,19 +34,29 @@ class HolidayController {
 	private final CurrentUser currentUser;
 
 	/** 그해 휴일, 날짜 순. 생략 시 올해 */
-	@GetMapping
+	@GetMapping("/holidays")
 	List<HolidayService.HolidayItem> list(@RequestParam(required = false) Integer year) {
 		return holidayService.list(year);
 	}
 
-	@PostMapping
+	@PostMapping("/holidays")
 	ResponseEntity<HolidayService.HolidayItem> create(@Valid @RequestBody CreateHolidayRequest request) {
 		AuthenticatedUser admin = currentUser.requireAdmin();
 		HolidayService.HolidayItem created = holidayService.create(request.date(), request.name(), admin.id());
 		return ResponseEntity.created(URI.create("/api/holidays/" + created.id())).body(created);
 	}
 
-	@DeleteMapping("/{holidayId}")
+	/**
+	 * 여러 휴일을 한 번에 등록. 이미 등록한 날짜는 건너뛰고 {@code skipped}로 알림. 한 건이라도 잘못되면 전부 미등록
+	 */
+	@PostMapping("/holiday-imports")
+	@ResponseStatus(HttpStatus.CREATED)
+	HolidayService.HolidayImport importHolidays(@RequestBody CreateHolidayImportRequest request) {
+		AuthenticatedUser admin = currentUser.requireAdmin();
+		return holidayService.importHolidays(request.holidays(), admin.id());
+	}
+
+	@DeleteMapping("/holidays/{holidayId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void delete(@PathVariable long holidayId) {
 		AuthenticatedUser admin = currentUser.requireAdmin();
