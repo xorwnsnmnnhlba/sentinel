@@ -2,7 +2,13 @@ package com.sentinel.application;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.sentinel.application.ChangeLogService.Target;
 import com.sentinel.domain.ChangeLog.Action;
@@ -20,6 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class HolidayService {
+
+	/** 한 번에 등록할 수 있는 휴일 수. 1년치 공휴일은 20건 안팎 */
+	public static final int MAX_IMPORT = 100;
 
 	private final HolidayRepository holidays;
 
@@ -47,6 +56,56 @@ public class HolidayService {
 		}
 		changeLog.record(actorId, target(holiday), Action.CREATED);
 		return HolidayItem.of(holiday);
+	}
+
+	/**
+	 * 여러 휴일을 한 트랜잭션으로 등록 (달력·문서에서 붙여 넣은 목록). 이미 등록한 날짜는 건너뜀 (같은 목록을 다시 붙여 넣어도 안전)
+	 * 한 건이라도 잘못되면 전부 미등록. 등록한 휴일마다 변경 이력
+	 * @throws InvalidRequestException 빈 목록·{@value #MAX_IMPORT}건 초과, 날짜 없음, 목록 안 같은 날짜, 이름 없음·100자 초과.
+	 * 메시지에 위치 표시 (예: {@code holidays[2] 2027-02-07: name must not be blank})
+	 */
+	@Transactional
+	public HolidayImport importHolidays(List<NewHoliday> requested, long actorId) {
+		if (requested == null || requested.isEmpty()) {
+			throw new InvalidRequestException("holidays must not be empty");
+		}
+		if (requested.size() > MAX_IMPORT) {
+			throw new InvalidRequestException("at most " + MAX_IMPORT + " holidays can be imported at once");
+		}
+		// 이름은 건너뛸 날짜도 확인 (잘못된 줄이 이미 등록된 날짜라는 이유로 조용히 통과하지 않도록)
+		Set<LocalDate> seen = new HashSet<>();
+		List<Holiday> candidates = new ArrayList<>();
+		for (int i = 0; i < requested.size(); i++) {
+			NewHoliday holiday = requested.get(i);
+			if (holiday == null || holiday.date() == null) {
+				throw new InvalidRequestException("holidays[" + i + "]: date is required");
+			}
+			if (!seen.add(holiday.date())) {
+				throw new InvalidRequestException("holidays[" + i + "] " + holiday.date() + ": appears more than once");
+			}
+			try {
+				candidates.add(new Holiday(holiday.date(), holiday.name(), actorId));
+			}
+			catch (IllegalArgumentException ex) {
+				throw new InvalidRequestException("holidays[" + i + "] " + holiday.date() + ": " + ex.getMessage());
+			}
+		}
+		Map<LocalDate, Holiday> existing = holidays.findByArchivedAtIsNullAndDateIn(seen)
+			.stream()
+			.collect(Collectors.toMap(Holiday::getDate, Function.identity()));
+		List<HolidayItem> created = new ArrayList<>();
+		List<HolidayItem> skipped = new ArrayList<>();
+		for (Holiday candidate : candidates) {
+			Holiday registered = existing.get(candidate.getDate());
+			if (registered != null) {
+				skipped.add(HolidayItem.of(registered));
+				continue;
+			}
+			Holiday saved = holidays.save(candidate);
+			changeLog.record(actorId, target(saved), Action.CREATED);
+			created.add(HolidayItem.of(saved));
+		}
+		return new HolidayImport(created, skipped);
 	}
 
 	/**
@@ -78,6 +137,17 @@ public class HolidayService {
 	/** 이름은 "날짜 이름" (예: 2026-10-09 한글날) */
 	private static Target target(Holiday holiday) {
 		return new Target(TargetType.HOLIDAY, holiday.getId(), holiday.getDate() + " " + holiday.getName(), null);
+	}
+
+	/** 등록 요청 1건 */
+	public record NewHoliday(LocalDate date, String name) {
+	}
+
+	/**
+	 * @param created 새로 등록한 휴일, 요청 순
+	 * @param skipped 이미 등록되어 건너뛴 날짜의 기존 휴일 (이름은 기존 이름)
+	 */
+	public record HolidayImport(List<HolidayItem> created, List<HolidayItem> skipped) {
 	}
 
 	public record HolidayItem(long id, LocalDate date, String name) {

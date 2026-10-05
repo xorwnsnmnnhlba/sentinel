@@ -463,7 +463,7 @@ deploy-check:
 | 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&failing=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs`, `PATCH /api/runs/{id}`(중지) | |
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
 | 점검 시간 | `GET /api/maintenance-windows?environmentId=` | | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
-| 휴일 | `GET /api/holidays?year=` | | `POST /api/holidays` | `DELETE /api/holidays/{id}` |
+| 휴일 | `GET /api/holidays?year=` | | `POST /api/holidays`, `POST /api/holiday-imports`(여러 건) | `DELETE /api/holidays/{id}` |
 | 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
 | 응답시간 변화 | `GET /api/response-time-changes?from=&to=&limit=5` | | | |
@@ -784,6 +784,7 @@ Skipped schedule 4 (suite 3) at 2026-09-29T01:10:00Z: environment 2 is under mai
 | `GET /api/holidays?year=` | 그해 휴일, 날짜 순. `year` 생략 시 올해(`sentinel.schedule.zone` 기준) |
 | `POST /api/holidays` | 등록. 본문 `{"date": "2026-10-09", "name": "한글날"}`. 201 + `Location`. 관리자만 (그 외 403) |
 | `DELETE /api/holidays/{id}` | 삭제. 그날도 다시 실행. 204. 관리자만 |
+| `POST /api/holiday-imports` | 여러 휴일을 한 번에 등록. 본문 `{"holidays": [{"date": "2026-12-25", "name": "성탄절"}, ...]}`. 201 + `{"created": [등록한 휴일], "skipped": [이미 등록되어 건너뛴 날짜의 기존 휴일]}`. 관리자만 |
 
 - 항목: `{id, date, name}`
 - 휴일 판단은 `sentinel.schedule.zone` 기준 날짜 (예: 09:00 KST 스케줄은 UTC로 전날이어도 KST 날짜로 판단)
@@ -791,6 +792,7 @@ Skipped schedule 4 (suite 3) at 2026-09-29T01:10:00Z: environment 2 is under mai
 - 공휴일 자동 반영 없음 (대체공휴일·임시공휴일 포함 화면에서 직접 등록). 모든 스케줄에 영향을 주므로 등록·삭제는 관리자만, 조회는 모든 사용자
 - 건너뛴 스케줄은 점검 시간과 같이 `nextRunAt`만 옮김 (실행 기록·알림·모니터링 공백 없음). INFO 로그 1줄. 수동 실행은 휴일에도 가능
 - 등록·삭제는 변경 이력(`HOLIDAY`)에 기록
+- 한 번에 등록: 1~100건, 한 트랜잭션. 이미 등록한 날짜는 건너뜀 (같은 목록을 다시 보내도 중복 없음). 날짜 없음·목록 안 같은 날짜·잘못된 이름(건너뛸 날짜 포함)이 한 건이라도 있으면 전부 미등록 400 (`holidays[1] 2027-01-01: name must not be blank`처럼 위치 표시). 등록한 휴일마다 변경 이력
 
 ```
 Skipped schedule 4 (suite 3) at 2026-10-09T00:10:00Z: 2026-10-09 is a holiday
