@@ -3,7 +3,8 @@
 import { refresh } from "next/cache";
 
 import { apiSend, isApiError } from "@/lib/api/server";
-import { holidayError } from "@/lib/holiday";
+import type { Holiday } from "@/lib/api/types";
+import { holidayError, parseHolidayLines } from "@/lib/holiday";
 
 /**
  * 휴일 등록·삭제. 모든 스케줄에 영향을 주므로 관리자만 (그 외는 Spring이 403)
@@ -11,6 +12,9 @@ import { holidayError } from "@/lib/holiday";
  */
 
 export type ActionState = { error?: string } | undefined;
+
+/** 여러 건 등록 결과. 성공하면 새로 등록한 휴일과 이미 등록되어 건너뛴 휴일 */
+export type ImportState = { created?: Holiday[]; skipped?: Holiday[]; error?: string } | undefined;
 
 export async function createHoliday(_: ActionState, form: FormData): Promise<ActionState> {
   const date = String(form.get("date") ?? "");
@@ -29,6 +33,26 @@ export async function createHoliday(_: ActionState, form: FormData): Promise<Act
   }
   refresh();
   return {};
+}
+
+/**
+ * 붙여 넣은 여러 줄("날짜 이름")을 한 번에 등록. 이미 등록한 날짜는 건너뜀, 잘못된 줄이 있으면 전부 미등록
+ */
+export async function importHolidays(_: ImportState, form: FormData): Promise<ImportState> {
+  const parsed = parseHolidayLines(String(form.get("lines") ?? ""));
+  if ("error" in parsed) {
+    return { error: parsed.error };
+  }
+  let result: { created: Holiday[]; skipped: Holiday[] } | null;
+  try {
+    result = await apiSend<{ created: Holiday[]; skipped: Holiday[] }>("POST", "/api/holiday-imports", {
+      holidays: parsed.holidays,
+    });
+  } catch (error) {
+    return { error: message(error) };
+  }
+  refresh();
+  return { created: result?.created ?? [], skipped: result?.skipped ?? [] };
 }
 
 /** 삭제하면 그날도 스케줄 실행 */

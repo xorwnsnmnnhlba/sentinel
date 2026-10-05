@@ -6,11 +6,12 @@ import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { TextField } from "@/components/catalog/field";
 import { FormDialog } from "@/components/catalog/form-dialog";
 import { Panel, PanelEmpty } from "@/components/catalog/section";
+import { HolidayImportDialog } from "@/components/holiday/holiday-import-dialog";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { createHoliday, deleteHoliday } from "@/lib/actions/holidays";
+import { createHoliday, deleteHoliday, importHolidays } from "@/lib/actions/holidays";
 import { apiGet } from "@/lib/api/server";
 import type { AuthenticatedUser, Holiday } from "@/lib/api/types";
 import { historyHref } from "@/lib/change-log";
@@ -31,6 +32,7 @@ export default async function HolidaysPage(props: PageProps<"/holidays">) {
     apiGet<AuthenticatedUser>("/api/sessions/current"),
   ]);
   const isAdmin = me.role === "ADMIN";
+  const thisYear = year === Number(today.slice(0, 4));
 
   return (
     <div className="space-y-4">
@@ -38,26 +40,29 @@ export default async function HolidaysPage(props: PageProps<"/holidays">) {
         title="휴일"
         actions={
           isAdmin && (
-            <FormDialog
-              trigger={
-                <Button>
-                  <Plus /> 휴일 추가
-                </Button>
-              }
-              title="휴일 추가"
-              description="휴일 건너뛰기를 켠 스케줄은 이날 실행하지 않습니다."
-              submitLabel="등록"
-              action={createHoliday}
-            >
-              <TextField name="date" label="날짜 (KST)" type="date" required />
-              <TextField
-                name="name"
-                label="이름"
-                required
-                maxLength={MAX_NAME_LENGTH}
-                placeholder="예: 추석, 창립기념일"
-              />
-            </FormDialog>
+            <>
+              <HolidayImportDialog action={importHolidays} />
+              <FormDialog
+                trigger={
+                  <Button>
+                    <Plus /> 휴일 추가
+                  </Button>
+                }
+                title="휴일 추가"
+                description="휴일 건너뛰기를 켠 스케줄은 이날 실행하지 않습니다."
+                submitLabel="등록"
+                action={createHoliday}
+              >
+                <TextField name="date" label="날짜 (KST)" type="date" required />
+                <TextField
+                  name="name"
+                  label="이름"
+                  required
+                  maxLength={MAX_NAME_LENGTH}
+                  placeholder="예: 추석, 창립기념일"
+                />
+              </FormDialog>
+            </>
           )
         }
       />
@@ -65,11 +70,12 @@ export default async function HolidaysPage(props: PageProps<"/holidays">) {
       <Panel
         title={`${year}년`}
         count={holidays.length}
-        meta={upcomingLabel(holidays, today)}
+        // 오늘·다음 휴일은 올해 목록에서만 (다른 해의 첫 휴일을 "다음"으로 보이지 않도록)
+        meta={thisYear ? upcomingLabel(holidays, today) : undefined}
         action={
           <div className="flex gap-1">
             <YearLink year={year - 1} icon="previous" />
-            {year !== Number(today.slice(0, 4)) && (
+            {!thisYear && (
               <Button asChild variant="outline" size="sm">
                 <Link href="/holidays">올해</Link>
               </Button>

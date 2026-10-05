@@ -11,6 +11,8 @@ const stamp = Date.now();
 const year = 2090 + (stamp % 10);
 const date = `${year}-${String((stamp % 12) + 1).padStart(2, "0")}-${String((stamp % 28) + 1).padStart(2, "0")}`;
 const name = `창립기념일-${stamp}`;
+/** 붙여넣기용 해. 위 날짜와 겹치지 않는 범위 */
+const pasteYear = 2040 + (stamp % 40);
 
 let suiteId = 0;
 
@@ -96,4 +98,35 @@ test("스케줄 대화상자에서 휴일 건너뛰기를 켜고 끔", async ({ 
   await edit.getByRole("button", { name: "저장" }).click();
   await expect(edit).toBeHidden();
   await expect(row).not.toContainText("휴일 제외");
+});
+
+test("여러 건을 붙여 넣으면 이미 등록한 날짜는 건너뛰고 나머지를 등록", async ({ page, request }) => {
+  await create(request, "/api/holidays", { date: `${pasteYear}-05-05`, name: `어린이날-${stamp}` });
+  await page.goto(`/holidays?year=${pasteYear}`);
+
+  await page.getByRole("button", { name: "여러 건 붙여넣기" }).click();
+  const dialog = page.getByRole("dialog", { name: "휴일 여러 건 붙여넣기" });
+  const lines = dialog.getByLabel("휴일 목록 (KST)");
+  await lines.fill(`${pasteYear}-03-01 삼일절-${stamp}\n잘못된 줄`);
+  await expect(dialog.getByText("2번째 줄: 날짜를 읽을 수 없습니다 (예: 2026-12-25 성탄절)")).toBeVisible();
+  expect(await accessibilityViolations(page)).toEqual([]);
+
+  await lines.fill(
+    [`${pasteYear}-03-01 삼일절-${stamp}`, `${pasteYear}.5.5 어린이날`, `${pasteYear}/06/06 (수) 현충일-${stamp}`].join(
+      "\n",
+    ),
+  );
+  await expect(dialog.getByText("3건", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "등록" }).click();
+
+  await expect(dialog.getByRole("status")).toHaveText("2건 등록, 이미 등록되어 1건 건너뜀");
+  // 건너뛴 날짜는 기존 이름
+  await expect(dialog.getByRole("list", { name: "건너뛴 휴일" })).toContainText(`어린이날-${stamp}`);
+  await dialog.getByRole("button", { name: "닫기" }).click();
+  await expect(dialog).toBeHidden();
+
+  const table = page.getByRole("table", { name: `${pasteYear}년 휴일` });
+  await expect(table.getByRole("row", { name: new RegExp(`삼일절-${stamp}`) })).toContainText(`${pasteYear}-03-01`);
+  await expect(table.getByRole("row", { name: new RegExp(`현충일-${stamp}`) })).toContainText(`${pasteYear}-06-06`);
+  await expect(table.getByRole("row", { name: new RegExp(`어린이날-${stamp}`) })).toHaveCount(1);
 });
