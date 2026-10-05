@@ -42,17 +42,17 @@ class ScheduleController {
 	@PostMapping
 	ResponseEntity<ScheduleDetail> create(@Valid @RequestBody CreateScheduleRequest request) {
 		ScheduleDetail schedule = scheduleService.create(request.suiteId(), request.environmentId(), request.cron(),
-				currentUser.get().id());
+				Boolean.TRUE.equals(request.skipHolidays()), currentUser.get().id());
 		return ResponseEntity.created(URI.create("/api/schedules/" + schedule.id())).body(schedule);
 	}
 
 	/**
-	 * 부분 수정. enabled, cron, environmentId 지원, 생략한 필드는 유지
+	 * 부분 수정. enabled, cron, environmentId, skipHolidays 지원, 생략한 필드는 유지
 	 */
 	@PatchMapping("/{scheduleId}")
 	ScheduleDetail update(@PathVariable long scheduleId, @RequestBody UpdateScheduleRequest request) {
 		return scheduleService.update(scheduleId, request.enabled(), request.cron(), request.environmentId(),
-				currentUser.get().id());
+				request.skipHolidays(), currentUser.get().id());
 	}
 
 	/**

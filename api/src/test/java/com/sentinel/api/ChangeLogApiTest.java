@@ -113,12 +113,16 @@ class ChangeLogApiTest {
 				{"suiteId": %d, "environmentId": %d, "cron": "10 9 * * 1-5"}""".formatted(suite, environment)));
 
 		patch("/api/schedules/" + schedule, "{\"enabled\": false, \"cron\": \"0 18 * * *\"}");
+		patch("/api/schedules/" + schedule, "{\"skipHolidays\": true}");
+		// 바뀐 것이 없으면 기록하지 않음
+		patch("/api/schedules/" + schedule, "{\"skipHolidays\": true}");
 		mvc.delete().uri("/api/schedules/{id}", schedule).exchange();
 
 		String logs = logs("targetType=SCHEDULE&targetId=" + schedule);
 		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].action")).containsExactly("DELETED", "UPDATED",
-				"CREATED");
-		assertThat(JsonPath.<List<String>>read(logs, "$.content[1].fields")).containsExactly("cron", "enabled");
+				"UPDATED", "CREATED");
+		assertThat(JsonPath.<List<String>>read(logs, "$.content[1].fields")).containsExactly("skipHolidays");
+		assertThat(JsonPath.<List<String>>read(logs, "$.content[2].fields")).containsExactly("cron", "enabled");
 		// 스케줄은 스위트 이름으로 표시
 		assertThat(JsonPath.<String>read(logs, "$.content[0].targetName")).isEqualTo("smoke");
 	}

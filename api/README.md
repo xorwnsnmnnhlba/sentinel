@@ -463,6 +463,7 @@ deploy-check:
 | 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&failing=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs`, `PATCH /api/runs/{id}`(중지) | |
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
 | 점검 시간 | `GET /api/maintenance-windows?environmentId=` | | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
+| 휴일 | `GET /api/holidays?year=` | | `POST /api/holidays` | `DELETE /api/holidays/{id}` |
 | 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
 | 응답시간 변화 | `GET /api/response-time-changes?from=&to=&limit=5` | | | |
@@ -667,6 +668,7 @@ deploy-check:
 | `PROJECT`·`ENVIRONMENT`·`SUITE`·`CASE`·`SCHEDULE`·`MAINTENANCE_WINDOW` | 등록·수정·삭제 (케이스 가져오기는 케이스마다 등록) | 요청한 사용자 |
 | `ACCESS_TOKEN` | API 토큰 발급(`CREATED`)·폐기(`DELETED`) (`targetName`은 토큰 이름) | 토큰 주인 |
 | `INVITE` | 초대 링크 발급 (`targetName`은 이메일) | 관리자 |
+| `HOLIDAY` | 휴일 등록·삭제 (`targetName`은 "날짜 이름", 예: `2026-10-09 한글날`) | 관리자 |
 | `USER` | 가입(초대 수락), 비밀번호 변경·재설정, 재설정 링크 발급, 삭제 | 가입·비밀번호는 본인, 링크 발급·삭제는 관리자 |
 
 - 항목: `{id, occurredAt, actor: {id, name(이메일)}, targetType, targetId, targetName, projectId, action, fields}`
@@ -675,7 +677,7 @@ deploy-check:
   - `projectId`: 소속 프로젝트. 사용자·초대는 `null`
   - `suiteId`: 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 `null`
   - `fields`: 수정에서 값이 실제로 바뀐 항목 이름. 등록·삭제는 빈 목록
-- `fields` 값: 프로젝트·스위트 `name`·`description`, 스위트 `caseOrder`, 환경 `name`·`baseUrl`·`variables.<키>`·`secrets.<이름>`, 케이스 `name`·`request`·`assertions`·`extractors`, 프로젝트 `webhook`, 스케줄 `environment`·`cron`·`enabled`, 점검 시간 `startsAt`·`endsAt`·`reason`, 사용자 `password`·`passwordResetLink`
+- `fields` 값: 프로젝트·스위트 `name`·`description`, 스위트 `caseOrder`, 환경 `name`·`baseUrl`·`variables.<키>`·`secrets.<이름>`, 케이스 `name`·`request`·`assertions`·`extractors`, 프로젝트 `webhook`, 스케줄 `environment`·`cron`·`enabled`·`skipHolidays`, 점검 시간 `startsAt`·`endsAt`·`reason`, 사용자 `password`·`passwordResetLink`
 - 값은 남기지 않음 (변수 값, 시크릿, 비밀번호, 링크 토큰 모두). 시크릿은 암호화 값을 비교할 수 없어 요청에 있던 이름을 모두 변경으로 기록
 - 같은 값으로 저장한 수정은 기록하지 않음. 삭제는 대상 1건만 기록 (프로젝트 삭제 시 함께 보관되는 환경·스위트·케이스·스케줄은 따로 기록하지 않음)
 - 스케줄러가 다음 실행 시각을 옮기는 것과 실행 자체는 기록하지 않음 (실행은 실행 이력)
@@ -686,9 +688,9 @@ deploy-check:
 
 | API | 설명 |
 |-----|------|
-| `POST /api/schedules` | 스케줄 등록. 본문 `{"suiteId": 1, "environmentId": 1, "cron": "10 9 * * 1-5"}`. 201 + `Location` |
+| `POST /api/schedules` | 스케줄 등록. 본문 `{"suiteId": 1, "environmentId": 1, "cron": "10 9 * * 1-5", "skipHolidays": true}`. `skipHolidays` 생략 시 `false`. 201 + `Location` |
 | `GET /api/schedules/{id}` | 조회. `nextRunAt`(다음 실행 시각), `lastTriggeredAt`(마지막 실행 시각) 포함 |
-| `PATCH /api/schedules/{id}` | 부분 수정. `{"enabled": false}`는 `nextRunAt` 제거, `{"enabled": true}`는 현재 시각 기준 재계산. `{"cron": "30 17 * * 1-5"}`는 활성 상태면 `nextRunAt` 재계산. `{"environmentId": 2}`는 실행 환경 변경(스위트와 같은 프로젝트만, 다르면 400). 생략한 필드는 유지 |
+| `PATCH /api/schedules/{id}` | 부분 수정. `{"enabled": false}`는 `nextRunAt` 제거, `{"enabled": true}`는 현재 시각 기준 재계산. `{"cron": "30 17 * * 1-5"}`는 활성 상태면 `nextRunAt` 재계산. `{"environmentId": 2}`는 실행 환경 변경(스위트와 같은 프로젝트만, 다르면 400). `{"skipHolidays": true}`는 휴일 건너뛰기 켜기. 생략한 필드는 유지 |
 
 - cron은 5자리 표준 형식(`분 시 일 월 요일`), `Asia/Seoul` 기준. 예: `10 9 * * 1-5` = 평일 09:10
 - 60초 간격 폴링으로 실행 시각 도달 스케줄의 스위트 실행 (`trigger: SCHEDULED`)
@@ -697,6 +699,7 @@ deploy-check:
 - DB 접속 실패 시 해당 주기 건너뜀. 연결 실패 시 1회, 복구 시 1회 알림
 - 예정 시각보다 10분 넘게 늦게 실행된 스케줄이 있으면 모니터링 공백으로 기록·알림 (아래 "모니터링 공백")
 - 환경이 점검 중이면 그 환경의 스케줄은 실행하지 않고 다음 실행 시각으로 넘어감 (아래 "점검 시간")
+- 휴일 건너뛰기(`skipHolidays`)를 켠 스케줄은 등록한 휴일에 실행하지 않음 (아래 "휴일")
 - 실행 완료 시 INFO 로그 1줄 (수동·스케줄 공통)
 
 ```
@@ -721,7 +724,7 @@ Sentinel 중지·서버 절전·DB 연결 끊김 등으로 스케줄이 제때 �
 - 감지: 폴링이 재개될 때 예정 시각보다 기준 시간(`gap-threshold`) 넘게 늦은 스케줄이 있으면 기록. 멈춰 있는 동안은 알 수 없으므로 재개 후 알림
 - 기간: 늦은 스케줄 중 가장 이른 예정 시각 ~ 폴링 재개 시각. 스케줄이 없거나 하루 1회뿐이면 실제 중지 시각보다 늦게 시작할 수 있음
 - 공백이 끝난 뒤 기준 시간 안에 다시 시작된 공백은 한 건으로 합침 (밀린 실행을 처리하느라 다음 폴링이 늦어진 경우 등). 합친 공백은 다시 알리지 않음
-- 점검 시간으로 건너뛴 스케줄, 비활성 스케줄은 해당 없음 (다음 실행 시각이 제때 옮겨짐)
+- 점검 시간·휴일로 건너뛴 스케줄, 비활성 스케줄은 해당 없음 (다음 실행 시각이 제때 옮겨짐)
 - 기록하지 못해도 알림은 발송. DB 연결 복구 알림을 보낸 주기는 같은 기간이므로 공백 알림 생략 (기록은 함)
 
 멈춘 그 순간에 알려면 아래 "외부 생존 신호"
@@ -770,6 +773,27 @@ Sentinel 중지·서버 절전·DB 연결 끊김 등으로 스케줄이 제때 �
 
 ```
 Skipped schedule 4 (suite 3) at 2026-09-29T01:10:00Z: environment 2 is under maintenance until 2026-09-29T02:00:00Z
+```
+
+### 휴일
+
+공휴일·창립기념일 등 대상 시스템도 쉬는 날에 스케줄 실행을 건너뜀. 평일 cron(`1-5`)만으로는 거를 수 없는 날용. 스케줄마다 휴일 건너뛰기(`skipHolidays`)를 켠 경우만 해당 (24시간 감시 스케줄은 휴일에도 실행)
+
+| API | 설명 |
+|-----|------|
+| `GET /api/holidays?year=` | 그해 휴일, 날짜 순. `year` 생략 시 올해(`sentinel.schedule.zone` 기준) |
+| `POST /api/holidays` | 등록. 본문 `{"date": "2026-10-09", "name": "한글날"}`. 201 + `Location`. 관리자만 (그 외 403) |
+| `DELETE /api/holidays/{id}` | 삭제. 그날도 다시 실행. 204. 관리자만 |
+
+- 항목: `{id, date, name}`
+- 휴일 판단은 `sentinel.schedule.zone` 기준 날짜 (예: 09:00 KST 스케줄은 UTC로 전날이어도 KST 날짜로 판단)
+- `name`: 앞뒤 공백 제거 후 1~100자. 이미 등록한 날짜는 409 (삭제 후 다시 등록 가능)
+- 공휴일 자동 반영 없음 (대체공휴일·임시공휴일 포함 화면에서 직접 등록). 모든 스케줄에 영향을 주므로 등록·삭제는 관리자만, 조회는 모든 사용자
+- 건너뛴 스케줄은 점검 시간과 같이 `nextRunAt`만 옮김 (실행 기록·알림·모니터링 공백 없음). INFO 로그 1줄. 수동 실행은 휴일에도 가능
+- 등록·삭제는 변경 이력(`HOLIDAY`)에 기록
+
+```
+Skipped schedule 4 (suite 3) at 2026-10-09T00:10:00Z: 2026-10-09 is a holiday
 ```
 
 ## 결과 원문 보관기간
