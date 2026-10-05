@@ -34,6 +34,7 @@ describe("fieldLabel", () => {
     ["caseOrder", "실행 순서"],
     ["endsAt", "끝 시각"],
     ["reason", "사유"],
+    ["skipHolidays", "휴일 건너뛰기"],
     ["passwordResetLink", "비밀번호 재설정 링크 발급"],
     ["variables.userId", "변수 userId"],
     ["secrets.token", "시크릿 token"],
@@ -62,6 +63,11 @@ describe("targetHref", () => {
     expect(targetHref(log({ targetType: "ENVIRONMENT", targetId: 9, projectId: 3 }))).toBe("/projects/3");
     // 점검 시간도 환경이 있는 프로젝트 화면
     expect(targetHref(log({ targetType: "MAINTENANCE_WINDOW", targetId: 2, projectId: 3 }))).toBe("/projects/3");
+    // 휴일은 그해 휴일 화면 (이름이 "날짜 이름")
+    expect(targetHref(log({ targetType: "HOLIDAY", targetName: "2027-01-01 신정", projectId: null }))).toBe(
+      "/holidays?year=2027",
+    );
+    expect(targetHref(log({ targetType: "HOLIDAY", targetName: "신정", projectId: null }))).toBe("/holidays");
   });
 
   it("offers no link for deletions and targets without a screen", () => {
@@ -69,6 +75,7 @@ describe("targetHref", () => {
     expect(targetHref(log({ targetType: "SCHEDULE" }))).toBeNull();
     expect(targetHref(log({ targetType: "USER", projectId: null }))).toBeNull();
     expect(targetHref(log({ targetType: "INVITE", projectId: null }))).toBeNull();
+    expect(targetHref(log({ targetType: "HOLIDAY", targetName: "2026-10-09 한글날", action: "DELETED" }))).toBeNull();
     expect(targetHref(log({ targetType: "ENVIRONMENT", projectId: null }))).toBeNull();
   });
 });

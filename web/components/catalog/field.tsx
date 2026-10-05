@@ -22,7 +22,7 @@ export function TextField({
   placeholder?: string;
   hint?: string;
   multiline?: boolean;
-  type?: "text" | "url" | "datetime-local";
+  type?: "text" | "url" | "date" | "datetime-local";
 }) {
   const id = `field-${name}`;
   const props = {

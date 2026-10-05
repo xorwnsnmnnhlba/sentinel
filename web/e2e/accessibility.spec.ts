@@ -91,6 +91,7 @@ for (const colorScheme of ["light", "dark"] as const) {
         "/search?q=invites",
         `/change-logs?targetType=CASE&targetId=${ids.passingCase}`,
         "/users",
+        "/holidays",
         "/settings/password",
       ];
       for (const path of paths) {

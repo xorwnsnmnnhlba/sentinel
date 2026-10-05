@@ -17,6 +17,7 @@ import { ScheduleToggle } from "@/components/catalog/schedule-toggle";
 import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
 import { SlowBadge, UnstableBadge } from "@/components/run-badges";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -290,7 +291,12 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
             <TableBody>
               {schedules.map((schedule) => (
                 <TableRow key={schedule.id}>
-                  <TableCell className="font-mono text-xs">{schedule.cron}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    <div className="flex items-center gap-2">
+                      {schedule.cron}
+                      {schedule.skipHolidays && <Badge variant="outline">휴일 제외</Badge>}
+                    </div>
+                  </TableCell>
                   <TableCell>{environmentNames.get(schedule.environmentId) ?? "-"}</TableCell>
                   <TableCell className="font-mono text-xs">
                     {schedule.nextRunAt ? formatDateTime(schedule.nextRunAt) : "-"}
@@ -313,7 +319,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                       <FormDialog
                         menuId="edit"
                         title="스케줄 수정"
-                        description="환경·cron 변경. 활성 상태면 다음 실행 시각을 현재 시각 기준으로 다시 계산합니다."
+                        description="환경·cron·휴일 건너뛰기 변경. 활성 상태면 다음 실행 시각을 현재 시각 기준으로 다시 계산합니다."
                         submitLabel="저장"
                         action={updateSchedule.bind(null, schedule.id)}
                       >

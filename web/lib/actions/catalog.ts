@@ -290,16 +290,26 @@ export async function createSchedule(suiteId: number, _: ActionState, form: Form
   if (!Number.isSafeInteger(environmentId) || environmentId <= 0) {
     return { error: "실행할 환경을 선택해 주세요" };
   }
-  return mutate("POST", "/api/schedules", { suiteId: id(suiteId), environmentId, cron: raw(form, "cron") });
+  return mutate("POST", "/api/schedules", {
+    suiteId: id(suiteId),
+    environmentId,
+    cron: raw(form, "cron"),
+    skipHolidays: form.get("skipHolidays") === "true",
+  });
 }
 
-/** cron·환경 변경. 활성 상태면 다음 실행 시각 재계산 */
+/** cron·환경·휴일 건너뛰기 변경. 활성 상태면 다음 실행 시각 재계산 */
 export async function updateSchedule(scheduleId: number, _: ActionState, form: FormData): Promise<ActionState> {
   const environmentId = Number(form.get("environmentId"));
   if (!Number.isSafeInteger(environmentId) || environmentId <= 0) {
     return { error: "실행할 환경을 선택해 주세요" };
   }
-  return mutate("PATCH", `/api/schedules/${id(scheduleId)}`, { cron: raw(form, "cron"), environmentId });
+  // 체크 해제된 상자는 폼에 없으므로 false (수정 대화상자는 항상 상자를 표시)
+  return mutate("PATCH", `/api/schedules/${id(scheduleId)}`, {
+    cron: raw(form, "cron"),
+    environmentId,
+    skipHolidays: form.get("skipHolidays") === "true",
+  });
 }
 
 /** 활성·비활성 전환. 활성화 시 현재 시각 기준으로 다음 실행 시각 재계산 */
