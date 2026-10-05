@@ -15,13 +15,14 @@ class NotificationConfig {
 
 	/** Webhook 주소 지정 시 발송, 미지정 시 로그 기록. 주소는 자격증명이므로 로그에 남기지 않음 */
 	@Bean
-	Notifier notifier(NotificationProperties properties) {
+	Notifier notifier(NotificationProperties properties, DeliveryLog deliveries) {
 		if (!properties.hasWebhook()) {
 			log.info("Notifications are written to the log (sentinel.notification.webhook-url is not set)");
-			return new LoggingNotifier();
+			return new LoggingNotifier(deliveries);
 		}
 		log.info("Notifications are sent to the configured webhook");
-		return new WebhookNotifier(properties.webhookUrl(), properties.connectTimeout(), properties.readTimeout());
+		return new WebhookNotifier(properties.webhookUrl(), properties.connectTimeout(), properties.readTimeout(),
+				deliveries);
 	}
 
 	/** 프로젝트 Webhook 발송. 실행기와 같은 목적지 확인, 알림 제한 시간 */

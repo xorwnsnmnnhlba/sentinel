@@ -29,4 +29,17 @@ public final class HttpFailures {
 		return ex.getClass().getSimpleName();
 	}
 
+	/**
+	 * 응답을 받지 못한 사유. 실행기({@code RequestExecutionException.Reason})와 같은 이름
+	 * @return TIMEOUT, CONNECTION_FAILED, IO_ERROR
+	 */
+	public static String reason(RestClientException ex) {
+		if (ex instanceof ResourceAccessException) {
+			Throwable cause = ex.getCause();
+			return cause instanceof HttpTimeoutException || cause instanceof SocketTimeoutException ? "TIMEOUT"
+					: "CONNECTION_FAILED";
+		}
+		return "IO_ERROR";
+	}
+
 }

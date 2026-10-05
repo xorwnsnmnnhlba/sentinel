@@ -62,6 +62,8 @@ sentinel:
     enabled: true
     # 요청·응답 원문(헤더·본문) 보관 기간. 지나면 원문만 비우고 실행·판정 기록은 유지
     raw-retention: 30d
+    # 알림 발송 이력 보관 기간. 지나면 삭제
+    notification-retention: 90d
     # 정리 배치 실행 시각 (초 분 시 일 월 요일). sentinel.schedule.zone 기준
     cron: "0 30 3 * * *"
     batch-size: 500

@@ -138,6 +138,24 @@ class ProjectWebhookApiTest {
 		var rejected = assertThat(testNotification()).hasStatusOk().bodyJson();
 		rejected.extractingPath("$.delivered").isEqualTo(false);
 		rejected.extractingPath("$.statusCode").isEqualTo(404);
+
+		// 발송 이력: 최신순, 프로젝트 채널, 주소는 남기지 않음
+		MvcTestResult deliveries = mvc.get()
+			.uri("/api/notification-deliveries?projectId={id}", project.getId())
+			.exchange();
+		var history = assertThat(deliveries).hasStatusOk().bodyJson();
+		history.extractingPath("$.content[*].delivered").isEqualTo(List.of(false, true));
+		history.extractingPath("$.content[*].statusCode").isEqualTo(List.of(404, 200));
+		history.extractingPath("$.content[0].channel").isEqualTo("PROJECT");
+		history.extractingPath("$.content[0].format").isEqualTo("TEXT");
+		history.extractingPath("$.content[0].project.name").isEqualTo(project.getName());
+		history.extractingPath("$.content[0].title").isEqualTo("[Sentinel] " + project.getName() + " 알림 연결 확인");
+		history.extractingPath("$.content[0].tone").isEqualTo("INFO");
+		assertThat(body(deliveries)).doesNotContain("127.0.0.1").doesNotContain("/hook");
+		assertThat(mvc.get().uri("/api/notification-deliveries?projectId={id}&failed=true", project.getId()))
+			.bodyJson()
+			.extractingPath("$.content[*].statusCode")
+			.isEqualTo(List.of(404));
 	}
 
 	@Test
@@ -148,6 +166,9 @@ class ProjectWebhookApiTest {
 		blocked.extractingPath("$.delivered").isEqualTo(false);
 		blocked.extractingPath("$.error").isEqualTo("BLOCKED_DESTINATION");
 		blocked.extractingPath("$.statusCode").isNull();
+		assertThat(mvc.get().uri("/api/notification-deliveries?projectId={id}", project.getId())).bodyJson()
+			.extractingPath("$.content[0].error")
+			.isEqualTo("BLOCKED_DESTINATION");
 	}
 
 	@Test
@@ -195,6 +216,10 @@ class ProjectWebhookApiTest {
 		assertThat(runResultNotifier.notifyResult(runId)).isEqualTo(RunResultNotifier.Sent.FAILURE);
 		assertThat(received).singleElement().asString().contains(suite.getName()).contains("GET /broken");
 		assertThat(defaultChannel.sent()).isEmpty();
+		var history = assertThat(mvc.get().uri("/api/notification-deliveries")).bodyJson();
+		history.extractingPath("$.content[0].tone").isEqualTo("FAILURE");
+		history.extractingPath("$.content[0].delivered").isEqualTo(true);
+		history.extractingPath("$.content[0].project.id").isEqualTo(project.getId().intValue());
 	}
 
 	@Test

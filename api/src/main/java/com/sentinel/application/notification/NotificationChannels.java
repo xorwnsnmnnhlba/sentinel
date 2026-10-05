@@ -28,6 +28,8 @@ public class NotificationChannels {
 
 	private final SecretCipher cipher;
 
+	private final DeliveryLog deliveries;
+
 	/** 트랜잭션 안에서 호출 (프로젝트의 Webhook 암호문 조회). 발송은 트랜잭션 밖에서 */
 	public Notifier forProject(Project project) {
 		if (!project.hasWebhook()) {
@@ -49,6 +51,7 @@ public class NotificationChannels {
 				log.warn("Notification delivery to the webhook of project {} failed: {} ({})", projectId,
 						notification.title(), delivery.describe());
 			}
+			deliveries.record(DeliveryLog.Target.project(projectId, url), notification, delivery);
 		};
 	}
 
@@ -64,9 +67,12 @@ public class NotificationChannels {
 			throw new IllegalStateException("project " + project.getId() + " has no webhook");
 		}
 		String url = cipher.decrypt(project.getWebhookUrlCipher());
-		return sender.deliver(url, new Notification("[Sentinel] " + project.getName() + " 알림 연결 확인",
+		Notification notification = new Notification("[Sentinel] " + project.getName() + " 알림 연결 확인",
 				List.of("이 채널로 " + project.getName() + " 프로젝트의 스케줄 실행 실패·복구 알림을 보냅니다",
-						"보낸 사람: " + requester)));
+						"보낸 사람: " + requester));
+		WebhookSender.Delivery delivery = sender.deliver(url, notification);
+		deliveries.record(DeliveryLog.Target.project(project.getId(), url), notification, delivery);
+		return delivery;
 	}
 
 }

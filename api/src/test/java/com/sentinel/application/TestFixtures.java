@@ -15,6 +15,7 @@ import com.sentinel.infra.persistence.ChangeLogRepository;
 import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.HolidayRepository;
 import com.sentinel.infra.persistence.MaintenanceWindowRepository;
+import com.sentinel.infra.persistence.NotificationDeliveryRepository;
 import com.sentinel.infra.persistence.MonitoringGapRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.SlowdownAlertRepository;
@@ -62,6 +63,8 @@ public class TestFixtures {
 	private final SlowdownAlertRepository slowdownAlerts;
 
 	private final HolidayRepository holidays;
+
+	private final NotificationDeliveryRepository notificationDeliveries;
 
 	private final TestRunService testRunService;
 
@@ -123,6 +126,7 @@ public class TestFixtures {
 		monitoringGaps.deleteAllInBatch();
 		slowdownAlerts.deleteAllInBatch();
 		holidays.deleteAllInBatch();
+		notificationDeliveries.deleteAllInBatch();
 		schedules.deleteAllInBatch();
 		results.deleteAllInBatch();
 		runs.deleteAllInBatch();
