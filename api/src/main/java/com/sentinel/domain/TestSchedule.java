@@ -50,6 +50,10 @@ public class TestSchedule extends BaseEntity {
 
 	private Instant lastTriggeredAt;
 
+	/** 휴일({@link Holiday})에는 실행을 건너뜀. 기본 꺼짐 */
+	@Column(nullable = false)
+	private boolean skipHolidays;
+
 	/** 삭제(보관) 시각. 보관 시 비활성화하여 폴링 대상에서 제외 */
 	private Instant archivedAt;
 
@@ -133,6 +137,11 @@ public class TestSchedule extends BaseEntity {
 		}
 		this.enabled = true;
 		this.nextRunAt = nextAfter(now, zone);
+	}
+
+	/** 휴일 건너뛰기 켜기·끄기 */
+	public void changeSkipHolidays(boolean skipHolidays) {
+		this.skipHolidays = skipHolidays;
 	}
 
 	public void disable() {

@@ -5,6 +5,7 @@ package com.sentinel.api.request;
  *
  * @param cron 5자리 표준 cron. 활성 상태면 다음 실행 시각 재계산
  * @param environmentId 실행 환경. 스위트와 같은 프로젝트의 환경만 허용
+ * @param skipHolidays 휴일 건너뛰기
  */
-public record UpdateScheduleRequest(Boolean enabled, String cron, Long environmentId) {
+public record UpdateScheduleRequest(Boolean enabled, String cron, Long environmentId, Boolean skipHolidays) {
 }

@@ -80,6 +80,38 @@ class ScheduleControllerTest {
 	}
 
 	@Test
+	void togglesHolidaySkipping() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		// 생략 시 꺼짐
+		assertThat(create(suite, environment, "10 9 * * 1-5")).bodyJson()
+			.extractingPath("$.skipHolidays")
+			.isEqualTo(false);
+		MvcTestResult created = mvc.post()
+			.uri("/api/schedules")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"suiteId\": %d, \"environmentId\": %d, \"cron\": \"0 9 * * *\", \"skipHolidays\": true}"
+				.formatted(suite.getId(), environment.getId()))
+			.exchange();
+		assertThat(created).hasStatus(HttpStatus.CREATED).bodyJson().extractingPath("$.skipHolidays").isEqualTo(true);
+		String location = created.getResponse().getHeader("Location");
+
+		// 생략하면 유지
+		assertThat(patch(location, "{\"cron\": \"30 9 * * *\"}")).bodyJson()
+			.extractingPath("$.skipHolidays")
+			.isEqualTo(true);
+		assertThat(patch(location, "{\"skipHolidays\": false}")).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.skipHolidays")
+			.isEqualTo(false);
+		assertThat(mvc.get().uri(location)).bodyJson().extractingPath("$.skipHolidays").isEqualTo(false);
+		assertThat(patch(location, "{\"skipHolidays\": true}")).bodyJson()
+			.extractingPath("$.skipHolidays")
+			.isEqualTo(true);
+	}
+
+	@Test
 	void changesEnvironmentOfSchedule() {
 		Project project = fixtures.project();
 		Environment dev = fixtures.environment(project, Map.of());

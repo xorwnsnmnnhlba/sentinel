@@ -3,6 +3,7 @@ package com.sentinel.application;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,6 +17,7 @@ import com.sentinel.application.notification.RunResultNotifier;
 import com.sentinel.domain.MaintenanceWindow;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSchedule;
+import com.sentinel.infra.persistence.HolidayRepository;
 import com.sentinel.infra.persistence.MaintenanceWindowRepository;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +29,8 @@ import org.springframework.transaction.TransactionException;
 
 /**
  * DB 폴링 스케줄러. 실행 시각에 도달한 스케줄을 찾아 다음 실행 시각을 먼저 갱신한 뒤 스위트 실행.
- * 환경이 점검 중이면 실행하지 않고 다음 실행 시각만 갱신 (실행 기록·알림 없음, {@link MaintenanceWindow}).
+ * 환경이 점검 중이거나, 휴일 건너뛰기를 켠 스케줄이 휴일({@link com.sentinel.domain.Holiday})이면 실행하지 않고 다음 실행 시각만 갱신
+ * (실행 기록·알림 없음, {@link MaintenanceWindow}).
  * <p>
  * DB 접속 실패(VPN 끊김 등)는 즉시 재시도해도 복구되지 않으므로 해당 주기를 건너뛰고 다음 주기 대기.
  * 접속 실패는 최초 1회, 복구 시 1회 알림 발송. 스케줄 실행 결과에 실패가 있으면 실패 알림 발송.
@@ -64,6 +67,8 @@ class SchedulePoller {
 	private final MonitoringGapService monitoringGaps;
 
 	private final Heartbeat heartbeat;
+
+	private final HolidayRepository holidays;
 
 	/** DB 접속 실패 시작 시각. 정상 시 null. 스케줄러 단일 스레드에서만 갱신 */
 	private volatile Instant databaseUnavailableSince;
@@ -113,7 +118,7 @@ class SchedulePoller {
 		return runIds;
 	}
 
-	/** 실행할 스케줄의 다음 실행 시각을 옮기고 실행 대상 반환. 환경이 점검 중이면 건너뛰고 null */
+	/** 실행할 스케줄의 다음 실행 시각을 옮기고 실행 대상 반환. 환경이 점검 중이거나 휴일이면 건너뛰고 null */
 	private Trigger claim(long scheduleId, Instant now) {
 		TestSchedule schedule = schedules.findById(scheduleId).orElse(null);
 		if (schedule == null || !schedule.isDue(now)) {
@@ -124,6 +129,13 @@ class SchedulePoller {
 			schedule.skip(now, properties.zone());
 			log.info("Skipped schedule {} (suite {}) at {}: environment {} is under maintenance until {}", scheduleId,
 					schedule.getSuite().getId(), now, schedule.getEnvironment().getId(), maintenance.get().getEndsAt());
+			return null;
+		}
+		LocalDate today = LocalDate.ofInstant(now, properties.zone());
+		if (schedule.isSkipHolidays() && holidays.existsByDateAndArchivedAtIsNull(today)) {
+			schedule.skip(now, properties.zone());
+			log.info("Skipped schedule {} (suite {}) at {}: {} is a holiday", scheduleId, schedule.getSuite().getId(), now,
+					today);
 			return null;
 		}
 		schedule.markTriggered(now, properties.zone());

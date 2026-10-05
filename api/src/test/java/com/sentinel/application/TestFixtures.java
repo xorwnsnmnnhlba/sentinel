@@ -13,6 +13,7 @@ import com.sentinel.domain.TestSuite;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.ChangeLogRepository;
 import com.sentinel.infra.persistence.EnvironmentRepository;
+import com.sentinel.infra.persistence.HolidayRepository;
 import com.sentinel.infra.persistence.MaintenanceWindowRepository;
 import com.sentinel.infra.persistence.MonitoringGapRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
@@ -59,6 +60,8 @@ public class TestFixtures {
 	private final MonitoringGapRepository monitoringGaps;
 
 	private final SlowdownAlertRepository slowdownAlerts;
+
+	private final HolidayRepository holidays;
 
 	private final TestRunService testRunService;
 
@@ -119,6 +122,7 @@ public class TestFixtures {
 		maintenanceWindows.deleteAllInBatch();
 		monitoringGaps.deleteAllInBatch();
 		slowdownAlerts.deleteAllInBatch();
+		holidays.deleteAllInBatch();
 		schedules.deleteAllInBatch();
 		results.deleteAllInBatch();
 		runs.deleteAllInBatch();

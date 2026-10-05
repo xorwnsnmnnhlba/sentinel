@@ -10,6 +10,7 @@ import com.sentinel.application.notification.Notification;
 import com.sentinel.application.notification.RecordingNotifier;
 import com.sentinel.application.notification.RunResultNotifier;
 import com.sentinel.domain.TestSchedule;
+import com.sentinel.infra.persistence.HolidayRepository;
 import com.sentinel.infra.persistence.MaintenanceWindowRepository;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +53,8 @@ class SchedulePollerDatabaseOutageTest {
 		when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
 		poller = new SchedulePoller(schedules, mock(TestRunService.class), mock(RunResultNotifier.class), notifier,
 				new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60), Duration.ofMinutes(10)), clock,
-				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), monitoringGaps, heartbeat);
+				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), monitoringGaps, heartbeat,
+				mock(HolidayRepository.class));
 	}
 
 	@Test
@@ -147,7 +149,7 @@ class SchedulePollerDatabaseOutageTest {
 				new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60), Duration.ofMinutes(10)), clock,
 				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), monitoringGaps, () -> {
 					throw new IllegalStateException("broken");
-				});
+				}, mock(HolidayRepository.class));
 		dueSchedule(Instant.parse("2026-09-18T23:00:00Z"));
 		when(monitoringGaps.record(any(), any(), anyInt())).thenReturn(true);
 
@@ -196,7 +198,7 @@ class SchedulePollerDatabaseOutageTest {
 					throw new IllegalStateException("webhook down");
 				}, new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60), Duration.ofMinutes(10)), clock,
 				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), mock(MonitoringGapService.class),
-				Heartbeat.NONE);
+				Heartbeat.NONE, mock(HolidayRepository.class));
 		databaseDown();
 
 		assertThat(failingNotifierPoller.poll()).isEmpty();

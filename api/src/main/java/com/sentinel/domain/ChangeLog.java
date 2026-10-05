@@ -31,7 +31,9 @@ public class ChangeLog extends BaseEntity {
 		/** 점검 시간. 이름은 환경 이름 */
 		MAINTENANCE_WINDOW,
 		/** API 토큰. 이름은 토큰 이름 (값은 남기지 않음) */
-		ACCESS_TOKEN
+		ACCESS_TOKEN,
+		/** 휴일. 이름은 "날짜 이름" */
+		HOLIDAY
 
 	}
 

@@ -43,6 +43,16 @@ public class ScheduleService {
 	 */
 	@Transactional
 	public ScheduleDetail create(long suiteId, long environmentId, String cron, long actorId) {
+		return create(suiteId, environmentId, cron, false, actorId);
+	}
+
+	/**
+	 * @param skipHolidays 휴일에는 실행하지 않음
+	 * @throws NotFoundException 스위트 또는 환경 미존재
+	 * @throws InvalidRequestException 잘못된 cron, 스위트와 환경의 프로젝트 불일치
+	 */
+	@Transactional
+	public ScheduleDetail create(long suiteId, long environmentId, String cron, boolean skipHolidays, long actorId) {
 		TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId).orElseThrow(() -> new NotFoundException("test suite", suiteId));
 		Environment environment = environments.findByIdAndArchivedAtIsNull(environmentId)
 			.orElseThrow(() -> new NotFoundException("environment", environmentId));
@@ -53,6 +63,7 @@ public class ScheduleService {
 		catch (IllegalArgumentException ex) {
 			throw new InvalidRequestException(ex.getMessage());
 		}
+		schedule.changeSkipHolidays(skipHolidays);
 		schedules.save(schedule);
 		changeLog.record(actorId, target(schedule), Action.CREATED);
 		return detailOf(schedule);
@@ -68,6 +79,16 @@ public class ScheduleService {
 	 */
 	@Transactional
 	public ScheduleDetail update(long scheduleId, Boolean enabled, String cron, Long environmentId, long actorId) {
+		return update(scheduleId, enabled, cron, environmentId, null, actorId);
+	}
+
+	/**
+	 * 부분 수정. 위와 같고 휴일 건너뛰기 포함
+	 * @param skipHolidays null이면 유지
+	 */
+	@Transactional
+	public ScheduleDetail update(long scheduleId, Boolean enabled, String cron, Long environmentId, Boolean skipHolidays,
+			long actorId) {
 		TestSchedule schedule = find(scheduleId);
 		ScheduleDetail before = detailOf(schedule);
 		if (environmentId != null) {
@@ -88,6 +109,9 @@ public class ScheduleService {
 				throw new InvalidRequestException(ex.getMessage());
 			}
 		}
+		if (skipHolidays != null) {
+			schedule.changeSkipHolidays(skipHolidays);
+		}
 		if (Boolean.TRUE.equals(enabled)) {
 			schedule.enable(clock.instant(), properties.zone());
 		}
@@ -99,6 +123,7 @@ public class ScheduleService {
 				new Changes().compare("environment", before.environmentId(), after.environmentId())
 					.compare("cron", before.cron(), after.cron())
 					.compare("enabled", before.enabled(), after.enabled())
+					.compare("skipHolidays", before.skipHolidays(), after.skipHolidays())
 					.fields());
 		return after;
 	}

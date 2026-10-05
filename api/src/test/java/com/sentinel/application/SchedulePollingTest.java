@@ -76,6 +76,9 @@ class SchedulePollingTest {
 	@Autowired
 	private MonitoringGapService monitoringGaps;
 
+	@Autowired
+	private HolidayService holidays;
+
 	private TestSuite suite;
 
 	private Environment environment;
@@ -189,6 +192,55 @@ class SchedulePollingTest {
 		clock.set(Instant.parse("2026-09-18T00:30:00Z"));
 		assertThat(poller.poll()).hasSize(1);
 		assertThat(scheduleService.get(schedule.id()).nextRunAt()).isEqualTo("2026-09-18T00:40:00Z");
+	}
+
+	@Test
+	void skipsHolidaysOnlyForSchedulesThatOptIn() {
+		ScheduleDetail skipping = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", true, ACTOR);
+		ScheduleDetail running = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", ACTOR);
+		// 2026-09-18(금)만 휴일. 휴일 판단은 서버 설정 시간대(KST) 날짜 기준
+		holidays.create(LocalDate.parse("2026-09-18"), "창립기념일", ACTOR);
+
+		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
+		List<Long> onHoliday = poller.poll();
+
+		// 건너뛴 스케줄은 실행 기록·알림 없이 다음 날로 넘어가고 마지막 실행 시각은 그대로
+		assertThat(onHoliday).hasSize(1);
+		assertThat(scheduleService.get(running.id()).lastTriggeredAt()).isEqualTo("2026-09-18T00:10:00Z");
+		ScheduleDetail skipped = scheduleService.get(skipping.id());
+		assertThat(skipped.nextRunAt()).isEqualTo("2026-09-19T00:10:00Z");
+		assertThat(skipped.lastTriggeredAt()).isNull();
+		assertThat(notifier.sent()).isEmpty();
+		assertThat(monitoringGaps.list(LocalDate.parse("2026-09-18"), LocalDate.parse("2026-09-19")).gaps()).isEmpty();
+
+		// 다음 날은 실행
+		clock.set(Instant.parse("2026-09-19T00:10:00Z"));
+		assertThat(poller.poll()).hasSize(2);
+		assertThat(scheduleService.get(skipping.id()).lastTriggeredAt()).isEqualTo("2026-09-19T00:10:00Z");
+	}
+
+	@Test
+	void judgesTheDateInTheServerZoneAndRunsOnceTheHolidayIsDeletedOrSkippingIsOff() {
+		// 매일 08:50 KST = 전날 23:50 UTC
+		ScheduleDetail schedule = scheduleService.create(suite.getId(), environment.getId(), "50 8 * * *", true, ACTOR);
+		holidays.create(LocalDate.parse("2026-09-19"), "토요일", ACTOR);
+		long sunday = holidays.create(LocalDate.parse("2026-09-20"), "일요일", ACTOR).id();
+		holidays.create(LocalDate.parse("2026-09-21"), "월요일", ACTOR);
+
+		// UTC로는 18일이지만 KST로는 19일(휴일)
+		clock.set(Instant.parse("2026-09-18T23:50:00Z"));
+		assertThat(poller.poll()).isEmpty();
+		assertThat(scheduleService.get(schedule.id()).nextRunAt()).isEqualTo("2026-09-19T23:50:00Z");
+
+		// 삭제한 휴일에는 실행
+		holidays.delete(sunday, ACTOR);
+		clock.set(Instant.parse("2026-09-19T23:50:00Z"));
+		assertThat(poller.poll()).hasSize(1);
+
+		// 건너뛰기를 끄면 휴일에도 실행
+		scheduleService.update(schedule.id(), null, null, null, false, ACTOR);
+		clock.set(Instant.parse("2026-09-20T23:50:00Z"));
+		assertThat(poller.poll()).hasSize(1);
 	}
 
 	@Test
