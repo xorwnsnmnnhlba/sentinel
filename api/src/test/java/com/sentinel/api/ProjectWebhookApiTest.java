@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -17,9 +18,11 @@ import com.sentinel.application.TestFixtures;
 import com.sentinel.application.notification.RecordingNotifier;
 import com.sentinel.application.notification.RunResultNotifier;
 import com.sentinel.domain.Environment;
+import com.sentinel.domain.NotificationDelivery;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.infra.persistence.NotificationDeliveryRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sun.net.httpserver.HttpServer;
@@ -72,6 +75,9 @@ class ProjectWebhookApiTest {
 
 	@Autowired
 	private RecordingNotifier defaultChannel;
+
+	@Autowired
+	private NotificationDeliveryRepository deliveryRecords;
 
 	private HttpServer server;
 
@@ -156,6 +162,19 @@ class ProjectWebhookApiTest {
 			.bodyJson()
 			.extractingPath("$.content[*].statusCode")
 			.isEqualTo(List.of(404));
+
+		// 채널 상태: 마지막 발송이 실패한 채널. 기본 채널은 주소가 없어 실패 기록이 있어도 판단하지 않음
+		deliveryRecords.save(new NotificationDelivery(Instant.now(), NotificationDelivery.Channel.DEFAULT, null,
+				NotificationDelivery.Format.TEXT, "예전 기본 채널 실패", NotificationDelivery.Tone.FAILURE, false, 404, null));
+		var health = assertThat(mvc.get().uri("/api/notification-channel-health")).bodyJson();
+		health.extractingPath("$.defaultChannelConfigured").isEqualTo(false);
+		health.extractingPath("$.failing[*].project.name").isEqualTo(List.of(project.getName()));
+		health.extractingPath("$.failing[0].statusCode").isEqualTo(404);
+		responseStatus = 200;
+		testNotification();
+		assertThat(mvc.get().uri("/api/notification-channel-health")).bodyJson()
+			.extractingPath("$.failing.length()")
+			.isEqualTo(0);
 	}
 
 	@Test

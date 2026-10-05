@@ -464,7 +464,7 @@ deploy-check:
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
 | 점검 시간 | `GET /api/maintenance-windows?environmentId=` | | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
 | 휴일 | `GET /api/holidays?year=` | | `POST /api/holidays`, `POST /api/holiday-imports`(여러 건) | `DELETE /api/holidays/{id}` |
-| 알림 발송 이력 | `GET /api/notification-deliveries?projectId=&failed=` | | | |
+| 알림 발송 이력 | `GET /api/notification-deliveries?projectId=&failed=`, `GET /api/notification-channel-health`(채널 상태) | | | |
 | 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
 | 응답시간 변화 | `GET /api/response-time-changes?from=&to=&limit=5` | | | |
@@ -1002,6 +1002,7 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 | API | 설명 |
 |-----|------|
 | `GET /api/notification-deliveries?projectId=&failed=&page=&size=` | 발송 시각 최신순 20건 단위(`size` 1~100). `projectId`는 그 프로젝트 Webhook으로 보낸 것만, `failed=true`는 보내지 못한 것만 |
+| `GET /api/notification-channel-health` | 알림을 보내지 못하는 채널 (대시보드 경고용). `{defaultChannelConfigured, failing: [...]}` |
 
 - 항목: `{id, sentAt, channel, project: {id, name}, format, title, tone, delivered, statusCode, error}`
   - `channel`: `DEFAULT`(서버 기본 채널, `project`는 `null`) / `PROJECT`(프로젝트 Webhook). 삭제된 프로젝트도 이름 표시
@@ -1012,6 +1013,11 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 - Webhook 주소(자격증명)와 본문은 기록하지 않음. 제목은 300자까지
 - 발송 뒤 별도 트랜잭션으로 기록. 기록 실패(DB 연결 끊김 등)는 WARN 로그만 남기고 알림에는 영향 없음 (DB 연결 실패 알림은 기록되지 않을 수 있음)
 - 보관기간(`sentinel.retention.notification-retention`, 기본 90일)이 지나면 매일 정리 배치에서 삭제
+- 채널 상태(`notification-channel-health`): 채널(기본 채널, 프로젝트 Webhook별)마다 최근 7일 안 마지막 발송이 실패면 `failing`에 포함, 한 번 보내면 빠짐
+  - 항목: `{channel, project: {id, name}, format, failingSince(이어진 실패 중 가장 이른 시각), failures(마지막 성공 뒤 실패 건수), lastSentAt, statusCode, error}`. 오래 실패한 채널 먼저
+  - 지금 쓰지 않는 채널은 제외: 기본 채널 주소 미설정, Webhook을 지운 프로젝트, 삭제된 프로젝트. 로그 기록(`LOG`)은 판단에 쓰지 않음
+  - `defaultChannelConfigured`: 서버 기본 채널 주소(`sentinel.notification.webhook-url`)가 있음. `false`면 기본 채널 알림은 서버 로그에만 남음
+  - Webhook 주소를 고친 뒤에는 다음 발송(또는 테스트 알림)이 성공해야 빠짐
 
 ```
 Failed to record notification delivery: [Sentinel] DB 연결 실패 (CannotCreateTransactionException)
