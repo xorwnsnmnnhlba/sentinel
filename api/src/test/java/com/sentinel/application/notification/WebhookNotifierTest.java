@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.sentinel.domain.NotificationDelivery;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,16 @@ class WebhookNotifierTest {
 	private volatile int responseStatus = 200;
 
 	private volatile long responseDelayMillis = 0;
+
+	/** 발송 이력에 넘긴 결과 */
+	private final List<WebhookSender.Delivery> deliveries = new CopyOnWriteArrayList<>();
+
+	private final List<DeliveryLog.Target> targets = new CopyOnWriteArrayList<>();
+
+	private final DeliveryLog recorded = (target, notification, delivery) -> {
+		targets.add(target);
+		deliveries.add(delivery);
+	};
 
 	@BeforeEach
 	void startServer() throws IOException {
@@ -64,6 +75,19 @@ class WebhookNotifierTest {
 		assertThat(bodies.getFirst()).isEqualTo(
 				"{\"text\":\"[Sentinel] dev smoke - 4건 중 2건 실패\\nGET /a → 500\\nGET /b → timeout\"}");
 		assertThat(contentTypes.getFirst()).startsWith("application/json");
+		assertThat(deliveries).containsExactly(new WebhookSender.Delivery(true, 200, null));
+		assertThat(targets).containsExactly(
+				new DeliveryLog.Target(NotificationDelivery.Channel.DEFAULT, null, NotificationDelivery.Format.TEXT));
+	}
+
+	@Test
+	void recordsTheStatusTheChannelAnswered() {
+		// Teams 워크플로 등은 200이 아닌 2xx로 응답
+		responseStatus = 204;
+
+		notifier().send(new Notification("알림", List.of()));
+
+		assertThat(deliveries).containsExactly(new WebhookSender.Delivery(true, 204, null));
 	}
 
 	@Test
@@ -72,23 +96,43 @@ class WebhookNotifierTest {
 
 		assertThatCode(() -> notifier().send(new Notification("알림", List.of()))).doesNotThrowAnyException();
 		assertThat(bodies).hasSize(1);
+		assertThat(deliveries).containsExactly(new WebhookSender.Delivery(false, 500, null));
 	}
 
 	@Test
 	void keepsRunningWhenTheChannelIsSlow(CapturedOutput output) {
 		responseDelayMillis = 500;
-		WebhookNotifier notifier = new WebhookNotifier(url(), Duration.ofSeconds(2), Duration.ofMillis(100));
+		WebhookNotifier notifier = new WebhookNotifier(url(), Duration.ofSeconds(2), Duration.ofMillis(100), recorded);
 
 		assertThatCode(() -> notifier.send(new Notification("알림", List.of()))).doesNotThrowAnyException();
 		assertThat(output).contains("Notification delivery failed: 알림 (timeout)");
+		assertThat(deliveries).containsExactly(new WebhookSender.Delivery(false, null, "TIMEOUT"));
 	}
 
 	@Test
 	void keepsRunningWhenTheChannelIsUnreachable() {
 		WebhookNotifier notifier = new WebhookNotifier("http://127.0.0.1:%d/hook".formatted(closedPort()),
-				Duration.ofMillis(500), Duration.ofMillis(500));
+				Duration.ofMillis(500), Duration.ofMillis(500), recorded);
 
 		assertThatCode(() -> notifier.send(new Notification("알림", List.of()))).doesNotThrowAnyException();
+		assertThat(deliveries).containsExactly(new WebhookSender.Delivery(false, null, "CONNECTION_FAILED"));
+	}
+
+	@Test
+	void recordsLoggedNotificationsAsWrittenToTheLog() {
+		new LoggingNotifier(recorded).send(new Notification("알림", List.of()));
+
+		assertThat(targets).containsExactly(
+				new DeliveryLog.Target(NotificationDelivery.Channel.DEFAULT, null, NotificationDelivery.Format.LOG));
+		assertThat(deliveries).containsExactly(new WebhookSender.Delivery(true, null, null));
+	}
+
+	@Test
+	void namesTheChannelFormatFromTheAddress() {
+		assertThat(DeliveryLog.Target.defaultWebhook("https://hooks.slack.com/services/T0/B0/x").format())
+			.isEqualTo(NotificationDelivery.Format.SLACK);
+		assertThat(DeliveryLog.Target.project(7, "https://example.webhook.office.com/x"))
+			.isEqualTo(new DeliveryLog.Target(NotificationDelivery.Channel.PROJECT, 7L, NotificationDelivery.Format.TEAMS));
 	}
 
 	@Test
@@ -96,10 +140,10 @@ class WebhookNotifierTest {
 		// 주소는 자격증명. 연결 실패 예외 메시지에는 요청 주소가 들어 있으므로 그대로 남기지 않음
 		String secretPath = "/hook/T000-secret-token";
 		new WebhookNotifier("http://127.0.0.1:%d%s".formatted(closedPort(), secretPath), Duration.ofMillis(500),
-				Duration.ofMillis(500))
+				Duration.ofMillis(500), recorded)
 			.send(new Notification("알림", List.of()));
 		responseStatus = 404;
-		new WebhookNotifier(url() + "?token=secret-token", Duration.ofSeconds(2), Duration.ofSeconds(2))
+		new WebhookNotifier(url() + "?token=secret-token", Duration.ofSeconds(2), Duration.ofSeconds(2), recorded)
 			.send(new Notification("알림", List.of()));
 
 		assertThat(output).contains("Notification delivery failed: 알림 (connection failed)")
@@ -123,9 +167,9 @@ class WebhookNotifierTest {
 	void usesTheLogWhenNoWebhookIsConfigured() {
 		NotificationConfig config = new NotificationConfig();
 
-		assertThat(config.notifier(properties(null))).isInstanceOf(LoggingNotifier.class);
-		assertThat(config.notifier(properties("  "))).isInstanceOf(LoggingNotifier.class);
-		assertThat(config.notifier(properties(url()))).isInstanceOf(WebhookNotifier.class);
+		assertThat(config.notifier(properties(null), recorded)).isInstanceOf(LoggingNotifier.class);
+		assertThat(config.notifier(properties("  "), recorded)).isInstanceOf(LoggingNotifier.class);
+		assertThat(config.notifier(properties(url()), recorded)).isInstanceOf(WebhookNotifier.class);
 	}
 
 	private static NotificationProperties webProperties(String webBaseUrl) {
@@ -137,7 +181,7 @@ class WebhookNotifierTest {
 	}
 
 	private WebhookNotifier notifier() {
-		return new WebhookNotifier(url(), Duration.ofSeconds(2), Duration.ofSeconds(2));
+		return new WebhookNotifier(url(), Duration.ofSeconds(2), Duration.ofSeconds(2), recorded);
 	}
 
 	private String url() {

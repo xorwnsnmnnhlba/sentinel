@@ -464,6 +464,7 @@ deploy-check:
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
 | 점검 시간 | `GET /api/maintenance-windows?environmentId=` | | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
 | 휴일 | `GET /api/holidays?year=` | | `POST /api/holidays`, `POST /api/holiday-imports`(여러 건) | `DELETE /api/holidays/{id}` |
+| 알림 발송 이력 | `GET /api/notification-deliveries?projectId=&failed=` | | | |
 | 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
 | 응답시간 변화 | `GET /api/response-time-changes?from=&to=&limit=5` | | | |
@@ -819,6 +820,7 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 |------|--------|------|
 | `sentinel.retention.enabled` | `true` | 정리 배치 동작 여부 |
 | `sentinel.retention.raw-retention` | `30d` | 원문 보관 기간. 0 이하이면 기동 실패 |
+| `sentinel.retention.notification-retention` | `90d` | 알림 발송 이력 보관 기간 (아래 "발송 이력"). 같은 시각에 삭제. 0 이하이면 기동 실패 |
 | `sentinel.retention.cron` | `0 30 3 * * *` | 실행 시각 (Spring cron 6자리, 초 포함) |
 | `sentinel.retention.batch-size` | `500` | 한 트랜잭션에서 정리할 실행 수 |
 
@@ -992,6 +994,29 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
 - 로그인한 사용자 누구나 지정할 수 있는 주소라 실행기와 같은 목적지 확인을 거침: 링크 로컬·클라우드 메타데이터 주소로는 보내지 않고(`BLOCKED_DESTINATION`) 리다이렉트를 따라가지 않음 (서버 기본 채널은 운영자가 환경변수로 지정하므로 기존 방식)
 - 주소를 읽을 수 없으면(암호화 키 변경·미설정) 알림을 잃지 않도록 기본 채널로 보내고 WARN 로그. 연결 확인 알림은 기본 채널로 대신 보내지 않음
 - 발송 실패는 기본 채널과 같이 WARN 로그만 (프로젝트 ID·알림 제목·상태 코드 또는 사유, 주소 없음)
+
+### 발송 이력
+
+알림을 보낼 때마다 시각·채널·제목·결과를 기록. "알림이 안 왔다"를 서버 로그 없이 확인 (모든 사용자 조회)
+
+| API | 설명 |
+|-----|------|
+| `GET /api/notification-deliveries?projectId=&failed=&page=&size=` | 발송 시각 최신순 20건 단위(`size` 1~100). `projectId`는 그 프로젝트 Webhook으로 보낸 것만, `failed=true`는 보내지 못한 것만 |
+
+- 항목: `{id, sentAt, channel, project: {id, name}, format, title, tone, delivered, statusCode, error}`
+  - `channel`: `DEFAULT`(서버 기본 채널, `project`는 `null`) / `PROJECT`(프로젝트 Webhook). 삭제된 프로젝트도 이름 표시
+  - `format`: `SLACK` / `TEAMS` / `TEXT` / `LOG`(기본 채널 주소 미설정, 서버 로그에만 기록)
+  - `tone`: `FAILURE`(실패·장애) / `WARNING`(악화·공백) / `SUCCESS`(복구·회복) / `INFO`(요약·확인)
+  - `delivered`: 2xx 응답을 받음 (`LOG`는 `true`). `statusCode`는 받은 응답, `error`는 응답을 받지 못한 사유 (`TIMEOUT`·`CONNECTION_FAILED`·`BLOCKED_DESTINATION` 등)
+- 대상: 기본 채널·프로젝트 채널로 보낸 모든 알림 (실패·복구, 재알림, 스케줄 실행 오류, DB 연결 실패·복구, 모니터링 공백, 주간 요약, 응답시간 악화·회복, 연결 확인)
+- Webhook 주소(자격증명)와 본문은 기록하지 않음. 제목은 300자까지
+- 발송 뒤 별도 트랜잭션으로 기록. 기록 실패(DB 연결 끊김 등)는 WARN 로그만 남기고 알림에는 영향 없음 (DB 연결 실패 알림은 기록되지 않을 수 있음)
+- 보관기간(`sentinel.retention.notification-retention`, 기본 90일)이 지나면 매일 정리 배치에서 삭제
+
+```
+Failed to record notification delivery: [Sentinel] DB 연결 실패 (CannotCreateTransactionException)
+Deleted 12 notification delivery record(s) sent before 2026-07-07T18:30:00Z
+```
 
 ## 패키지 구조 (계획)
 

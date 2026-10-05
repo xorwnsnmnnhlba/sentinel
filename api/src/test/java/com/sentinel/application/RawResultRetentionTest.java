@@ -167,12 +167,15 @@ class RawResultRetentionTest {
 
 	@Test
 	void rejectsNonPositiveRetention() {
-		assertThatThrownBy(() -> new RetentionProperties(true, Duration.ZERO, "0 30 3 * * *", 500))
+		assertThatThrownBy(() -> new RetentionProperties(true, Duration.ZERO, Duration.ofDays(90), "0 30 3 * * *", 500))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("raw-retention");
-		assertThatThrownBy(() -> new RetentionProperties(true, Duration.ofDays(30), "0 30 3 * * *", 0))
+		assertThatThrownBy(() -> new RetentionProperties(true, Duration.ofDays(30), Duration.ofDays(90), "0 30 3 * * *", 0))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("batch-size");
+		assertThatThrownBy(() -> new RetentionProperties(true, Duration.ofDays(30), Duration.ZERO, "0 30 3 * * *", 500))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("notification-retention");
 	}
 
 	private long runAt(Instant startedAt) {

@@ -29,6 +29,8 @@ class SchedulingConfig implements SchedulingConfigurer {
 
 	private final RawResultRetention retention;
 
+	private final NotificationDeliveryService notificationDeliveries;
+
 	private final DigestProperties digestProperties;
 
 	private final WeeklyDigestSender digestSender;
@@ -54,6 +56,9 @@ class SchedulingConfig implements SchedulingConfigurer {
 		if (retentionProperties.enabled()) {
 			// 스케줄 cron과 같은 시간대로 해석 (컨테이너 기본값 UTC 사용 시 새벽 정리가 낮에 실행되는 것 방지)
 			registrar.addCronTask(new CronTask(retention::purgeExpired,
+					new CronTrigger(retentionProperties.cron(), properties.zone())));
+			// 원문 정리와 따로 등록 (한쪽이 실패해도 다른 쪽은 실행)
+			registrar.addCronTask(new CronTask(notificationDeliveries::deleteExpired,
 					new CronTrigger(retentionProperties.cron(), properties.zone())));
 		}
 	}
