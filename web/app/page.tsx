@@ -4,6 +4,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import { PassRateMeter } from "@/components/dashboard/pass-rate-meter";
 import { Panel, PanelEmpty } from "@/components/catalog/section";
+import { FailingChannelList } from "@/components/dashboard/failing-channel-list";
 import { FailureCauseList } from "@/components/dashboard/failure-cause-list";
 import { MonitoringGapList } from "@/components/dashboard/monitoring-gap-list";
 import { SlowdownTable } from "@/components/dashboard/slowdown-table";
@@ -17,6 +18,7 @@ import type {
   FailureCauses,
   MaintenanceWindow,
   MonitoringGaps,
+  NotificationChannelHealth,
   Page,
   ResponseTimeChanges,
   RunSummary,
@@ -39,6 +41,7 @@ import {
 import { formatDateTime, formatProgress } from "@/lib/format";
 import { formatEnd } from "@/lib/maintenance";
 import { formatGapDuration, totalGapDuration } from "@/lib/monitoring-gap";
+import { notificationsHref } from "@/lib/notification-delivery";
 import { formatMs, kstDateRange } from "@/lib/response-times";
 import { cn } from "@/lib/utils";
 
@@ -78,6 +81,7 @@ export default async function Dashboard(props: PageProps<"/">) {
     monitoringGaps,
     slowdowns,
     failureCauses,
+    channelHealth,
   ] = await Promise.all([
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
@@ -89,6 +93,7 @@ export default async function Dashboard(props: PageProps<"/">) {
     apiGet<MonitoringGaps>(`/api/monitoring-gaps?${range(current)}`),
     apiGet<Slowdown[]>("/api/slowdowns"),
     apiGet<FailureCauses>(`/api/failure-causes?${range(current)}`),
+    apiGet<NotificationChannelHealth>("/api/notification-channel-health"),
   ]);
   const gaps = monitoringGaps.gaps;
   const maintenance = windows.filter((window) => window.active);
@@ -111,6 +116,28 @@ export default async function Dashboard(props: PageProps<"/">) {
         }
         actions={<PeriodLinks days={days} />}
       />
+
+      {/* 채널이 고장 나면 실패 알림도, 그 사실을 알릴 알림도 가지 않으므로 맨 위에. 없으면 표시하지 않음 */}
+      {channelHealth.failing.length > 0 && (
+        <Panel
+          title={<span className="text-destructive">알림을 보내지 못하는 채널</span>}
+          count={channelHealth.failing.length}
+          meta="이 채널의 실패 알림도 가지 않음"
+          action={
+            <Button asChild variant="ghost" size="sm">
+              <Link href={notificationsHref(undefined, true)}>알림 이력</Link>
+            </Button>
+          }
+        >
+          <FailingChannelList channels={channelHealth.failing} />
+        </Panel>
+      )}
+      {!channelHealth.defaultChannelConfigured && (
+        <p className="text-xs text-muted-foreground">
+          기본 알림 채널 주소(SENTINEL_WEBHOOK_URL)가 없어 Webhook을 지정하지 않은 프로젝트와 스케줄러 알림은 서버
+          로그에만 남습니다
+        </p>
+      )}
 
       {maintenance.length > 0 && (
         <Panel title="점검 중인 환경" count={maintenance.length} meta="스케줄 실행 건너뜀">

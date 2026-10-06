@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { channelLabel, notificationsHref, resultHint, resultLabel } from "./notification-delivery";
+import {
+  channelLabel,
+  failingSummary,
+  failuresHref,
+  notificationsHref,
+  resultHint,
+  resultLabel,
+} from "./notification-delivery";
 
 const sent = { delivered: true, format: "SLACK" as const, statusCode: 200, error: null };
 
@@ -56,5 +63,21 @@ describe("notificationsHref", () => {
   it("links to all deliveries or those of one project", () => {
     expect(notificationsHref()).toBe("/notifications");
     expect(notificationsHref(3)).toBe("/notifications?projectId=3");
+    expect(notificationsHref(3, true)).toBe("/notifications?projectId=3&failed=true");
+    expect(notificationsHref(undefined, true)).toBe("/notifications?failed=true");
+  });
+});
+
+describe("failuresHref", () => {
+  it("narrows to the failed deliveries of the channel", () => {
+    expect(failuresHref({ project: { id: 3, name: "billing" } })).toBe("/notifications?projectId=3&failed=true");
+    expect(failuresHref({ project: null })).toBe("/notifications?failed=true");
+  });
+});
+
+describe("failingSummary", () => {
+  it("says since when in KST and how many", () => {
+    expect(failingSummary({ failingSince: "2026-10-05T05:20:00Z", failures: 3 })).toBe("10-05 14:20부터 3건");
+    expect(failingSummary({ failingSince: "2026-10-05T15:05:00Z", failures: 1 })).toBe("10-06 00:05부터 1건");
   });
 });

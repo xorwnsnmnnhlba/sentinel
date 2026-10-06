@@ -1,4 +1,5 @@
-import type { NotificationDeliveryItem, NotificationTone } from "@/lib/api/types";
+import type { FailingChannel, NotificationDeliveryItem, NotificationTone } from "@/lib/api/types";
+import { formatDateTime } from "@/lib/format";
 import { failureReason } from "@/lib/webhook";
 
 /** 알림 발송 이력 표시 문구 (api/README.md "발송 이력") */
@@ -62,7 +63,24 @@ export function resultHint(
   return status >= 500 ? "채널 서버 오류" : "주소와 채널 설정 확인";
 }
 
-/** 알림 이력 화면 주소. 프로젝트 Webhook으로 보낸 것만 보려면 projectId */
-export function notificationsHref(projectId?: number): string {
-  return projectId === undefined ? "/notifications" : `/notifications?projectId=${projectId}`;
+/** 알림 이력 화면 주소. 프로젝트 Webhook으로 보낸 것만 보려면 projectId, 보내지 못한 것만 보려면 failedOnly */
+export function notificationsHref(projectId?: number, failedOnly = false): string {
+  const query = new URLSearchParams();
+  if (projectId !== undefined) {
+    query.set("projectId", String(projectId));
+  }
+  if (failedOnly) {
+    query.set("failed", "true");
+  }
+  return query.size === 0 ? "/notifications" : `/notifications?${query}`;
+}
+
+/** 고장 난 채널의 보내지 못한 알림 이력. 기본 채널은 프로젝트로 좁힐 수 없어 전체 */
+export function failuresHref(channel: Pick<FailingChannel, "project">): string {
+  return notificationsHref(channel.project?.id, true);
+}
+
+/** 실패가 이어진 기간. 예: "10-05 14:20부터 3건" (KST) */
+export function failingSummary(channel: Pick<FailingChannel, "failingSince" | "failures">): string {
+  return `${formatDateTime(channel.failingSince).slice(5, 16)}부터 ${channel.failures}건`;
 }
