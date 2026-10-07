@@ -461,7 +461,7 @@ deploy-check:
 | 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | `POST /api/suites`, `PATCH /api/suites/{id}` | `DELETE /api/suites/{id}` |
 | 케이스 | `GET /api/cases?suiteId=&q=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
 | 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&failing=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs`, `PATCH /api/runs/{id}`(중지) | |
-| 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}` | `DELETE /api/schedules/{id}` |
+| 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}`, `PATCH /api/schedules`(여러 건) | `DELETE /api/schedules/{id}` |
 | 점검 시간 | `GET /api/maintenance-windows?environmentId=` | | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
 | 휴일 | `GET /api/holidays?year=` | | `POST /api/holidays`, `POST /api/holiday-imports`(여러 건) | `DELETE /api/holidays/{id}` |
 | 알림 발송 이력 | `GET /api/notification-deliveries?projectId=&failed=`, `GET /api/notification-channel-health`(채널 상태) | | | |
@@ -691,6 +691,7 @@ deploy-check:
 |-----|------|
 | `POST /api/schedules` | 스케줄 등록. 본문 `{"suiteId": 1, "environmentId": 1, "cron": "10 9 * * 1-5", "skipHolidays": true}`. `skipHolidays` 생략 시 `false`. 201 + `Location` |
 | `GET /api/schedules/{id}` | 조회. `nextRunAt`(다음 실행 시각), `lastTriggeredAt`(마지막 실행 시각) 포함 |
+| `PATCH /api/schedules` | 여러 스케줄 한 번에 변경. 본문 `{"scheduleIds": [1, 2], "enabled": false, "skipHolidays": true}` (`enabled`·`skipHolidays` 중 하나 이상, 생략한 항목은 유지). 200 + 바뀐 스케줄 목록(요청 순서, 중복 ID는 한 번) |
 | `PATCH /api/schedules/{id}` | 부분 수정. `{"enabled": false}`는 `nextRunAt` 제거, `{"enabled": true}`는 현재 시각 기준 재계산. `{"cron": "30 17 * * 1-5"}`는 활성 상태면 `nextRunAt` 재계산. `{"environmentId": 2}`는 실행 환경 변경(스위트와 같은 프로젝트만, 다르면 400). `{"skipHolidays": true}`는 휴일 건너뛰기 켜기. 생략한 필드는 유지 |
 
 - cron은 5자리 표준 형식(`분 시 일 월 요일`), `Asia/Seoul` 기준. 예: `10 9 * * 1-5` = 평일 09:10
@@ -701,6 +702,8 @@ deploy-check:
 - 예정 시각보다 10분 넘게 늦게 실행된 스케줄이 있으면 모니터링 공백으로 기록·알림 (아래 "모니터링 공백")
 - 환경이 점검 중이면 그 환경의 스케줄은 실행하지 않고 다음 실행 시각으로 넘어감 (아래 "점검 시간")
 - 휴일 건너뛰기(`skipHolidays`)를 켠 스케줄은 등록한 휴일에 실행하지 않음 (아래 "휴일")
+- 여러 건 변경: 1~200건, 한 트랜잭션. 없거나 삭제된 스케줄이 하나라도 있으면 전부 미변경 404. 스케줄마다 변경 이력
+  - 이미 그 상태인 스케줄은 그대로: 켜져 있는 스케줄을 다시 켜면 다음 실행 시각이 지금 기준으로 다시 계산되어 곧 돌 실행을 건너뛸 수 있음
 - 실행 완료 시 INFO 로그 1줄 (수동·스케줄 공통)
 
 ```

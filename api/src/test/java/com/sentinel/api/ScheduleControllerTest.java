@@ -1,6 +1,10 @@
 package com.sentinel.api;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
@@ -112,6 +116,81 @@ class ScheduleControllerTest {
 	}
 
 	@Test
+	void updatesManySchedulesAtOnce() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		long first = id(create(suite, environment, "10 9 * * 1-5"));
+		long second = id(create(suite, environment, "30 9 * * 1-5"));
+		long untouched = id(create(suite, environment, "0 18 * * *"));
+
+		var updated = assertThat(patchAll("""
+				{"scheduleIds": [%d, %d, %d], "enabled": false, "skipHolidays": true}""".formatted(first, second, first)))
+			.hasStatusOk()
+			.bodyJson();
+		// 요청 순서대로, 중복은 한 번
+		updated.extractingPath("$[*].id").isEqualTo(List.of((int) first, (int) second));
+		updated.extractingPath("$[*].enabled").isEqualTo(List.of(false, false));
+		updated.extractingPath("$[*].skipHolidays").isEqualTo(List.of(true, true));
+		updated.extractingPath("$[*].nextRunAt").isEqualTo(Arrays.asList(null, null));
+		var other = assertThat(mvc.get().uri("/api/schedules/{id}", untouched)).bodyJson();
+		other.extractingPath("$.enabled").isEqualTo(true);
+		other.extractingPath("$.skipHolidays").isEqualTo(false);
+
+		// 생략한 항목은 유지
+		assertThat(patchAll("{\"scheduleIds\": [%d], \"enabled\": true}".formatted(first))).bodyJson()
+			.extractingPath("$[0].skipHolidays")
+			.isEqualTo(true);
+		// 스케줄마다 변경 이력
+		assertThat(mvc.get().uri("/api/change-logs?targetType=SCHEDULE&targetId={id}", first)).bodyJson()
+			.extractingPath("$.content[*].fields")
+			.isEqualTo(List.of(List.of("enabled"), List.of("enabled", "skipHolidays"), List.of()));
+	}
+
+	@Test
+	void changesNothingWhenAnyScheduleIsMissingOrTheRequestIsInvalid() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestSuite suite = fixtures.suite(project);
+		long schedule = id(create(suite, environment, "10 9 * * 1-5"));
+
+		assertThat(patchAll("{\"scheduleIds\": [%d, -1], \"enabled\": false}".formatted(schedule)))
+			.hasStatus(HttpStatus.NOT_FOUND)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("test schedule -1 not found");
+		assertThat(mvc.get().uri("/api/schedules/{id}", schedule)).bodyJson()
+			.extractingPath("$.enabled")
+			.isEqualTo(true);
+
+		assertThat(patchAll("{\"scheduleIds\": [], \"enabled\": false}")).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("scheduleIds must not be empty");
+		assertThat(patchAll("{\"enabled\": false}")).hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(patchAll("{\"scheduleIds\": [%d, null], \"enabled\": false}".formatted(schedule)))
+			.hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(patchAll("{\"scheduleIds\": [%d]}".formatted(schedule))).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("enabled or skipHolidays is required");
+		String tooMany = LongStream.rangeClosed(1, 201)
+			.mapToObj(String::valueOf)
+			.collect(Collectors.joining(","));
+		assertThat(patchAll("{\"scheduleIds\": [%s], \"enabled\": false}".formatted(tooMany)))
+			.hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("at most 200 schedules can be updated at once");
+		// 200건까지는 형식 확인을 통과 (없는 ID라 404)
+		String limit = LongStream.rangeClosed(1, 200)
+			.mapToObj(id -> String.valueOf(-id))
+			.collect(Collectors.joining(","));
+		assertThat(patchAll("{\"scheduleIds\": [%s], \"enabled\": false}".formatted(limit)))
+			.hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
 	void changesEnvironmentOfSchedule() {
 		Project project = fixtures.project();
 		Environment dev = fixtures.environment(project, Map.of());
@@ -171,6 +250,15 @@ class ScheduleControllerTest {
 			.content("{\"suiteId\": %d, \"environmentId\": %d, \"cron\": \"%s\"}".formatted(suite.getId(),
 					environment.getId(), cron))
 			.exchange();
+	}
+
+	private MvcTestResult patchAll(String body) {
+		return patch("/api/schedules", body);
+	}
+
+	private static long id(MvcTestResult result) {
+		String location = result.getResponse().getHeader("Location");
+		return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
 	}
 
 	private MvcTestResult patch(String uri, String body) {

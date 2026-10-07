@@ -2,6 +2,7 @@ package com.sentinel.application;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.Objects;
 
 import com.sentinel.application.ChangeLogService.Changes;
 import com.sentinel.application.ChangeLogService.Target;
@@ -24,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ScheduleService {
+
+	/** 한 번에 바꿀 수 있는 스케줄 수 */
+	public static final int MAX_BULK_UPDATE = 200;
 
 	private final TestScheduleRepository schedules;
 
@@ -126,6 +130,34 @@ public class ScheduleService {
 					.compare("skipHolidays", before.skipHolidays(), after.skipHolidays())
 					.fields());
 		return after;
+	}
+
+	/**
+	 * 여러 스케줄의 활성·휴일 건너뛰기를 한 번에 변경. 한 트랜잭션이라 하나라도 없으면(404) 전부 미변경. 스케줄마다 변경 이력
+	 * <p>
+	 * 이미 그 상태인 스케줄은 그대로 둠: 켜져 있는 스케줄을 다시 켜면 다음 실행 시각이 지금 기준으로 다시 계산되어, 곧 돌 실행을 건너뛸 수 있음
+	 * @param enabled null이면 유지
+	 * @param skipHolidays null이면 유지
+	 * @return 요청 순서대로 (중복 ID는 한 번)
+	 * @throws InvalidRequestException ID 없음·{@value #MAX_BULK_UPDATE}건 초과, 바꿀 항목 없음
+	 * @throws NotFoundException 스케줄 미존재 또는 삭제
+	 */
+	@Transactional
+	public List<ScheduleDetail> updateAll(List<Long> scheduleIds, Boolean enabled, Boolean skipHolidays, long actorId) {
+		if (scheduleIds == null || scheduleIds.isEmpty() || scheduleIds.stream().anyMatch(Objects::isNull)) {
+			throw new InvalidRequestException("scheduleIds must not be empty");
+		}
+		List<Long> ids = scheduleIds.stream().distinct().toList();
+		if (ids.size() > MAX_BULK_UPDATE) {
+			throw new InvalidRequestException("at most " + MAX_BULK_UPDATE + " schedules can be updated at once");
+		}
+		if (enabled == null && skipHolidays == null) {
+			throw new InvalidRequestException("enabled or skipHolidays is required");
+		}
+		return ids.stream().map(id -> {
+			Boolean changeEnabled = enabled != null && enabled == find(id).isEnabled() ? null : enabled;
+			return update(id, changeEnabled, null, null, skipHolidays, actorId);
+		}).toList();
 	}
 
 	/**

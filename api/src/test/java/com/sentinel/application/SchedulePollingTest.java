@@ -244,6 +244,22 @@ class SchedulePollingTest {
 	}
 
 	@Test
+	void bulkEnablingLeavesAlreadyEnabledSchedulesDue() {
+		ScheduleDetail due = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", ACTOR);
+		ScheduleDetail off = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", ACTOR);
+		scheduleService.update(off.id(), false, null, null, ACTOR);
+		// 09:10 예정이 아직 폴링되지 않은 사이에 일괄로 켬
+		clock.set(Instant.parse("2026-09-18T00:10:30Z"));
+
+		scheduleService.updateAll(List.of(due.id(), off.id()), true, null, ACTOR);
+
+		// 켜져 있던 스케줄은 예정 그대로라 이번 폴링에 실행, 꺼져 있던 스케줄은 지금 기준으로 다음 날
+		assertThat(scheduleService.get(due.id()).nextRunAt()).isEqualTo("2026-09-18T00:10:00Z");
+		assertThat(scheduleService.get(off.id()).nextRunAt()).isEqualTo("2026-09-19T00:10:00Z");
+		assertThat(poller.poll()).hasSize(1);
+	}
+
+	@Test
 	void recordsAndNotifiesMonitoringGapWhenSchedulesRunLate() {
 		scheduleService.create(suite.getId(), environment.getId(), "*/10 * * * *", ACTOR);
 		scheduleService.create(suite.getId(), environment.getId(), "30 9 * * *", ACTOR);
