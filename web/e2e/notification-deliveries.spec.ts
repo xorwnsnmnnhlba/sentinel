@@ -65,3 +65,20 @@ test("프로젝트 화면의 알림 채널에서 그 프로젝트의 발송 이�
   await expect(page.getByLabel("프로젝트 Webhook")).toHaveValue(String(projectId));
   await expect(page.getByRole("row", { name: new RegExp(`${projectName} 알림 연결 확인`) })).toHaveCount(1);
 });
+
+test("대시보드 맨 위에 알림을 보내지 못하는 채널을 알리고 그 채널의 실패 이력으로 이동", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "대시보드", level: 1 })).toBeVisible();
+
+  const channels = page.getByRole("list", { name: "알림을 보내지 못하는 채널" });
+  const row = channels.getByRole("listitem").filter({ hasText: `${projectName} · 텍스트` });
+  await expect(row).toContainText(/HTTP 4\d\d/);
+  await expect(row).toContainText(/부터 1건/);
+  // E2E 스택은 기본 채널 주소가 없음
+  await expect(page.getByText(/기본 알림 채널 주소\(SENTINEL_WEBHOOK_URL\)가 없어/)).toBeVisible();
+  expect(await accessibilityViolations(page)).toEqual([]);
+
+  await row.getByRole("link", { name: `${projectName} · 텍스트` }).click();
+  await expect(page).toHaveURL(new RegExp(`/notifications\\?projectId=${projectId}&failed=true$`));
+  await expect(page.getByLabel("보내지 못한 것만")).toBeChecked();
+});
