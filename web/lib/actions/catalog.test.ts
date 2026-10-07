@@ -33,6 +33,7 @@ import {
   updateEnvironment,
   updateMaintenanceWindow,
   updateSchedule,
+  updateSchedules,
   updateProject,
 } from "./catalog";
 
@@ -554,6 +555,51 @@ describe("cases", () => {
     server.use(http.post(springUrl("/api/cases"), () => problem(409, "test case name 'health' is already in use")));
 
     await expect(createCase(4, draft)).resolves.toEqual({ errors: ["이미 사용 중인 이름입니다"] });
+  });
+});
+
+describe("updateSchedules", () => {
+  it("changes the chosen schedules at once and reloads the list", async () => {
+    const bodies = capture("patch", "/api/schedules", () => HttpResponse.json([]));
+
+    await expect(updateSchedules([3, 4], { enabled: false })).resolves.toEqual({});
+    await expect(updateSchedules([3], { skipHolidays: true })).resolves.toEqual({});
+
+    expect(bodies).toEqual([
+      { scheduleIds: [3, 4], enabled: false },
+      { scheduleIds: [3], skipHolidays: true },
+    ]);
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects requests that did not come from the list without calling Spring", async () => {
+    const bodies = capture("patch", "/api/schedules", () => HttpResponse.json([]));
+
+    for (const ids of [[], [0], [1.5], Array.from({ length: 201 }, (_, i) => i + 1)]) {
+      await expect(updateSchedules(ids, { enabled: true })).resolves.toEqual({
+        error: "스케줄을 1~200개 골라 주세요",
+      });
+    }
+    await expect(updateSchedules([1], {})).resolves.toEqual({ error: "요청 형식이 올바르지 않습니다" });
+    await expect(updateSchedules([1], { enabled: "yes" } as unknown as { enabled: boolean })).resolves.toEqual({
+      error: "요청 형식이 올바르지 않습니다",
+    });
+    expect(bodies).toEqual([]);
+    // 200개까지는 보냄
+    await updateSchedules(
+      Array.from({ length: 200 }, (_, i) => i + 1),
+      { enabled: true },
+    );
+    expect(bodies).toHaveLength(1);
+  });
+
+  it("reloads the list when one of them was deleted meanwhile", async () => {
+    capture("patch", "/api/schedules", () => problem(404, "test schedule 4 not found"));
+
+    await expect(updateSchedules([3, 4], { enabled: true })).resolves.toEqual({
+      error: "고른 스케줄 중 삭제된 것이 있어 아무것도 바꾸지 않았습니다. 목록을 새로 고쳤으니 다시 골라 주세요",
+    });
+    expect(refresh).toHaveBeenCalledOnce();
   });
 });
 
