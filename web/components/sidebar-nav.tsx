@@ -2,6 +2,7 @@
 
 import {
   BellRing,
+  CalendarClock,
   CalendarOff,
   FileClock,
   FolderKanban,
@@ -24,6 +25,7 @@ const navigation = [
   { href: "/projects", label: "프로젝트", icon: FolderKanban, match: ["/suites", "/cases"] },
   { href: "/search", label: "케이스 검색", icon: Search, match: [] as string[] },
   { href: "/runs", label: "실행 이력", icon: History, match: [] as string[] },
+  { href: "/schedules", label: "스케줄", icon: CalendarClock, match: [] as string[] },
   { href: "/change-logs", label: "변경 이력", icon: FileClock, match: [] as string[] },
   { href: "/notifications", label: "알림 이력", icon: BellRing, match: [] as string[] },
   { href: "/holidays", label: "휴일", icon: CalendarOff, match: [] as string[] },

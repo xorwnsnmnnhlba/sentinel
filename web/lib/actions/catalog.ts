@@ -8,6 +8,7 @@ import type { CaseItem, EnvironmentItem, MaintenanceWindow, ProjectItem, RunDeta
 import { copyName, MAX_CASE_NAME_LENGTH } from "@/lib/copy-name";
 import { type CaseDraft, isCaseDraft, validateDraft } from "@/lib/case-draft";
 import { fromKstInput, periodError } from "@/lib/maintenance";
+import { MAX_BULK_UPDATE } from "@/lib/schedule-overview";
 import { type Delivery, webhookUrlError } from "@/lib/webhook";
 
 /**
@@ -315,6 +316,41 @@ export async function updateSchedule(scheduleId: number, _: ActionState, form: F
 /** 활성·비활성 전환. 활성화 시 현재 시각 기준으로 다음 실행 시각 재계산 */
 export async function setScheduleEnabled(scheduleId: number, enabled: boolean): Promise<ActionState> {
   return mutate("PATCH", `/api/schedules/${id(scheduleId)}`, { enabled: enabled === true });
+}
+
+/**
+ * 여러 스케줄의 활성·휴일 건너뛰기를 한 번에 변경. 하나라도 그사이 삭제되었으면 아무것도 바뀌지 않음 (화면 재조회)
+ */
+export async function updateSchedules(
+  scheduleIds: number[],
+  change: { enabled?: boolean; skipHolidays?: boolean },
+): Promise<ActionState> {
+  if (
+    !Array.isArray(scheduleIds) ||
+    scheduleIds.length === 0 ||
+    scheduleIds.length > MAX_BULK_UPDATE ||
+    !scheduleIds.every((scheduleId) => Number.isSafeInteger(scheduleId) && scheduleId > 0)
+  ) {
+    return { error: `스케줄을 1~${MAX_BULK_UPDATE}개 골라 주세요` };
+  }
+  const enabled = typeof change?.enabled === "boolean" ? change.enabled : undefined;
+  const skipHolidays = typeof change?.skipHolidays === "boolean" ? change.skipHolidays : undefined;
+  if (enabled === undefined && skipHolidays === undefined) {
+    return { error: "요청 형식이 올바르지 않습니다" };
+  }
+  try {
+    await apiSend("PATCH", "/api/schedules", { scheduleIds, enabled, skipHolidays });
+  } catch (error) {
+    if (isApiError(error) && error.status === 404) {
+      refresh();
+      return {
+        error: "고른 스케줄 중 삭제된 것이 있어 아무것도 바꾸지 않았습니다. 목록을 새로 고쳤으니 다시 골라 주세요",
+      };
+    }
+    return failure(error);
+  }
+  refresh();
+  return {};
 }
 
 export async function deleteSchedule(scheduleId: number): Promise<ActionState> {
