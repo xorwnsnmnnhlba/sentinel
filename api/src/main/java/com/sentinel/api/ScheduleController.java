@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.sentinel.api.request.CreateScheduleRequest;
 import com.sentinel.api.request.UpdateScheduleRequest;
+import com.sentinel.api.request.UpdateSchedulesRequest;
 import com.sentinel.application.ScheduleDetail;
 import com.sentinel.application.ScheduleService;
 import jakarta.validation.Valid;
@@ -44,6 +45,15 @@ class ScheduleController {
 		ScheduleDetail schedule = scheduleService.create(request.suiteId(), request.environmentId(), request.cron(),
 				Boolean.TRUE.equals(request.skipHolidays()), currentUser.get().id());
 		return ResponseEntity.created(URI.create("/api/schedules/" + schedule.id())).body(schedule);
+	}
+
+	/**
+	 * 여러 스케줄의 활성·휴일 건너뛰기를 한 번에 변경. 하나라도 없으면 전부 미변경 (404)
+	 */
+	@PatchMapping
+	List<ScheduleDetail> updateAll(@RequestBody UpdateSchedulesRequest request) {
+		return scheduleService.updateAll(request.scheduleIds(), request.enabled(), request.skipHolidays(),
+				currentUser.get().id());
 	}
 
 	/**
