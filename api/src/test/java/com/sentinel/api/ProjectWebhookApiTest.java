@@ -214,6 +214,15 @@ class ProjectWebhookApiTest {
 	}
 
 	@Test
+	void cannotTestTheDefaultChannelWhenItIsNotConfigured() {
+		assertThat(mvc.post().uri("/api/test-notifications")).hasStatus(HttpStatus.CONFLICT)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("default notification channel is not configured");
+		assertThat(defaultChannel.sent()).isEmpty();
+	}
+
+	@Test
 	void rejectsInvalidWebhooks() {
 		assertThat(patch("{\"webhookUrl\": \"ftp://hooks.example.test/x\"}")).hasStatus(HttpStatus.BAD_REQUEST)
 			.bodyJson()

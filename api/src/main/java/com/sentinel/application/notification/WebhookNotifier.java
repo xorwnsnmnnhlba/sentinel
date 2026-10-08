@@ -44,6 +44,11 @@ class WebhookNotifier implements Notifier {
 
 	@Override
 	public void send(Notification notification) {
+		deliver(notification);
+	}
+
+	/** 발송하고 결과 반환 (연결 확인용). 실패는 예외 대신 결과로, 발송 이력에 기록 */
+	WebhookSender.Delivery deliver(Notification notification) {
 		WebhookSender.Delivery delivery;
 		try {
 			int status = restClient.post()
@@ -64,6 +69,7 @@ class WebhookNotifier implements Notifier {
 					: new WebhookSender.Delivery(false, null, HttpFailures.reason(ex));
 		}
 		deliveries.record(DeliveryLog.Target.defaultWebhook(url), notification, delivery);
+		return delivery;
 	}
 
 }

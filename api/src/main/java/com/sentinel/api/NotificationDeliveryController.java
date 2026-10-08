@@ -3,8 +3,10 @@ package com.sentinel.api;
 import com.sentinel.application.NotificationDeliveryService;
 import com.sentinel.application.NotificationDeliveryService.DeliveryItem;
 import com.sentinel.application.PageResponse;
+import com.sentinel.application.notification.WebhookSender;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 class NotificationDeliveryController {
 
 	private final NotificationDeliveryService deliveries;
+
+	private final CurrentUser currentUser;
 
 	/**
 	 * 최신순. size는 1~100으로 보정
@@ -37,6 +41,15 @@ class NotificationDeliveryController {
 	@GetMapping("/notification-channel-health")
 	NotificationDeliveryService.ChannelHealth health() {
 		return deliveries.health();
+	}
+
+	/**
+	 * 서버 기본 채널로 연결 확인 알림. 발송 결과(성공 여부·상태 코드·응답이 없는 사유)를 200으로 응답.
+	 * 모든 프로젝트에 걸친 채널이라 관리자만. 기본 채널 주소가 없으면 409
+	 */
+	@PostMapping("/test-notifications")
+	WebhookSender.Delivery sendDefaultTest() {
+		return deliveries.sendDefaultTest(currentUser.requireAdmin().id());
 	}
 
 }

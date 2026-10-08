@@ -12,11 +12,15 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.sentinel.application.notification.NotificationChannels;
 import com.sentinel.application.notification.NotificationProperties;
+import com.sentinel.application.notification.WebhookSender;
 import com.sentinel.domain.NotificationDelivery;
 import com.sentinel.domain.Project;
+import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.NotificationDeliveryRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
+import com.sentinel.infra.persistence.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +50,10 @@ public class NotificationDeliveryService {
 	private final RetentionProperties retention;
 
 	private final NotificationProperties notificationProperties;
+
+	private final NotificationChannels channels;
+
+	private final UserRepository users;
 
 	private final Clock clock;
 
@@ -113,6 +121,21 @@ public class NotificationDeliveryService {
 	private boolean inUse(NotificationDelivery delivery, Map<Long, Project> webhookProjects) {
 		return delivery.getChannel() == NotificationDelivery.Channel.DEFAULT ? notificationProperties.hasWebhook()
 				: webhookProjects.containsKey(delivery.getProjectId());
+	}
+
+	/**
+	 * 서버 기본 채널로 연결 확인 알림 (배포 직후 기본 채널이 받는지 확인). 발송은 트랜잭션 밖에서
+	 * @param requesterId 보낸 사람. 알림에 이메일 표시
+	 * @throws ConflictException 기본 채널 주소 미설정
+	 */
+	public WebhookSender.Delivery sendDefaultTest(long requesterId) {
+		String requester = users.findById(requesterId).map(User::getEmail).orElse("알 수 없음");
+		try {
+			return channels.sendDefaultTest(requester);
+		}
+		catch (IllegalStateException ex) {
+			throw new ConflictException(ex.getMessage());
+		}
 	}
 
 	/** 보관기간({@code sentinel.retention.notification-retention})이 지난 기록 삭제 */

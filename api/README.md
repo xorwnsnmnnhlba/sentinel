@@ -464,7 +464,7 @@ deploy-check:
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}`, `PATCH /api/schedules`(여러 건) | `DELETE /api/schedules/{id}` |
 | 점검 시간 | `GET /api/maintenance-windows?environmentId=` | | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
 | 휴일 | `GET /api/holidays?year=` | | `POST /api/holidays`, `POST /api/holiday-imports`(여러 건) | `DELETE /api/holidays/{id}` |
-| 알림 발송 이력 | `GET /api/notification-deliveries?projectId=&failed=`, `GET /api/notification-channel-health`(채널 상태) | | | |
+| 알림 발송 이력 | `GET /api/notification-deliveries?projectId=&failed=`, `GET /api/notification-channel-health`(채널 상태) | | `POST /api/test-notifications`(기본 채널 연결 확인) | |
 | 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |
 | 응답시간 변화 | `GET /api/response-time-changes?from=&to=&limit=5` | | | |
@@ -981,6 +981,7 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
   - 두 서식 모두 알림 미리보기용 `text`(제목)를 함께 보냄. Slack 본문은 서식 문법(`*`, `_`)으로 해석되지 않도록 일반 텍스트로 보내고 블록 글자 수 제한(머리 150자, 본문 3,000자)을 넘으면 자름
   - Teams의 새 워크플로 Webhook("Webhook 요청을 받으면 채널에 게시")은 카드 형식이 필요하여, 예전 텍스트 한 필드로는 게시되지 않을 수 있음
 - Webhook 주소는 자격증명이므로 환경변수로 주입하고 로그·git에 남기지 않음 (`sentinel.env`)
+- 연결 확인: `POST /api/test-notifications` (관리자만). 기본 채널로 "기본 알림 채널 연결 확인" 알림을 실제 알림과 같은 경로로 보내고 200 `{delivered, statusCode, error}` (프로젝트 연결 확인과 같은 형식). 발송 이력에 기록. 주소가 없으면(로그에만 기록하는 상태) 409
 - 발송 실패(4xx·5xx, 타임아웃, 연결 실패)는 WARN 로그만 남기고 실행·폴링은 계속
 - 다른 형식이 필요하면 `com.sentinel.application.notification.Notifier` 구현체 추가 후 `NotificationConfig`의 빈 교체
 
