@@ -56,6 +56,20 @@ public class NotificationChannels {
 	}
 
 	/**
+	 * 서버 기본 채널로 연결 확인 알림. 실제 알림과 같은 경로로 보내고 발송 이력에 기록
+	 * @param requester 보낸 사람 (이메일)
+	 * @throws IllegalStateException 기본 채널 주소 미설정 (알림이 로그에만 남는 상태)
+	 */
+	public WebhookSender.Delivery sendDefaultTest(String requester) {
+		if (!(defaultChannel instanceof WebhookNotifier webhook)) {
+			throw new IllegalStateException("default notification channel is not configured");
+		}
+		return webhook.deliver(new Notification("[Sentinel] 기본 알림 채널 연결 확인",
+				List.of("이 채널로 Webhook을 지정하지 않은 프로젝트의 실패·복구 알림과 DB 연결 실패·모니터링 공백·주간 요약을 보냅니다",
+						"보낸 사람: " + requester)));
+	}
+
+	/**
 	 * 연결 확인용 알림. 프로젝트 Webhook으로만 보냄 (기본 채널로 대신 보내지 않음)
 	 * @param requester 보낸 사람 (이메일)
 	 * @throws IllegalStateException Webhook 미지정
