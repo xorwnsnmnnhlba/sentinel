@@ -2,6 +2,8 @@
 
 팀원이 사내망에서 쓰도록 서버에 띄우고 유지하는 절차. 컨테이너 구성과 설계 배경은 [design.md](design.md) "6. 실행 환경"
 
+최종 점검: 2026-10-07 (알림 이력·채널 고장 표시·휴일·스케줄 일괄 변경 반영)
+
 ## 결정 사항 (2026-09-26)
 
 | 항목 | 결정 | 비고 |
@@ -37,16 +39,18 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
    - `SENTINEL_HSTS_MAX_AGE=300`: 처음에는 5분. 확인을 마치면 31536000(1년)으로 변경 후 `docker compose up -d sentinel-proxy`
 3. `sentinel.env` 작성 (`cp sentinel.env.example sentinel.env`, `chmod 600 sentinel.env`)
    - `DB_URL`: `jdbc:postgresql://<RDS 엔드포인트>:5432/<DB>?currentSchema=sentinel&sslmode=require`
-   - `SENTINEL_SECRET_KEY`: `openssl rand -base64 32`로 생성. 분실하면 저장된 시크릿을 복호화할 수 없으므로 팀 비밀번호 관리 도구에 따로 보관
+   - `SENTINEL_SECRET_KEY`: `openssl rand -base64 32`로 생성. 환경 시크릿(토큰·API 키)과 프로젝트별 알림 Webhook 주소를 암호화. 없으면 둘 다 등록할 수 없음. 분실하면 저장된 값을 복호화할 수 없으므로 팀 비밀번호 관리 도구에 따로 보관
    - `SENTINEL_ADMIN_EMAIL`·`SENTINEL_ADMIN_PASSWORD`: 사용자가 없을 때 1회 생성되는 최초 관리자
    - `SENTINEL_WEB_URL=https://sentinel.<사내 도메인>`: 실패 알림의 결과 링크
-   - `SENTINEL_WEBHOOK_URL`: Slack·Teams 수신 Webhook (주소 자체가 자격증명)
+   - `SENTINEL_WEBHOOK_URL`: 기본 알림 채널. Slack·Teams 수신 Webhook (주소 자체가 자격증명). 프로젝트 Webhook이 없는 프로젝트의 실패·복구 알림, DB 연결 실패·복구, 모니터링 공백, 주간 요약(월 09:00)이 이 채널로. 없으면 로그에만 남음
    - `SENTINEL_HEARTBEAT_URL`: 외부 감시 서비스의 생존 신호 주소 (주소 자체가 자격증명). 서버가 멈추면 외부 서비스가 알림 (`api/README.md` "외부 생존 신호")
 4. 점검: `scripts/preflight.sh`에서 실패 0 확인. 값은 출력하지 않음
 5. 기동: `docker compose up -d --build --wait`
 6. 확인 (다른 PC 브라우저)
    - `https://<접속 이름>` 접속 시 인증서 경고 없음, 로그인 유지
    - `http://<접속 이름>`은 `https://`로 이동
+   - 대시보드 머리 아래에 "기본 알림 채널 주소(SENTINEL_WEBHOOK_URL)가 없어…" 안내가 없음 (있으면 `sentinel.env` 확인)
+   - 생존 신호를 설정했다면 외부 감시 서비스에 첫 신호가 도착 (스케줄 폴링 주기 60초)
 7. 최초 관리자로 로그인 → 비밀번호 변경 → `sentinel.env`에서 `SENTINEL_ADMIN_PASSWORD` 줄 삭제 후 `docker compose up -d sentinel-api` → 사용자 화면에서 팀원 초대
    - 줄만 지우면 실행 중인 컨테이너의 환경변수(`docker inspect`에 표시)에는 남아 있으므로 컨테이너를 다시 만들어 제거
 8. HSTS를 1년(31536000)으로 변경
@@ -57,7 +61,23 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 |------|------|
 | `.env` | 접속 주소, 인증서 방식 형식, HSTS 값 (내부 인증서와 함께 쓰면 경고) |
 | 보유 인증서 | 만료(30일 전 경고), 개인 키 짝, 접속 주소마다 인증서 포함 여부(와일드카드는 한 단계), 중간 인증서 포함 |
-| `sentinel.env` | 따옴표 사용, DB 필수 값, DB 주소(컨테이너 안 localhost 금지, RDS의 sslmode), 암호화 키 길이, 최초 관리자 비밀번호 잔존, 알림 링크 주소 |
+| `sentinel.env` | 따옴표 사용, DB 필수 값, DB 주소(컨테이너 안 localhost 금지, RDS의 sslmode), 암호화 키 길이, 최초 관리자 비밀번호 잔존, 알림 링크 주소, 기본 알림 채널·생존 신호 주소 유무 (값은 출력하지 않음) |
+
+## 운영 시작 설정
+
+배포 후 관리자가 화면에서 1회 설정
+
+1. 팀원 초대: 사이드바 "사용자" → "사용자 초대"로 발급한 링크 전달 (메일 발송 없음)
+2. 프로젝트별 알림 채널: 프로젝트 화면 "알림 채널"에서 Webhook 지정 → "테스트 알림 보내기"로 채널에 메시지가 오는지 확인. 지정하지 않은 프로젝트는 기본 채널
+3. 휴일: 사이드바 "휴일" → "여러 건 붙여넣기"로 올해 남은 공휴일과 내년 공휴일, 회사 휴일 등록 (한 줄에 "날짜 이름"). 대체·임시공휴일은 발표 때마다 추가
+4. 휴일 건너뛰기: 사이드바 "스케줄"에서 평일 업무 시간 스케줄을 골라 "휴일 건너뛰기 켜기" (24시간 감시 스케줄은 그대로)
+5. CI 연동이 필요하면 팀원마다 "API 토큰" 발급 (`api/README.md` "API 토큰")
+
+알림 확인
+
+- 보낸 알림과 결과는 사이드바 "알림 이력". "알림이 안 왔다"는 먼저 여기서 확인 (보냄·HTTP 상태·응답 없는 사유와 확인할 점)
+- 채널이 고장 나면(마지막 발송이 실패) 대시보드 맨 위에 "알림을 보내지 못하는 채널"로 표시. Webhook을 고친 뒤 테스트 알림이 성공하면 사라짐
+- 기본 채널은 따로 보내 볼 수 없어 첫 알림(예: 월요일 09:00 주간 요약)이 알림 이력에 "보냄"으로 남는지로 확인
 
 ## 업데이트
 
@@ -106,7 +126,8 @@ openssl x509 -in proxy/certs/cert.pem -noout -enddate
 | 대상 | 방법 |
 |------|------|
 | DB (케이스·실행 이력·사용자) | RDS 자동 백업 보존 기간 확인, 마이그레이션이 있는 업데이트 전 수동 스냅샷 |
-| `SENTINEL_SECRET_KEY` | 팀 비밀번호 관리 도구에 보관. 분실 시 환경의 시크릿을 모두 다시 입력 |
+| `SENTINEL_SECRET_KEY` | 팀 비밀번호 관리 도구에 보관. 분실 시 환경의 시크릿과 프로젝트 Webhook을 모두 다시 입력 |
+| 알림 발송 이력 | DB에 90일 보관 후 자동 삭제 (`sentinel.retention.notification-retention`). 주소·본문은 기록하지 않음 |
 | `sentinel.env`·`.env`·`proxy/certs/` | 서버에만 존재. 서버 교체에 대비해 값의 보관 위치 기록 (파일째 공유 금지) |
 | `caddy_data` 볼륨 | 회사 인증서 방식에서는 보관 불필요 (내부 인증서 방식일 때만 인증 기관 키 보관) |
 
@@ -119,3 +140,8 @@ docker compose logs --since 1h sentinel-proxy
 
 - 서비스당 10MB 파일 5개까지 보관 후 오래된 것부터 삭제 (`docker-compose.yml`의 `x-logging`)
 - 실행 결과의 요청·응답 원문은 로그가 아니라 DB에 저장하며 보관기간(기본 30일) 후 삭제
+- 알림 발송 결과는 화면 "알림 이력"(90일)에서 먼저 확인. 로그에는 발송 실패만 WARN 1줄 (주소 없음)
+
+```bash
+docker compose logs --since 1d sentinel-api | grep "Notification delivery"
+```
