@@ -2,13 +2,21 @@ import Link from "next/link";
 
 import { Panel, PanelEmpty, PanelFooter } from "@/components/catalog/section";
 import { DeliveryResultBadge, ToneBadge } from "@/components/notification/delivery-badges";
+import { TestNotificationButton } from "@/components/notification/test-notification-button";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { sendDefaultTestNotification } from "@/lib/actions/catalog";
 import { apiGet } from "@/lib/api/server";
-import type { NotificationDeliveryItem, Page, ProjectItem } from "@/lib/api/types";
+import type {
+  AuthenticatedUser,
+  NotificationChannelHealth,
+  NotificationDeliveryItem,
+  Page,
+  ProjectItem,
+} from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { channelLabel, resultHint } from "@/lib/notification-delivery";
 
@@ -34,14 +42,37 @@ export default async function NotificationsPage(props: PageProps<"/notifications
 
   const query = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
   appendFilters(query, filters);
-  const [deliveries, projects] = await Promise.all([
+  const [deliveries, projects, me, health] = await Promise.all([
     apiGet<Page<NotificationDeliveryItem>>(`/api/notification-deliveries?${query}`),
     apiGet<ProjectItem[]>("/api/projects"),
+    apiGet<AuthenticatedUser>("/api/sessions/current"),
+    apiGet<NotificationChannelHealth>("/api/notification-channel-health"),
   ]);
 
   return (
     <div className="space-y-4">
       <PageHeader title="알림 이력" />
+
+      {/* 기본 채널은 모든 프로젝트에 걸친 서버 설정이라 관리자에게만. 배포 직후 받는지 확인용 */}
+      {me.role === "ADMIN" && (
+        <Panel title="기본 알림 채널" meta="SENTINEL_WEBHOOK_URL">
+          <div className="space-y-3 p-4 text-sm">
+            {health.defaultChannelConfigured ? (
+              <>
+                <p>
+                  Webhook을 지정하지 않은 프로젝트의 실패·복구 알림과 DB 연결 실패·모니터링 공백·주간 요약을 보냅니다
+                </p>
+                <TestNotificationButton label="기본 채널 테스트 알림" action={sendDefaultTestNotification} />
+              </>
+            ) : (
+              <p className="text-muted-foreground">
+                주소가 설정되지 않아 이 채널 알림은 서버 로그에만 남습니다. 서버의 sentinel.env에 지정한 뒤 api를 다시
+                시작해 주세요
+              </p>
+            )}
+          </div>
+        </Panel>
+      )}
 
       <form
         method="get"

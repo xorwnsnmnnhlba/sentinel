@@ -50,6 +50,7 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
    - `https://<접속 이름>` 접속 시 인증서 경고 없음, 로그인 유지
    - `http://<접속 이름>`은 `https://`로 이동
    - 대시보드 머리 아래에 "기본 알림 채널 주소(SENTINEL_WEBHOOK_URL)가 없어…" 안내가 없음 (있으면 `sentinel.env` 확인)
+   - 사이드바 "알림 이력"의 "기본 채널 테스트 알림"(관리자)으로 기본 채널에 메시지가 오는지 확인
    - 생존 신호를 설정했다면 외부 감시 서비스에 첫 신호가 도착 (스케줄 폴링 주기 60초)
 7. 최초 관리자로 로그인 → 비밀번호 변경 → `sentinel.env`에서 `SENTINEL_ADMIN_PASSWORD` 줄 삭제 후 `docker compose up -d sentinel-api` → 사용자 화면에서 팀원 초대
    - 줄만 지우면 실행 중인 컨테이너의 환경변수(`docker inspect`에 표시)에는 남아 있으므로 컨테이너를 다시 만들어 제거
@@ -77,7 +78,7 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 
 - 보낸 알림과 결과는 사이드바 "알림 이력". "알림이 안 왔다"는 먼저 여기서 확인 (보냄·HTTP 상태·응답 없는 사유와 확인할 점)
 - 채널이 고장 나면(마지막 발송이 실패) 대시보드 맨 위에 "알림을 보내지 못하는 채널"로 표시. Webhook을 고친 뒤 테스트 알림이 성공하면 사라짐
-- 기본 채널은 따로 보내 볼 수 없어 첫 알림(예: 월요일 09:00 주간 요약)이 알림 이력에 "보냄"으로 남는지로 확인
+- 기본 채널은 "알림 이력"의 "기본 채널 테스트 알림"(관리자)으로 확인. 실제 알림과 같은 경로로 보내고 이력에 남음
 
 ## 업데이트
 
