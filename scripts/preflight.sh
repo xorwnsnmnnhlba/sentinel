@@ -204,11 +204,11 @@ check_app_env() {
 
   value=$(value_of "$APP_ENV_FILE" SENTINEL_SECRET_KEY)
   if [ -z "$value" ]; then
-    warn "SENTINEL_SECRET_KEY 없음. 시크릿(토큰·API 키) 등록 불가"
+    warn "SENTINEL_SECRET_KEY 없음. 환경 시크릿(토큰·API 키) 등록과 프로젝트별 알림 Webhook 지정 불가"
   else
     bytes=$(printf '%s' "$value" | openssl base64 -d -A 2>/dev/null | wc -c | tr -d ' ')
     case "$bytes" in
-      16 | 24 | 32) ok "SENTINEL_SECRET_KEY 형식 정상 (${bytes}바이트). 분실 시 저장된 시크릿 복구 불가, 별도 보관" ;;
+      16 | 24 | 32) ok "SENTINEL_SECRET_KEY 형식 정상 (${bytes}바이트). 분실 시 저장된 시크릿·프로젝트 Webhook 복구 불가, 별도 보관" ;;
       *) fail "SENTINEL_SECRET_KEY는 Base64로 16·24·32바이트 (생성: openssl rand -base64 32)" ;;
     esac
   fi
@@ -233,7 +233,7 @@ check_app_env() {
   fi
 
   if [ -z "$(value_of "$APP_ENV_FILE" SENTINEL_WEBHOOK_URL)" ]; then
-    warn "SENTINEL_WEBHOOK_URL 없음. 실패 알림은 로그로만 기록"
+    warn "SENTINEL_WEBHOOK_URL 없음. 프로젝트 Webhook이 없는 프로젝트의 실패 알림과 DB 연결 실패·모니터링 공백·주간 요약은 로그로만 기록"
   fi
 
   if [ -z "$(value_of "$APP_ENV_FILE" SENTINEL_HEARTBEAT_URL)" ]; then
