@@ -75,6 +75,27 @@ export async function sendTestNotification(projectId: number): Promise<TestNotif
   }
 }
 
+/**
+ * 서버 기본 채널로 연결 확인 알림 발송 (관리자). 결과를 그대로 반환하고 알림 이력을 다시 받음
+ */
+export async function sendDefaultTestNotification(): Promise<TestNotificationState> {
+  let delivery: Delivery | null;
+  try {
+    delivery = await apiSend<Delivery>("POST", "/api/test-notifications");
+  } catch (error) {
+    if (isApiError(error) && error.status === 409) {
+      refresh();
+      return { error: "기본 알림 채널 주소(SENTINEL_WEBHOOK_URL)가 설정되지 않아 보낼 수 없습니다" };
+    }
+    if (isApiError(error) && error.status === 403) {
+      return { error: "기본 채널 테스트 알림은 관리자만 보낼 수 있습니다" };
+    }
+    return failure(error);
+  }
+  refresh();
+  return { delivery: delivery ?? undefined };
+}
+
 export async function deleteProject(projectId: number): Promise<ActionState> {
   try {
     await apiSend("DELETE", `/api/projects/${id(projectId)}`);

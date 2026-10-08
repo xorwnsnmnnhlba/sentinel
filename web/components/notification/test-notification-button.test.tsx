@@ -49,4 +49,18 @@ describe("TestNotificationButton", () => {
     expect(await screen.findByText("지정된 Webhook이 없습니다")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "테스트 알림 보내기" })).toBeEnabled();
   });
+
+  it("can be named for the channel it tests", async () => {
+    const user = userEvent.setup();
+    render(
+      <TestNotificationButton
+        label="기본 채널 테스트 알림"
+        action={async () => ({ delivery: { delivered: true, statusCode: 204, error: null } })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "기본 채널 테스트 알림" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("테스트 알림을 보냈습니다 (HTTP 204)");
+  });
 });

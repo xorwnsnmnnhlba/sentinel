@@ -36,6 +36,10 @@ test.beforeEach(async ({ page }) => {
 test("보내지 못한 알림을 프로젝트·실패로 좁혀 결과와 확인할 점을 봄", async ({ page }) => {
   await mainMenu(page).getByRole("link", { name: "알림 이력" }).click();
   await expect(page.getByRole("heading", { name: "알림 이력", level: 1 })).toBeVisible();
+  // E2E 스택은 기본 채널 주소가 없어 테스트 알림 대신 설정 안내 (관리자)
+  await expect(page.getByRole("heading", { name: "기본 알림 채널" })).toBeVisible();
+  await expect(page.getByText(/주소가 설정되지 않아 이 채널 알림은 서버 로그에만 남습니다/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "기본 채널 테스트 알림" })).toHaveCount(0);
 
   await page.getByLabel("프로젝트 Webhook").selectOption({ label: projectName });
   await page.getByLabel("보내지 못한 것만").check();
