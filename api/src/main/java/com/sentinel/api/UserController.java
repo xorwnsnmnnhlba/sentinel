@@ -40,6 +40,13 @@ class UserController {
 	/**
 	 * 초대 링크 발급. 응답의 토큰으로 링크를 만들어 전달 (메일 발송 없음)
 	 */
+	/** 관리자만 (목록과 같음) */
+	@GetMapping("/{userId}")
+	UserService.UserSummary get(@PathVariable long userId) {
+		currentUser.requireAdmin();
+		return userService.get(userId);
+	}
+
 	@PostMapping("/invites")
 	@ResponseStatus(HttpStatus.CREATED)
 	IssuedLinkResponse invite(@Valid @RequestBody CreateInviteRequest request) {

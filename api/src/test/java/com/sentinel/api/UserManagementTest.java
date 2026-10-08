@@ -191,6 +191,7 @@ class UserManagementTest {
 		String memberToken = authService.login(email, "member-password").token();
 
 		assertThat(get("/api/users", memberToken)).hasStatus(HttpStatus.FORBIDDEN);
+		assertThat(get("/api/users/" + adminId, memberToken)).hasStatus(HttpStatus.FORBIDDEN);
 		assertThat(post("/api/users/invites", memberToken, """
 				{"email": "other@sentinel.test"}""")).hasStatus(HttpStatus.FORBIDDEN);
 		assertThat(get("/api/users", adminToken)).hasStatusOk().bodyJson().extractingPath("$.length()").isEqualTo(2);
@@ -209,8 +210,15 @@ class UserManagementTest {
 			.asString()
 			.contains("your own account");
 
+		var read = assertThat(get("/api/users/" + member.getId(), adminToken)).hasStatusOk().bodyJson();
+		read.extractingPath("$.email").isEqualTo(email);
+		read.extractingPath("$.role").isEqualTo("MEMBER");
 		assertThat(mvc.delete().uri("/api/users/{id}", member.getId()).header("Authorization", "Bearer " + adminToken))
 			.hasStatus(HttpStatus.NO_CONTENT);
+		assertThat(get("/api/users/" + member.getId(), adminToken)).hasStatus(HttpStatus.NOT_FOUND)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("user " + member.getId() + " not found");
 		assertThat(get("/api/projects", memberToken)).hasStatus(HttpStatus.UNAUTHORIZED);
 		assertThat(get("/api/users", adminToken)).bodyJson().extractingPath("$.length()").isEqualTo(1);
 	}

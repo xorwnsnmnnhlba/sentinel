@@ -39,6 +39,11 @@ class HolidayController {
 		return holidayService.list(year);
 	}
 
+	@GetMapping("/holidays/{holidayId}")
+	HolidayService.HolidayItem get(@PathVariable long holidayId) {
+		return holidayService.get(holidayId);
+	}
+
 	@PostMapping("/holidays")
 	ResponseEntity<HolidayService.HolidayItem> create(@Valid @RequestBody CreateHolidayRequest request) {
 		AuthenticatedUser admin = currentUser.requireAdmin();

@@ -74,6 +74,10 @@ class MaintenanceWindowApiTest {
 
 		assertThat(created).hasStatus(HttpStatus.CREATED);
 		assertThat(created.getResponse().getHeader("Location")).isEqualTo("/api/maintenance-windows/" + id(created));
+		assertThat(mvc.get().uri(created.getResponse().getHeader("Location"))).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.reason")
+			.isEqualTo("GW 배포");
 		var body = assertThat(created).bodyJson();
 		body.extractingPath("$.environment.name").isEqualTo("dev");
 		body.extractingPath("$.projectId").isEqualTo(project.getId().intValue());
@@ -92,11 +96,15 @@ class MaintenanceWindowApiTest {
 			.extractingPath("$[*].environment.name")
 			.isEqualTo(List.of("staging"));
 
-		// 끝난 점검은 목록에서 빠짐
+		// 끝난 점검은 목록에서 빠지지만 단건으로는 조회
 		clock.set(NOW.plus(Duration.ofMinutes(30)));
 		assertThat(mvc.get().uri("/api/maintenance-windows")).bodyJson()
 			.extractingPath("$[*].environment.name")
 			.isEqualTo(List.of("staging"));
+		assertThat(mvc.get().uri("/api/maintenance-windows/{id}", id(created))).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.active")
+			.isEqualTo(false);
 	}
 
 	@Test
@@ -132,6 +140,7 @@ class MaintenanceWindowApiTest {
 		assertThat(mvc.delete().uri("/api/maintenance-windows/{id}", windowId)).hasStatus(HttpStatus.NO_CONTENT);
 
 		assertThat(mvc.get().uri("/api/maintenance-windows")).bodyJson().extractingPath("$.length()").isEqualTo(0);
+		assertThat(mvc.get().uri("/api/maintenance-windows/{id}", windowId)).hasStatus(HttpStatus.NOT_FOUND);
 		assertThat(mvc.delete().uri("/api/maintenance-windows/{id}", windowId)).hasStatus(HttpStatus.NOT_FOUND);
 		assertThat(patch(windowId, "{\"reason\": \"x\"}")).hasStatus(HttpStatus.NOT_FOUND)
 			.bodyJson()
@@ -141,11 +150,12 @@ class MaintenanceWindowApiTest {
 
 	@Test
 	void leavesOutWindowsOfDeletedEnvironments() {
-		create(dev.getId(), NOW, NOW.plus(Duration.ofMinutes(10)), null);
+		long windowId = id(create(dev.getId(), NOW, NOW.plus(Duration.ofMinutes(10)), null));
 
 		assertThat(mvc.delete().uri("/api/environments/{id}", dev.getId())).hasStatus(HttpStatus.NO_CONTENT);
 
 		assertThat(mvc.get().uri("/api/maintenance-windows")).bodyJson().extractingPath("$.length()").isEqualTo(0);
+		assertThat(mvc.get().uri("/api/maintenance-windows/{id}", windowId)).hasStatus(HttpStatus.NOT_FOUND);
 	}
 
 	@Test

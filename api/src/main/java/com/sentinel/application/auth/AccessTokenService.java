@@ -80,6 +80,17 @@ public class AccessTokenService {
 	}
 
 	/**
+	 * 내 토큰 단건 (만료 포함)
+	 * @throws NotFoundException 없거나 다른 사용자의 토큰이거나 폐기됨
+	 */
+	@Transactional(readOnly = true)
+	public AccessTokenItem get(long tokenId, long userId) {
+		return tokens.findByIdAndUserIdAndRevokedAtIsNull(tokenId, userId)
+			.map(token -> AccessTokenItem.of(token, clock.instant()))
+			.orElseThrow(() -> new NotFoundException("access token", tokenId));
+	}
+
+	/**
 	 * 폐기. 이후 이 토큰의 요청은 401
 	 * @throws NotFoundException 없거나 다른 사용자의 토큰이거나 이미 폐기됨
 	 */
