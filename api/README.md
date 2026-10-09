@@ -344,7 +344,8 @@ GW·네트워크가 잠깐 흔들린 것만으로 실패가 기록·알림되지
   - 없는 계정도 같은 방식으로 세어 잠김 여부로 계정 존재를 알 수 없음. 성공하면 실패 횟수 초기화
   - IP 기준은 미사용 (Spring에는 Next.js 서버 주소만 보임). 다른 사람이 특정 계정을 최대 15분 잠글 수 있음
   - 메모리 보관이라 재시작하면 초기화 (단일 인스턴스 전제)
-- 로그인 없이 허용하는 링크 API(`/api/invites/`, `/api/password-resets/`)는 경로가 깨끗할 때만 예외. 점 세그먼트, `;`, 인코딩된 `.`·`/`·`\`, `//`가 있으면 인증 요구 (라우팅의 경로 정리 방식에 기대지 않음)
+- 로그인 없이 허용하는 요청은 메서드와 경로가 정확히 맞을 때만 예외: 로그인(`POST /api/sessions`), 초대·재설정 링크 확인(`GET /api/invites/{token}`·`GET /api/password-resets/{token}`), 계정 만들기(`POST /api/users`, 초대 토큰), 재설정 링크로 비밀번호 설정(`PUT /api/users/{id}/password`, 재설정 토큰). 같은 경로의 다른 메서드는 인증 필요
+  - 점 세그먼트, `;`, 인코딩된 `.`·`/`·`\`, `//`가 있으면 인증 요구 (라우팅의 경로 정리 방식에 기대지 않음)
 
 ### API 토큰 (CI 연동)
 
@@ -426,14 +427,14 @@ deploy-check:
 |-----|------|------|
 | `GET /api/users` | 관리자 | 사용자 목록 |
 | `GET /api/users/{id}` | 관리자 | 사용자 단건 (목록 항목과 같은 형식). 삭제된 사용자는 404 |
-| `POST /api/users/invites` | 관리자 | 초대 링크 발급. 본문 `{"email": "...", "role": "MEMBER"}`. 201 + `{"token": "...", "expiresAt": "..."}` |
-| `POST /api/users/{id}/password-resets` | 관리자 | 재설정 링크 발급 |
+| `POST /api/users` | 없음 (초대 토큰) | 초대 수락으로 계정 만들기. 본문 `{"inviteToken": "...", "name": "...", "password": "..."}`. 이메일·역할은 초대에 따름. 201 + `Location` + 사용자. 로그인은 `POST /api/sessions`로 따로 |
 | `DELETE /api/users/{id}` | 관리자 | 삭제(보관). 세션·남은 링크 정리 |
-| `POST /api/users/me/password` | 본인 | 비밀번호 변경. 본문 `{"currentPassword": "...", "newPassword": "..."}` |
+| `PUT /api/users/me/password` | 본인 | 비밀번호 변경. 본문 `{"currentPassword": "...", "newPassword": "..."}`. 204 |
+| `PUT /api/users/{id}/password` | 없음 (재설정 토큰) | 재설정 링크로 새 비밀번호 설정. 본문 `{"resetToken": "...", "password": "..."}`. 204. 다른 사용자의 링크는 404 |
+| `POST /api/invites` | 관리자 | 초대 링크 발급. 본문 `{"email": "...", "role": "MEMBER"}`. 201 + `Location` + `{"token": "...", "expiresAt": "..."}` |
 | `GET /api/invites/{token}` | 없음 | 초대 링크 확인 (대상 이메일) |
-| `POST /api/invites/{token}` | 없음 | 초대 수락. 본문 `{"name": "...", "password": "..."}`. 201 + 세션 토큰 |
-| `GET /api/password-resets/{token}` | 없음 | 재설정 링크 확인 |
-| `POST /api/password-resets/{token}` | 없음 | 새 비밀번호 설정. 204 |
+| `POST /api/password-resets` | 관리자 | 재설정 링크 발급. 본문 `{"userId": 7}`. 201 + `Location` + `{"token", "expiresAt"}` |
+| `GET /api/password-resets/{token}` | 없음 | 재설정 링크 확인 (`userId`, 대상 이메일) |
 
 - 가입 경로는 초대뿐. 공개 가입·비밀번호 찾기 폼 없음 (메일 발송 미사용)
 - 링크 토큰은 1회용이며 저장은 해시로만. 만료·사용·위조는 모두 404로 동일하게 응답

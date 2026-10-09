@@ -53,6 +53,9 @@ sentinel/
 - URL에 동사 미사용. 상태 변경은 `PATCH` 부분 수정 (`PATCH /api/schedules/{id}` `{"enabled": false}`)
 - 실행 생성 입구는 `POST /api/runs` 하나. 대상은 본문의 `suiteId` 또는 `caseId` 중 정확히 하나
 - 생성은 201 + `Location`, 오류는 ProblemDetail
+- 계정 리소스 정리 (2026-10-09): 한 개념이 두 경로로 나뉘던 것을 정리. 초대는 `/api/invites`(발급 `POST`, 확인 `GET /{token}`), 재설정 링크는 `/api/password-resets`(발급 `POST {userId}`, 확인 `GET /{token}`). 초대 수락은 계정을 만드는 것이므로 `POST /api/users`(초대 토큰), 비밀번호는 사용자의 하위 리소스로 `PUT /api/users/me/password`(현재 비밀번호)·`PUT /api/users/{id}/password`(재설정 토큰). 이전 `POST /api/users/invites`·`POST /api/invites/{token}`·`POST /api/users/{id}/password-resets`·`POST /api/password-resets/{token}`·`POST /api/users/me/password`
+  - 초대 수락은 계정만 만들고 로그인은 `POST /api/sessions`로 따로 (리소스 생성 응답에 세션을 섞지 않음). 화면(BFF)이 두 요청을 이어서 처리
+  - 인증 필터의 로그인 없이 허용하는 요청을 경로 접두어에서 "메서드 + 경로" 목록으로 좁힘 (같은 경로의 다른 메서드는 인증 필요)
 - 알림 리소스 정리 (2026-10-09): 연결 확인 알림은 발송 이력을 만드는 것이므로 `POST /api/notification-deliveries`(201 + 발송 기록) 하나로 (이전 `POST /api/projects/{id}/test-notifications`·`POST /api/test-notifications`). 채널 상태는 채널을 리소스로 `GET /api/notification-channels` (이전 `GET /api/notification-channel-health`). 같은 저장소의 화면만 쓰는 주소라 옛 주소를 남기지 않고 api·web을 한 번에 교체
 - 단건 조회 (2026-10-09): ID로 수정·삭제할 수 있는 리소스는 그 주소로 조회도 가능 (`Location`이 실제로 조회되는 주소). 휴일·점검 시간·API 토큰·사용자 단건 조회 추가. `RestConventionTest`가 경로 규칙(`/api/` 아래 소문자·하이픈)과 함께 확인
 - 수정은 `PATCH` 부분 수정. 생략한 필드는 유지, 목록·객체 값(환경 변수, 요청 정의, 판정 규칙)은 지정 시 전체 교체

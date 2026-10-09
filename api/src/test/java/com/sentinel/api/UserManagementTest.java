@@ -85,11 +85,12 @@ class UserManagementTest {
 	void invitesAUserWhoThenSignsInWithTheLink() {
 		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
 
-		MvcTestResult invited = post("/api/users/invites", adminToken, """
+		MvcTestResult invited = post("/api/invites", adminToken, """
 				{"email": "%s", "role": "MEMBER"}""".formatted(email));
 
 		assertThat(invited).hasStatus(HttpStatus.CREATED);
 		String token = read(invited, "$.token");
+		assertThat(invited.getResponse().getHeader("Location")).isEqualTo("/api/invites/" + token);
 		// 저장은 해시로만
 		assertThat(tokens.findAll()).singleElement()
 			.satisfies(saved -> assertThat(saved.getTokenHash()).isNotEqualTo(token).hasSize(64));
@@ -99,27 +100,35 @@ class UserManagementTest {
 			.extractingPath("$.email")
 			.isEqualTo(email);
 
-		MvcTestResult accepted = post("/api/invites/" + token, null, """
-				{"name": "구성원", "password": "member-password"}""");
+		// 초대 수락 = 계정 만들기 (로그인 없이, 초대 토큰으로)
+		MvcTestResult accepted = post("/api/users", null, """
+				{"inviteToken": "%s", "name": "구성원", "password": "member-password"}""".formatted(token));
 		assertThat(accepted).hasStatus(HttpStatus.CREATED);
-		assertThat(accepted).bodyJson().extractingPath("$.user.email").isEqualTo(email);
-		assertThat(accepted).bodyJson().extractingPath("$.user.role").isEqualTo("MEMBER");
+		assertThat(accepted).bodyJson().extractingPath("$.email").isEqualTo(email);
+		assertThat(accepted).bodyJson().extractingPath("$.role").isEqualTo("MEMBER");
+		assertThat(accepted.getResponse().getHeader("Location"))
+			.isEqualTo("/api/users/" + ((Number) JsonPath.read(body(accepted), "$.id")).longValue());
 
-		// 발급된 세션으로 바로 사용 가능
-		assertThat(get("/api/projects", read(accepted, "$.token"))).hasStatusOk();
+		// 만든 계정으로 로그인
+		assertThat(get("/api/projects", authService.login(email, "member-password").token())).hasStatusOk();
 	}
 
 	@Test
 	void refusesToUseAnInviteTwiceOrAfterItExpired() {
-		String token = read(post("/api/users/invites", adminToken, """
+		String token = read(post("/api/invites", adminToken, """
 				{"email": "member-%s@sentinel.test"}""".formatted(UUID.randomUUID())), "$.token");
-		post("/api/invites/" + token, null, """
-				{"name": "구성원", "password": "member-password"}""");
+		post("/api/users", null, """
+				{"inviteToken": "%s", "name": "구성원", "password": "member-password"}""".formatted(token));
 
-		assertThat(post("/api/invites/" + token, null, """
-				{"name": "다시", "password": "member-password"}""")).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(post("/api/users", null, """
+				{"inviteToken": "%s", "name": "다시", "password": "member-password"}""".formatted(token)))
+			.hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(post("/api/users", null, """
+				{"inviteToken": "forged", "name": "위조", "password": "member-password"}""")).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(post("/api/users", null, """
+				{"name": "토큰 없음", "password": "member-password"}""")).hasStatus(HttpStatus.BAD_REQUEST);
 
-		String second = read(post("/api/users/invites", adminToken, """
+		String second = read(post("/api/invites", adminToken, """
 				{"email": "later-%s@sentinel.test"}""".formatted(UUID.randomUUID())), "$.token");
 		clock.advance(Duration.ofDays(8));
 		assertThat(mvc.get().uri("/api/invites/{token}", second)).hasStatus(HttpStatus.NOT_FOUND);
@@ -129,13 +138,14 @@ class UserManagementTest {
 	void rejectsInvitesForExistingAccountsAndWeakPasswords() {
 		String email = users.findById(adminId).orElseThrow().getEmail();
 
-		assertThat(post("/api/users/invites", adminToken, """
+		assertThat(post("/api/invites", adminToken, """
 				{"email": "%s"}""".formatted(email))).hasStatus(HttpStatus.CONFLICT);
 
-		String token = read(post("/api/users/invites", adminToken, """
+		String token = read(post("/api/invites", adminToken, """
 				{"email": "member-%s@sentinel.test"}""".formatted(UUID.randomUUID())), "$.token");
-		assertThat(post("/api/invites/" + token, null, """
-				{"name": "구성원", "password": "short"}""")).hasStatus(HttpStatus.BAD_REQUEST)
+		assertThat(post("/api/users", null, """
+				{"inviteToken": "%s", "name": "구성원", "password": "short"}""".formatted(token)))
+			.hasStatus(HttpStatus.BAD_REQUEST)
 			.bodyJson()
 			.extractingPath("$.detail")
 			.asString()
@@ -148,20 +158,32 @@ class UserManagementTest {
 		User member = users.save(new User(email, "구성원", TestAuthConfiguration.passwordHash("old-password-1"), User.Role.MEMBER));
 		String memberToken = authService.login(email, "old-password-1").token();
 
-		String token = read(post("/api/users/%d/password-resets".formatted(member.getId()), adminToken, ""), "$.token");
-		assertThat(mvc.get().uri("/api/password-resets/{token}", token)).hasStatusOk()
-			.bodyJson()
-			.extractingPath("$.email")
-			.isEqualTo(email);
+		MvcTestResult issued = post("/api/password-resets", adminToken, """
+				{"userId": %d}""".formatted(member.getId()));
+		assertThat(issued).hasStatus(HttpStatus.CREATED);
+		String token = read(issued, "$.token");
+		assertThat(issued.getResponse().getHeader("Location")).isEqualTo("/api/password-resets/" + token);
+		var link = assertThat(mvc.get().uri("/api/password-resets/{token}", token)).hasStatusOk().bodyJson();
+		link.extractingPath("$.email").isEqualTo(email);
+		link.extractingPath("$.userId").isEqualTo(member.getId().intValue());
 
-		assertThat(post("/api/password-resets/" + token, null, """
-				{"password": "brand-new-password"}""")).hasStatus(HttpStatus.NO_CONTENT);
+		// 다른 사용자의 비밀번호에는 쓸 수 없음 (위조와 같은 404)
+		assertThat(put("/api/users/" + adminId + "/password", null, """
+				{"resetToken": "%s", "password": "brand-new-password"}""".formatted(token)))
+			.hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(put("/api/users/" + member.getId() + "/password", null, """
+				{"resetToken": "%s", "password": "brand-new-password"}""".formatted(token)))
+			.hasStatus(HttpStatus.NO_CONTENT);
 
 		// 기존 세션은 모두 종료되고 새 비밀번호로만 로그인
 		assertThat(get("/api/projects", memberToken)).hasStatus(HttpStatus.UNAUTHORIZED);
 		assertThat(authService.login(email, "brand-new-password").token()).isNotBlank();
-		assertThat(post("/api/password-resets/" + token, null, """
-				{"password": "another-password"}""")).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(put("/api/users/" + member.getId() + "/password", null, """
+				{"resetToken": "%s", "password": "another-password"}""".formatted(token)))
+			.hasStatus(HttpStatus.NOT_FOUND);
+		// 링크 발급은 관리자만
+		assertThat(post("/api/password-resets", authService.login(email, "brand-new-password").token(), """
+				{"userId": %d}""".formatted(member.getId()))).hasStatus(HttpStatus.FORBIDDEN);
 	}
 
 	@Test
@@ -169,14 +191,14 @@ class UserManagementTest {
 		String otherDevice = authService.login(users.findById(adminId).orElseThrow().getEmail(), ADMIN_PASSWORD)
 			.token();
 
-		assertThat(post("/api/users/me/password", adminToken, """
+		assertThat(put("/api/users/me/password", adminToken, """
 				{"currentPassword": "wrong-password", "newPassword": "new-password-1234"}"""))
 			.hasStatus(HttpStatus.UNAUTHORIZED);
-		assertThat(post("/api/users/me/password", adminToken, """
+		assertThat(put("/api/users/me/password", adminToken, """
 				{"currentPassword": "%s", "newPassword": "short"}""".formatted(ADMIN_PASSWORD)))
 			.hasStatus(HttpStatus.BAD_REQUEST);
 
-		assertThat(post("/api/users/me/password", adminToken, """
+		assertThat(put("/api/users/me/password", adminToken, """
 				{"currentPassword": "%s", "newPassword": "new-password-1234"}""".formatted(ADMIN_PASSWORD)))
 			.hasStatus(HttpStatus.NO_CONTENT);
 
@@ -192,7 +214,7 @@ class UserManagementTest {
 
 		assertThat(get("/api/users", memberToken)).hasStatus(HttpStatus.FORBIDDEN);
 		assertThat(get("/api/users/" + adminId, memberToken)).hasStatus(HttpStatus.FORBIDDEN);
-		assertThat(post("/api/users/invites", memberToken, """
+		assertThat(post("/api/invites", memberToken, """
 				{"email": "other@sentinel.test"}""")).hasStatus(HttpStatus.FORBIDDEN);
 		assertThat(get("/api/users", adminToken)).hasStatusOk().bodyJson().extractingPath("$.length()").isEqualTo(2);
 	}
@@ -226,6 +248,20 @@ class UserManagementTest {
 	private MvcTestResult post(String uri, String token, String body) {
 		var request = mvc.post().uri(uri).contentType(MediaType.APPLICATION_JSON).content(body.isEmpty() ? "{}" : body);
 		return (token == null ? request : request.header("Authorization", "Bearer " + token)).exchange();
+	}
+
+	private MvcTestResult put(String uri, String token, String body) {
+		var request = mvc.put().uri(uri).contentType(MediaType.APPLICATION_JSON).content(body);
+		return (token == null ? request : request.header("Authorization", "Bearer " + token)).exchange();
+	}
+
+	private static String body(MvcTestResult result) {
+		try {
+			return result.getResponse().getContentAsString();
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException(ex);
+		}
 	}
 
 	private MvcTestResult get(String uri, String token) {

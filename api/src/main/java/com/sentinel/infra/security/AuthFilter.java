@@ -1,6 +1,7 @@
 package com.sentinel.infra.security;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -32,10 +33,16 @@ public class AuthFilter extends OncePerRequestFilter {
 	/** 컨트롤러가 현재 사용자를 읽는 요청 속성 이름 */
 	public static final String USER_ATTRIBUTE = "sentinel.user";
 
-	private static final String LOGIN_PATH = "/api/sessions";
-
-	/** 로그인 전에 쓰는 링크 API. 토큰 자체가 자격증명이며 만료·1회용 */
-	private static final Set<String> OPEN_PREFIXES = Set.of("/api/invites/", "/api/password-resets/");
+	/**
+	 * 로그인 전에 쓰는 요청. 로그인 자체와, 초대·재설정 토큰이 자격증명인 요청 (토큰은 만료·1회용, 서비스가 확인)
+	 * 메서드와 경로가 모두 맞아야 함 (같은 경로의 다른 메서드는 인증 필요)
+	 */
+	private static final List<OpenRoute> OPEN_ROUTES = List.of(new OpenRoute("POST", "/api/sessions"),
+			new OpenRoute("GET", "/api/invites/[^/]+"), new OpenRoute("GET", "/api/password-resets/[^/]+"),
+			// 초대 수락 (계정 만들기)
+			new OpenRoute("POST", "/api/users"),
+			// 재설정 링크로 새 비밀번호 설정
+			new OpenRoute("PUT", "/api/users/\\d+/password"));
 
 	private static final Set<String> OPEN_METHODS = Set.of("OPTIONS");
 
@@ -79,11 +86,21 @@ public class AuthFilter extends OncePerRequestFilter {
 		if (!path.startsWith("/api/") || OPEN_METHODS.contains(request.getMethod())) {
 			return false;
 		}
-		if (OPEN_PREFIXES.stream().anyMatch(path::startsWith) && !AMBIGUOUS_PATH.matcher(path).find()) {
-			return false;
+		// 로그아웃(DELETE /api/sessions/current)은 토큰이 있어야 처리 가능하므로 열지 않음
+		return AMBIGUOUS_PATH.matcher(path).find()
+				|| OPEN_ROUTES.stream().noneMatch(route -> route.matches(request.getMethod(), path));
+	}
+
+	private record OpenRoute(String method, Pattern path) {
+
+		OpenRoute(String method, String path) {
+			this(method, Pattern.compile("^" + path + "$"));
 		}
-		// 로그인 요청만 예외. 로그아웃은 토큰이 있어야 처리 가능
-		return !(LOGIN_PATH.equals(path) && "POST".equals(request.getMethod()));
+
+		boolean matches(String requestMethod, String requestPath) {
+			return method.equals(requestMethod) && path.matcher(requestPath).matches();
+		}
+
 	}
 
 	private static String bearerToken(HttpServletRequest request) {

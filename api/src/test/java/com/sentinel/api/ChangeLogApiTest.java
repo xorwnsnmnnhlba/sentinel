@@ -200,22 +200,26 @@ class ChangeLogApiTest {
 	@Test
 	void recordsInvitesSignUpsResetLinksAndDeletions() {
 		String email = "member-" + System.nanoTime() + "@sentinel.test";
-		String invite = JsonPath.read(body(post("/api/users/invites", """
+		String invite = JsonPath.read(body(post("/api/invites", """
 				{"email": "%s", "role": "MEMBER"}""".formatted(email))), "$.token");
-		String signedUp = body(post("/api/invites/" + invite, """
-				{"name": "구성원", "password": "member-password"}"""));
-		long user = JsonPath.<Integer>read(signedUp, "$.user.id");
+		long user = JsonPath.<Integer>read(body(post("/api/users", """
+				{"inviteToken": "%s", "name": "구성원", "password": "member-password"}""".formatted(invite))), "$.id");
+		String session = JsonPath.read(body(post("/api/sessions", """
+				{"email": "%s", "password": "member-password"}""".formatted(email))), "$.token");
 		// 본인 비밀번호 변경은 가입한 사용자의 세션으로
-		assertThat(mvc.post()
+		assertThat(mvc.put()
 			.uri("/api/users/me/password")
-			.header("Authorization", "Bearer " + JsonPath.read(signedUp, "$.token"))
+			.header("Authorization", "Bearer " + session)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
 					{"currentPassword": "member-password", "newPassword": "changed-member-password"}""")).hasStatus(
 					HttpStatus.NO_CONTENT);
-		String reset = JsonPath.read(body(post("/api/users/" + user + "/password-resets", "{}")), "$.token");
-		assertThat(post("/api/password-resets/" + reset, """
-				{"password": "new-member-password"}""").getResponse().getStatus()).isLessThan(300);
+		String reset = JsonPath.read(body(post("/api/password-resets", "{\"userId\": %d}".formatted(user))), "$.token");
+		assertThat(mvc.put()
+			.uri("/api/users/{id}/password", user)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"resetToken\": \"%s\", \"password\": \"new-member-password\"}".formatted(reset)))
+			.hasStatus(HttpStatus.NO_CONTENT);
 		mvc.delete().uri("/api/users/{id}", user).exchange();
 
 		String userLogs = logs("targetType=USER&targetId=" + user);
