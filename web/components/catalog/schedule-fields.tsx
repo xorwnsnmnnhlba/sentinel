@@ -23,7 +23,7 @@ export function ScheduleFields({
             id="schedule-environment"
             name="environmentId"
             className="w-full"
-            defaultValue={schedule?.environmentId}
+            defaultValue={schedule?.environment.id}
             required
           >
             {environments.map((environment) => (

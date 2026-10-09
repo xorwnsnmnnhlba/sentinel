@@ -285,7 +285,7 @@ export async function duplicateCase(caseId: number): Promise<ActionState> {
   let siblings: CaseItem[];
   try {
     original = await apiGet<CaseItem>(`/api/cases/${id(caseId)}`);
-    siblings = await apiGet<CaseItem[]>(`/api/cases?suiteId=${original.suiteId}`);
+    siblings = await apiGet<CaseItem[]>(`/api/cases?suiteId=${original.suite.id}`);
   } catch (error) {
     // 세션 만료 시 로그인 화면 이동(redirect)은 그대로 전달
     if (!isApiError(error)) {
@@ -296,7 +296,7 @@ export async function duplicateCase(caseId: number): Promise<ActionState> {
   let created: CaseItem | null;
   try {
     created = await apiSend<CaseItem>("POST", "/api/cases", {
-      suiteId: original.suiteId,
+      suiteId: original.suite.id,
       name: copyName(
         original.name,
         siblings.map((sibling) => sibling.name),

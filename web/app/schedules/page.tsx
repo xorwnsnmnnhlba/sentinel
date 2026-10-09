@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { updateSchedules } from "@/lib/actions/catalog";
 import { apiGet } from "@/lib/api/server";
-import type { EnvironmentItem, ProjectItem, ScheduleDetail, SuiteItem } from "@/lib/api/types";
-import { filterRows, parseStatus, scheduleRows } from "@/lib/schedule-overview";
+import type { ProjectItem, ScheduleDetail } from "@/lib/api/types";
+import { filterSchedules, parseStatus, sortSchedules } from "@/lib/schedule-overview";
 
 export const metadata = { title: "스케줄 · Sentinel" };
 
@@ -24,15 +24,13 @@ export default async function SchedulesPage(props: PageProps<"/schedules">) {
   const status = parseStatus(single(searchParams.status));
   const hasFilter = projectId !== undefined || status !== undefined;
 
-  const [schedules, projects, suites, environments] = await Promise.all([
+  // 프로젝트 목록은 필터 선택지용 (스케줄 응답에 프로젝트·스위트·환경 이름이 있음)
+  const [all, projects] = await Promise.all([
     apiGet<ScheduleDetail[]>("/api/schedules"),
     apiGet<ProjectItem[]>("/api/projects"),
-    apiGet<SuiteItem[]>("/api/suites"),
-    apiGet<EnvironmentItem[]>("/api/environments"),
   ]);
-  const all = scheduleRows(schedules, projects, suites, environments);
-  const rows = filterRows(all, { projectId, status });
-  const disabled = all.filter((row) => !row.schedule.enabled).length;
+  const rows = filterSchedules(sortSchedules(all), { projectId, status });
+  const disabled = all.filter((schedule) => !schedule.enabled).length;
 
   return (
     <div className="space-y-4">
@@ -89,7 +87,7 @@ export default async function SchedulesPage(props: PageProps<"/schedules">) {
             }
           />
         ) : (
-          <ScheduleBulkTable rows={rows} action={updateSchedules} />
+          <ScheduleBulkTable schedules={rows} action={updateSchedules} />
         )}
       </Panel>
     </div>

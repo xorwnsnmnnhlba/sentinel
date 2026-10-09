@@ -62,6 +62,7 @@ public class CatalogQueryService {
 	public List<EnvironmentItem> listEnvironments(Long projectId) {
 		List<Environment> found = projectId == null ? environments.findByArchivedAtIsNullOrderByName()
 				: environments.findByProjectIdAndArchivedAtIsNullOrderByName(projectId);
+		Preload.of(projects, found.stream().map(environment -> environment.getProject().getId()));
 		return found.stream().map(EnvironmentItem::of).toList();
 	}
 
@@ -81,6 +82,7 @@ public class CatalogQueryService {
 					TestSuiteQueries.SuiteCaseCount::count));
 		List<TestSuite> found = projectId == null ? suites.findByArchivedAtIsNullOrderByName()
 				: suites.findByProjectIdAndArchivedAtIsNullOrderByName(projectId);
+		Preload.of(projects, found.stream().map(suite -> suite.getProject().getId()));
 		return found.stream()
 			.map(suite -> SuiteItem.of(suite, caseCounts.getOrDefault(suite.getId(), 0L).intValue()))
 			.toList();
@@ -107,17 +109,20 @@ public class CatalogQueryService {
 		if (query == null) {
 			List<TestCase> found = suiteId == null ? testCases.findAllActiveInRunOrder()
 					: testCases.findActiveInRunOrder(suiteId);
-			return found.stream().map(CaseItem::of).toList();
+			return casesWithSuites(found);
 		}
 		String trimmed = query.strip();
 		if (trimmed.isEmpty() || trimmed.length() > MAX_QUERY_LENGTH) {
 			throw new InvalidRequestException("q must be 1-" + MAX_QUERY_LENGTH + " characters");
 		}
-		return testCases.search(likePattern(trimmed), suiteId, MAX_SEARCH_RESULTS)
-			.stream()
-			.map(CaseItem::of)
-			.toList();
+		return casesWithSuites(testCases.search(likePattern(trimmed), suiteId, MAX_SEARCH_RESULTS));
 	}
+
+	private List<CaseItem> casesWithSuites(List<TestCase> found) {
+		Preload.of(suites, found.stream().map(testCase -> testCase.getSuite().getId()));
+		return found.stream().map(CaseItem::of).toList();
+	}
+
 
 	/** 검색어를 문자 그대로 찾도록 LIKE 특수 문자 이스케이프 */
 	private static String likePattern(String query) {
@@ -144,7 +149,7 @@ public class CatalogQueryService {
 	 * @param variables 비밀이 아닌 값만 저장하므로 값 포함
 	 * @param secretNames 시크릿 이름만 노출. 값은 조회 불가
 	 */
-	public record EnvironmentItem(long id, long projectId, String name, String baseUrl, Map<String, String> variables,
+	public record EnvironmentItem(long id, IdName project, String name, String baseUrl, Map<String, String> variables,
 			List<String> secretNames) {
 
 		/** 엔티티의 변수 목록은 실시간 뷰이므로 복사 (수정 전후 비교가 같은 목록을 보지 않도록). 입력 순서 유지 */
@@ -154,16 +159,16 @@ public class CatalogQueryService {
 		}
 
 		static EnvironmentItem of(Environment environment) {
-			return new EnvironmentItem(environment.getId(), environment.getProject().getId(), environment.getName(),
+			return new EnvironmentItem(environment.getId(), IdName.of(environment.getProject()), environment.getName(),
 					environment.getBaseUrl(), environment.getVariables(), environment.getSecretNames());
 		}
 
 	}
 
-	public record SuiteItem(long id, long projectId, String name, String description, int caseCount) {
+	public record SuiteItem(long id, IdName project, String name, String description, int caseCount) {
 
 		static SuiteItem of(TestSuite suite, int caseCount) {
-			return new SuiteItem(suite.getId(), suite.getProject().getId(), suite.getName(), suite.getDescription(),
+			return new SuiteItem(suite.getId(), IdName.of(suite.getProject()), suite.getName(), suite.getDescription(),
 					caseCount);
 		}
 
@@ -173,12 +178,12 @@ public class CatalogQueryService {
 	 * @param assertions 비어 있으면 기본 판정(status in [2xx]) 적용
 	 * @param extractors 응답 값 추출 규칙
 	 */
-	public record CaseItem(long id, long suiteId, String name, Request request, List<Assertion> assertions,
+	public record CaseItem(long id, IdName suite, String name, Request request, List<Assertion> assertions,
 			List<Extractor> extractors) {
 
 		static CaseItem of(TestCase testCase) {
 			RequestSpec spec = testCase.getRequest();
-			return new CaseItem(testCase.getId(), testCase.getSuite().getId(), testCase.getName(),
+			return new CaseItem(testCase.getId(), IdName.of(testCase.getSuite()), testCase.getName(),
 					new Request(spec.getMethod(), spec.getPath(), spec.getHeaders(), spec.getBody()),
 					testCase.getAssertions(), testCase.getExtractors());
 		}

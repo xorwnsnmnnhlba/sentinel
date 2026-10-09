@@ -23,9 +23,9 @@ export default async function CasePage(props: PageProps<"/cases/[id]">) {
   }
   const { notice } = await props.searchParams;
   const testCase = await apiGetOrNotFound<CaseItem>(`/api/cases/${id}`);
-  const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${testCase.suiteId}`);
+  const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${testCase.suite.id}`);
   const [environments, siblings] = await Promise.all([
-    apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`),
+    apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.project.id}`),
     apiGet<CaseItem[]>(`/api/cases?suiteId=${suite.id}`),
   ]);
 

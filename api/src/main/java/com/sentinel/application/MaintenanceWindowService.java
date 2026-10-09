@@ -16,6 +16,7 @@ import com.sentinel.domain.MaintenanceWindow;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.EnvironmentRepository;
 import com.sentinel.infra.persistence.MaintenanceWindowRepository;
+import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,8 @@ public class MaintenanceWindowService {
 	private final MaintenanceWindowRepository windows;
 
 	private final EnvironmentRepository environments;
+
+	private final ProjectRepository projects;
 
 	private final UserRepository users;
 
@@ -124,6 +127,8 @@ public class MaintenanceWindowService {
 	public List<MaintenanceWindowItem> listOpen(Long environmentId) {
 		Instant now = clock.instant();
 		List<MaintenanceWindow> found = windows.findOpen(environmentId, now);
+		Preload.of(environments, found.stream().map(window -> window.getEnvironment().getId()));
+		Preload.of(projects, found.stream().map(window -> window.getEnvironment().getProject().getId()));
 		Map<Long, IdName> creators = creators(found);
 		return found.stream()
 			.map(window -> MaintenanceWindowItem.of(window,

@@ -65,7 +65,7 @@ export function RunFilters({
           {projects.map((project) => (
             <NativeSelectOptGroup key={project.id} label={project.name}>
               {suites
-                .filter((suite) => suite.projectId === project.id)
+                .filter((suite) => suite.project.id === project.id)
                 .map((suite) => (
                   <NativeSelectOption key={suite.id} value={suite.id}>
                     {suite.name}
@@ -87,7 +87,7 @@ export function RunFilters({
           {projects.map((project) => (
             <NativeSelectOptGroup key={project.id} label={project.name}>
               {environments
-                .filter((environment) => environment.projectId === project.id)
+                .filter((environment) => environment.project.id === project.id)
                 .map((environment) => (
                   <NativeSelectOption key={environment.id} value={environment.id}>
                     {environment.name}

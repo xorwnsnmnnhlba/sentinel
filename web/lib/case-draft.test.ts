@@ -32,7 +32,7 @@ describe("toDraft", () => {
   it("turns a saved case into form state and back into the same request", () => {
     const item: CaseItem = {
       id: 1,
-      suiteId: 2,
+      suite: { id: 2, name: "suite-2" },
       name: "결제 요청",
       request: {
         method: "POST",
@@ -78,7 +78,7 @@ describe("toDraft", () => {
   it("keeps an empty body as empty text", () => {
     const form = toDraft({
       id: 1,
-      suiteId: 1,
+      suite: { id: 1, name: "suite-1" },
       name: "a",
       request: { method: "GET", path: "/", headers: {}, body: null },
       assertions: [],
@@ -334,7 +334,7 @@ describe("expected value round trip", () => {
     (expected) => {
       const form = toDraft({
         id: 1,
-        suiteId: 1,
+        suite: { id: 1, name: "suite-1" },
         name: "a",
         request: { method: "GET", path: "/", headers: {}, body: null },
         assertions: [{ type: "jsonPath", path: "$.a", operator: "EQUALS", expected }],

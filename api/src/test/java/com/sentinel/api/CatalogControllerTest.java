@@ -65,7 +65,8 @@ class CatalogControllerTest {
 		var environments = assertThat(mvc.get().uri("/api/environments?projectId={id}", project.getId())).hasStatusOk()
 			.bodyJson();
 		environments.extractingPath("$.length()").isEqualTo(1);
-		environments.extractingPath("$[0].projectId").isEqualTo(project.getId().intValue());
+		environments.extractingPath("$[0].project.id").isEqualTo(project.getId().intValue());
+		environments.extractingPath("$[0].project.name").isEqualTo(project.getName());
 		environments.extractingPath("$[0].variables.userId").isEqualTo("42");
 		assertThat(mvc.get().uri("/api/environments")).bodyJson().extractingPath("$.length()").isEqualTo(2);
 		assertThat(mvc.get().uri("/api/environments/{id}", environment.getId())).hasStatusOk()
@@ -102,7 +103,8 @@ class CatalogControllerTest {
 				List.of(new JsonPathAssertion("$.status", Operator.EQUALS, "UP")));
 
 		var cases = assertThat(mvc.get().uri("/api/cases?suiteId={id}", suite.getId())).hasStatusOk().bodyJson();
-		cases.extractingPath("$[0].suiteId").isEqualTo(suite.getId().intValue());
+		cases.extractingPath("$[0].suite.id").isEqualTo(suite.getId().intValue());
+		cases.extractingPath("$[0].suite.name").isEqualTo(suite.getName());
 		cases.extractingPath("$[0].request.method").isEqualTo("POST");
 		cases.extractingPath("$[0].request.path").isEqualTo("/users/{{id}}");
 		cases.extractingPath("$[0].request.headers.Accept[0]").isEqualTo("application/json");

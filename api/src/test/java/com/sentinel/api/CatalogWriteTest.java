@@ -115,7 +115,7 @@ class CatalogWriteTest {
 
 		assertThat(created).hasStatus(HttpStatus.CREATED);
 		var body = assertThat(created).bodyJson();
-		body.extractingPath("$.projectId").isEqualTo(project.getId().intValue());
+		body.extractingPath("$.project.id").isEqualTo(project.getId().intValue());
 		body.extractingPath("$.baseUrl").isEqualTo("https://gw.dev.internal");
 		body.extractingPath("$.variables.userId").isEqualTo("42");
 		String location = created.getResponse().getHeader("Location");
@@ -171,7 +171,7 @@ class CatalogWriteTest {
 
 		assertThat(created).hasStatus(HttpStatus.CREATED);
 		var body = assertThat(created).bodyJson();
-		body.extractingPath("$.suiteId").isEqualTo(suite.getId().intValue());
+		body.extractingPath("$.suite.id").isEqualTo(suite.getId().intValue());
 		body.extractingPath("$.request.method").isEqualTo("POST");
 		body.extractingPath("$.request.headers.Accept[0]").isEqualTo("application/json");
 		body.extractingPath("$.assertions[0].type").isEqualTo("statusCode");

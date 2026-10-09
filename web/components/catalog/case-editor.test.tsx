@@ -25,7 +25,7 @@ function renderEditor(action: Action, initial: CaseDraft = emptyDraft(), environ
 const valid: CaseDraft = { ...emptyDraft(), name: "health", path: "/health" };
 
 function environment(id: number, name: string): EnvironmentItem {
-  return { id, projectId: 1, name, baseUrl: "http://gw", variables: {}, secretNames: [] };
+  return { id, project: { id: 1, name: "project-1" }, name, baseUrl: "http://gw", variables: {}, secretNames: [] };
 }
 
 describe("CaseEditor", () => {

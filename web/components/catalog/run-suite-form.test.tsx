@@ -11,7 +11,7 @@ type Action = (state: ActionState, form: FormData) => Promise<ActionState>;
 
 const dev: EnvironmentItem = {
   id: 1,
-  projectId: 1,
+  project: { id: 1, name: "project-1" },
   name: "dev",
   baseUrl: "https://gw.dev",
   variables: {},
@@ -19,7 +19,7 @@ const dev: EnvironmentItem = {
 };
 const staging: EnvironmentItem = {
   id: 2,
-  projectId: 1,
+  project: { id: 1, name: "project-1" },
   name: "staging",
   baseUrl: "https://gw.stg",
   variables: {},

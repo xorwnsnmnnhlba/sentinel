@@ -16,7 +16,7 @@ export default async function NewCasePage(props: PageProps<"/cases/new">) {
     notFound();
   }
   const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${suiteId}`);
-  const environments = await apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`);
+  const environments = await apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.project.id}`);
 
   return (
     <div className="max-w-4xl space-y-4">

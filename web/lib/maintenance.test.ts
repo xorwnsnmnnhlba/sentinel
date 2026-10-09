@@ -8,7 +8,7 @@ function window(patch: Partial<MaintenanceWindow>): MaintenanceWindow {
   return {
     id: 1,
     environment: { id: 1, name: "dev" },
-    projectId: 1,
+    project: { id: 1, name: "project-1" },
     startsAt: "2026-09-29T01:00:00Z",
     endsAt: "2026-09-29T02:00:00Z",
     reason: null,

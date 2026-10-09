@@ -145,7 +145,7 @@ export default async function Dashboard(props: PageProps<"/">) {
           <ul className="divide-y text-sm">
             {maintenance.map((window) => (
               <li key={window.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
-                <Link href={`/projects/${window.projectId}`} className="font-medium hover:underline">
+                <Link href={`/projects/${window.project.id}`} className="font-medium hover:underline">
                   {window.environment.name}
                 </Link>
                 <span className="font-mono text-xs text-muted-foreground">~{formatEnd(window.endsAt, at)} KST</span>

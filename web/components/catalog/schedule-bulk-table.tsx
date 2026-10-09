@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ActionState } from "@/lib/actions/catalog";
 import { formatDateTime } from "@/lib/format";
-import type { ScheduleRow } from "@/lib/schedule-overview";
+import type { ScheduleDetail } from "@/lib/api/types";
 
 type Change = { enabled?: boolean; skipHolidays?: boolean };
 
@@ -27,10 +27,10 @@ type Change = { enabled?: boolean; skipHolidays?: boolean };
  * 변경 후 목록을 다시 받으면 선택은 비움
  */
 export function ScheduleBulkTable({
-  rows,
+  schedules,
   action,
 }: {
-  rows: ScheduleRow[];
+  schedules: ScheduleDetail[];
   action: (scheduleIds: number[], change: Change) => Promise<ActionState>;
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -39,8 +39,8 @@ export function ScheduleBulkTable({
   const [pending, startTransition] = useTransition();
 
   // 목록이 바뀌어(삭제·필터) 보이지 않는 스케줄은 선택에서 제외
-  const chosen = rows.map((row) => row.schedule.id).filter((id) => selected.has(id));
-  const allChosen = rows.length > 0 && chosen.length === rows.length;
+  const chosen = schedules.map((schedule) => schedule.id).filter((id) => selected.has(id));
+  const allChosen = schedules.length > 0 && chosen.length === schedules.length;
 
   function toggle(scheduleId: number, checked: boolean) {
     setSelected((current) => {
@@ -124,9 +124,9 @@ export function ScheduleBulkTable({
                 type="checkbox"
                 aria-label="모두 선택"
                 checked={allChosen}
-                disabled={rows.length === 0}
+                disabled={schedules.length === 0}
                 onChange={(event) =>
-                  setSelected(event.target.checked ? new Set(rows.map((row) => row.schedule.id)) : new Set())
+                  setSelected(event.target.checked ? new Set(schedules.map((schedule) => schedule.id)) : new Set())
                 }
                 className="size-4 accent-primary"
               />
@@ -140,12 +140,12 @@ export function ScheduleBulkTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map(({ schedule, project, suite, environmentName }) => (
+          {schedules.map((schedule) => (
             <TableRow key={schedule.id} data-state={selected.has(schedule.id) ? "selected" : undefined}>
               <TableCell>
                 <input
                   type="checkbox"
-                  aria-label={`${suite.name} ${environmentName} ${schedule.cron} 선택`}
+                  aria-label={`${schedule.suite.name} ${schedule.environment.name} ${schedule.cron} 선택`}
                   checked={selected.has(schedule.id)}
                   onChange={(event) => toggle(schedule.id, event.target.checked)}
                   className="size-4 accent-primary"
@@ -158,12 +158,12 @@ export function ScheduleBulkTable({
                 </div>
               </TableCell>
               <TableCell className="whitespace-normal">
-                <Link href={`/suites/${suite.id}`} className="font-medium hover:underline">
-                  {suite.name}
+                <Link href={`/suites/${schedule.suite.id}`} className="font-medium hover:underline">
+                  {schedule.suite.name}
                 </Link>
-                <div className="text-xs text-muted-foreground">{project.name}</div>
+                <div className="text-xs text-muted-foreground">{schedule.project.name}</div>
               </TableCell>
-              <TableCell>{environmentName}</TableCell>
+              <TableCell>{schedule.environment.name}</TableCell>
               <TableCell className="font-mono text-xs">
                 {schedule.enabled && schedule.nextRunAt ? formatDateTime(schedule.nextRunAt) : "-"}
               </TableCell>

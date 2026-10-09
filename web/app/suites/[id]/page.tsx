@@ -63,8 +63,8 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
   const searchParams = await props.searchParams;
   const suite = await apiGetOrNotFound<SuiteItem>(`/api/suites/${id}`);
   const [project, environments, cases, schedules, unstable, slowdowns] = await Promise.all([
-    apiGetOrNotFound<ProjectItem>(`/api/projects/${suite.projectId}`),
-    apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.projectId}`),
+    apiGetOrNotFound<ProjectItem>(`/api/projects/${suite.project.id}`),
+    apiGet<EnvironmentItem[]>(`/api/environments?projectId=${suite.project.id}`),
     apiGet<CaseItem[]>(`/api/cases?suiteId=${suite.id}`),
     apiGet<ScheduleDetail[]>(`/api/schedules?suiteId=${suite.id}`),
     // 최근 7일 스케줄 실행 기준
@@ -74,7 +74,6 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
   ]);
   const unstableCases = unstableByCase(unstable.cases);
   const slowCases = slowdownsByCase(slowdowns);
-  const environmentNames = new Map(environments.map((environment) => [environment.id, environment.name]));
 
   return (
     <div className="space-y-4">
@@ -297,7 +296,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                       {schedule.skipHolidays && <Badge variant="outline">휴일 제외</Badge>}
                     </div>
                   </TableCell>
-                  <TableCell>{environmentNames.get(schedule.environmentId) ?? "-"}</TableCell>
+                  <TableCell>{schedule.environment.name}</TableCell>
                   <TableCell className="font-mono text-xs">
                     {schedule.nextRunAt ? formatDateTime(schedule.nextRunAt) : "-"}
                   </TableCell>
