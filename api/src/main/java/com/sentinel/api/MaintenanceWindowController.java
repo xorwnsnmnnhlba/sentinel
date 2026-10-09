@@ -46,6 +46,12 @@ class MaintenanceWindowController {
 	}
 
 	/** 부분 변경 (연장·단축·사유). 이미 끝난 점검은 409 */
+	/** 단건. 끝난 점검도 조회 */
+	@GetMapping("/{windowId}")
+	MaintenanceWindowItem get(@PathVariable long windowId) {
+		return maintenanceWindowService.get(windowId);
+	}
+
 	@PatchMapping("/{windowId}")
 	MaintenanceWindowItem update(@PathVariable long windowId, @RequestBody UpdateMaintenanceWindowRequest request) {
 		return maintenanceWindowService.update(windowId, request.startsAt(), request.endsAt(), request.reason(),

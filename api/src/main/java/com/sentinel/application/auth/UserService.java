@@ -52,6 +52,16 @@ public class UserService {
 	}
 
 	/**
+	 * @throws NotFoundException 미존재 또는 삭제
+	 */
+	@Transactional(readOnly = true)
+	public UserSummary get(long userId) {
+		return users.findByIdAndArchivedAtIsNull(userId)
+			.map(UserSummary::of)
+			.orElseThrow(() -> new NotFoundException("user", userId));
+	}
+
+	/**
 	 * 초대 링크 발급. 이미 있는 계정이면 거부
 	 * @return 토큰 원문. 저장하지 않으므로 이 응답에서만 확인 가능
 	 */

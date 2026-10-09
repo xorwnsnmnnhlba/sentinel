@@ -104,6 +104,19 @@ public class MaintenanceWindowService {
 	}
 
 	/**
+	 * 단건. 끝난 점검도 조회 (목록에는 없음)
+	 * @throws NotFoundException 미존재·삭제, 삭제된 환경의 점검 (목록과 같은 기준)
+	 */
+	@Transactional(readOnly = true)
+	public MaintenanceWindowItem get(long windowId) {
+		MaintenanceWindow window = find(windowId);
+		if (window.getEnvironment().isArchived()) {
+			throw new NotFoundException("maintenance window", windowId);
+		}
+		return itemOf(window, clock.instant());
+	}
+
+	/**
 	 * 끝나지 않은 점검 (진행 중·예정), 시작 순
 	 * @param environmentId null이면 전체
 	 */

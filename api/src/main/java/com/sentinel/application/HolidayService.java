@@ -121,6 +121,16 @@ public class HolidayService {
 	}
 
 	/**
+	 * @throws NotFoundException 미존재 또는 삭제
+	 */
+	@Transactional(readOnly = true)
+	public HolidayItem get(long holidayId) {
+		return holidays.findByIdAndArchivedAtIsNull(holidayId)
+			.map(HolidayItem::of)
+			.orElseThrow(() -> new NotFoundException("holiday", holidayId));
+	}
+
+	/**
 	 * @param year 생략 시 올해 ({@code sentinel.schedule.zone} 기준)
 	 * @return 그해 휴일, 날짜 순
 	 */

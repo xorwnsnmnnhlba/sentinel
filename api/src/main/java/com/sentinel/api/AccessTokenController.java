@@ -43,6 +43,12 @@ class AccessTokenController {
 	}
 
 	/** 폐기. 다른 사용자의 토큰은 404 */
+	/** 내 토큰 단건. 다른 사용자의 토큰은 404 */
+	@GetMapping("/{tokenId}")
+	AccessTokenService.AccessTokenItem get(@PathVariable long tokenId) {
+		return accessTokens.get(tokenId, currentUser.get().id());
+	}
+
 	@DeleteMapping("/{tokenId}")
 	ResponseEntity<Void> delete(@PathVariable long tokenId) {
 		accessTokens.revoke(tokenId, currentUser.get().id());

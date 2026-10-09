@@ -71,6 +71,10 @@ class HolidayApiTest {
 
 		assertThat(created).hasStatus(HttpStatus.CREATED);
 		assertThat(created.getResponse().getHeader("Location")).isEqualTo("/api/holidays/" + id(created));
+		assertThat(mvc.get().uri(created.getResponse().getHeader("Location"))).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.name")
+			.isEqualTo("한글날");
 		var body = assertThat(created).bodyJson();
 		body.extractingPath("$.date").isEqualTo("2026-10-09");
 		body.extractingPath("$.name").isEqualTo("한글날");
@@ -93,6 +97,10 @@ class HolidayApiTest {
 			.isEqualTo("holiday 2026-09-25 already exists");
 
 		assertThat(mvc.delete().uri("/api/holidays/{id}", chuseok)).hasStatus(HttpStatus.NO_CONTENT);
+		assertThat(mvc.get().uri("/api/holidays/{id}", chuseok)).hasStatus(HttpStatus.NOT_FOUND)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("holiday " + chuseok + " not found");
 		assertThat(mvc.get().uri("/api/holidays?year=2026")).bodyJson().extractingPath("$.length()").isEqualTo(0);
 		assertThat(mvc.delete().uri("/api/holidays/{id}", chuseok)).hasStatus(HttpStatus.NOT_FOUND)
 			.bodyJson()

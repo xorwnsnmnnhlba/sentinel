@@ -354,6 +354,7 @@ GW·네트워크가 잠깐 흔들린 것만으로 실패가 기록·알림되지
 |-----|------|
 | `POST /api/access-tokens` | 발급. 본문 `{"name": "GitHub Actions 배포 확인", "validityDays": 90}`. 201 + `{"token": "snt_...", "accessToken": {...}}`. 토큰 원문은 이 응답에서만 |
 | `GET /api/access-tokens` | 내 토큰 목록 (폐기되지 않은 것, 만료 포함, 최근 발급 순). `{id, name, prefix, createdAt, expiresAt, lastUsedAt, expired}` |
+| `GET /api/access-tokens/{id}` | 내 토큰 단건 (목록 항목과 같은 형식). 다른 사용자의 토큰·폐기된 토큰은 404 |
 | `DELETE /api/access-tokens/{id}` | 폐기. 이후 그 토큰의 요청은 401. 다른 사용자의 토큰은 404 |
 
 - 토큰으로 허용하는 요청은 `POST /api/runs`(실행 시작)와 `GET /api/runs/{id}`(진행 상황·결과)뿐. 그 외 API는 403 (`access tokens can only start runs and read them`). 토큰이 새도 케이스·환경 수정, 환경 변수 조회, 사용자 관리, 토큰 발급은 불가
@@ -424,6 +425,7 @@ deploy-check:
 | API | 권한 | 설명 |
 |-----|------|------|
 | `GET /api/users` | 관리자 | 사용자 목록 |
+| `GET /api/users/{id}` | 관리자 | 사용자 단건 (목록 항목과 같은 형식). 삭제된 사용자는 404 |
 | `POST /api/users/invites` | 관리자 | 초대 링크 발급. 본문 `{"email": "...", "role": "MEMBER"}`. 201 + `{"token": "...", "expiresAt": "..."}` |
 | `POST /api/users/{id}/password-resets` | 관리자 | 재설정 링크 발급 |
 | `DELETE /api/users/{id}` | 관리자 | 삭제(보관). 세션·남은 링크 정리 |
@@ -462,8 +464,8 @@ deploy-check:
 | 케이스 | `GET /api/cases?suiteId=&q=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
 | 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&failing=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs`, `PATCH /api/runs/{id}`(중지) | |
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}`, `PATCH /api/schedules`(여러 건) | `DELETE /api/schedules/{id}` |
-| 점검 시간 | `GET /api/maintenance-windows?environmentId=` | | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
-| 휴일 | `GET /api/holidays?year=` | | `POST /api/holidays`, `POST /api/holiday-imports`(여러 건) | `DELETE /api/holidays/{id}` |
+| 점검 시간 | `GET /api/maintenance-windows?environmentId=` | `GET /api/maintenance-windows/{id}`(끝난 점검 포함) | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
+| 휴일 | `GET /api/holidays?year=` | `GET /api/holidays/{id}` | `POST /api/holidays`, `POST /api/holiday-imports`(여러 건) | `DELETE /api/holidays/{id}` |
 | 알림 발송 이력 | `GET /api/notification-deliveries?projectId=&failed=`, `GET /api/notification-channel-health`(채널 상태) | | `POST /api/test-notifications`(기본 채널 연결 확인) | |
 | 응답시간 추세 | `GET /api/response-time-trends?caseId=&environmentId=&from=&to=` | | | |
 | 응답시간 요약 | `GET /api/response-time-summaries?suiteId=&environmentId=&from=&to=` | | | |

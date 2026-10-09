@@ -104,6 +104,10 @@ class AccessTokenApiTest {
 		MvcTestResult listed = get(session, "/api/access-tokens");
 		assertThat(listed).bodyJson().extractingPath("$[0].name").isEqualTo("GitHub Actions 배포 확인");
 		assertThat(body(listed)).doesNotContain(token);
+		// Location으로 단건 조회 (원문 없음)
+		MvcTestResult single = get(session, created.getResponse().getHeader("Location"));
+		assertThat(single).hasStatusOk().bodyJson().extractingPath("$.name").isEqualTo("GitHub Actions 배포 확인");
+		assertThat(body(single)).doesNotContain(token);
 		// 원문은 저장하지 않음
 		assertThat(accessTokens.findAll()).singleElement()
 			.satisfies(stored -> assertThat(stored.getTokenHash()).isNotEqualTo(token).doesNotContain(token));
@@ -198,12 +202,16 @@ class AccessTokenApiTest {
 		String otherSession = authService.login(other.getEmail(), PASSWORD).token();
 		// 관리자라도 다른 사용자의 토큰은 보이지 않고 폐기할 수 없음
 		assertThat(get(otherSession, "/api/access-tokens")).bodyJson().extractingPath("$.length()").isEqualTo(0);
+		assertThat(get(otherSession, "/api/access-tokens/" + mine)).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(get(session, "/api/access-tokens/" + mine)).hasStatusOk();
 		assertThat(mvc.delete().uri("/api/access-tokens/{id}", mine).header("Authorization", "Bearer " + otherSession))
 			.hasStatus(HttpStatus.NOT_FOUND);
 		assertThat(mvc.delete().uri("/api/access-tokens/{id}", mine).header("Authorization", "Bearer " + session))
 			.hasStatus(HttpStatus.NO_CONTENT);
 		assertThat(mvc.delete().uri("/api/access-tokens/{id}", mine).header("Authorization", "Bearer " + session))
 			.hasStatus(HttpStatus.NOT_FOUND);
+		// 폐기한 토큰은 단건 조회도 404
+		assertThat(get(session, "/api/access-tokens/" + mine)).hasStatus(HttpStatus.NOT_FOUND);
 	}
 
 	@Test
