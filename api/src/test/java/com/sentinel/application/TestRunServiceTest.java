@@ -192,7 +192,7 @@ class TestRunServiceTest {
 		TestRunDetail run = service.getRun(service.runSuite(html.getSuite().getId(), environment.getId(),
 				TestRun.Trigger.MANUAL, tester()));
 
-		assertThat(run.results()).extracting(TestRunDetail.Result::testCaseId)
+		assertThat(run.results()).extracting(result -> result.testCase().id())
 			.containsExactly(html.getId(), unresolved.getId());
 		assertThat(run.results()).allSatisfy(result -> assertThat(result.responseSchema()).isNull());
 	}
@@ -210,9 +210,9 @@ class TestRunServiceTest {
 
 		assertThat(single.testCase()).isEqualTo(new IdName(target.getId(), target.getName()));
 		assertThat(single.results()).singleElement()
-			.satisfies(result -> assertThat(result.testCaseId()).isEqualTo(target.getId()));
+			.satisfies(result -> assertThat(result.testCase().id()).isEqualTo(target.getId()));
 		// 같은 스위트의 실행이지만 스위트 전체 실행은 대상 케이스 없음
-		assertThat(single.suiteId()).isEqualTo(whole.suiteId());
+		assertThat(single.suite()).isEqualTo(whole.suite());
 		assertThat(whole.testCase()).isNull();
 		assertThat(whole.results()).hasSize(2);
 
@@ -281,7 +281,7 @@ class TestRunServiceTest {
 		assertThat(executor.requests()).extracting(request -> request.uri().getPath()).containsExactly("/a/7", "/c");
 		assertThat(run.trigger()).isEqualTo(TestRun.Trigger.SCHEDULED);
 		assertThat(run.status()).isEqualTo(TestRun.Status.COMPLETED);
-		assertThat(run.results()).extracting(TestRunDetail.Result::testCaseId)
+		assertThat(run.results()).extracting(result -> result.testCase().id())
 			.containsExactly(first.getId(), second.getId(), third.getId());
 		assertThat(run.results()).extracting(TestRunDetail.Result::outcome)
 			.containsExactly(Outcome.RESPONDED, Outcome.ERROR, Outcome.RESPONDED);

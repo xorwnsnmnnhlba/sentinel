@@ -40,9 +40,9 @@ export async function ResponseTimes({
   const summary = await apiGet<ResponseTimeSummary>(`/api/response-time-summaries?suiteId=${suiteId}&${range}`);
 
   const requested = Number(single(searchParams.caseId));
-  const selected = summary.cases.find((testCase) => testCase.caseId === requested) ?? slowestCase(summary.cases);
+  const selected = summary.cases.find((stats) => stats.testCase.id === requested) ?? slowestCase(summary.cases);
   const trend = selected
-    ? await apiGet<ResponseTimeTrend>(`/api/response-time-trends?caseId=${selected.caseId}&${range}`)
+    ? await apiGet<ResponseTimeTrend>(`/api/response-time-trends?caseId=${selected.testCase.id}&${range}`)
     : null;
   const environmentName = environments.find((environment) => environment.id === environmentId)?.name;
 
@@ -54,7 +54,7 @@ export async function ResponseTimes({
           environments={environments}
           environmentId={environmentId}
           days={days}
-          caseId={selected?.caseId}
+          caseId={selected?.testCase.id}
         />
       </div>
 
@@ -70,24 +70,24 @@ export async function ResponseTimes({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {summary.cases.map((testCase) => {
-              const current = testCase.caseId === selected?.caseId;
+            {summary.cases.map((stats) => {
+              const current = stats.testCase.id === selected?.testCase.id;
               return (
-                <TableRow key={testCase.caseId} className={cn(current && "bg-muted/50")}>
+                <TableRow key={stats.testCase.id} className={cn(current && "bg-muted/50")}>
                   <TableCell className="font-medium whitespace-normal">
                     <Link
-                      href={`/suites/${suiteId}?environmentId=${environmentId}&days=${days}&caseId=${testCase.caseId}#response-times`}
+                      href={`/suites/${suiteId}?environmentId=${environmentId}&days=${days}&caseId=${stats.testCase.id}#response-times`}
                       aria-current={current ? "true" : undefined}
                       scroll={false}
                       className="hover:underline"
                     >
-                      {testCase.name}
+                      {stats.testCase.name}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{testCase.samples}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMs(testCase.p50)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMs(testCase.p95)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMs(testCase.max)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{stats.samples}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMs(stats.p50)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMs(stats.p95)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMs(stats.max)}</TableCell>
                 </TableRow>
               );
             })}
@@ -98,9 +98,9 @@ export async function ResponseTimes({
       {selected && trend ? (
         <div className="p-4">
           <TrendChart
-            key={`${selected.caseId}-${environmentId}-${days}`}
+            key={`${selected.testCase.id}-${environmentId}-${days}`}
             points={trend.points}
-            title={`${selected.name} · ${environmentName} · 최근 ${days}일 일별 응답시간`}
+            title={`${selected.testCase.name} · ${environmentName} · 최근 ${days}일 일별 응답시간`}
           />
         </div>
       ) : (

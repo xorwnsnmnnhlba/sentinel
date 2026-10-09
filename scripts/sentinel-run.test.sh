@@ -28,10 +28,10 @@ def run(status, results):
     return {"id": 7, "status": status, "plannedCount": 2, "results": results,
             "summary": {"total": len(results), "passed": passed, "failed": failed, "errors": errors}}
 
-PASS = {"testCaseName": "주문 조회", "verdict": "PASSED", "errorReason": None, "assertionResults": []}
-FAIL = {"testCaseName": "결제 승인", "verdict": "FAILED", "errorReason": None,
+PASS = {"testCase": {"id": 1, "name": "주문 조회"}, "verdict": "PASSED", "errorReason": None, "assertionResults": []}
+FAIL = {"testCase": {"id": 1, "name": "결제 승인"}, "verdict": "FAILED", "errorReason": None,
         "assertionResults": [{"description": "status in [2xx]", "passed": False}]}
-ERROR = {"testCaseName": "환불", "verdict": "ERROR", "errorReason": "TIMEOUT", "assertionResults": []}
+ERROR = {"testCase": {"id": 1, "name": "환불"}, "verdict": "ERROR", "errorReason": "TIMEOUT", "assertionResults": []}
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):

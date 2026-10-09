@@ -163,7 +163,7 @@ case "$run_status" in
     fi
     echo "실패: $summary" >&2
     jq -r '.results[] | select(.verdict != "PASSED")
-      | "  - \(.testCaseName): \(.errorReason // ([.assertionResults[] | select(.passed | not) | .description] | join(", ")))"' \
+      | "  - \(.testCase.name): \(.errorReason // ([.assertionResults[] | select(.passed | not) | .description] | join(", ")))"' \
       <<<"$body" >&2
     echo "결과: $base/runs/$run_id" >&2
     exit 1

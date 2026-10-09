@@ -59,8 +59,7 @@ export type Headers = Record<string, string[]>;
 
 export interface RunResult {
   id: number;
-  testCaseId: number;
-  testCaseName: string;
+  testCase: IdName;
   verdict: Verdict | null;
   outcome: Outcome;
   assertionResults: AssertionResult[];
@@ -114,10 +113,9 @@ export interface ResponseSchema {
 
 export interface RunDetail {
   id: number;
-  suiteId: number;
-  suiteName: string;
-  environmentId: number;
-  environmentName: string;
+  project: IdName;
+  suite: IdName;
+  environment: IdName;
   trigger: Trigger;
   status: RunStatus;
   startedAt: string;
@@ -284,8 +282,8 @@ export interface ResponseTimePoint {
 
 /** 케이스 1건의 일별 응답시간 */
 export interface ResponseTimeTrend {
-  caseId: number;
-  environmentId: number;
+  testCase: IdName;
+  environment: IdName;
   from: string;
   to: string;
   points: ResponseTimePoint[];
@@ -293,8 +291,7 @@ export interface ResponseTimeTrend {
 
 /** 기간 전체의 케이스별 응답시간 */
 export interface CaseResponseTime {
-  caseId: number;
-  name: string;
+  testCase: IdName;
   samples: number;
   p50: number | null;
   p95: number | null;
@@ -302,8 +299,8 @@ export interface CaseResponseTime {
 }
 
 export interface ResponseTimeSummary {
-  suiteId: number;
-  environmentId: number;
+  suite: IdName;
+  environment: IdName;
   from: string;
   to: string;
   cases: CaseResponseTime[];

@@ -82,7 +82,8 @@ class JUnitReportTest {
 		int passed = (int) results.stream().filter(r -> r.verdict() == TestResult.Verdict.PASSED).count();
 		int failed = (int) results.stream().filter(r -> r.verdict() == TestResult.Verdict.FAILED).count();
 		int errors = (int) results.stream().filter(r -> r.verdict() == TestResult.Verdict.ERROR).count();
-		return new TestRunDetail(12, 3, "결제", 2, "dev", TestRun.Trigger.SCHEDULED, TestRun.Status.COMPLETED, STARTED,
+		return new TestRunDetail(12, new IdName(1, "billing"), new IdName(3, "결제"), new IdName(2, "dev"),
+				TestRun.Trigger.SCHEDULED, TestRun.Status.COMPLETED, STARTED,
 				STARTED.plusSeconds(1), new TestRunDetail.Summary(results.size(), passed, failed, errors), results,
 				null, null, null, null, null, results.size(), null, null);
 	}
@@ -102,7 +103,7 @@ class JUnitReportTest {
 	private static TestRunDetail.Result result(String name, TestResult.Verdict verdict,
 			List<AssertionResult> assertions, TestResult.ErrorReason reason, String message, Long elapsedMs,
 			int retries) {
-		return new TestRunDetail.Result(1, 1, name, verdict, TestResult.Outcome.RESPONDED, assertions, reason, message,
+		return new TestRunDetail.Result(1, new IdName(1, name), verdict, TestResult.Outcome.RESPONDED, assertions, reason, message,
 				elapsedMs,
 				new TestRunDetail.Request(HttpMethod.POST, "https://gw/x", Map.of(), "request-body-secret"),
 				new TestRunDetail.Response(200, Map.of(), "response-body-secret", false), null, null, null, retries,

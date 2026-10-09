@@ -56,6 +56,8 @@ sentinel/
 - 관계 표기 (2026-10-09): 응답에서 다른 리소스를 가리킬 때는 `{id, name}` 객체. 숫자 ID만(`suiteId`) 또는 ID·이름 따로(`suiteId`+`suiteName`)를 섞어 쓰던 것을 통일. 요청 본문·조회 조건은 ID 그대로
   - 1차: 목록 리소스(환경·스위트의 `project`, 케이스의 `suite`, 스케줄의 `project`·`suite`·`environment`, 점검 시간의 `project`). 화면이 이름을 붙이려고 목록을 따로 받아 잇던 곳(스케줄·검색 화면)이 단순해짐
   - 목록은 가리키는 리소스를 한 번에 읽어 둔 뒤 이름을 채움 (`Preload`). 항목 수만큼 조회하지 않는지 `RelationQueryCountTest`가 확인
+  - 2차: 실행 상세(`suiteId`+`suiteName` 등 → `project`·`suite`·`environment`, 결과의 `testCase`), 응답시간 추세·요약(`testCase`·`suite`·`environment`). CI 스크립트(`scripts/sentinel-run.sh`)의 실패 케이스 이름도 `.testCase.name`으로
+  - 이름이 없는 실행을 가리킬 때는 ID 그대로 (`rerunOf`). 직전 실행은 `{id, startedAt}`
 - 계정 리소스 정리 (2026-10-09): 한 개념이 두 경로로 나뉘던 것을 정리. 초대는 `/api/invites`(발급 `POST`, 확인 `GET /{token}`), 재설정 링크는 `/api/password-resets`(발급 `POST {userId}`, 확인 `GET /{token}`). 초대 수락은 계정을 만드는 것이므로 `POST /api/users`(초대 토큰), 비밀번호는 사용자의 하위 리소스로 `PUT /api/users/me/password`(현재 비밀번호)·`PUT /api/users/{id}/password`(재설정 토큰). 이전 `POST /api/users/invites`·`POST /api/invites/{token}`·`POST /api/users/{id}/password-resets`·`POST /api/password-resets/{token}`·`POST /api/users/me/password`
   - 초대 수락은 계정만 만들고 로그인은 `POST /api/sessions`로 따로 (리소스 생성 응답에 세션을 섞지 않음). 화면(BFF)이 두 요청을 이어서 처리
   - 인증 필터의 로그인 없이 허용하는 요청을 경로 접두어에서 "메서드 + 경로" 목록으로 좁힘 (같은 경로의 다른 메서드는 인증 필요)

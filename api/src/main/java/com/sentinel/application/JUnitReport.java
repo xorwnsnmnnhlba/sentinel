@@ -44,7 +44,7 @@ public final class JUnitReport {
 			counts(xml, summary, time);
 
 			xml.writeStartElement("testsuite");
-			xml.writeAttribute("name", safe(run.suiteName() + " (" + run.environmentName() + ")"));
+			xml.writeAttribute("name", safe(run.suite().name() + " (" + run.environment().name() + ")"));
 			counts(xml, summary, time);
 			xml.writeAttribute("skipped", "0");
 			xml.writeAttribute("timestamp", run.startedAt().toString());
@@ -52,14 +52,14 @@ public final class JUnitReport {
 			xml.writeStartElement("properties");
 			property(xml, "sentinel.run", String.valueOf(run.id()));
 			property(xml, "sentinel.status", run.status().name());
-			property(xml, "sentinel.environment", safe(run.environmentName()));
+			property(xml, "sentinel.environment", safe(run.environment().name()));
 			if (runUrl != null) {
 				property(xml, "sentinel.result", safe(runUrl));
 			}
 			xml.writeEndElement();
 
 			for (TestRunDetail.Result result : run.results()) {
-				testCase(xml, run.suiteName(), result);
+				testCase(xml, run.suite().name(), result);
 			}
 			xml.writeEndElement();
 			xml.writeEndElement();
@@ -75,7 +75,7 @@ public final class JUnitReport {
 	private static void testCase(XMLStreamWriter xml, String suiteName, TestRunDetail.Result result)
 			throws XMLStreamException {
 		xml.writeStartElement("testcase");
-		xml.writeAttribute("name", safe(result.testCaseName()));
+		xml.writeAttribute("name", safe(result.testCase().name()));
 		xml.writeAttribute("classname", safe(suiteName));
 		xml.writeAttribute("time", seconds(elapsedMs(result)));
 		if (result.verdict() == Verdict.FAILED) {

@@ -149,8 +149,8 @@ class ResponseTimeServiceTest {
 
 		// 보관(삭제)된 케이스는 제외, 등록 순
 		assertThat(summary.cases()).containsExactly(
-				new ResponseTimeService.CaseStats(orders.getId(), orders.getName(), 3, 100L, 100L, 100L),
-				new ResponseTimeService.CaseStats(payments.getId(), payments.getName(), 3, 800L, 800L, 800L));
+				new ResponseTimeService.CaseStats(new IdName(orders.getId(), orders.getName()), 3, 100L, 100L, 100L),
+				new ResponseTimeService.CaseStats(new IdName(payments.getId(), payments.getName()), 3, 800L, 800L, 800L));
 	}
 
 	@Test
@@ -158,7 +158,7 @@ class ResponseTimeServiceTest {
 		ResponseTimeService.Summary summary = responseTimes.summary(suite.getId(), dev.getId(), SEPT_1, SEPT_1);
 
 		assertThat(summary.cases()).containsExactly(
-				new ResponseTimeService.CaseStats(orders.getId(), orders.getName(), 0, null, null, null));
+				new ResponseTimeService.CaseStats(new IdName(orders.getId(), orders.getName()), 0, null, null, null));
 	}
 
 	@Test

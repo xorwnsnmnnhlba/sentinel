@@ -8,8 +8,7 @@ import { ResultDetail } from "./result-detail";
 
 const responded: RunResult = {
   id: 1,
-  testCaseId: 10,
-  testCaseName: "주문 생성",
+  testCase: { id: 10, name: "주문 생성" },
   verdict: "PASSED",
   outcome: "RESPONDED",
   assertionResults: [{ description: "status in [200]", passed: true, message: "200" }],

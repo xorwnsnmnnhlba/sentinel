@@ -85,7 +85,7 @@ class CatalogArchiveTest {
 			.isEqualTo(1);
 
 		// 이력은 보관된 케이스 이름까지 그대로 조회
-		assertThat(testRunService.getRun(earlierRun).results()).extracting(TestRunDetail.Result::testCaseName)
+		assertThat(testRunService.getRun(earlierRun).results()).extracting(result -> result.testCase().name())
 			.contains(removed.getName());
 		// 이후 실행 대상에서 제외
 		executor.reset();
@@ -118,7 +118,7 @@ class CatalogArchiveTest {
 		assertThat(archivedSchedule.isEnabled()).isFalse();
 		assertThat(archivedSchedule.getNextRunAt()).isNull();
 
-		assertThat(mvc.get().uri("/api/runs/{id}", run)).hasStatusOk().bodyJson().extractingPath("$.suiteName")
+		assertThat(mvc.get().uri("/api/runs/{id}", run)).hasStatusOk().bodyJson().extractingPath("$.suite.name")
 			.isEqualTo(suite.getName());
 		assertThat(mvc.get().uri("/api/runs")).bodyJson().extractingPath("$.totalElements").isEqualTo(1);
 	}

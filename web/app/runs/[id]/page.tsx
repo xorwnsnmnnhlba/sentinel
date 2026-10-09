@@ -60,7 +60,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
           title={
             <span className="inline-flex flex-wrap items-center gap-2">
               <span>
-                <span className="text-muted-foreground">#{run.id}</span> {run.suiteName}
+                <span className="text-muted-foreground">#{run.id}</span> {run.suite.name}
               </span>
               <TriggerBadge trigger={run.trigger} />
               {run.testCase && <SingleCaseBadge />}
@@ -90,7 +90,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
               }
             />
           )}
-          <Meta label="환경" value={run.environmentName} />
+          <Meta label="환경" value={run.environment.name} />
           {run.triggeredBy && <Meta label="실행" value={run.triggeredBy.name} />}
           {run.canceledBy && <Meta label="중지" value={run.canceledBy.name} />}
           <Meta label="시작" value={formatDateTime(run.startedAt)} />
@@ -139,7 +139,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <VerdictBadge verdict={result.verdict} />
-                    <span className="truncate font-medium">{result.testCaseName}</span>
+                    <span className="truncate font-medium">{result.testCase.name}</span>
                     {result.supporting && <SupportingBadge />}
                     <RetryBadge retries={result.retries} />
                     <ChangeBadge change={result.change} />
