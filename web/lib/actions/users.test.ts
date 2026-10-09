@@ -24,7 +24,7 @@ describe("invite", () => {
   it("builds the link from the issued token", async () => {
     let received: unknown;
     server.use(
-      http.post(springUrl("/api/users/invites"), async ({ request }) => {
+      http.post(springUrl("/api/invites"), async ({ request }) => {
         received = await request.json();
         return HttpResponse.json({ token: "invite-token", expiresAt: "2026-09-27T00:00:00Z" }, { status: 201 });
       }),
@@ -42,7 +42,7 @@ describe("invite", () => {
   it("defaults to the member role and requires an email", async () => {
     let received: unknown;
     server.use(
-      http.post(springUrl("/api/users/invites"), async ({ request }) => {
+      http.post(springUrl("/api/invites"), async ({ request }) => {
         received = await request.json();
         return HttpResponse.json({ token: "t" }, { status: 201 });
       }),
@@ -56,7 +56,7 @@ describe("invite", () => {
   });
 
   it("explains that the email is taken", async () => {
-    server.use(http.post(springUrl("/api/users/invites"), () => problem(409, "email is already in use")));
+    server.use(http.post(springUrl("/api/invites"), () => problem(409, "email is already in use")));
 
     await expect(invite("https://x", undefined, form({ email: "a@b.c" }))).resolves.toEqual({
       error: "이미 사용 중인 이메일입니다",
@@ -64,7 +64,7 @@ describe("invite", () => {
   });
 
   it("explains that only administrators may invite", async () => {
-    server.use(http.post(springUrl("/api/users/invites"), () => problem(403, "administrator role is required")));
+    server.use(http.post(springUrl("/api/invites"), () => problem(403, "administrator role is required")));
 
     await expect(invite("https://x", undefined, form({ email: "a@b.c" }))).resolves.toEqual({
       error: "권한이 없습니다. 관리자만 사용할 수 있습니다",
@@ -74,16 +74,19 @@ describe("invite", () => {
 
 describe("password reset link", () => {
   it("builds the link for a user", async () => {
+    let received: unknown;
     server.use(
-      http.post(springUrl("/api/users/7/password-resets"), () =>
-        HttpResponse.json({ token: "reset-token", expiresAt: "2026-09-20T02:00:00Z" }, { status: 201 }),
-      ),
+      http.post(springUrl("/api/password-resets"), async ({ request }) => {
+        received = await request.json();
+        return HttpResponse.json({ token: "reset-token", expiresAt: "2026-09-20T02:00:00Z" }, { status: 201 });
+      }),
     );
 
     await expect(createPasswordReset("https://sentinel.example.com", 7)).resolves.toEqual({
       link: "https://sentinel.example.com/password-resets/reset-token",
       expiresAt: "2026-09-20T02:00:00Z",
     });
+    expect(received).toEqual({ userId: 7 });
   });
 });
 
@@ -108,7 +111,7 @@ describe("changePassword", () => {
   it("sends both passwords and asks for a new login", async () => {
     let received: unknown;
     server.use(
-      http.post(springUrl("/api/users/me/password"), async ({ request }) => {
+      http.put(springUrl("/api/users/me/password"), async ({ request }) => {
         received = await request.json();
         return new HttpResponse(null, { status: 204 });
       }),
@@ -135,7 +138,7 @@ describe("changePassword", () => {
   });
 
   it("reports a wrong current password", async () => {
-    server.use(http.post(springUrl("/api/users/me/password"), () => problem(401, "email or password is incorrect")));
+    server.use(http.put(springUrl("/api/users/me/password"), () => problem(401, "email or password is incorrect")));
 
     await expect(
       changePassword(
@@ -147,7 +150,7 @@ describe("changePassword", () => {
 
   it("reports a too short password", async () => {
     server.use(
-      http.post(springUrl("/api/users/me/password"), () => problem(400, "password must be at least 10 characters")),
+      http.put(springUrl("/api/users/me/password"), () => problem(400, "password must be at least 10 characters")),
     );
 
     await expect(
@@ -160,11 +163,20 @@ describe("changePassword", () => {
 });
 
 describe("acceptInvite", () => {
-  it("creates the account, keeps the session and opens the home page", async () => {
+  it("creates the account, signs in with it and opens the home page", async () => {
+    const requests: unknown[] = [];
     server.use(
-      http.post(springUrl("/api/invites/invite-token"), () =>
-        HttpResponse.json({ token: "session-token", user: { id: 2 } }, { status: 201 }),
-      ),
+      http.post(springUrl("/api/users"), async ({ request }) => {
+        requests.push(await request.json());
+        return HttpResponse.json(
+          { id: 2, email: "member@sentinel.test", name: "구성원", role: "MEMBER" },
+          { status: 201 },
+        );
+      }),
+      http.post(springUrl("/api/sessions"), async ({ request }) => {
+        requests.push(await request.json());
+        return HttpResponse.json({ token: "session-token", user: { id: 2 } });
+      }),
     );
 
     await expect(
@@ -177,10 +189,14 @@ describe("acceptInvite", () => {
       ),
     ).resolves.toBe("/");
     expect(testCookies.get("sentinel_session")).toBe("session-token");
+    expect(requests).toEqual([
+      { inviteToken: "invite-token", name: "구성원", password: "member-password" },
+      { email: "member@sentinel.test", password: "member-password" },
+    ]);
   });
 
   it("explains an expired or used link", async () => {
-    server.use(http.post(springUrl("/api/invites/old-token"), () => problem(404, "link 0 not found")));
+    server.use(http.post(springUrl("/api/users"), () => problem(404, "link 0 not found")));
 
     await expect(
       acceptInvite(
@@ -197,7 +213,10 @@ describe("resetPassword", () => {
   it("sets the new password and sends the visitor to the login page", async () => {
     let received: unknown;
     server.use(
-      http.post(springUrl("/api/password-resets/reset-token"), async ({ request }) => {
+      http.get(springUrl("/api/password-resets/reset-token"), () =>
+        HttpResponse.json({ userId: 7, email: "member@sentinel.test", expiresAt: "2026-09-20T02:00:00Z" }),
+      ),
+      http.put(springUrl("/api/users/7/password"), async ({ request }) => {
         received = await request.json();
         return new HttpResponse(null, { status: 204 });
       }),
@@ -212,7 +231,19 @@ describe("resetPassword", () => {
         ),
       ),
     ).resolves.toBe("/login?changed=1");
-    expect(received).toEqual({ password: "brand-new-password" });
+    expect(received).toEqual({ resetToken: "reset-token", password: "brand-new-password" });
+  });
+
+  it("explains an expired or used link", async () => {
+    server.use(http.get(springUrl("/api/password-resets/old-token"), () => problem(404, "link 0 not found")));
+
+    await expect(
+      resetPassword(
+        "old-token",
+        undefined,
+        form({ password: "brand-new-password", passwordConfirmation: "brand-new-password" }),
+      ),
+    ).resolves.toEqual({ error: "링크가 만료되었거나 이미 사용되었습니다. 새 링크를 요청해 주세요" });
   });
 
   it("checks the confirmation", async () => {

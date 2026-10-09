@@ -238,6 +238,11 @@ export interface LinkInfo {
   expiresAt: string;
 }
 
+/** 재설정 링크 확인. 새 비밀번호는 이 사용자의 {@code PUT /api/users/{userId}/password}로 */
+export interface PasswordResetLinkInfo extends LinkInfo {
+  userId: number;
+}
+
 /** 가져오기 후보 케이스. name·request·assertions를 그대로(또는 고쳐) 가져오기에 사용 */
 export interface CaseImportCandidate {
   /** 원본 작업. 예: GET /pets/{petId} */

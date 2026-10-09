@@ -69,7 +69,11 @@ export async function apiGetOrNotFound<T>(path: string): Promise<T> {
 /**
  * 등록·수정·삭제·실행 요청. 204(본문 없음)는 null 반환, 2xx 외 응답은 ApiError
  */
-export async function apiSend<T>(method: "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T | null> {
+export async function apiSend<T>(
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  body?: unknown,
+): Promise<T | null> {
   const response = await apiFetch(path, {
     method,
     headers:

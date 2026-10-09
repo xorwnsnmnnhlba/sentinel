@@ -3,9 +3,9 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { apiSend, isApiError } from "@/lib/api/server";
+import { apiGet, apiSend, isApiError } from "@/lib/api/server";
 import { setSessionCookie } from "@/lib/api/session";
-import type { AuthenticatedUser, IssuedLink } from "@/lib/api/types";
+import type { AuthenticatedUser, IssuedLink, PasswordResetLinkInfo, UserSummary } from "@/lib/api/types";
 
 /**
  * 사용자 초대·삭제, 비밀번호 변경·재설정.
@@ -24,7 +24,7 @@ export async function invite(baseUrl: string, _: LinkState, form: FormData): Pro
     return { error: "이메일을 입력해 주세요" };
   }
   try {
-    const issued = await apiSend<IssuedLink>("POST", "/api/users/invites", { email, role });
+    const issued = await apiSend<IssuedLink>("POST", "/api/invites", { email, role });
     return { link: `${baseUrl}/invites/${issued!.token}`, expiresAt: issued!.expiresAt };
   } catch (error) {
     return { error: message(error) };
@@ -33,7 +33,7 @@ export async function invite(baseUrl: string, _: LinkState, form: FormData): Pro
 
 export async function createPasswordReset(baseUrl: string, userId: number): Promise<LinkState> {
   try {
-    const issued = await apiSend<IssuedLink>("POST", `/api/users/${userId}/password-resets`);
+    const issued = await apiSend<IssuedLink>("POST", "/api/password-resets", { userId: Number(userId) });
     return { link: `${baseUrl}/password-resets/${issued!.token}`, expiresAt: issued!.expiresAt };
   } catch (error) {
     return { error: message(error) };
@@ -62,7 +62,7 @@ export async function changePassword(_: ActionState, form: FormData): Promise<Ac
     return { error: "새 비밀번호가 서로 다릅니다" };
   }
   try {
-    await apiSend("POST", "/api/users/me/password", { currentPassword, newPassword });
+    await apiSend("PUT", "/api/users/me/password", { currentPassword, newPassword });
   } catch (error) {
     if (isApiError(error) && error.status === 401) {
       return { error: "현재 비밀번호가 올바르지 않습니다" };
@@ -72,7 +72,7 @@ export async function changePassword(_: ActionState, form: FormData): Promise<Ac
   redirect("/login?changed=1");
 }
 
-/** 초대 수락. 계정을 만들고 바로 로그인 상태로 전환 */
+/** 초대 수락. 계정을 만들고(초대 토큰) 그 비밀번호로 로그인하여 바로 로그인 상태로 전환 */
 export async function acceptInvite(token: string, _: ActionState, form: FormData): Promise<ActionState> {
   const name = String(form.get("name") ?? "").trim();
   const password = String(form.get("password") ?? "");
@@ -85,8 +85,9 @@ export async function acceptInvite(token: string, _: ActionState, form: FormData
   }
   let session: { token: string; user: AuthenticatedUser } | null;
   try {
-    session = await apiSend<{ token: string; user: AuthenticatedUser }>("POST", `/api/invites/${token}`, {
-      name,
+    const user = await apiSend<UserSummary>("POST", "/api/users", { inviteToken: token, name, password });
+    session = await apiSend<{ token: string; user: AuthenticatedUser }>("POST", "/api/sessions", {
+      email: user!.email,
       password,
     });
   } catch (error) {
@@ -107,7 +108,9 @@ export async function resetPassword(token: string, _: ActionState, form: FormDat
     return { error: "비밀번호가 서로 다릅니다" };
   }
   try {
-    await apiSend("POST", `/api/password-resets/${token}`, { password });
+    // 링크의 사용자를 서버에서 다시 확인 (화면이 보낸 값에 기대지 않음)
+    const reset = await apiGet<PasswordResetLinkInfo>(`/api/password-resets/${encodeURIComponent(token)}`);
+    await apiSend("PUT", `/api/users/${reset.userId}/password`, { resetToken: token, password });
   } catch (error) {
     return { error: message(error) };
   }

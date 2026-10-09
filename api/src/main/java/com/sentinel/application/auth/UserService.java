@@ -85,13 +85,14 @@ public class UserService {
 		return new InviteInfo(invite.getEmail(), invite.getExpiresAt());
 	}
 
-    /**
-	 * 초대 수락. 계정을 만들고 바로 로그인 상태로 전환
+	/**
+	 * 초대 수락. 초대받은 이메일·역할로 계정을 만듦 (로그인은 따로)
+	 * @throws NotFoundException 만료·사용·위조된 초대 (구분하지 않음)
 	 * @throws InvalidRequestException 짧은 비밀번호
 	 * @throws ConflictException 수락 직전에 같은 이메일로 계정이 만들어진 경우
 	 */
 	@Transactional
-	public AuthService.Login acceptInvite(String token, String name, String password) {
+	public UserSummary acceptInvite(String token, String name, String password) {
 		UserToken invite = usable(token, UserToken.Type.INVITE);
 		requireStrongPassword(password);
 		if (users.findByEmailAndArchivedAtIsNull(invite.getEmail()).isPresent()) {
@@ -100,7 +101,7 @@ public class UserService {
 		User user = users.save(new User(invite.getEmail(), name, authService.encodePassword(password), invite.getRole()));
 		invite.use(clock.instant());
 		changeLog.record(user.getId(), target(user), Action.CREATED);
-		return authService.login(invite.getEmail(), password);
+		return UserSummary.of(user);
 	}
 
 	/**
@@ -123,15 +124,19 @@ public class UserService {
 		UserToken reset = usable(token, UserToken.Type.PASSWORD_RESET);
 		User user = users.findByIdAndArchivedAtIsNull(reset.getUserId())
 			.orElseThrow(() -> new NotFoundException("user", reset.getUserId()));
-		return new ResetInfo(user.getEmail(), reset.getExpiresAt());
+		return new ResetInfo(user.getId(), user.getEmail(), reset.getExpiresAt());
 	}
 
 	/**
 	 * 링크로 비밀번호 재설정. 기존 세션은 모두 종료하여 탈취된 세션을 끊음
+	 * @throws NotFoundException 만료·사용·위조된 링크, 다른 사용자의 링크 (구분하지 않음)
 	 */
 	@Transactional
-	public void resetPassword(String token, String password) {
+	public void resetPassword(long userId, String token, String password) {
 		UserToken reset = usable(token, UserToken.Type.PASSWORD_RESET);
+		if (reset.getUserId() == null || reset.getUserId() != userId) {
+			throw new NotFoundException("link", 0);
+		}
 		requireStrongPassword(password);
 		User user = users.findByIdAndArchivedAtIsNull(reset.getUserId())
 			.orElseThrow(() -> new NotFoundException("user", reset.getUserId()));
@@ -219,7 +224,8 @@ public class UserService {
 	public record InviteInfo(String email, Instant expiresAt) {
 	}
 
-	public record ResetInfo(String email, Instant expiresAt) {
+	/** @param userId 비밀번호를 바꿀 사용자 ({@code PUT /api/users/{userId}/password}) */
+	public record ResetInfo(long userId, String email, Instant expiresAt) {
 	}
 
 	public record UserSummary(long id, String email, String name, User.Role role, Instant createdAt) {
