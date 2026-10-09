@@ -1,4 +1,4 @@
-import type { FailingChannel, NotificationDeliveryItem, NotificationTone } from "@/lib/api/types";
+import type { ChannelFailure, NotificationChannel, NotificationDeliveryItem, NotificationTone } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { failureReason } from "@/lib/webhook";
 
@@ -18,9 +18,13 @@ const FORMAT_LABELS: Record<NotificationDeliveryItem["format"], string> = {
   LOG: "로그",
 };
 
-/** 보낸 곳. 예: "billing · Slack", "기본 채널 · Teams" */
-export function channelLabel(item: Pick<NotificationDeliveryItem, "project" | "format">): string {
-  return `${item.project?.name ?? "기본 채널"} · ${FORMAT_LABELS[item.format]}`;
+/** 보낸 곳. 예: "billing · Slack", "기본 채널 · Teams". 서식을 알 수 없으면 이름만 */
+export function channelLabel(item: {
+  project: NotificationDeliveryItem["project"];
+  format: NotificationDeliveryItem["format"] | null;
+}): string {
+  const name = item.project?.name ?? "기본 채널";
+  return item.format === null ? name : `${name} · ${FORMAT_LABELS[item.format]}`;
 }
 
 /** 결과 한마디. 예: "보냄", "로그에만 기록", "HTTP 404", "연결하지 못했습니다" */
@@ -76,11 +80,25 @@ export function notificationsHref(projectId?: number, failedOnly = false): strin
 }
 
 /** 고장 난 채널의 보내지 못한 알림 이력. 기본 채널은 프로젝트로 좁힐 수 없어 전체 */
-export function failuresHref(channel: Pick<FailingChannel, "project">): string {
+export function failuresHref(channel: Pick<NotificationChannel, "project">): string {
   return notificationsHref(channel.project?.id, true);
 }
 
 /** 실패가 이어진 기간. 예: "10-05 14:20부터 3건" (KST) */
-export function failingSummary(channel: Pick<FailingChannel, "failingSince" | "failures">): string {
-  return `${formatDateTime(channel.failingSince).slice(5, 16)}부터 ${channel.failures}건`;
+export function failingSummary(failing: Pick<ChannelFailure, "since" | "failures">): string {
+  return `${formatDateTime(failing.since).slice(5, 16)}부터 ${failing.failures}건`;
+}
+
+/** 마지막 발송이 실패한 채널, 오래 실패한 순 (대시보드 경고) */
+export function failingChannels(
+  channels: NotificationChannel[],
+): (NotificationChannel & { failing: ChannelFailure })[] {
+  return channels
+    .filter((channel): channel is NotificationChannel & { failing: ChannelFailure } => channel.failing !== null)
+    .sort((a, b) => a.failing.since.localeCompare(b.failing.since));
+}
+
+/** 서버 기본 채널 주소가 있는지. 기본 채널 항목이 없으면(응답 이상) 없다고 봄 */
+export function defaultChannelConfigured(channels: NotificationChannel[]): boolean {
+  return channels.some((channel) => channel.channel === "DEFAULT" && channel.configured);
 }

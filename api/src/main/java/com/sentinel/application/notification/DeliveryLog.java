@@ -9,10 +9,10 @@ import com.sentinel.domain.NotificationDelivery;
 interface DeliveryLog {
 
 	/** 기록하지 않음 (테스트용) */
-	DeliveryLog NONE = (target, notification, delivery) -> {
-	};
+	DeliveryLog NONE = (target, notification, delivery) -> null;
 
-	void record(Target target, Notification notification, WebhookSender.Delivery delivery);
+	/** @return 저장한 발송 이력 ID. 기록하지 못했으면 null */
+	Long record(Target target, Notification notification, WebhookSender.Delivery delivery);
 
 	/**
 	 * 보낸 곳. 주소는 형식 판별에만 쓰고 남기지 않음

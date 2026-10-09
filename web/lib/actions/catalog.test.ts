@@ -294,21 +294,32 @@ describe("project webhook", () => {
   });
 
   it("returns how the test notification went", async () => {
-    capture("post", "/api/projects/3/test-notifications", () =>
-      HttpResponse.json({ delivered: false, statusCode: 404, error: null }),
+    const bodies = capture("post", "/api/notification-deliveries", () =>
+      HttpResponse.json(
+        {
+          id: 9,
+          channel: "PROJECT",
+          project: { id: 3, name: "billing" },
+          delivered: false,
+          statusCode: 404,
+          error: null,
+        },
+        { status: 201 },
+      ),
     );
 
     await expect(sendTestNotification(3)).resolves.toEqual({
       delivery: { delivered: false, statusCode: 404, error: null },
     });
+    expect(bodies).toEqual([{ projectId: 3 }]);
   });
 
   it("explains a missing or unreadable webhook", async () => {
-    capture("post", "/api/projects/3/test-notifications", () => problem(409, "project 3 has no webhook"));
+    capture("post", "/api/notification-deliveries", () => problem(409, "project 3 has no webhook"));
     await expect(sendTestNotification(3)).resolves.toEqual({ error: "지정된 Webhook이 없습니다" });
     expect(refresh).toHaveBeenCalledOnce();
 
-    capture("post", "/api/projects/3/test-notifications", () => problem(400, "webhook of project 3 cannot be read"));
+    capture("post", "/api/notification-deliveries", () => problem(400, "webhook of project 3 cannot be read"));
     await expect(sendTestNotification(3)).resolves.toEqual({
       error: "Webhook 주소를 읽을 수 없습니다. 서버 암호화 키가 바뀌었다면 주소를 다시 지정해 주세요",
     });
@@ -317,25 +328,31 @@ describe("project webhook", () => {
 
 describe("sendDefaultTestNotification", () => {
   it("returns how the test notification went and reloads the history", async () => {
-    const bodies = capture("post", "/api/test-notifications", () =>
-      HttpResponse.json({ delivered: true, statusCode: 200, error: null }),
+    const bodies = capture("post", "/api/notification-deliveries", () =>
+      HttpResponse.json(
+        { id: 10, channel: "DEFAULT", project: null, delivered: true, statusCode: 200, error: null },
+        { status: 201 },
+      ),
     );
 
     await expect(sendDefaultTestNotification()).resolves.toEqual({
       delivery: { delivered: true, statusCode: 200, error: null },
     });
-    expect(bodies).toEqual([undefined]);
+    // 프로젝트 없이 보내면 기본 채널
+    expect(bodies).toEqual([{}]);
     expect(refresh).toHaveBeenCalledOnce();
   });
 
   it("explains a missing default channel or a member trying it", async () => {
-    capture("post", "/api/test-notifications", () => problem(409, "default notification channel is not configured"));
+    capture("post", "/api/notification-deliveries", () =>
+      problem(409, "default notification channel is not configured"),
+    );
     await expect(sendDefaultTestNotification()).resolves.toEqual({
       error: "기본 알림 채널 주소(SENTINEL_WEBHOOK_URL)가 설정되지 않아 보낼 수 없습니다",
     });
     expect(refresh).toHaveBeenCalledOnce();
 
-    capture("post", "/api/test-notifications", () => problem(403, "administrator role is required"));
+    capture("post", "/api/notification-deliveries", () => problem(403, "administrator role is required"));
     await expect(sendDefaultTestNotification()).resolves.toEqual({
       error: "기본 채널 테스트 알림은 관리자만 보낼 수 있습니다",
     });

@@ -12,13 +12,13 @@ import { sendDefaultTestNotification } from "@/lib/actions/catalog";
 import { apiGet } from "@/lib/api/server";
 import type {
   AuthenticatedUser,
-  NotificationChannelHealth,
+  NotificationChannel,
   NotificationDeliveryItem,
   Page,
   ProjectItem,
 } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
-import { channelLabel, resultHint } from "@/lib/notification-delivery";
+import { channelLabel, defaultChannelConfigured, resultHint } from "@/lib/notification-delivery";
 
 const PAGE_SIZE = 20;
 
@@ -42,11 +42,11 @@ export default async function NotificationsPage(props: PageProps<"/notifications
 
   const query = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
   appendFilters(query, filters);
-  const [deliveries, projects, me, health] = await Promise.all([
+  const [deliveries, projects, me, channels] = await Promise.all([
     apiGet<Page<NotificationDeliveryItem>>(`/api/notification-deliveries?${query}`),
     apiGet<ProjectItem[]>("/api/projects"),
     apiGet<AuthenticatedUser>("/api/sessions/current"),
-    apiGet<NotificationChannelHealth>("/api/notification-channel-health"),
+    apiGet<NotificationChannel[]>("/api/notification-channels"),
   ]);
 
   return (
@@ -57,7 +57,7 @@ export default async function NotificationsPage(props: PageProps<"/notifications
       {me.role === "ADMIN" && (
         <Panel title="기본 알림 채널" meta="SENTINEL_WEBHOOK_URL">
           <div className="space-y-3 p-4 text-sm">
-            {health.defaultChannelConfigured ? (
+            {defaultChannelConfigured(channels) ? (
               <>
                 <p>
                   Webhook을 지정하지 않은 프로젝트의 실패·복구 알림과 DB 연결 실패·모니터링 공백·주간 요약을 보냅니다

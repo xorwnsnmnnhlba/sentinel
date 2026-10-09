@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { NotificationChannel } from "@/lib/api/types";
+
 import {
   channelLabel,
+  defaultChannelConfigured,
+  failingChannels,
   failingSummary,
   failuresHref,
   notificationsHref,
@@ -77,7 +81,36 @@ describe("failuresHref", () => {
 
 describe("failingSummary", () => {
   it("says since when in KST and how many", () => {
-    expect(failingSummary({ failingSince: "2026-10-05T05:20:00Z", failures: 3 })).toBe("10-05 14:20부터 3건");
-    expect(failingSummary({ failingSince: "2026-10-05T15:05:00Z", failures: 1 })).toBe("10-06 00:05부터 1건");
+    expect(failingSummary({ since: "2026-10-05T05:20:00Z", failures: 3 })).toBe("10-05 14:20부터 3건");
+    expect(failingSummary({ since: "2026-10-05T15:05:00Z", failures: 1 })).toBe("10-06 00:05부터 1건");
+  });
+});
+
+describe("channel list", () => {
+  const failing = (since: string) => ({ since, failures: 1, lastSentAt: since, statusCode: 404, error: null });
+  const channels: NotificationChannel[] = [
+    { channel: "DEFAULT", project: null, configured: true, format: "SLACK", failing: failing("2026-10-05T09:00:00Z") },
+    { channel: "PROJECT", project: { id: 1, name: "a" }, configured: true, format: "TEXT", failing: null },
+    {
+      channel: "PROJECT",
+      project: { id: 2, name: "b" },
+      configured: true,
+      format: null,
+      failing: failing("2026-10-05T01:00:00Z"),
+    },
+  ];
+
+  it("picks the broken channels, longest broken first", () => {
+    expect(failingChannels(channels).map((channel) => channel.project?.name ?? "default")).toEqual(["b", "default"]);
+  });
+
+  it("tells whether the default channel has an address", () => {
+    expect(defaultChannelConfigured(channels)).toBe(true);
+    expect(defaultChannelConfigured([{ ...channels[0], configured: false, format: "LOG", failing: null }])).toBe(false);
+    expect(defaultChannelConfigured([])).toBe(false);
+  });
+
+  it("names a channel without a known format by its name only", () => {
+    expect(channelLabel({ project: { id: 2, name: "b" }, format: null })).toBe("b");
   });
 });

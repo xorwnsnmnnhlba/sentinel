@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.sentinel.TestAuthConfiguration;
@@ -15,6 +16,7 @@ import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutor;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.TestFixtures;
+import com.sentinel.application.auth.AuthService;
 import com.sentinel.application.notification.RecordingNotifier;
 import com.sentinel.application.notification.RunResultNotifier;
 import com.sentinel.domain.Environment;
@@ -22,8 +24,10 @@ import com.sentinel.domain.NotificationDelivery;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.NotificationDeliveryRepository;
 import com.sentinel.infra.persistence.ProjectRepository;
+import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -79,6 +83,12 @@ class ProjectWebhookApiTest {
 	@Autowired
 	private NotificationDeliveryRepository deliveryRecords;
 
+	@Autowired
+	private UserRepository users;
+
+	@Autowired
+	private AuthService authService;
+
 	private HttpServer server;
 
 	private final List<String> received = new CopyOnWriteArrayList<>();
@@ -131,9 +141,16 @@ class ProjectWebhookApiTest {
 	void sendsATestNotificationAndReportsTheResult() {
 		patch("{\"webhookUrl\": \"%s\"}".formatted(url()));
 
-		var sent = assertThat(testNotification()).hasStatusOk().bodyJson();
+		MvcTestResult created = testNotification();
+		var sent = assertThat(created).hasStatus(HttpStatus.CREATED).bodyJson();
 		sent.extractingPath("$.delivered").isEqualTo(true);
 		sent.extractingPath("$.statusCode").isEqualTo(200);
+		sent.extractingPath("$.channel").isEqualTo("PROJECT");
+		// 만든 발송 기록은 Location으로 조회
+		assertThat(mvc.get().uri(created.getResponse().getHeader("Location"))).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.project.name")
+			.isEqualTo(project.getName());
 		assertThat(received).singleElement()
 			.asString()
 			.contains(project.getName() + " 알림 연결 확인")
@@ -141,7 +158,7 @@ class ProjectWebhookApiTest {
 		assertThat(defaultChannel.sent()).isEmpty();
 
 		responseStatus = 404;
-		var rejected = assertThat(testNotification()).hasStatusOk().bodyJson();
+		var rejected = assertThat(testNotification()).hasStatus(HttpStatus.CREATED).bodyJson();
 		rejected.extractingPath("$.delivered").isEqualTo(false);
 		rejected.extractingPath("$.statusCode").isEqualTo(404);
 
@@ -166,22 +183,25 @@ class ProjectWebhookApiTest {
 		// 채널 상태: 마지막 발송이 실패한 채널. 기본 채널은 주소가 없어 실패 기록이 있어도 판단하지 않음
 		deliveryRecords.save(new NotificationDelivery(Instant.now(), NotificationDelivery.Channel.DEFAULT, null,
 				NotificationDelivery.Format.TEXT, "예전 기본 채널 실패", NotificationDelivery.Tone.FAILURE, false, 404, null));
-		var health = assertThat(mvc.get().uri("/api/notification-channel-health")).bodyJson();
-		health.extractingPath("$.defaultChannelConfigured").isEqualTo(false);
-		health.extractingPath("$.failing[*].project.name").isEqualTo(List.of(project.getName()));
-		health.extractingPath("$.failing[0].statusCode").isEqualTo(404);
+		var channels = assertThat(mvc.get().uri("/api/notification-channels")).hasStatusOk().bodyJson();
+		channels.extractingPath("$[*].channel").isEqualTo(List.of("DEFAULT", "PROJECT"));
+		channels.extractingPath("$[0].configured").isEqualTo(false);
+		channels.extractingPath("$[0].format").isEqualTo("LOG");
+		channels.extractingPath("$[0].failing").isNull();
+		channels.extractingPath("$[1].project.name").isEqualTo(project.getName());
+		channels.extractingPath("$[1].format").isEqualTo("TEXT");
+		channels.extractingPath("$[1].failing.statusCode").isEqualTo(404);
+		channels.extractingPath("$[1].failing.failures").isEqualTo(1);
 		responseStatus = 200;
 		testNotification();
-		assertThat(mvc.get().uri("/api/notification-channel-health")).bodyJson()
-			.extractingPath("$.failing.length()")
-			.isEqualTo(0);
+		assertThat(mvc.get().uri("/api/notification-channels")).bodyJson().extractingPath("$[1].failing").isNull();
 	}
 
 	@Test
 	void refusesToSendToCloudMetadataAddresses() {
 		patch("{\"webhookUrl\": \"http://169.254.169.254/latest/meta-data\"}");
 
-		var blocked = assertThat(testNotification()).hasStatusOk().bodyJson();
+		var blocked = assertThat(testNotification()).hasStatus(HttpStatus.CREATED).bodyJson();
 		blocked.extractingPath("$.delivered").isEqualTo(false);
 		blocked.extractingPath("$.error").isEqualTo("BLOCKED_DESTINATION");
 		blocked.extractingPath("$.statusCode").isNull();
@@ -214,8 +234,27 @@ class ProjectWebhookApiTest {
 	}
 
 	@Test
+	void anyMemberCanTestAProjectChannel() {
+		patch("{\"webhookUrl\": \"%s\"}".formatted(url()));
+		String password = UUID.randomUUID().toString();
+		User member = users.save(new User("member-" + UUID.randomUUID() + "@sentinel.test", "팀원",
+				TestAuthConfiguration.passwordHash(password), User.Role.MEMBER));
+		String session = "Bearer " + authService.login(member.getEmail(), password).token();
+
+		assertThat(mvc.post()
+			.uri("/api/notification-deliveries")
+			.header("Authorization", session)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"projectId\": %d}".formatted(project.getId()))).hasStatus(HttpStatus.CREATED);
+		assertThat(received).singleElement().asString().contains("보낸 사람: " + member.getEmail());
+		// 기본 채널은 관리자만
+		assertThat(mvc.post().uri("/api/notification-deliveries").header("Authorization", session))
+			.hasStatus(HttpStatus.FORBIDDEN);
+	}
+
+	@Test
 	void cannotTestTheDefaultChannelWhenItIsNotConfigured() {
-		assertThat(mvc.post().uri("/api/test-notifications")).hasStatus(HttpStatus.CONFLICT)
+		assertThat(mvc.post().uri("/api/notification-deliveries")).hasStatus(HttpStatus.CONFLICT)
 			.bodyJson()
 			.extractingPath("$.detail")
 			.isEqualTo("default notification channel is not configured");
@@ -228,7 +267,10 @@ class ProjectWebhookApiTest {
 			.bodyJson()
 			.extractingPath("$.detail")
 			.isEqualTo("webhookUrl must be an absolute http(s) URL");
-		assertThat(mvc.post().uri("/api/projects/{id}/test-notifications", -1)).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(mvc.post()
+			.uri("/api/notification-deliveries")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"projectId\": -1}")).hasStatus(HttpStatus.NOT_FOUND);
 	}
 
 	@Test
@@ -295,7 +337,11 @@ class ProjectWebhookApiTest {
 	}
 
 	private MvcTestResult testNotification() {
-		return mvc.post().uri("/api/projects/{id}/test-notifications", project.getId()).exchange();
+		return mvc.post()
+			.uri("/api/notification-deliveries")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"projectId\": %d}".formatted(project.getId()))
+			.exchange();
 	}
 
 	private String url() {

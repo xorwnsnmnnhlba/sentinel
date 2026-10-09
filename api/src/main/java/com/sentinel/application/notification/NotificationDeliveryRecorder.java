@@ -26,16 +26,18 @@ class NotificationDeliveryRecorder implements DeliveryLog {
 	private final Clock clock;
 
 	@Override
-	public void record(Target target, Notification notification, WebhookSender.Delivery delivery) {
+	public Long record(Target target, Notification notification, WebhookSender.Delivery delivery) {
 		try {
-			transactions.writeSeparately(status -> deliveries.save(new NotificationDelivery(clock.instant(),
+			return transactions.writeSeparately(status -> deliveries.save(new NotificationDelivery(clock.instant(),
 					target.channel(), target.projectId(), target.format(), notification.title(),
 					NotificationDelivery.Tone.valueOf(notification.tone().name()), delivery.delivered(),
-					delivery.statusCode(), delivery.error())));
+					delivery.statusCode(), delivery.error())))
+				.getId();
 		}
 		catch (RuntimeException ex) {
 			log.warn("Failed to record notification delivery: {} ({})", notification.title(),
 					ex.getClass().getSimpleName());
+			return null;
 		}
 	}
 
