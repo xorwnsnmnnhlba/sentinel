@@ -5,6 +5,7 @@ import java.util.List;
 import com.sentinel.application.secret.SecretCipher;
 import com.sentinel.application.secret.SecretDecryptionException;
 import com.sentinel.application.secret.SecretKeyMissingException;
+import com.sentinel.domain.NotificationDelivery;
 import com.sentinel.domain.Project;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -58,9 +59,10 @@ public class NotificationChannels {
 	/**
 	 * 서버 기본 채널로 연결 확인 알림. 실제 알림과 같은 경로로 보내고 발송 이력에 기록
 	 * @param requester 보낸 사람 (이메일)
+	 * @return 발송 이력 ID. 기록하지 못했으면 null
 	 * @throws IllegalStateException 기본 채널 주소 미설정 (알림이 로그에만 남는 상태)
 	 */
-	public WebhookSender.Delivery sendDefaultTest(String requester) {
+	public Long sendDefaultTest(String requester) {
 		if (!(defaultChannel instanceof WebhookNotifier webhook)) {
 			throw new IllegalStateException("default notification channel is not configured");
 		}
@@ -70,13 +72,14 @@ public class NotificationChannels {
 	}
 
 	/**
-	 * 연결 확인용 알림. 프로젝트 Webhook으로만 보냄 (기본 채널로 대신 보내지 않음)
+	 * 연결 확인용 알림. 프로젝트 Webhook으로만 보냄 (기본 채널로 대신 보내지 않음). 발송 이력에 기록
 	 * @param requester 보낸 사람 (이메일)
+	 * @return 발송 이력 ID. 기록하지 못했으면 null
 	 * @throws IllegalStateException Webhook 미지정
 	 * @throws SecretKeyMissingException 암호화 키 미설정
 	 * @throws SecretDecryptionException 키 불일치·손상
 	 */
-	public WebhookSender.Delivery sendTest(Project project, String requester) {
+	public Long sendTest(Project project, String requester) {
 		if (!project.hasWebhook()) {
 			throw new IllegalStateException("project " + project.getId() + " has no webhook");
 		}
@@ -85,8 +88,25 @@ public class NotificationChannels {
 				List.of("이 채널로 " + project.getName() + " 프로젝트의 스케줄 실행 실패·복구 알림을 보냅니다",
 						"보낸 사람: " + requester));
 		WebhookSender.Delivery delivery = sender.deliver(url, notification);
-		deliveries.record(DeliveryLog.Target.project(project.getId(), url), notification, delivery);
-		return delivery;
+		return deliveries.record(DeliveryLog.Target.project(project.getId(), url), notification, delivery);
+	}
+
+	/** 서버 기본 채널의 서식. 주소가 없으면 LOG */
+	public NotificationDelivery.Format defaultFormat() {
+		return defaultChannel instanceof WebhookNotifier webhook ? webhook.format() : NotificationDelivery.Format.LOG;
+	}
+
+	/** 프로젝트 Webhook의 서식. Webhook이 없거나 주소를 읽을 수 없으면 null */
+	public NotificationDelivery.Format formatOf(Project project) {
+		if (!project.hasWebhook()) {
+			return null;
+		}
+		try {
+			return DeliveryLog.Target.project(project.getId(), cipher.decrypt(project.getWebhookUrlCipher())).format();
+		}
+		catch (SecretKeyMissingException | SecretDecryptionException ex) {
+			return null;
+		}
 	}
 
 }

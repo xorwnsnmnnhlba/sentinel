@@ -24,6 +24,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -138,25 +139,29 @@ class NotificationDeliveryApiTest {
 		mvc.delete().uri("/api/projects/{id}", archived.getId()).exchange();
 		save(NOW.minus(Duration.ofDays(7)).minusSeconds(1), stale.getId(), "오래된 실패", false, 404, null);
 
-		var health = assertThat(mvc.get().uri("/api/notification-channel-health")).hasStatusOk().bodyJson();
-		health.extractingPath("$.defaultChannelConfigured").isEqualTo(true);
-		// 오래 실패한 채널 먼저
-		health.extractingPath("$.failing[*].channel").isEqualTo(List.of("PROJECT", "DEFAULT"));
-		health.extractingPath("$.failing[0].project.name").isEqualTo(billing.getName());
-		health.extractingPath("$.failing[0].failingSince").isEqualTo("2026-10-04T22:00:00Z");
-		health.extractingPath("$.failing[0].lastSentAt").isEqualTo("2026-10-04T23:00:00Z");
-		health.extractingPath("$.failing[0].failures").isEqualTo(2);
-		health.extractingPath("$.failing[0].statusCode").isEqualTo(404);
-		health.extractingPath("$.failing[0].format").isEqualTo("TEXT");
-		health.extractingPath("$.failing[1].project").isNull();
-		health.extractingPath("$.failing[1].error").isEqualTo("TIMEOUT");
-		health.extractingPath("$.failing[1].statusCode").isNull();
-		health.extractingPath("$.failing[1].failures").isEqualTo(1);
+		var channels = assertThat(mvc.get().uri("/api/notification-channels")).hasStatusOk().bodyJson();
+		// 기본 채널이 첫 항목, 이어서 Webhook을 지정한 프로젝트 (Webhook 지운·삭제된 프로젝트는 없음)
+		channels.extractingPath("$[0].channel").isEqualTo("DEFAULT");
+		channels.extractingPath("$[0].configured").isEqualTo(true);
+		channels.extractingPath("$[0].failing.error").isEqualTo("TIMEOUT");
+		channels.extractingPath("$[0].failing.statusCode").isNull();
+		channels.extractingPath("$[0].failing.failures").isEqualTo(1);
+		channels.extractingPath("$[*].project.name")
+			.asArray()
+			.containsExactlyInAnyOrder(billing.getName(), recovered.getName(), stale.getName());
+		String billingPath = "$[?(@.project.name == '%s')]".formatted(billing.getName());
+		channels.extractingPath(billingPath + ".channel").isEqualTo(List.of("PROJECT"));
+		channels.extractingPath(billingPath + ".failing.since").isEqualTo(List.of("2026-10-04T22:00:00Z"));
+		channels.extractingPath(billingPath + ".failing.lastSentAt").isEqualTo(List.of("2026-10-04T23:00:00Z"));
+		channels.extractingPath(billingPath + ".failing.failures").isEqualTo(List.of(2));
+		channels.extractingPath(billingPath + ".failing.statusCode").isEqualTo(List.of(404));
+		// 복구된 채널, 7일보다 오래된 실패는 실패 아님
+		channels.extractingPath("$[?(@.failing != null)].project.name").isEqualTo(List.of(billing.getName()));
 
 		// 한 번 보내면 빠짐
 		save(NOW, billing.getId(), "다시 통과", true, 200, null);
-		assertThat(mvc.get().uri("/api/notification-channel-health")).bodyJson()
-			.extractingPath("$.failing[*].channel")
+		assertThat(mvc.get().uri("/api/notification-channels")).bodyJson()
+			.extractingPath("$[?(@.failing != null)].channel")
 			.isEqualTo(List.of("DEFAULT"));
 	}
 
@@ -165,9 +170,23 @@ class NotificationDeliveryApiTest {
 		withWebhook(billing);
 		save(NOW.minus(Duration.ofDays(7)), billing.getId(), "7일 전 실패", false, 500, null);
 
-		assertThat(mvc.get().uri("/api/notification-channel-health")).bodyJson()
-			.extractingPath("$.failing[0].failingSince")
+		assertThat(mvc.get().uri("/api/notification-channels")).bodyJson()
+			.extractingPath("$[1].failing.since")
 			.isEqualTo("2026-09-28T00:00:00Z");
+	}
+
+	@Test
+	void readsOneDeliveryById() {
+		save(NOW, billing.getId(), "billing 실패", false, 500, null);
+		long id = deliveries.findAll().getFirst().getId();
+
+		var one = assertThat(mvc.get().uri("/api/notification-deliveries/{id}", id)).hasStatusOk().bodyJson();
+		one.extractingPath("$.title").isEqualTo("billing 실패");
+		one.extractingPath("$.project.name").isEqualTo(billing.getName());
+		assertThat(mvc.get().uri("/api/notification-deliveries/{id}", -1)).hasStatus(HttpStatus.NOT_FOUND)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("notification delivery -1 not found");
 	}
 
 	@Test

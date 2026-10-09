@@ -3,6 +3,7 @@ package com.sentinel.application.notification;
 import java.net.http.HttpClient;
 import java.time.Duration;
 
+import com.sentinel.domain.NotificationDelivery;
 import com.sentinel.infra.http.HttpFailures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,8 +48,11 @@ class WebhookNotifier implements Notifier {
 		deliver(notification);
 	}
 
-	/** 발송하고 결과 반환 (연결 확인용). 실패는 예외 대신 결과로, 발송 이력에 기록 */
-	WebhookSender.Delivery deliver(Notification notification) {
+	/**
+	 * 발송하고 발송 이력에 기록 (연결 확인용). 실패는 예외 대신 이력의 결과로
+	 * @return 발송 이력 ID. 기록하지 못했으면 null
+	 */
+	Long deliver(Notification notification) {
 		WebhookSender.Delivery delivery;
 		try {
 			int status = restClient.post()
@@ -68,8 +72,12 @@ class WebhookNotifier implements Notifier {
 					? new WebhookSender.Delivery(false, response.getStatusCode().value(), null)
 					: new WebhookSender.Delivery(false, null, HttpFailures.reason(ex));
 		}
-		deliveries.record(DeliveryLog.Target.defaultWebhook(url), notification, delivery);
-		return delivery;
+		return deliveries.record(DeliveryLog.Target.defaultWebhook(url), notification, delivery);
+	}
+
+	/** 주소로 판별한 채널 서식 */
+	NotificationDelivery.Format format() {
+		return DeliveryLog.Target.defaultWebhook(url).format();
 	}
 
 }

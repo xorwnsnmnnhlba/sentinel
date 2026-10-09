@@ -1,30 +1,38 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { FailingChannel } from "@/lib/api/types";
+import type { ChannelFailure, NotificationChannel } from "@/lib/api/types";
 
 import { FailingChannelList } from "./failing-channel-list";
 
-const billing: FailingChannel = {
+type Failing = NotificationChannel & { failing: ChannelFailure };
+
+const billing: Failing = {
   channel: "PROJECT",
   project: { id: 3, name: "billing" },
+  configured: true,
   format: "SLACK",
-  failingSince: "2026-10-05T05:20:00Z",
-  failures: 3,
-  lastSentAt: "2026-10-05T07:00:00Z",
-  statusCode: 404,
-  error: null,
+  failing: {
+    since: "2026-10-05T05:20:00Z",
+    failures: 3,
+    lastSentAt: "2026-10-05T07:00:00Z",
+    statusCode: 404,
+    error: null,
+  },
 };
 
-const defaultChannel: FailingChannel = {
+const defaultChannel: Failing = {
   channel: "DEFAULT",
   project: null,
+  configured: true,
   format: "TEAMS",
-  failingSince: "2026-10-05T00:00:00Z",
-  failures: 1,
-  lastSentAt: "2026-10-05T00:00:00Z",
-  statusCode: null,
-  error: "CONNECTION_FAILED",
+  failing: {
+    since: "2026-10-05T00:00:00Z",
+    failures: 1,
+    lastSentAt: "2026-10-05T00:00:00Z",
+    statusCode: null,
+    error: "CONNECTION_FAILED",
+  },
 };
 
 describe("FailingChannelList", () => {

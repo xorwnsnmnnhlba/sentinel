@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 
 /** 알림 발송 이력 저장. 저장 실패는 발송한 쪽으로 전파하지 않음 */
 @SpringBootTest(properties = "sentinel.schedule.enabled=false")
@@ -49,12 +48,13 @@ class NotificationDeliveryRecorderTest {
 
 	@Test
 	void savesTheTitleAndResultWithTheSendingTime() {
-		recorder.record(DeliveryLog.Target.defaultWebhook("https://hooks.slack.com/services/T0/B0/secret"),
+		Long id = recorder.record(DeliveryLog.Target.defaultWebhook("https://hooks.slack.com/services/T0/B0/secret"),
 				new Notification("[Sentinel] dev smoke - 실패", List.of("GET /a → 500"), Notification.Tone.FAILURE,
 						List.of()),
 				new WebhookSender.Delivery(false, null, "TIMEOUT"));
 
 		assertThat(deliveries.findAll()).singleElement().satisfies(delivery -> {
+			assertThat(delivery.getId()).isEqualTo(id);
 			assertThat(delivery.getSentAt()).isEqualTo(NOW);
 			assertThat(delivery.getChannel()).isEqualTo(NotificationDelivery.Channel.DEFAULT);
 			assertThat(delivery.getProjectId()).isNull();
@@ -73,9 +73,8 @@ class NotificationDeliveryRecorderTest {
 		DeliveryLog.Target broken = new DeliveryLog.Target(NotificationDelivery.Channel.PROJECT, null,
 				NotificationDelivery.Format.TEXT);
 
-		assertThatCode(() -> recorder.record(broken, new Notification("알림", List.of()),
-				new WebhookSender.Delivery(true, 200, null)))
-			.doesNotThrowAnyException();
+		assertThat(recorder.record(broken, new Notification("알림", List.of()), new WebhookSender.Delivery(true, 200, null)))
+			.isNull();
 		assertThat(deliveries.count()).isZero();
 		assertThat(output).contains("Failed to record notification delivery: 알림 (IllegalArgumentException)");
 	}

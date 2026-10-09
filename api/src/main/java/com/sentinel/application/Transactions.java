@@ -44,8 +44,8 @@ public class Transactions {
 	}
 
 	/** 호출한 쪽 트랜잭션과 별도로 커밋 (부가 기록의 실패가 본래 작업을 되돌리지 않도록) */
-	public void writeSeparately(Consumer<TransactionStatus> action) {
-		separate.executeWithoutResult(action);
+	public <T> T writeSeparately(TransactionCallback<T> action) {
+		return separate.execute(action);
 	}
 
 }

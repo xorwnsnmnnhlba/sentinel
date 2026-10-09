@@ -21,7 +21,7 @@ test.beforeAll(async ({ request }) => {
     headers,
     data: { webhookUrl: "http://e2e-api:8080/api/invites/delivery-check" },
   });
-  const sent = await request.post(`${api}/api/projects/${projectId}/test-notifications`, { headers });
+  const sent = await request.post(`${api}/api/notification-deliveries`, { headers, data: { projectId } });
   expect(sent.ok()).toBe(true);
 });
 

@@ -25,6 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
@@ -32,7 +33,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 서버 기본 채널 연결 확인 알림 ({@code POST /api/test-notifications}). 기본 채널은 JDK 내장 HTTP 서버.
+ * 서버 기본 채널 연결 확인 알림 ({@code POST /api/notification-deliveries}, projectId 없음). 기본 채널은 JDK 내장 HTTP 서버.
  * 기본 채널이 없을 때(409)는 ProjectWebhookApiTest
  */
 @SpringBootTest(properties = "sentinel.schedule.enabled=false")
@@ -79,7 +80,9 @@ class DefaultChannelTestNotificationApiTest {
 
 	@Test
 	void sendsATestNotificationThroughTheDefaultChannelAndRecordsIt() {
-		var sent = assertThat(mvc.post().uri("/api/test-notifications")).hasStatusOk().bodyJson();
+		var sent = assertThat(mvc.post().uri("/api/notification-deliveries")).hasStatus(HttpStatus.CREATED).bodyJson();
+		sent.extractingPath("$.channel").isEqualTo("DEFAULT");
+		sent.extractingPath("$.project").isNull();
 		sent.extractingPath("$.delivered").isEqualTo(true);
 		sent.extractingPath("$.statusCode").isEqualTo(200);
 		assertThat(received).singleElement()
@@ -88,7 +91,10 @@ class DefaultChannelTestNotificationApiTest {
 			.contains("보낸 사람: tester-");
 
 		responseStatus = 404;
-		var rejected = assertThat(mvc.post().uri("/api/test-notifications")).hasStatusOk().bodyJson();
+		var rejected = assertThat(mvc.post()
+			.uri("/api/notification-deliveries")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{}")).hasStatus(HttpStatus.CREATED).bodyJson();
 		rejected.extractingPath("$.delivered").isEqualTo(false);
 		rejected.extractingPath("$.statusCode").isEqualTo(404);
 
@@ -97,9 +103,10 @@ class DefaultChannelTestNotificationApiTest {
 		history.extractingPath("$.content[*].statusCode").isEqualTo(List.of(404, 200));
 		history.extractingPath("$.content[0].channel").isEqualTo("DEFAULT");
 		history.extractingPath("$.content[0].title").isEqualTo("[Sentinel] 기본 알림 채널 연결 확인");
-		var health = assertThat(mvc.get().uri("/api/notification-channel-health")).bodyJson();
-		health.extractingPath("$.defaultChannelConfigured").isEqualTo(true);
-		health.extractingPath("$.failing[*].channel").isEqualTo(List.of("DEFAULT"));
+		var channels = assertThat(mvc.get().uri("/api/notification-channels")).bodyJson();
+		channels.extractingPath("$[0].configured").isEqualTo(true);
+		channels.extractingPath("$[0].format").isEqualTo("TEXT");
+		channels.extractingPath("$[0].failing.statusCode").isEqualTo(404);
 	}
 
 	@Test
@@ -109,7 +116,7 @@ class DefaultChannelTestNotificationApiTest {
 				TestAuthConfiguration.passwordHash(password), User.Role.MEMBER));
 		String session = "Bearer " + authService.login(member.getEmail(), password).token();
 
-		assertThat(mvc.post().uri("/api/test-notifications").header("Authorization", session))
+		assertThat(mvc.post().uri("/api/notification-deliveries").header("Authorization", session))
 			.hasStatus(HttpStatus.FORBIDDEN);
 		assertThat(received).isEmpty();
 	}

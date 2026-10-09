@@ -18,7 +18,7 @@ import type {
   FailureCauses,
   MaintenanceWindow,
   MonitoringGaps,
-  NotificationChannelHealth,
+  NotificationChannel,
   Page,
   ResponseTimeChanges,
   RunSummary,
@@ -41,7 +41,7 @@ import {
 import { formatDateTime, formatProgress } from "@/lib/format";
 import { formatEnd } from "@/lib/maintenance";
 import { formatGapDuration, totalGapDuration } from "@/lib/monitoring-gap";
-import { notificationsHref } from "@/lib/notification-delivery";
+import { defaultChannelConfigured, failingChannels, notificationsHref } from "@/lib/notification-delivery";
 import { formatMs, kstDateRange } from "@/lib/response-times";
 import { cn } from "@/lib/utils";
 
@@ -81,7 +81,7 @@ export default async function Dashboard(props: PageProps<"/">) {
     monitoringGaps,
     slowdowns,
     failureCauses,
-    channelHealth,
+    channels,
   ] = await Promise.all([
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
@@ -93,9 +93,10 @@ export default async function Dashboard(props: PageProps<"/">) {
     apiGet<MonitoringGaps>(`/api/monitoring-gaps?${range(current)}`),
     apiGet<Slowdown[]>("/api/slowdowns"),
     apiGet<FailureCauses>(`/api/failure-causes?${range(current)}`),
-    apiGet<NotificationChannelHealth>("/api/notification-channel-health"),
+    apiGet<NotificationChannel[]>("/api/notification-channels"),
   ]);
   const gaps = monitoringGaps.gaps;
+  const failing = failingChannels(channels);
   const maintenance = windows.filter((window) => window.active);
   const at = new Date();
   const now = totals(summaries.suites);
@@ -118,10 +119,10 @@ export default async function Dashboard(props: PageProps<"/">) {
       />
 
       {/* 채널이 고장 나면 실패 알림도, 그 사실을 알릴 알림도 가지 않으므로 맨 위에. 없으면 표시하지 않음 */}
-      {channelHealth.failing.length > 0 && (
+      {failing.length > 0 && (
         <Panel
           title={<span className="text-destructive">알림을 보내지 못하는 채널</span>}
-          count={channelHealth.failing.length}
+          count={failing.length}
           meta="이 채널의 실패 알림도 가지 않음"
           action={
             <Button asChild variant="ghost" size="sm">
@@ -129,10 +130,10 @@ export default async function Dashboard(props: PageProps<"/">) {
             </Button>
           }
         >
-          <FailingChannelList channels={channelHealth.failing} />
+          <FailingChannelList channels={failing} />
         </Panel>
       )}
-      {!channelHealth.defaultChannelConfigured && (
+      {!defaultChannelConfigured(channels) && (
         <p className="text-xs text-muted-foreground">
           기본 알림 채널 주소(SENTINEL_WEBHOOK_URL)가 없어 Webhook을 지정하지 않은 프로젝트와 스케줄러 알림은 서버
           로그에만 남습니다

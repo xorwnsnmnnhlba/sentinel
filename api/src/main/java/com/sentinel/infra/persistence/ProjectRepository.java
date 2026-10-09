@@ -15,6 +15,9 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
 	List<Project> findByArchivedAtIsNullOrderByName();
 
+	/** Webhook을 지정한 프로젝트, 이름 순 */
+	List<Project> findByArchivedAtIsNullAndWebhookUrlCipherIsNotNullOrderByName();
+
 	Optional<Project> findByIdAndArchivedAtIsNull(Long id);
 
 }

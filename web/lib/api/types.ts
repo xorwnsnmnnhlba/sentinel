@@ -530,21 +530,22 @@ export interface NotificationDeliveryItem {
 /** FAILURE: 실패·장애, WARNING: 악화·공백, SUCCESS: 복구·회복, INFO: 요약·확인 */
 export type NotificationTone = "FAILURE" | "WARNING" | "SUCCESS" | "INFO";
 
-/** 알림을 보내지 못하는 채널 (api/README.md "발송 이력" 채널 상태) */
-export interface NotificationChannelHealth {
-  /** false면 기본 채널 알림은 서버 로그에만 남음 */
-  defaultChannelConfigured: boolean;
-  /** 최근 7일 안 마지막 발송이 실패한 채널, 오래 실패한 순 */
-  failing: FailingChannel[];
-}
-
-export interface FailingChannel {
+/** 알림 채널: 서버 기본 채널(첫 항목)과 Webhook을 지정한 프로젝트 (api/README.md "알림 채널") */
+export interface NotificationChannel {
   channel: "DEFAULT" | "PROJECT";
   /** 프로젝트 Webhook이면 그 프로젝트, 기본 채널이면 null */
   project: IdName | null;
-  format: NotificationDeliveryItem["format"];
+  /** false는 기본 채널뿐 (주소가 없어 알림이 서버 로그에만 남음) */
+  configured: boolean;
+  /** 주소로 판별한 서식. 기본 채널 주소가 없으면 LOG, 프로젝트 주소를 읽을 수 없으면 null */
+  format: NotificationDeliveryItem["format"] | null;
+  /** 최근 7일 안 마지막 발송이 실패면 이어진 실패, 아니면 null */
+  failing: ChannelFailure | null;
+}
+
+export interface ChannelFailure {
   /** 이어진 실패 중 가장 이른 발송 시각 */
-  failingSince: string;
+  since: string;
   /** 마지막 성공 뒤 실패 건수 */
   failures: number;
   lastSentAt: string;

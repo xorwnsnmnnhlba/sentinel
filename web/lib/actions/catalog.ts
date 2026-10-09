@@ -60,9 +60,9 @@ export type TestNotificationState = { delivery?: Delivery; error?: string } | un
 
 /** 프로젝트 Webhook으로 연결 확인 알림 발송. 결과(받았는지·상태 코드·사유)를 그대로 반환 */
 export async function sendTestNotification(projectId: number): Promise<TestNotificationState> {
+  let sent: Delivery | null;
   try {
-    const delivery = await apiSend<Delivery>("POST", `/api/projects/${id(projectId)}/test-notifications`);
-    return { delivery: delivery ?? undefined };
+    sent = await apiSend<Delivery>("POST", "/api/notification-deliveries", { projectId: id(projectId) });
   } catch (error) {
     if (isApiError(error) && error.status === 409) {
       refresh();
@@ -73,15 +73,16 @@ export async function sendTestNotification(projectId: number): Promise<TestNotif
     }
     return failure(error);
   }
+  return { delivery: deliveryOf(sent) };
 }
 
 /**
  * 서버 기본 채널로 연결 확인 알림 발송 (관리자). 결과를 그대로 반환하고 알림 이력을 다시 받음
  */
 export async function sendDefaultTestNotification(): Promise<TestNotificationState> {
-  let delivery: Delivery | null;
+  let sent: Delivery | null;
   try {
-    delivery = await apiSend<Delivery>("POST", "/api/test-notifications");
+    sent = await apiSend<Delivery>("POST", "/api/notification-deliveries", {});
   } catch (error) {
     if (isApiError(error) && error.status === 409) {
       refresh();
@@ -93,7 +94,12 @@ export async function sendDefaultTestNotification(): Promise<TestNotificationSta
     return failure(error);
   }
   refresh();
-  return { delivery: delivery ?? undefined };
+  return { delivery: deliveryOf(sent) };
+}
+
+/** 만든 발송 기록에서 결과만 (응답은 발송 이력 항목 전체) */
+function deliveryOf(sent: Delivery | null): Delivery | undefined {
+  return sent ? { delivered: sent.delivered, statusCode: sent.statusCode, error: sent.error } : undefined;
 }
 
 export async function deleteProject(projectId: number): Promise<ActionState> {

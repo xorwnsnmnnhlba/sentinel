@@ -45,6 +45,7 @@ class WebhookNotifierTest {
 	private final DeliveryLog recorded = (target, notification, delivery) -> {
 		targets.add(target);
 		deliveries.add(delivery);
+		return (long) deliveries.size();
 	};
 
 	@BeforeEach
