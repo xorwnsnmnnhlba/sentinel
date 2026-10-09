@@ -7,7 +7,7 @@ import { EnvironmentFields } from "./entity-fields";
 
 const dev: EnvironmentItem = {
   id: 3,
-  projectId: 1,
+  project: { id: 1, name: "project-1" },
   name: "dev",
   baseUrl: "https://gw.dev.internal",
   variables: { apiPrefix: "/api" },

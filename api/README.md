@@ -457,6 +457,8 @@ deploy-check:
 
 모든 리소스는 최상위 컬렉션, 관계는 쿼리 파라미터로 필터 (`docs/design.md` "REST API 설계")
 
+- 응답에서 다른 리소스를 가리킬 때는 `{id, name}` 객체 (예: 환경·스위트의 `project`, 케이스의 `suite`, 스케줄의 `project`·`suite`·`environment`). 요청 본문과 조회 조건은 ID (`projectId`, `suiteId` 등)
+
 | 리소스 | 목록 | 단건 | 생성·수정 | 삭제 |
 |--------|------|------|-----------|------|
 | 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | `POST /api/projects`, `PATCH /api/projects/{id}` | `DELETE /api/projects/{id}` |
@@ -694,7 +696,7 @@ deploy-check:
 | API | 설명 |
 |-----|------|
 | `POST /api/schedules` | 스케줄 등록. 본문 `{"suiteId": 1, "environmentId": 1, "cron": "10 9 * * 1-5", "skipHolidays": true}`. `skipHolidays` 생략 시 `false`. 201 + `Location` |
-| `GET /api/schedules/{id}` | 조회. `nextRunAt`(다음 실행 시각), `lastTriggeredAt`(마지막 실행 시각) 포함 |
+| `GET /api/schedules/{id}` | 조회. `{id, project, suite, environment, cron, zone, enabled, skipHolidays, nextRunAt(다음 실행 시각), lastTriggeredAt(마지막 실행 시각)}`. 관계는 `{id, name}` |
 | `PATCH /api/schedules` | 여러 스케줄 한 번에 변경. 본문 `{"scheduleIds": [1, 2], "enabled": false, "skipHolidays": true}` (`enabled`·`skipHolidays` 중 하나 이상, 생략한 항목은 유지). 200 + 바뀐 스케줄 목록(요청 순서, 중복 ID는 한 번) |
 | `PATCH /api/schedules/{id}` | 부분 수정. `{"enabled": false}`는 `nextRunAt` 제거, `{"enabled": true}`는 현재 시각 기준 재계산. `{"cron": "30 17 * * 1-5"}`는 활성 상태면 `nextRunAt` 재계산. `{"environmentId": 2}`는 실행 환경 변경(스위트와 같은 프로젝트만, 다르면 400). `{"skipHolidays": true}`는 휴일 건너뛰기 켜기. 생략한 필드는 유지 |
 
@@ -772,7 +774,7 @@ Sentinel 중지·서버 절전·DB 연결 끊김 등으로 스케줄이 제때 �
 | `PATCH /api/maintenance-windows/{id}` | 부분 변경(연장·단축·사유). 생략한 필드는 유지, `"reason": ""`은 사유 삭제. 이미 끝난 점검은 409 |
 | `DELETE /api/maintenance-windows/{id}` | 삭제. 예정된 점검은 취소, 진행 중인 점검은 바로 끝나 다음 스케줄부터 실행. 204 |
 
-- 항목: `{id, environment: {id, name}, projectId, startsAt, endsAt, reason, active, createdBy: {id, name(이메일)}}`. `active`는 지금 점검 중(스케줄 건너뜀), `false`는 예정
+- 항목: `{id, environment: {id, name}, project: {id, name}, startsAt, endsAt, reason, active, createdBy: {id, name(이메일)}}`. `active`는 지금 점검 중(스케줄 건너뜀), `false`는 예정
 - 기간: `startsAt` 이상 `endsAt` 미만. `endsAt`은 `startsAt` 뒤이고 현재 이후, 기간은 최대 7일 (끄고 잊어 모니터링이 멈추는 것 방지). 이미 시작한 시각으로도 등록 가능(지금부터 점검). 어기면 400
 - `reason`: 선택, 앞뒤 공백 제거 후 200자 이하
 - 건너뛴 스케줄은 `nextRunAt`만 다음 시각으로 옮기고 `lastTriggeredAt`(마지막 실행 시각)은 그대로. INFO 로그 1줄

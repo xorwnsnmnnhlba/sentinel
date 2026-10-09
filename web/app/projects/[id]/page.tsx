@@ -60,7 +60,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
     apiGet<SuiteItem[]>(`/api/suites?projectId=${project.id}`),
     apiGet<MaintenanceWindow[]>("/api/maintenance-windows"),
   ]);
-  const windows = allWindows.filter((window) => window.projectId === project.id);
+  const windows = allWindows.filter((window) => window.project.id === project.id);
   const now = new Date();
 
   return (

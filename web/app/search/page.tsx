@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiGet } from "@/lib/api/server";
-import type { CaseItem, ProjectItem, SuiteItem } from "@/lib/api/types";
+import type { CaseItem, SuiteItem } from "@/lib/api/types";
 import { MAX_QUERY_LENGTH, MAX_SEARCH_RESULTS, splitMatches } from "@/lib/search";
 
 export const metadata = { title: "케이스 검색 · Sentinel" };
@@ -21,16 +21,15 @@ export default async function SearchPage(props: PageProps<"/search">) {
   const raw = single(searchParams.q) ?? "";
   const query = raw.trim().slice(0, MAX_QUERY_LENGTH);
 
-  const [cases, suites, projects] =
+  // 케이스 응답에는 스위트까지, 스위트의 프로젝트 이름은 스위트 목록에서
+  const [cases, suites] =
     query === ""
-      ? [null, [], []]
+      ? [null, []]
       : await Promise.all([
           apiGet<CaseItem[]>(`/api/cases?${new URLSearchParams({ q: query })}`),
           apiGet<SuiteItem[]>("/api/suites"),
-          apiGet<ProjectItem[]>("/api/projects"),
         ]);
-  const suiteById = new Map(suites.map((suite) => [suite.id, suite]));
-  const projectNames = new Map(projects.map((project) => [project.id, project.name]));
+  const projectBySuite = new Map(suites.map((suite) => [suite.id, suite.project.name]));
 
   return (
     <div className="space-y-4">
@@ -72,7 +71,6 @@ export default async function SearchPage(props: PageProps<"/search">) {
               </TableHeader>
               <TableBody>
                 {cases.map((testCase) => {
-                  const suite = suiteById.get(testCase.suiteId);
                   return (
                     <TableRow key={testCase.id}>
                       <TableCell className="font-medium whitespace-normal">
@@ -89,16 +87,10 @@ export default async function SearchPage(props: PageProps<"/search">) {
                         </div>
                       </TableCell>
                       <TableCell className="whitespace-normal">
-                        {suite ? (
-                          <>
-                            <Link href={`/suites/${suite.id}`} className="hover:underline">
-                              {suite.name}
-                            </Link>
-                            <div className="text-xs text-muted-foreground">{projectNames.get(suite.projectId)}</div>
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground">#{testCase.suiteId}</span>
-                        )}
+                        <Link href={`/suites/${testCase.suite.id}`} className="hover:underline">
+                          {testCase.suite.name}
+                        </Link>
+                        <div className="text-xs text-muted-foreground">{projectBySuite.get(testCase.suite.id)}</div>
                       </TableCell>
                     </TableRow>
                   );

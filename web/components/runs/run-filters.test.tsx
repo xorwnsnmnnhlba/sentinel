@@ -11,13 +11,27 @@ const projects: ProjectItem[] = [
 ];
 
 const suites: SuiteItem[] = [
-  { id: 10, projectId: 1, name: "결제 스모크", description: null, caseCount: 3 },
-  { id: 20, projectId: 2, name: "가입", description: null, caseCount: 1 },
+  { id: 10, project: { id: 1, name: "project-1" }, name: "결제 스모크", description: null, caseCount: 3 },
+  { id: 20, project: { id: 2, name: "project-2" }, name: "가입", description: null, caseCount: 1 },
 ];
 
 const environments: EnvironmentItem[] = [
-  { id: 100, projectId: 1, name: "dev", baseUrl: "http://dev", variables: {}, secretNames: [] },
-  { id: 200, projectId: 2, name: "staging", baseUrl: "http://stg", variables: {}, secretNames: [] },
+  {
+    id: 100,
+    project: { id: 1, name: "project-1" },
+    name: "dev",
+    baseUrl: "http://dev",
+    variables: {},
+    secretNames: [],
+  },
+  {
+    id: 200,
+    project: { id: 2, name: "project-2" },
+    name: "staging",
+    baseUrl: "http://stg",
+    variables: {},
+    secretNames: [],
+  },
 ];
 
 function renderFilters(values: Parameters<typeof RunFilters>[0]["values"] = {}) {

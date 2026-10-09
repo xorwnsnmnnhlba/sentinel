@@ -9,13 +9,13 @@ import com.sentinel.domain.MaintenanceWindow;
  * @param reason 점검 사유. 없으면 null
  * @param createdBy 등록한 사용자 {id, name(이메일)}. 알 수 없으면 null
  */
-public record MaintenanceWindowItem(long id, IdName environment, long projectId, Instant startsAt, Instant endsAt,
+public record MaintenanceWindowItem(long id, IdName environment, IdName project, Instant startsAt, Instant endsAt,
 		String reason, boolean active, IdName createdBy) {
 
 	static MaintenanceWindowItem of(MaintenanceWindow window, IdName createdBy, Instant now) {
 		return new MaintenanceWindowItem(window.getId(),
-				new IdName(window.getEnvironment().getId(), window.getEnvironment().getName()),
-				window.getEnvironment().getProject().getId(), window.getStartsAt(), window.getEndsAt(),
+				IdName.of(window.getEnvironment()), IdName.of(window.getEnvironment().getProject()),
+				window.getStartsAt(), window.getEndsAt(),
 				window.getReason(), window.isActive(now), createdBy);
 	}
 

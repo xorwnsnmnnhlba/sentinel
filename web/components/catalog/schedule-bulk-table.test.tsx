@@ -3,38 +3,34 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ActionState } from "@/lib/actions/catalog";
-import type { ScheduleRow } from "@/lib/schedule-overview";
+import type { ScheduleDetail } from "@/lib/api/types";
 
 import { ScheduleBulkTable } from "./schedule-bulk-table";
 
 type Action = (scheduleIds: number[], change: { enabled?: boolean; skipHolidays?: boolean }) => Promise<ActionState>;
 
-function row(id: number, suite: string, enabled: boolean, skipHolidays = false): ScheduleRow {
+function schedule(id: number, suite: string, enabled: boolean, skipHolidays = false): ScheduleDetail {
   return {
-    schedule: {
-      id,
-      suiteId: id * 10,
-      environmentId: 1,
-      cron: "10 9 * * 1-5",
-      zone: "Asia/Seoul",
-      enabled,
-      skipHolidays,
-      nextRunAt: enabled ? "2026-10-08T00:10:00Z" : null,
-      lastTriggeredAt: null,
-    },
+    id,
     project: { id: 1, name: "결제" },
     suite: { id: id * 10, name: suite },
-    environmentName: "dev",
+    environment: { id: 1, name: "dev" },
+    cron: "10 9 * * 1-5",
+    zone: "Asia/Seoul",
+    enabled,
+    skipHolidays,
+    nextRunAt: enabled ? "2026-10-08T00:10:00Z" : null,
+    lastTriggeredAt: null,
   };
 }
 
-const rows = [row(1, "승인", true, true), row(2, "환불", true), row(3, "정산", false)];
+const schedules = [schedule(1, "승인", true, true), schedule(2, "환불", true), schedule(3, "정산", false)];
 
 describe("ScheduleBulkTable", () => {
   it("changes only the chosen schedules and clears the choice afterwards", async () => {
     const user = userEvent.setup();
     const action = vi.fn<Action>(async () => ({}));
-    render(<ScheduleBulkTable rows={rows} action={action} />);
+    render(<ScheduleBulkTable schedules={schedules} action={action} />);
 
     const toolbar = screen.getByRole("toolbar", { name: "고른 스케줄 변경" });
     expect(within(toolbar).getByRole("button", { name: "켜기" })).toBeDisabled();
@@ -60,7 +56,7 @@ describe("ScheduleBulkTable", () => {
   it("asks before turning schedules off", async () => {
     const user = userEvent.setup();
     const action = vi.fn<Action>(async () => ({}));
-    render(<ScheduleBulkTable rows={rows} action={action} />);
+    render(<ScheduleBulkTable schedules={schedules} action={action} />);
 
     await user.click(screen.getByRole("checkbox", { name: "모두 선택" }));
     await user.click(screen.getByRole("button", { name: "끄기" }));
@@ -78,7 +74,7 @@ describe("ScheduleBulkTable", () => {
 
   it("keeps the choice and shows the error when the change fails", async () => {
     const user = userEvent.setup();
-    render(<ScheduleBulkTable rows={rows} action={async () => ({ error: "요청을 처리하지 못했습니다" })} />);
+    render(<ScheduleBulkTable schedules={schedules} action={async () => ({ error: "요청을 처리하지 못했습니다" })} />);
 
     await user.click(screen.getByRole("checkbox", { name: "승인 dev 10 9 * * 1-5 선택" }));
     await user.click(screen.getByRole("button", { name: "켜기" }));
@@ -88,7 +84,7 @@ describe("ScheduleBulkTable", () => {
   });
 
   it("shows the holiday skipping and state of each schedule", () => {
-    render(<ScheduleBulkTable rows={rows} action={async () => ({})} />);
+    render(<ScheduleBulkTable schedules={schedules} action={async () => ({})} />);
 
     const [, approval, , settlement] = screen.getAllByRole("row");
     expect(approval).toHaveTextContent("휴일 제외");

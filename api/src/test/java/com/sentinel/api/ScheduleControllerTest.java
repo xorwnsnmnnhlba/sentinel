@@ -60,6 +60,10 @@ class ScheduleControllerTest {
 
 		assertThat(created).hasStatus(HttpStatus.CREATED);
 		assertThat(created).bodyJson().extractingPath("$.zone").isEqualTo("Asia/Seoul");
+		// 관계는 {id, name}
+		assertThat(created).bodyJson().extractingPath("$.suite.name").isEqualTo(suite.getName());
+		assertThat(created).bodyJson().extractingPath("$.environment.name").isEqualTo(environment.getName());
+		assertThat(created).bodyJson().extractingPath("$.project.name").isEqualTo(project.getName());
 		assertThat(created).bodyJson().extractingPath("$.nextRunAt").isNotNull();
 		String location = created.getResponse().getHeader("Location");
 		assertThat(location).startsWith("/api/schedules/");
@@ -200,7 +204,7 @@ class ScheduleControllerTest {
 
 		assertThat(patch(location, "{\"environmentId\": %d}".formatted(staging.getId()))).hasStatusOk()
 			.bodyJson()
-			.extractingPath("$.environmentId")
+			.extractingPath("$.environment.id")
 			.isEqualTo(staging.getId().intValue());
 		assertThat(mvc.get().uri(location)).bodyJson().extractingPath("$.cron").isEqualTo("10 9 * * 1-5");
 	}
@@ -221,7 +225,7 @@ class ScheduleControllerTest {
 			.contains("same project");
 		assertThat(patch(location, "{\"environmentId\": -1}")).hasStatus(HttpStatus.NOT_FOUND);
 		assertThat(mvc.get().uri(location)).bodyJson()
-			.extractingPath("$.environmentId")
+			.extractingPath("$.environment.id")
 			.isEqualTo(environment.getId().intValue());
 	}
 

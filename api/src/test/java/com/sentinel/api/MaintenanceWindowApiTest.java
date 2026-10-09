@@ -80,7 +80,8 @@ class MaintenanceWindowApiTest {
 			.isEqualTo("GW 배포");
 		var body = assertThat(created).bodyJson();
 		body.extractingPath("$.environment.name").isEqualTo("dev");
-		body.extractingPath("$.projectId").isEqualTo(project.getId().intValue());
+		body.extractingPath("$.project.id").isEqualTo(project.getId().intValue());
+		body.extractingPath("$.project.name").isEqualTo(project.getName());
 		body.extractingPath("$.reason").isEqualTo("GW 배포");
 		body.extractingPath("$.active").isEqualTo(true);
 		body.extractingPath("$.startsAt").isEqualTo("2026-09-29T00:59:00Z");

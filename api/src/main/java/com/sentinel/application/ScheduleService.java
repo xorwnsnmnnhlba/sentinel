@@ -12,6 +12,7 @@ import com.sentinel.domain.Environment;
 import com.sentinel.domain.TestSchedule;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.infra.persistence.EnvironmentRepository;
+import com.sentinel.infra.persistence.ProjectRepository;
 import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,8 @@ public class ScheduleService {
 	private final TestSuiteRepository suites;
 
 	private final EnvironmentRepository environments;
+
+	private final ProjectRepository projects;
 
 	private final ScheduleProperties properties;
 
@@ -124,7 +127,7 @@ public class ScheduleService {
 		}
 		ScheduleDetail after = detailOf(schedule);
 		changeLog.record(actorId, target(schedule), Action.UPDATED,
-				new Changes().compare("environment", before.environmentId(), after.environmentId())
+				new Changes().compare("environment", before.environment().id(), after.environment().id())
 					.compare("cron", before.cron(), after.cron())
 					.compare("enabled", before.enabled(), after.enabled())
 					.compare("skipHolidays", before.skipHolidays(), after.skipHolidays())
@@ -165,10 +168,12 @@ public class ScheduleService {
 	 */
 	@Transactional(readOnly = true)
 	public List<ScheduleDetail> list(Long suiteId) {
-		return (suiteId == null ? schedules.findByArchivedAtIsNullOrderById() : schedules.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId))
-			.stream()
-			.map(this::detailOf)
-			.toList();
+		List<TestSchedule> found = suiteId == null ? schedules.findByArchivedAtIsNullOrderById()
+				: schedules.findBySuiteIdAndArchivedAtIsNullOrderById(suiteId);
+		Preload.of(suites, found.stream().map(schedule -> schedule.getSuite().getId()));
+		Preload.of(environments, found.stream().map(schedule -> schedule.getEnvironment().getId()));
+		Preload.of(projects, found.stream().map(schedule -> schedule.getSuite().getProject().getId()));
+		return found.stream().map(this::detailOf).toList();
 	}
 
 	/**

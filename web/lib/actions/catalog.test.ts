@@ -764,7 +764,7 @@ describe("reorderCases", () => {
 describe("duplicateCase", () => {
   const original = {
     id: 7,
-    suiteId: 4,
+    suite: { id: 4, name: "주문" },
     name: "주문 조회",
     request: { method: "GET", path: "/orders/{{id}}", headers: { Authorization: ["Bearer {{token}}"] }, body: null },
     assertions: [{ type: "statusCode", anyOf: ["200"] }],

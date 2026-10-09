@@ -1,26 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import type { EnvironmentItem, ProjectItem, ScheduleDetail, SuiteItem } from "@/lib/api/types";
+import type { ScheduleDetail } from "@/lib/api/types";
 
-import { filterRows, parseStatus, scheduleRows } from "./schedule-overview";
+import { filterSchedules, parseStatus, sortSchedules } from "./schedule-overview";
 
-const projects: ProjectItem[] = [
-  { id: 1, name: "결제", description: null, webhookConfigured: false },
-  { id: 2, name: "가입", description: null, webhookConfigured: false },
-];
-const suites: SuiteItem[] = [
-  { id: 10, projectId: 1, name: "승인", description: null, caseCount: 3 },
-  { id: 20, projectId: 2, name: "인증", description: null, caseCount: 1 },
-];
-const environments: EnvironmentItem[] = [
-  { id: 100, projectId: 1, name: "dev", baseUrl: "http://dev", variables: {}, secretNames: [] },
-];
+const payment = { id: 1, name: "결제" };
+const signUp = { id: 2, name: "가입" };
 
-function schedule(id: number, suiteId: number, enabled: boolean, nextRunAt: string | null): ScheduleDetail {
+function schedule(
+  id: number,
+  project: { id: number; name: string },
+  suite: string,
+  enabled: boolean,
+  nextRunAt: string | null,
+): ScheduleDetail {
   return {
     id,
-    suiteId,
-    environmentId: 100,
+    project,
+    suite: { id: id * 10, name: suite },
+    environment: { id: 100, name: "dev" },
     cron: "10 9 * * 1-5",
     zone: "Asia/Seoul",
     enabled,
@@ -30,47 +28,33 @@ function schedule(id: number, suiteId: number, enabled: boolean, nextRunAt: stri
   };
 }
 
-describe("scheduleRows", () => {
-  it("names the project, suite and environment and orders by the next run, disabled ones last", () => {
-    const rows = scheduleRows(
-      [
-        schedule(1, 10, true, "2026-10-08T03:00:00Z"),
-        schedule(2, 10, false, null),
-        schedule(3, 20, true, "2026-10-08T00:10:00Z"),
-        schedule(4, 20, false, null),
-        schedule(5, 99, true, "2026-10-08T00:00:00Z"),
-        { ...schedule(6, 20, true, "2026-10-08T03:00:00Z"), environmentId: 999 },
-      ],
-      projects,
-      suites,
-      environments,
-    );
+describe("sortSchedules", () => {
+  it("orders by the next run, disabled ones last by project and suite name", () => {
+    const sorted = sortSchedules([
+      schedule(1, payment, "승인", true, "2026-10-08T03:00:00Z"),
+      schedule(2, payment, "승인", false, null),
+      schedule(3, signUp, "인증", true, "2026-10-08T00:10:00Z"),
+      schedule(4, signUp, "인증", false, null),
+      schedule(6, signUp, "인증", true, "2026-10-08T03:00:00Z"),
+    ]);
 
-    // 스위트를 찾을 수 없는 스케줄(5)은 제외. 같은 시각은 ID 순, 꺼진 스케줄은 프로젝트 이름 순(가입 < 결제)
-    expect(rows.map((row) => row.schedule.id)).toEqual([3, 1, 6, 4, 2]);
-    expect(rows[0]).toMatchObject({ project: { id: 2, name: "가입" }, suite: { id: 20, name: "인증" } });
-    expect(rows[1].environmentName).toBe("dev");
-    expect(rows[2].environmentName).toBe("-");
+    // 같은 시각은 ID 순, 꺼진 스케줄은 프로젝트 이름 순(가입 < 결제)
+    expect(sorted.map((item) => item.id)).toEqual([3, 1, 6, 4, 2]);
   });
 });
 
-describe("filterRows", () => {
-  const rows = scheduleRows(
-    [
-      schedule(1, 10, true, "2026-10-08T03:00:00Z"),
-      schedule(2, 10, false, null),
-      schedule(3, 20, true, "2026-10-08T00:10:00Z"),
-    ],
-    projects,
-    suites,
-    environments,
-  );
+describe("filterSchedules", () => {
+  const schedules = sortSchedules([
+    schedule(1, payment, "승인", true, "2026-10-08T03:00:00Z"),
+    schedule(2, payment, "승인", false, null),
+    schedule(3, signUp, "인증", true, "2026-10-08T00:10:00Z"),
+  ]);
 
   it("narrows by project and status", () => {
-    expect(filterRows(rows, {}).map((row) => row.schedule.id)).toEqual([3, 1, 2]);
-    expect(filterRows(rows, { projectId: 1 }).map((row) => row.schedule.id)).toEqual([1, 2]);
-    expect(filterRows(rows, { status: "enabled" }).map((row) => row.schedule.id)).toEqual([3, 1]);
-    expect(filterRows(rows, { projectId: 1, status: "disabled" }).map((row) => row.schedule.id)).toEqual([2]);
+    expect(filterSchedules(schedules, {}).map((item) => item.id)).toEqual([3, 1, 2]);
+    expect(filterSchedules(schedules, { projectId: 1 }).map((item) => item.id)).toEqual([1, 2]);
+    expect(filterSchedules(schedules, { status: "enabled" }).map((item) => item.id)).toEqual([3, 1]);
+    expect(filterSchedules(schedules, { projectId: 1, status: "disabled" }).map((item) => item.id)).toEqual([2]);
   });
 });
 

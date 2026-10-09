@@ -144,7 +144,7 @@ export interface RunDetail {
 
 export interface SuiteItem {
   id: number;
-  projectId: number;
+  project: IdName;
   name: string;
   description: string | null;
   caseCount: number;
@@ -162,7 +162,7 @@ export interface ProjectItem {
 
 export interface EnvironmentItem {
   id: number;
-  projectId: number;
+  project: IdName;
   name: string;
   baseUrl: string;
   /** 평문 저장. 토큰·API 키는 시크릿으로 등록 */
@@ -187,7 +187,7 @@ export interface Extractor {
 
 export interface CaseItem {
   id: number;
-  suiteId: number;
+  suite: IdName;
   name: string;
   request: { method: HttpMethod; path: string; headers: Headers; body: string | null };
   /** 비어 있으면 기본 판정(status in [2xx]) */
@@ -198,8 +198,10 @@ export interface CaseItem {
 /** 스위트 정기 실행. cron은 5자리(분 시 일 월 요일), zone 기준 해석 */
 export interface ScheduleDetail {
   id: number;
-  suiteId: number;
-  environmentId: number;
+  /** 스위트의 프로젝트 */
+  project: IdName;
+  suite: IdName;
+  environment: IdName;
   cron: string;
   zone: string;
   enabled: boolean;
@@ -375,7 +377,7 @@ export interface Holiday {
 export interface MaintenanceWindow {
   id: number;
   environment: IdName;
-  projectId: number;
+  project: IdName;
   /** 시작(포함)·끝(미포함) ISO-8601 */
   startsAt: string;
   endsAt: string;
