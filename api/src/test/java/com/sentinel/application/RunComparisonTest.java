@@ -165,7 +165,7 @@ class RunComparisonTest {
 	private static Map<Long, Change> changes(TestRunDetail run) {
 		return run.results()
 			.stream()
-			.collect(Collectors.toMap(TestRunDetail.Result::testCaseId, TestRunDetail.Result::change));
+			.collect(Collectors.toMap(result -> result.testCase().id(), TestRunDetail.Result::change));
 	}
 
 }

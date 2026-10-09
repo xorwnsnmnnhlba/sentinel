@@ -25,7 +25,7 @@ import com.sentinel.runner.schema.ResponseSchema;
  * @param previousRun 비교 기준인 직전 실행 (같은 스위트·환경의 완료된 스위트 전체 실행). 없거나 스위트 전체 실행이 아니면 null
  * @param rerunOf 실패 다시 실행의 원래 실행 ID. 그 외 실행은 null
  */
-public record TestRunDetail(long id, long suiteId, String suiteName, long environmentId, String environmentName,
+public record TestRunDetail(long id, IdName project, IdName suite, IdName environment,
 		TestRun.Trigger trigger, TestRun.Status status, Instant startedAt, Instant finishedAt, Summary summary,
 		List<Result> results, IdName triggeredBy, IdName canceledBy, Instant rawPurgedAt, IdName testCase,
 		IdName throughCase, Integer plannedCount, PreviousRun previousRun, Long rerunOf) {
@@ -47,8 +47,8 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 					previous == null ? null : Change.of(previous.verdicts(), result),
 					rerunTargets != null && !rerunTargets.contains(result.getTestCase().getId())))
 			.toList();
-		return new TestRunDetail(run.getId(), run.getSuite().getId(), run.getSuite().getName(),
-				run.getEnvironment().getId(), run.getEnvironment().getName(), run.getTrigger(), run.getStatus(),
+		return new TestRunDetail(run.getId(), IdName.of(run.getSuite().getProject()), IdName.of(run.getSuite()),
+				IdName.of(run.getEnvironment()), run.getTrigger(), run.getStatus(),
 				run.getStartedAt(), run.getFinishedAt(), Summary.of(mapped), mapped, triggeredBy, canceledBy,
 				run.getRawPurgedAt(),
 				testCase, throughCase, run.getPlannedCount(), previous == null ? null : previous.run(),
@@ -125,7 +125,7 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 	 * @param supporting 실패 다시 실행에서 원래 실행에 실패하지 않았지만 다시 실행하는 케이스가 쓰는 추출 값을 만들기 위해
 	 *     함께 실행한 케이스. 그 외는 false
 	 */
-	public record Result(long id, long testCaseId, String testCaseName, Verdict verdict, Outcome outcome,
+	public record Result(long id, IdName testCase, Verdict verdict, Outcome outcome,
 			List<AssertionResult> assertionResults, ErrorReason errorReason, String errorMessage, Long elapsedMs,
 			Request request, Response response, ResponseSchema responseSchema, ResultDrift drift, Change change,
 			int retries, boolean supporting) {
@@ -135,8 +135,7 @@ public record TestRunDetail(long id, long suiteId, String suiteName, long enviro
 					? new Response(result.getStatusCode(), result.getResponseHeaders(), result.getResponseBody(),
 							result.isResponseBodyTruncated())
 					: null;
-			return new Result(result.getId(), result.getTestCase().getId(), result.getTestCase().getName(),
-					result.getVerdict(), result.getOutcome(),
+			return new Result(result.getId(), IdName.of(result.getTestCase()), result.getVerdict(), result.getOutcome(),
 					result.getAssertionResults(), result.getErrorReason(), result.getErrorMessage(), result.getElapsedMs(),
 					new Request(result.getRequestMethod(), result.getRequestUrl(), result.getRequestHeaders(),
 							result.getRequestBody()),

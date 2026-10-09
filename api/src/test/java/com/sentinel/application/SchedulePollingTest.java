@@ -161,7 +161,7 @@ class SchedulePollingTest {
 
 		// 점검 중인 환경은 실행 기록 없이 다음 실행 시각으로 넘어가고 마지막 실행 시각은 그대로
 		assertThat(duringMaintenance).hasSize(1);
-		assertThat(testRunService.getRun(duringMaintenance.getFirst()).environmentId()).isEqualTo(other.getId());
+		assertThat(testRunService.getRun(duringMaintenance.getFirst()).environment().id()).isEqualTo(other.getId());
 		ScheduleDetail skipped = scheduleService.get(schedule.id());
 		assertThat(skipped.nextRunAt()).isEqualTo("2026-09-18T00:20:00Z");
 		assertThat(skipped.lastTriggeredAt()).isNull();

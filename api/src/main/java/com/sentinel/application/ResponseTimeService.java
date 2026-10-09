@@ -69,7 +69,7 @@ public class ResponseTimeService {
 	public Trend trend(long caseId, long environmentId, LocalDate from, LocalDate to) {
 		TestCase testCase = testCases.findByIdAndArchivedAtIsNull(caseId)
 			.orElseThrow(() -> new NotFoundException("test case", caseId));
-		requireSameProject(testCase.getSuite(), environmentId);
+		Environment environment = requireSameProject(testCase.getSuite(), environmentId);
 		DatePeriod period = period(from, to, DEFAULT_TREND_DAYS);
 
 		Map<LocalDate, Stats> byDay = new HashMap<>();
@@ -81,7 +81,7 @@ public class ResponseTimeService {
 		for (LocalDate day = period.from(); !day.isAfter(period.to()); day = day.plusDays(1)) {
 			points.add(DailyPoint.of(day, byDay.getOrDefault(day, Stats.NONE)));
 		}
-		return new Trend(caseId, environmentId, period.from(), period.to(), points);
+		return new Trend(IdName.of(testCase), IdName.of(environment), period.from(), period.to(), points);
 	}
 
 	/**
@@ -93,7 +93,7 @@ public class ResponseTimeService {
 	public Summary summary(long suiteId, long environmentId, LocalDate from, LocalDate to) {
 		TestSuite suite = suites.findByIdAndArchivedAtIsNull(suiteId)
 			.orElseThrow(() -> new NotFoundException("test suite", suiteId));
-		requireSameProject(suite, environmentId);
+		Environment environment = requireSameProject(suite, environmentId);
 		DatePeriod period = period(from, to, DEFAULT_SUMMARY_DAYS);
 
 		Map<Long, Stats> byCase = new HashMap<>();
@@ -105,7 +105,7 @@ public class ResponseTimeService {
 			.stream()
 			.map(testCase -> CaseStats.of(testCase, byCase.getOrDefault(testCase.getId(), Stats.NONE)))
 			.toList();
-		return new Summary(suiteId, environmentId, period.from(), period.to(), cases);
+		return new Summary(IdName.of(suite), IdName.of(environment), period.from(), period.to(), cases);
 	}
 
 	/**
@@ -156,13 +156,15 @@ public class ResponseTimeService {
 		return new Changes(current.from(), current.to(), previous.from(), previous.to(), changes);
 	}
 
-	private void requireSameProject(TestSuite suite, long environmentId) {
+	/** @return 확인한 환경 */
+	private Environment requireSameProject(TestSuite suite, long environmentId) {
 		Environment environment = environments.findByIdAndArchivedAtIsNull(environmentId)
 			.orElseThrow(() -> new NotFoundException("environment", environmentId));
 		if (!BaseEntity.same(environment.getProject(), suite.getProject())) {
 			throw new InvalidRequestException(
 					"environment " + environmentId + " does not belong to the project of test suite " + suite.getId());
 		}
+		return environment;
 	}
 
 	private DatePeriod period(LocalDate from, LocalDate to, int defaultDays) {
@@ -211,19 +213,18 @@ public class ResponseTimeService {
 
 	}
 
-	public record Trend(long caseId, long environmentId, LocalDate from, LocalDate to, List<DailyPoint> points) {
+	public record Trend(IdName testCase, IdName environment, LocalDate from, LocalDate to, List<DailyPoint> points) {
 	}
 
-	public record CaseStats(long caseId, String name, long samples, Long p50, Long p95, Long max) {
+	public record CaseStats(IdName testCase, long samples, Long p50, Long p95, Long max) {
 
 		static CaseStats of(TestCase testCase, Stats stats) {
-			return new CaseStats(testCase.getId(), testCase.getName(), stats.samples(), stats.p50(), stats.p95(),
-					stats.max());
+			return new CaseStats(IdName.of(testCase), stats.samples(), stats.p50(), stats.p95(), stats.max());
 		}
 
 	}
 
-	public record Summary(long suiteId, long environmentId, LocalDate from, LocalDate to, List<CaseStats> cases) {
+	public record Summary(IdName suite, IdName environment, LocalDate from, LocalDate to, List<CaseStats> cases) {
 	}
 
 	/**
@@ -242,9 +243,8 @@ public class ResponseTimeService {
 
 		static Change of(TestCase testCase, Environment environment, Stats previous, Stats current) {
 			double change = (double) (current.p95() - previous.p95()) / previous.p95();
-			return new Change(new IdName(testCase.getId(), testCase.getName()),
-					new IdName(testCase.getSuite().getId(), testCase.getSuite().getName()),
-					new IdName(environment.getId(), environment.getName()), previous.p95(), current.p95(), change,
+			return new Change(IdName.of(testCase), IdName.of(testCase.getSuite()), IdName.of(environment), previous.p95(),
+					current.p95(), change,
 					previous.samples(), current.samples());
 		}
 

@@ -495,7 +495,7 @@ deploy-check:
   - 필터: `projectId`, `suiteId`, `environmentId`, `status`(`RUNNING`/`COMPLETED`/`ABORTED`/`CANCELED`), 시작 시각 기간 `from`·`to`, `failing=true`(판정 실패·오류 결과가 하나 이상 있는 실행). 여러 개를 함께 지정하면 모두 만족하는 실행만
   - `from`·`to`는 `yyyy-MM-dd`이며 `sentinel.schedule.zone`(기본 `Asia/Seoul`) 기준. 시작일 00:00부터 종료일 다음 날 00:00 직전까지 (종료일 당일 포함)
   - 실행 건수와 무관하게 페이지당 쿼리 최대 4회 (이름 함께 로딩, 전체 건수, 실행 주체 일괄 조회, 단건 실행 대상 일괄 조회). 판정 건수와 `failing` 조건은 실행 행에 보관한 판정 수(V10)를 사용하여 결과 테이블을 읽지 않음
-- 실행 상세: 스위트·환경·케이스 이름과 케이스별 결과, 수동 실행이면 실행 주체 포함
+- 실행 상세: `project`·`suite`·`environment`(`{id, name}`)와 케이스별 결과(`testCase: {id, name}`), 수동 실행이면 실행 주체 포함
   - 실행 주체는 ID로 보관하고 이름은 조회 시 확인. 사용자를 삭제해도 이력에는 그대로 표시
 - 등록·수정
   - 등록은 201 + `Location`, 본문은 단건 조회와 같은 형태. 수정은 200 + 수정 후 항목
@@ -522,8 +522,8 @@ deploy-check:
 
 | API | 설명 |
 |-----|------|
-| `GET /api/response-time-trends?caseId=&environmentId=` | 케이스 1건의 일별 값. 기간 생략 시 최근 30일 |
-| `GET /api/response-time-summaries?suiteId=&environmentId=` | 스위트의 케이스별 값 (기간 전체). 기간 생략 시 최근 7일 |
+| `GET /api/response-time-trends?caseId=&environmentId=` | 케이스 1건의 일별 값. 기간 생략 시 최근 30일. `{testCase, environment, from, to, points}` |
+| `GET /api/response-time-summaries?suiteId=&environmentId=` | 스위트의 케이스별 값 (기간 전체). 기간 생략 시 최근 7일. `{suite, environment, from, to, cases: [{testCase, samples, p50, p95, max}]}` |
 | `GET /api/response-time-changes?limit=5` | 케이스·환경별 p95를 바로 앞의 같은 길이 기간과 비교, 가장 나빠진 순. 기간 생략 시 최근 7일, `limit` 1~50 |
 
 ```json

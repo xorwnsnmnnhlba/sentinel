@@ -74,9 +74,10 @@ class RunControllerTest {
 		assertThat(location).isEqualTo("/api/runs/" + runId);
 
 		var detail = assertThat(mvc.get().uri(location)).hasStatusOk().bodyJson();
-		detail.extractingPath("$.suiteName").isEqualTo(suite.getName());
-		detail.extractingPath("$.environmentName").isEqualTo("dev");
-		detail.extractingPath("$.results[0].testCaseName").isEqualTo(testCase.getName());
+		detail.extractingPath("$.suite.name").isEqualTo(suite.getName());
+		detail.extractingPath("$.environment.name").isEqualTo("dev");
+		detail.extractingPath("$.project.id").isEqualTo(suite.getProject().getId().intValue());
+		detail.extractingPath("$.results[0].testCase.name").isEqualTo(testCase.getName());
 		detail.extractingPath("$.results[0].response.body").isEqualTo("{\"status\":\"UP\"}");
 		detail.extractingPath("$.plannedCount").isEqualTo(1);
 	}
@@ -138,7 +139,7 @@ class RunControllerTest {
 		assertThat(rerun.getResponse().getHeader("Location")).isEqualTo("/api/runs/" + id(rerun));
 		var body = assertThat(rerun).bodyJson();
 		body.extractingPath("$.rerunOf").isEqualTo((int) original);
-		body.extractingPath("$.environmentId").isEqualTo(environment.getId().intValue());
+		body.extractingPath("$.environment.id").isEqualTo(environment.getId().intValue());
 		body.extractingPath("$.plannedCount").isEqualTo(1);
 		body.extractingPath("$.results[0].supporting").isEqualTo(false);
 		assertThat(executor.requests()).extracting(request -> request.uri().getPath()).containsExactly("/broken");

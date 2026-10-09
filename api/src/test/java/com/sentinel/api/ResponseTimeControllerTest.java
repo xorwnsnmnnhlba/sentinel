@@ -73,7 +73,9 @@ class ResponseTimeControllerTest {
 			.hasStatusOk()
 			.bodyJson();
 
-		body.extractingPath("$.caseId").isEqualTo(testCase.getId().intValue());
+		body.extractingPath("$.testCase.id").isEqualTo(testCase.getId().intValue());
+		body.extractingPath("$.testCase.name").isEqualTo(testCase.getName());
+		body.extractingPath("$.environment.name").isEqualTo("dev");
 		body.extractingPath("$.points.length()").isEqualTo(30);
 		// 오늘(마지막 날)에 방금 실행한 결과 1건. 가짜 실행기의 소요 시간은 12ms
 		body.extractingPath("$.points[29].samples").isEqualTo(1);
@@ -92,7 +94,7 @@ class ResponseTimeControllerTest {
 
 		body.extractingPath("$.from").isEqualTo("2026-09-01");
 		body.extractingPath("$.to").isEqualTo("2026-09-07");
-		body.extractingPath("$.cases[*].caseId").isEqualTo(List.of(testCase.getId().intValue()));
+		body.extractingPath("$.cases[*].testCase.id").isEqualTo(List.of(testCase.getId().intValue()));
 		body.extractingPath("$.cases[0].samples").isEqualTo(0);
 	}
 

@@ -35,8 +35,7 @@ describe("parsePeriod", () => {
 
 describe("slowestCase", () => {
   const stats = (caseId: number, p95: number | null): CaseResponseTime => ({
-    caseId,
-    name: `case ${caseId}`,
+    testCase: { id: caseId, name: `case ${caseId}` },
     samples: p95 === null ? 0 : 1,
     p50: p95,
     p95,
@@ -44,7 +43,7 @@ describe("slowestCase", () => {
   });
 
   it("picks the case with the highest p95 and skips cases without results", () => {
-    expect(slowestCase([stats(1, 120), stats(2, null), stats(3, 900), stats(4, 300)])?.caseId).toBe(3);
+    expect(slowestCase([stats(1, 120), stats(2, null), stats(3, 900), stats(4, 300)])?.testCase.id).toBe(3);
     expect(slowestCase([stats(1, null)])).toBeNull();
   });
 });

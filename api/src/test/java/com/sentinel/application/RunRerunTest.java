@@ -99,10 +99,10 @@ class RunRerunTest {
 		assertThat(rerun.rerunOf()).isEqualTo(original);
 		assertThat(rerun.trigger()).isEqualTo(TestRun.Trigger.MANUAL);
 		assertThat(rerun.triggeredBy().id()).isEqualTo(tester);
-		assertThat(rerun.environmentId()).isEqualTo(environment.getId());
+		assertThat(rerun.environment().id()).isEqualTo(environment.getId());
 		assertThat(rerun.plannedCount()).isEqualTo(3);
 		// 로그인은 원래 실행에서 실패하지 않았지만 값을 만들기 위해 함께 실행
-		assertThat(rerun.results()).extracting(TestRunDetail.Result::testCaseId, TestRunDetail.Result::supporting)
+		assertThat(rerun.results()).extracting(result -> result.testCase().id(), TestRunDetail.Result::supporting)
 			.containsExactly(tuple(login.getId(), true), tuple(orders.getId(), false), tuple(report.getId(), false));
 		assertThat(rerun.summary()).isEqualTo(new TestRunDetail.Summary(3, 2, 1, 0));
 		// 일부 케이스만 실행한 기록이라 직전 실행과 비교하지 않음
