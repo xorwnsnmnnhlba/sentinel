@@ -12,12 +12,14 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -37,6 +39,7 @@ class PasswordResetController {
 	/**
 	 * 발급 (관리자). 관리자가 새 비밀번호를 정하지 않고 사용자가 직접 입력. 토큰은 이 응답에서만 확인 가능
 	 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping
 	ResponseEntity<IssuedLinkResponse> create(@Valid @RequestBody CreatePasswordResetRequest request) {
 		AuthenticatedUser admin = currentUser.requireAdmin();

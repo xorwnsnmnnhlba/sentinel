@@ -466,6 +466,9 @@ deploy-check:
 - 경로·요청·응답 모양은 컨트롤러에서, 설명은 컨트롤러 메서드 Javadoc(요약·설명)과 응답 레코드 Javadoc(`@param`, 필드 설명)에서 생성 (springdoc-openapi + therapi-runtime-javadoc)
 - 묶음(태그)은 컨트롤러의 `@Tag`, 순서·설명은 `OpenApiConfig.TAGS`. 로그인 전에 쓰는 요청은 `@SecurityRequirements`로 인증 표시 없음
 - 새 API는 `@Tag`(알려진 묶음)와 메서드 Javadoc이 있어야 함 (`OpenApiDocsTest`가 확인)
+- 응답 상태: `ResponseEntity.created`·`noContent`·`accepted`를 돌려주는 메서드는 `@ResponseStatus`(201·204·202)도 함께 지정. 없으면 문서에 200으로 표시됨
+- 응답 형식은 `application/json` (`springdoc.default-produces-media-type`). 지정하지 않으면 `*/*`로 표시
+- 기동 로그의 springdoc "운영에서는 끄라"는 경고는 로그 수준으로 숨김. 로그인 뒤에서만 제공하므로 의도한 설정
 
 | 리소스 | 목록 | 단건 | 생성·수정 | 삭제 |
 |--------|------|------|-----------|------|

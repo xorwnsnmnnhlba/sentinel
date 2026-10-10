@@ -49,6 +49,17 @@ class OpenApiDocsTest {
 	}
 
 	@Test
+	void documentsTheActualStatusAndJsonResponses() {
+		var docs = assertThat(mvc.get().uri("/api/openapi")).bodyJson();
+		// ResponseEntity로 정하는 상태 코드도 문서에 (메서드의 @ResponseStatus)
+		docs.extractingPath("$.paths['/api/holidays'].post.responses").asMap().containsOnlyKeys("201");
+		docs.extractingPath("$.paths['/api/projects/{projectId}'].delete.responses").asMap().containsOnlyKeys("204");
+		docs.extractingPath("$.paths['/api/runs'].post.responses").asMap().containsOnlyKeys("202");
+		docs.extractingPath("$.paths['/api/projects'].get.responses['200'].content").asMap()
+			.containsOnlyKeys("application/json");
+	}
+
+	@Test
 	void everyOperationHasAKnownGroupAndADescription() {
 		String body = body(mvc.get().uri("/api/openapi").exchange());
 		List<String> tags = OpenApiConfig.TAGS.stream().map(io.swagger.v3.oas.models.tags.Tag::getName).toList();

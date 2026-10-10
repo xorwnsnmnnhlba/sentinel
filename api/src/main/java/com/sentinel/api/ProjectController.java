@@ -11,6 +11,7 @@ import com.sentinel.application.CatalogQueryService.ProjectItem;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -48,6 +50,7 @@ class ProjectController {
 	/**
 	 * 등록. 201 + Location, 같은 부모 아래 사용 중인 이름이면 409
 	 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping
 	ResponseEntity<ProjectItem> create(@Valid @RequestBody CreateProjectRequest request) {
 		ProjectItem created = commands.createProject(request.name(), request.description(), currentUser.get().id());
@@ -66,6 +69,7 @@ class ProjectController {
 	/**
 	 * 삭제(보관). 하위 항목 연쇄 보관, 실행 이력은 유지
 	 */
+	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@DeleteMapping("/{projectId}")
 	ResponseEntity<Void> delete(@PathVariable long projectId) {
 		commands.archiveProject(projectId, currentUser.get().id());

@@ -8,6 +8,7 @@ import com.sentinel.application.auth.AccessTokenService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -31,6 +33,7 @@ class AccessTokenController {
 	private final CurrentUser currentUser;
 
 	/** 발급. 201 + 토큰 원문(이 응답에서만) */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping
 	ResponseEntity<AccessTokenService.Issued> create(@Valid @RequestBody CreateAccessTokenRequest request) {
 		AccessTokenService.Issued issued = accessTokens.issue(currentUser.get().id(), request.name(),
@@ -52,6 +55,7 @@ class AccessTokenController {
 	}
 
 	/** 폐기. 이후 이 토큰의 요청은 401. 다른 사용자의 토큰·이미 폐기된 토큰은 404 */
+	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@DeleteMapping("/{tokenId}")
 	ResponseEntity<Void> delete(@PathVariable long tokenId) {
 		accessTokens.revoke(tokenId, currentUser.get().id());

@@ -101,8 +101,14 @@ sentinel:
     read-timeout: 5s
     # 같은 케이스가 계속 실패하는 동안 실패 알림을 다시 보내는 간격. 새로 실패·복구는 바로 발송. 0s이면 실행마다 발송
     repeat-interval: 1h
+# springdoc은 문서 주소가 켜져 있으면 기동마다 "운영에서는 끄라"는 경고를 남김. 로그인 뒤에 두고 일부러 켠 것이라 그 경고만 숨김
+logging:
+  level:
+    org.springdoc.core.events.SpringDocAppInitializer: error
 # API 문서 (OpenAPI JSON). 다른 API와 같이 로그인 필요, 화면은 web의 "API 문서"
 springdoc:
   api-docs:
     path: /api/openapi
   writer-with-order-by-keys: true
+  # 응답 형식을 */* 대신 JSON으로 표시 (실행 상세의 XML은 별도 표시)
+  default-produces-media-type: application/json

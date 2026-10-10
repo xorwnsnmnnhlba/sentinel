@@ -10,6 +10,7 @@ import com.sentinel.application.PageResponse;
 import com.sentinel.application.auth.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -57,6 +59,7 @@ class NotificationDeliveryController {
 	 * {@code projectId}가 없으면 서버 기본 채널로, 모든 프로젝트에 걸친 채널이라 관리자만.
 	 * Webhook·기본 채널 주소가 없으면 409, 프로젝트 주소를 읽을 수 없으면(키 변경) 400
 	 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping("/notification-deliveries")
 	ResponseEntity<DeliveryItem> sendTest(@RequestBody(required = false) CreateNotificationDeliveryRequest request) {
 		Long projectId = request == null ? null : request.projectId();

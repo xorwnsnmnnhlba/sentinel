@@ -48,6 +48,7 @@ class HolidayController {
 	}
 
 	/** 등록 (관리자). 이미 등록한 날짜는 409 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping("/holidays")
 	ResponseEntity<HolidayService.HolidayItem> create(@Valid @RequestBody CreateHolidayRequest request) {
 		AuthenticatedUser admin = currentUser.requireAdmin();
