@@ -50,7 +50,6 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
     apiGet<ProjectItem[]>("/api/projects"),
     suiteScoped ? suiteOrNull(filters.suiteId!) : null,
   ]);
-  const projectNames = new Map(projects.map((project) => [project.id, project.name]));
 
   return (
     <div className="space-y-4">
@@ -61,15 +60,15 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
           {scoped ? (
             <p>
               {TARGET_LABELS[filters.targetType!]}{" "}
-              <span className="font-medium">{logs.content[0]?.targetName ?? `#${filters.targetId}`}</span>의 변경 이력만
-              표시 중
+              <span className="font-medium">{logs.content[0]?.target.name ?? `#${filters.targetId}`}</span>의 변경
+              이력만 표시 중
             </p>
           ) : (
             <p>
               스위트{" "}
               <span className="font-medium">
                 {suite?.name ??
-                  logs.content.find((log) => log.targetType === "SUITE")?.targetName ??
+                  logs.content.find((log) => log.target.type === "SUITE")?.target.name ??
                   `#${filters.suiteId}`}
               </span>{" "}
               및 소속 케이스·스케줄의 변경 이력만 표시 중
@@ -148,24 +147,23 @@ export default async function ChangeLogsPage(props: PageProps<"/change-logs">) {
             <TableBody>
               {logs.content.map((log) => {
                 const href = targetHref(log);
-                const projectName = log.projectId === null ? undefined : projectNames.get(log.projectId);
                 return (
                   <TableRow key={log.id}>
                     <TableCell className="font-mono text-xs">{formatDateTime(log.occurredAt)}</TableCell>
                     <TableCell className="text-sm">{log.actor?.name ?? "알 수 없음"}</TableCell>
                     <TableCell className="whitespace-normal">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline">{TARGET_LABELS[log.targetType]}</Badge>
+                        <Badge variant="outline">{TARGET_LABELS[log.target.type]}</Badge>
                         {href ? (
                           <Link href={href} className="font-medium hover:underline">
-                            {log.targetName}
+                            {log.target.name}
                           </Link>
                         ) : (
-                          <span className="font-medium">{log.targetName}</span>
+                          <span className="font-medium">{log.target.name}</span>
                         )}
                       </div>
-                      {projectName && log.targetType !== "PROJECT" && (
-                        <div className="text-xs text-muted-foreground">{projectName}</div>
+                      {log.project && log.target.type !== "PROJECT" && (
+                        <div className="text-xs text-muted-foreground">{log.project.name}</div>
                       )}
                     </TableCell>
                     <TableCell>

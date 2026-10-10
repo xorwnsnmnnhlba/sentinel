@@ -1,8 +1,11 @@
 package com.sentinel.api;
 
+import java.util.List;
+
 import com.sentinel.api.request.CreateCaseImportPreviewRequest;
 import com.sentinel.api.request.CreateCaseImportRequest;
 import com.sentinel.api.response.CaseImportResponse;
+import com.sentinel.application.CatalogQueryService.CaseItem;
 import com.sentinel.application.importing.CaseImportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +40,8 @@ class CaseImportController {
 	@PostMapping("/api/case-imports")
 	@ResponseStatus(HttpStatus.CREATED)
 	CaseImportResponse create(@Valid @RequestBody CreateCaseImportRequest request) {
-		return new CaseImportResponse(request.suiteId(), imports.importCases(request.suiteId(), request.cases(), currentUser.get().id()));
+		List<CaseItem> imported = imports.importCases(request.suiteId(), request.cases(), currentUser.get().id());
+		// 가져오기는 1건 이상이며 모두 같은 스위트
+		return new CaseImportResponse(imported.getFirst().suite(), imported);
 	}
 }

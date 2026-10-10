@@ -434,7 +434,7 @@ deploy-check:
 | `POST /api/invites` | 관리자 | 초대 링크 발급. 본문 `{"email": "...", "role": "MEMBER"}`. 201 + `Location` + `{"token": "...", "expiresAt": "..."}` |
 | `GET /api/invites/{token}` | 없음 | 초대 링크 확인 (대상 이메일) |
 | `POST /api/password-resets` | 관리자 | 재설정 링크 발급. 본문 `{"userId": 7}`. 201 + `Location` + `{"token", "expiresAt"}` |
-| `GET /api/password-resets/{token}` | 없음 | 재설정 링크 확인 (`userId`, 대상 이메일) |
+| `GET /api/password-resets/{token}` | 없음 | 재설정 링크 확인. `{user: {id, name(이메일)}, expiresAt}` |
 
 - 가입 경로는 초대뿐. 공개 가입·비밀번호 찾기 폼 없음 (메일 발송 미사용)
 - 링크 토큰은 1회용이며 저장은 해시로만. 만료·사용·위조는 모두 404로 동일하게 응답
@@ -591,7 +591,7 @@ deploy-check:
 | API | 설명 |
 |-----|------|
 | `POST /api/case-import-previews` | 변환만 하고 저장하지 않음. 본문 `{"suiteId": 1, "format": "OPENAPI_3", "content": "<문서 원문>"}`. `format`은 `OPENAPI_3`(JSON·YAML) 또는 `POSTMAN`(Collection v2.0·v2.1 JSON) |
-| `POST /api/case-imports` | 한 트랜잭션으로 등록. 본문 `{"suiteId": 1, "cases": [{"name": "...", "request": {...}, "assertions": [...]}]}`. 201 + `{"suiteId", "cases": [등록한 케이스]}` |
+| `POST /api/case-imports` | 한 트랜잭션으로 등록. 본문 `{"suiteId": 1, "cases": [{"name": "...", "request": {...}, "assertions": [...]}]}`. 201 + `{"suite": {id, name}, "cases": [등록한 케이스]}` |
 
 - 미리보기 응답: `title`, `version`, `servers`(환경 기본 URL 설정 참고용), `cases`, `warnings`(문서 단위)
   - 후보: `source`(원본 위치. 예: `GET /pets/{petId}`, `GET {{baseUrl}}/orders`), `name`, `request`, `assertions`, `warnings`(생략·대체한 내용), `conflict`(스위트에 같은 이름 있음)
@@ -673,16 +673,16 @@ deploy-check:
 | 대상 (`targetType`) | 기록 시점 | 변경한 사용자 (`actor`) |
 |------|------|------|
 | `PROJECT`·`ENVIRONMENT`·`SUITE`·`CASE`·`SCHEDULE`·`MAINTENANCE_WINDOW` | 등록·수정·삭제 (케이스 가져오기는 케이스마다 등록) | 요청한 사용자 |
-| `ACCESS_TOKEN` | API 토큰 발급(`CREATED`)·폐기(`DELETED`) (`targetName`은 토큰 이름) | 토큰 주인 |
-| `INVITE` | 초대 링크 발급 (`targetName`은 이메일) | 관리자 |
-| `HOLIDAY` | 휴일 등록·삭제 (`targetName`은 "날짜 이름", 예: `2026-10-09 한글날`) | 관리자 |
+| `ACCESS_TOKEN` | API 토큰 발급(`CREATED`)·폐기(`DELETED`) (대상 이름은 토큰 이름) | 토큰 주인 |
+| `INVITE` | 초대 링크 발급 (대상 이름은 이메일) | 관리자 |
+| `HOLIDAY` | 휴일 등록·삭제 (대상 이름은 "날짜 이름", 예: `2026-10-09 한글날`) | 관리자 |
 | `USER` | 가입(초대 수락), 비밀번호 변경·재설정, 재설정 링크 발급, 삭제 | 가입·비밀번호는 본인, 링크 발급·삭제는 관리자 |
 
-- 항목: `{id, occurredAt, actor: {id, name(이메일)}, targetType, targetId, targetName, projectId, action, fields}`
+- 항목: `{id, occurredAt, actor: {id, name(이메일)}, target: {type, id, name}, project: {id, name}, suite: {id, name}, action, fields}`
   - `action`: `CREATED` / `UPDATED` / `DELETED`
-  - `targetName`: 변경 당시 이름. 항목을 삭제해도 표시 가능. 스케줄은 스위트 이름, 점검 시간은 환경 이름
-  - `projectId`: 소속 프로젝트. 사용자·초대는 `null`
-  - `suiteId`: 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 `null`
+  - `target.name`: 변경 당시 이름. 항목을 삭제해도 표시 가능. 스케줄은 스위트 이름, 점검 시간은 환경 이름
+  - `project`: 소속 프로젝트 (지금 이름, 삭제된 프로젝트 포함). 사용자·초대·휴일은 `null`
+  - `suite`: 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 `null`
   - `fields`: 수정에서 값이 실제로 바뀐 항목 이름. 등록·삭제는 빈 목록
 - `fields` 값: 프로젝트·스위트 `name`·`description`, 스위트 `caseOrder`, 환경 `name`·`baseUrl`·`variables.<키>`·`secrets.<이름>`, 케이스 `name`·`request`·`assertions`·`extractors`, 프로젝트 `webhook`, 스케줄 `environment`·`cron`·`enabled`·`skipHolidays`, 점검 시간 `startsAt`·`endsAt`·`reason`, 사용자 `password`·`passwordResetLink`
 - 값은 남기지 않음 (변수 값, 시크릿, 비밀번호, 링크 토큰 모두). 시크릿은 암호화 값을 비교할 수 없어 요청에 있던 이름을 모두 변경으로 기록

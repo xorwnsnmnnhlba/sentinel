@@ -115,7 +115,7 @@ class CaseImportTest {
 				{"suiteId": %d, "cases": %s}""".formatted(suite.getId(), chosen));
 
 		assertThat(imported).hasStatus(HttpStatus.CREATED);
-		assertThat(imported).bodyJson().extractingPath("$.suiteId").isEqualTo(suite.getId().intValue());
+		assertThat(imported).bodyJson().extractingPath("$.suite.id").isEqualTo(suite.getId().intValue());
 		assertThat(imported).bodyJson().extractingPath("$.cases[*].name").isEqualTo(List.of("Create order", "Get one order"));
 		List<TestCase> saved = testCases.findActiveInRunOrder(suite.getId());
 		assertThat(saved).extracting(TestCase::getName).containsExactly("Create order", "Get one order");

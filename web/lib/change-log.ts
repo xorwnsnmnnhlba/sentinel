@@ -31,11 +31,11 @@ export const TARGET_LABELS: Record<ChangeTargetType, string> = {
 const ACTION_LABELS: Record<ChangeAction, string> = { CREATED: "등록", UPDATED: "수정", DELETED: "삭제" };
 
 /** 동작 이름. 사용자 등록은 가입, 초대 등록은 초대 발급 */
-export function actionLabel(item: Pick<ChangeLogItem, "targetType" | "action">): string {
-  if (item.action === "CREATED" && item.targetType === "USER") {
+export function actionLabel(item: { target: Pick<ChangeLogItem["target"], "type">; action: ChangeAction }): string {
+  if (item.action === "CREATED" && item.target.type === "USER") {
     return "가입";
   }
-  if (item.action === "CREATED" && item.targetType === "INVITE") {
+  if (item.action === "CREATED" && item.target.type === "INVITE") {
     return "발급";
   }
   return ACTION_LABELS[item.action];
@@ -79,18 +79,19 @@ export function targetHref(item: ChangeLogItem): string | null {
   if (item.action === "DELETED") {
     return null;
   }
-  switch (item.targetType) {
+  const { target } = item;
+  switch (target.type) {
     case "PROJECT":
-      return `/projects/${item.targetId}`;
+      return `/projects/${target.id}`;
     case "SUITE":
-      return `/suites/${item.targetId}`;
+      return `/suites/${target.id}`;
     case "CASE":
-      return `/cases/${item.targetId}`;
+      return `/cases/${target.id}`;
     case "ENVIRONMENT":
     case "MAINTENANCE_WINDOW":
-      return item.projectId === null ? null : `/projects/${item.projectId}`;
+      return item.project === null ? null : `/projects/${item.project.id}`;
     case "HOLIDAY":
-      return /^\d{4}-/.test(item.targetName) ? `/holidays?year=${item.targetName.slice(0, 4)}` : "/holidays";
+      return /^\d{4}-/.test(target.name) ? `/holidays?year=${target.name.slice(0, 4)}` : "/holidays";
     default:
       return null;
   }

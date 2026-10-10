@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ChangeLogItem } from "@/lib/api/types";
+import type { ChangeAction, ChangeLogItem, ChangeTargetType } from "@/lib/api/types";
 
 import {
   actionLabel,
@@ -12,19 +12,24 @@ import {
   targetHref,
 } from "./change-log";
 
-function log(patch: Partial<ChangeLogItem>): ChangeLogItem {
+/** 기록 1건. 대상·프로젝트는 평평하게 받아 응답 모양으로 */
+function log(patch: {
+  targetType?: ChangeTargetType;
+  targetId?: number;
+  targetName?: string;
+  projectId?: number | null;
+  action?: ChangeAction;
+}): ChangeLogItem {
+  const projectId = patch.projectId === undefined ? 3 : patch.projectId;
   return {
     id: 1,
     occurredAt: "2026-09-27T01:00:00Z",
     actor: { id: 1, name: "admin@sentinel.test" },
-    targetType: "CASE",
-    targetId: 7,
-    targetName: "health",
-    projectId: 3,
-    suiteId: 5,
-    action: "UPDATED",
+    target: { type: patch.targetType ?? "CASE", id: patch.targetId ?? 7, name: patch.targetName ?? "health" },
+    project: projectId === null ? null : { id: projectId, name: "billing" },
+    suite: { id: 5, name: "smoke" },
+    action: patch.action ?? "UPDATED",
     fields: [],
-    ...patch,
   };
 }
 
@@ -46,11 +51,11 @@ describe("fieldLabel", () => {
 
 describe("actionLabel", () => {
   it("names sign-ups and invites after what happened", () => {
-    expect(actionLabel({ targetType: "USER", action: "CREATED" })).toBe("가입");
-    expect(actionLabel({ targetType: "INVITE", action: "CREATED" })).toBe("발급");
-    expect(actionLabel({ targetType: "USER", action: "UPDATED" })).toBe("수정");
-    expect(actionLabel({ targetType: "CASE", action: "CREATED" })).toBe("등록");
-    expect(actionLabel({ targetType: "CASE", action: "DELETED" })).toBe("삭제");
+    expect(actionLabel({ target: { type: "USER" }, action: "CREATED" })).toBe("가입");
+    expect(actionLabel({ target: { type: "INVITE" }, action: "CREATED" })).toBe("발급");
+    expect(actionLabel({ target: { type: "USER" }, action: "UPDATED" })).toBe("수정");
+    expect(actionLabel({ target: { type: "CASE" }, action: "CREATED" })).toBe("등록");
+    expect(actionLabel({ target: { type: "CASE" }, action: "DELETED" })).toBe("삭제");
   });
 });
 
