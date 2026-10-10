@@ -35,6 +35,11 @@ dependencies {
 	implementation 'io.github.openfeign.querydsl:querydsl-jpa:7.7'
 	annotationProcessor 'io.github.openfeign.querydsl:querydsl-apt:7.7:jakarta'
 	annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+	// API 문서(OpenAPI JSON) 생성. 화면은 web에서 그리므로 Swagger UI 없는 api 스타터. Boot 미관리 의존성이라 버전 명시
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-api:3.1.1'
+	// 컨트롤러 Javadoc을 API 문서의 설명으로 (컴파일 시 Javadoc을 런타임에 읽을 수 있게 저장)
+	implementation 'com.github.therapi:therapi-runtime-javadoc:0.15.0'
+	annotationProcessor 'com.github.therapi:therapi-runtime-javadoc-scribe:0.15.0'
 	runtimeOnly 'org.flywaydb:flyway-database-postgresql'
 	runtimeOnly 'org.postgresql:postgresql'
 	compileOnly 'org.projectlombok:lombok'

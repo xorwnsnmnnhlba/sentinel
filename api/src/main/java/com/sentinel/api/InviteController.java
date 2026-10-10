@@ -7,6 +7,8 @@ import com.sentinel.api.response.InviteResponse;
 import com.sentinel.api.response.IssuedLinkResponse;
 import com.sentinel.application.auth.AuthenticatedUser;
 import com.sentinel.application.auth.UserService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 초대. 관리자가 발급하고, 받은 사람은 로그인 전에 확인 (토큰 자체가 자격증명). 수락은 계정 만들기({@code POST /api/users})
  */
 @RestController
+@Tag(name = "초대")
 @RequestMapping("/api/invites")
 @RequiredArgsConstructor
 class InviteController {
@@ -41,6 +44,8 @@ class InviteController {
 	}
 
 	/** 확인 (로그인 불필요). 만료·사용·위조는 모두 404로 동일하게 응답 */
+	// 로그인 없이 호출 (API 문서에 인증 표시 없음)
+	@SecurityRequirements
 	@GetMapping("/{token}")
 	InviteResponse get(@PathVariable String token) {
 		UserService.InviteInfo invite = userService.invite(token);

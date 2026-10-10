@@ -7,6 +7,7 @@ import com.sentinel.api.request.CreateHolidayImportRequest;
 import com.sentinel.api.request.CreateHolidayRequest;
 import com.sentinel.application.HolidayService;
 import com.sentinel.application.auth.AuthenticatedUser;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 휴일. "휴일 건너뛰기"를 켠 스케줄은 이 날짜에 실행하지 않음. 모든 스케줄에 영향을 주므로 등록·삭제는 관리자만
  */
 @RestController
+@Tag(name = "휴일")
 @RequestMapping("/api")
 @RequiredArgsConstructor
 class HolidayController {
@@ -39,11 +41,13 @@ class HolidayController {
 		return holidayService.list(year);
 	}
 
+	/** 단건 */
 	@GetMapping("/holidays/{holidayId}")
 	HolidayService.HolidayItem get(@PathVariable long holidayId) {
 		return holidayService.get(holidayId);
 	}
 
+	/** 등록 (관리자). 이미 등록한 날짜는 409 */
 	@PostMapping("/holidays")
 	ResponseEntity<HolidayService.HolidayItem> create(@Valid @RequestBody CreateHolidayRequest request) {
 		AuthenticatedUser admin = currentUser.requireAdmin();
@@ -61,6 +65,7 @@ class HolidayController {
 		return holidayService.importHolidays(request.holidays(), admin.id());
 	}
 
+	/** 삭제 (관리자). 그날도 스케줄 실행 */
 	@DeleteMapping("/holidays/{holidayId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void delete(@PathVariable long holidayId) {

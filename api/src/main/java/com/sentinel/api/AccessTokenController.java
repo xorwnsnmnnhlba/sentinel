@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.sentinel.api.request.CreateAccessTokenRequest;
 import com.sentinel.application.auth.AccessTokenService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 내 API 토큰. 로그인 세션으로만 사용 (API 토큰으로 토큰을 발급·폐기할 수 없음, {@code AuthFilter})
  */
 @RestController
+@Tag(name = "API 토큰")
 @RequestMapping("/api/access-tokens")
 @RequiredArgsConstructor
 class AccessTokenController {
@@ -49,6 +51,7 @@ class AccessTokenController {
 		return accessTokens.get(tokenId, currentUser.get().id());
 	}
 
+	/** 폐기. 이후 이 토큰의 요청은 401. 다른 사용자의 토큰·이미 폐기된 토큰은 404 */
 	@DeleteMapping("/{tokenId}")
 	ResponseEntity<Void> delete(@PathVariable long tokenId) {
 		accessTokens.revoke(tokenId, currentUser.get().id());

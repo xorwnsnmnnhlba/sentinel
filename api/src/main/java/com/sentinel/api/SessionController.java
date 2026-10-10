@@ -4,6 +4,8 @@ import com.sentinel.api.request.CreateSessionRequest;
 import com.sentinel.api.response.SessionResponse;
 import com.sentinel.application.auth.AuthService;
 import com.sentinel.application.auth.AuthenticatedUser;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 로그인 세션. 브라우저 쿠키는 Next.js(BFF)가 관리하고 Spring은 토큰만 주고받음
  */
 @RestController
+@Tag(name = "로그인")
 @RequestMapping("/api/sessions")
 @RequiredArgsConstructor
 class SessionController {
@@ -31,6 +34,8 @@ class SessionController {
 	/**
 	 * 로그인. 응답의 토큰은 이후 {@code Authorization: Bearer <토큰>}으로 전달
 	 */
+	// 로그인 없이 호출 (API 문서에 인증 표시 없음)
+	@SecurityRequirements
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	SessionResponse create(@Valid @RequestBody CreateSessionRequest request) {

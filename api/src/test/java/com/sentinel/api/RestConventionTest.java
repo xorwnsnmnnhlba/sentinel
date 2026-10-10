@@ -21,6 +21,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,8 +68,7 @@ class RestConventionTest {
 		// 다른 리소스는 {id, name} 객체로 가리킴. 숫자 ID만(suiteId)이나 이름만 따로(suiteName) 두지 않음
 		Set<String> violations = new TreeSet<>();
 		Set<Class<?>> visited = new HashSet<>();
-		mappings.getHandlerMethods()
-			.forEach((info, method) -> collect(method.getReturnType().getGenericParameterType(), visited, violations));
+		ourHandlers().forEach((info, method) -> collect(method.getReturnType().getGenericParameterType(), visited, violations));
 		assertThat(violations).isEmpty();
 	}
 
@@ -92,10 +93,21 @@ class RestConventionTest {
 		}
 	}
 
+	/** 우리 컨트롤러만. API 문서 라이브러리(springdoc)가 만드는 문서 경로(/api/openapi.yaml 등)는 제외 */
+	private Map<RequestMappingInfo, HandlerMethod> ourHandlers() {
+		Map<RequestMappingInfo, HandlerMethod> ours = new HashMap<>();
+		mappings.getHandlerMethods().forEach((info, method) -> {
+			if (method.getBeanType().getName().startsWith("com.sentinel.")) {
+				ours.put(info, method);
+			}
+		});
+		return ours;
+	}
+
 	/** 경로별 메서드. API 경로만 */
 	private Map<String, Set<RequestMethod>> routes() {
 		Map<String, Set<RequestMethod>> routes = new HashMap<>();
-		mappings.getHandlerMethods().keySet().forEach(info -> info.getPatternValues()
+		ourHandlers().keySet().forEach(info -> info.getPatternValues()
 			.stream()
 			.filter(path -> path.startsWith("/api/"))
 			.forEach(path -> routes.computeIfAbsent(path, key -> new HashSet<>())

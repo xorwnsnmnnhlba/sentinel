@@ -8,6 +8,7 @@ import com.sentinel.api.request.UpdateProjectRequest;
 import com.sentinel.application.CatalogCommandService;
 import com.sentinel.application.CatalogQueryService;
 import com.sentinel.application.CatalogQueryService.ProjectItem;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Tag(name = "프로젝트")
 @RequestMapping("/api/projects")
 @RequiredArgsConstructor
 class ProjectController {
@@ -31,11 +33,13 @@ class ProjectController {
 
 	private final CurrentUser currentUser;
 
+	/** 프로젝트 목록, 이름 순 */
 	@GetMapping
 	List<ProjectItem> list() {
 		return catalog.listProjects();
 	}
 
+	/** 단건. Webhook은 지정 여부만 (주소는 응답에 없음) */
 	@GetMapping("/{projectId}")
 	ProjectItem get(@PathVariable long projectId) {
 		return catalog.getProject(projectId);

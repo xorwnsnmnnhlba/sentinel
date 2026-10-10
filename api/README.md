@@ -459,6 +459,14 @@ deploy-check:
 
 - 응답에서 다른 리소스를 가리킬 때는 `{id, name}` 객체 (예: 환경·스위트의 `project`, 케이스의 `suite`, 스케줄의 `project`·`suite`·`environment`). 요청 본문과 조회 조건은 ID (`projectId`, `suiteId` 등)
 
+### API 문서
+
+`GET /api/openapi`: OpenAPI 3.1 문서(JSON). 다른 API와 같이 로그인 필요 (API 토큰은 403). 화면은 web의 "API 문서"
+
+- 경로·요청·응답 모양은 컨트롤러에서, 설명은 컨트롤러 메서드 Javadoc(요약·설명)과 응답 레코드 Javadoc(`@param`, 필드 설명)에서 생성 (springdoc-openapi + therapi-runtime-javadoc)
+- 묶음(태그)은 컨트롤러의 `@Tag`, 순서·설명은 `OpenApiConfig.TAGS`. 로그인 전에 쓰는 요청은 `@SecurityRequirements`로 인증 표시 없음
+- 새 API는 `@Tag`(알려진 묶음)와 메서드 Javadoc이 있어야 함 (`OpenApiDocsTest`가 확인)
+
 | 리소스 | 목록 | 단건 | 생성·수정 | 삭제 |
 |--------|------|------|-----------|------|
 | 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | `POST /api/projects`, `PATCH /api/projects/{id}` | `DELETE /api/projects/{id}` |

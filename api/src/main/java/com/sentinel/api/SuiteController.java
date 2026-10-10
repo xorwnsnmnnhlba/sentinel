@@ -8,6 +8,7 @@ import com.sentinel.api.request.UpdateSuiteRequest;
 import com.sentinel.application.CatalogCommandService;
 import com.sentinel.application.CatalogQueryService;
 import com.sentinel.application.CatalogQueryService.SuiteItem;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Tag(name = "스위트")
 @RequestMapping("/api/suites")
 @RequiredArgsConstructor
 class SuiteController {
@@ -32,11 +34,13 @@ class SuiteController {
 
 	private final CurrentUser currentUser;
 
+	/** 스위트 목록, 이름 순. projectId로 좁힘 */
 	@GetMapping
 	List<SuiteItem> list(@RequestParam(required = false) Long projectId) {
 		return catalog.listSuites(projectId);
 	}
 
+	/** 단건. 케이스 수 포함 */
 	@GetMapping("/{suiteId}")
 	SuiteItem get(@PathVariable long suiteId) {
 		return catalog.getSuite(suiteId);

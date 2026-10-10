@@ -8,6 +8,8 @@ import com.sentinel.api.request.CreateUserRequest;
 import com.sentinel.api.request.ResetPasswordRequest;
 import com.sentinel.application.auth.AuthenticatedUser;
 import com.sentinel.application.auth.UserService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 사용자. 목록·조회·삭제는 관리자만, 비밀번호 변경은 본인만. 계정 만들기(초대 수락)와 재설정 링크로 비밀번호 설정은 로그인 전에 토큰으로
  */
 @RestController
+@Tag(name = "사용자")
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 class UserController {
@@ -34,6 +37,7 @@ class UserController {
 
 	private final CurrentUser currentUser;
 
+	/** 사용자 목록, 이메일 순 (관리자) */
 	@GetMapping
 	List<UserService.UserSummary> list() {
 		currentUser.requireAdmin();
@@ -51,6 +55,8 @@ class UserController {
 	 * 초대 수락으로 계정 만들기 (로그인 불필요, 초대 토큰이 자격증명). 이메일·역할은 초대에 따름. 로그인은 {@code POST /api/sessions}로 따로
 	 * 만료·사용·위조된 초대는 404
 	 */
+	// 로그인 없이 호출 (API 문서에 인증 표시 없음)
+	@SecurityRequirements
 	@PostMapping
 	ResponseEntity<UserService.UserSummary> create(@Valid @RequestBody CreateUserRequest request) {
 		UserService.UserSummary created = userService.acceptInvite(request.inviteToken(), request.name(),
@@ -78,6 +84,8 @@ class UserController {
 	 * 재설정 링크로 새 비밀번호 설정 (로그인 불필요, 재설정 토큰이 자격증명). 기존 세션은 모두 종료되므로 다시 로그인 필요.
 	 * 만료·사용·위조된 링크나 다른 사용자의 링크는 404
 	 */
+	// 로그인 없이 호출 (API 문서에 인증 표시 없음)
+	@SecurityRequirements
 	@PutMapping("/{userId}/password")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void resetPassword(@PathVariable long userId, @Valid @RequestBody ResetPasswordRequest request) {

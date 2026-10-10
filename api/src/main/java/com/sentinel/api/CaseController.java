@@ -8,6 +8,7 @@ import com.sentinel.api.request.UpdateCaseRequest;
 import com.sentinel.application.CatalogCommandService;
 import com.sentinel.application.CatalogQueryService;
 import com.sentinel.application.CatalogQueryService.CaseItem;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Tag(name = "케이스")
 @RequestMapping("/api/cases")
 @RequiredArgsConstructor
 class CaseController {
@@ -40,6 +42,7 @@ class CaseController {
 		return catalog.listCases(suiteId, q);
 	}
 
+	/** 단건. 요청 정의·판정 규칙·값 추출 포함 */
 	@GetMapping("/{caseId}")
 	CaseItem get(@PathVariable long caseId) {
 		return catalog.getCase(caseId);

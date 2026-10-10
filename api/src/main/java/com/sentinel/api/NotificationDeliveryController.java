@@ -8,6 +8,7 @@ import com.sentinel.application.NotificationDeliveryService;
 import com.sentinel.application.NotificationDeliveryService.DeliveryItem;
 import com.sentinel.application.PageResponse;
 import com.sentinel.application.auth.AuthenticatedUser;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 알림 발송 이력과 알림 채널. "알림이 안 왔다"를 구성원도 확인하도록 모든 사용자 조회 (주소는 기록하지 않음)
  */
 @RestController
+@Tag(name = "알림")
 @RequestMapping("/api")
 @RequiredArgsConstructor
 class NotificationDeliveryController {

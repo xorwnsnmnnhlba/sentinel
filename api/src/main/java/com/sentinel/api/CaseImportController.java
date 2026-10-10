@@ -7,6 +7,7 @@ import com.sentinel.api.request.CreateCaseImportRequest;
 import com.sentinel.api.response.CaseImportResponse;
 import com.sentinel.application.CatalogQueryService.CaseItem;
 import com.sentinel.application.importing.CaseImportService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 외부 문서에서 케이스 가져오기. 미리보기로 후보를 확인한 뒤 고른 케이스만 가져오기
  */
 @RestController
+@Tag(name = "케이스 가져오기")
 @RequiredArgsConstructor
 class CaseImportController {
 

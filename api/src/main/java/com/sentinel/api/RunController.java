@@ -15,6 +15,7 @@ import com.sentinel.application.TestRunDetail;
 import com.sentinel.application.TestRunService;
 import com.sentinel.application.notification.NotificationProperties;
 import com.sentinel.domain.TestRun;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Tag(name = "실행")
 @RequestMapping("/api/runs")
 @RequiredArgsConstructor
 class RunController {

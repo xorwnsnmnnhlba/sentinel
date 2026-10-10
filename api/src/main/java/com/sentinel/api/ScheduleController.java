@@ -8,6 +8,7 @@ import com.sentinel.api.request.UpdateScheduleRequest;
 import com.sentinel.api.request.UpdateSchedulesRequest;
 import com.sentinel.application.ScheduleDetail;
 import com.sentinel.application.ScheduleService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Tag(name = "스케줄")
 @RequestMapping("/api/schedules")
 @RequiredArgsConstructor
 class ScheduleController {
@@ -30,16 +32,19 @@ class ScheduleController {
 
 	private final CurrentUser currentUser;
 
+	/** 스케줄 목록. suiteId로 좁힘 */
 	@GetMapping
 	List<ScheduleDetail> list(@RequestParam(required = false) Long suiteId) {
 		return scheduleService.list(suiteId);
 	}
 
+	/** 단건. 다음·마지막 실행 시각 포함 */
 	@GetMapping("/{scheduleId}")
 	ScheduleDetail get(@PathVariable long scheduleId) {
 		return scheduleService.get(scheduleId);
 	}
 
+	/** 등록. cron은 5자리(분 시 일 월 요일), 서버 시간대 기준 */
 	@PostMapping
 	ResponseEntity<ScheduleDetail> create(@Valid @RequestBody CreateScheduleRequest request) {
 		ScheduleDetail schedule = scheduleService.create(request.suiteId(), request.environmentId(), request.cron(),
