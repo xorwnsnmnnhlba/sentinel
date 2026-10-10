@@ -13,6 +13,11 @@ java {
 	}
 }
 
+// 시스템 상태 화면의 버전·빌드 시각 (META-INF/build-info.properties → BuildProperties)
+springBoot {
+	buildInfo()
+}
+
 repositories {
 	mavenCentral()
 }

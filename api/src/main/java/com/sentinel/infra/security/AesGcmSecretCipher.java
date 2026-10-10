@@ -143,4 +143,9 @@ class AesGcmSecretCipher implements SecretCipher {
 		return true;
 	}
 
+	@Override
+	public boolean hasPreviousKey() {
+		return previousKey != null;
+	}
+
 }

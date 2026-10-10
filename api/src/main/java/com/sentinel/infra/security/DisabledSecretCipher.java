@@ -30,4 +30,9 @@ class DisabledSecretCipher implements SecretCipher {
 		return false;
 	}
 
+	@Override
+	public boolean hasPreviousKey() {
+		return false;
+	}
+
 }

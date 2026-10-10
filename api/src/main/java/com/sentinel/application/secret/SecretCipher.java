@@ -25,4 +25,7 @@ public interface SecretCipher {
 	/** 키 설정 여부. 미설정 시 시크릿 등록 거부 */
 	boolean isEnabled();
 
+	/** 이전 키 설정 여부 (키 교체 중). 재암호화 확인 후 이전 키를 제거하도록 안내 */
+	boolean hasPreviousKey();
+
 }

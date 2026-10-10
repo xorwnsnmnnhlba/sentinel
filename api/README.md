@@ -459,17 +459,6 @@ deploy-check:
 
 - 응답에서 다른 리소스를 가리킬 때는 `{id, name}` 객체 (예: 환경·스위트의 `project`, 케이스의 `suite`, 스케줄의 `project`·`suite`·`environment`). 요청 본문과 조회 조건은 ID (`projectId`, `suiteId` 등)
 
-### API 문서
-
-`GET /api/openapi`: OpenAPI 3.1 문서(JSON). 다른 API와 같이 로그인 필요 (API 토큰은 403). 화면은 web의 "API 문서"
-
-- 경로·요청·응답 모양은 컨트롤러에서, 설명은 컨트롤러 메서드 Javadoc(요약·설명)과 응답 레코드 Javadoc(`@param`, 필드 설명)에서 생성 (springdoc-openapi + therapi-runtime-javadoc)
-- 묶음(태그)은 컨트롤러의 `@Tag`, 순서·설명은 `OpenApiConfig.TAGS`. 로그인 전에 쓰는 요청은 `@SecurityRequirements`로 인증 표시 없음
-- 새 API는 `@Tag`(알려진 묶음)와 메서드 Javadoc이 있어야 함 (`OpenApiDocsTest`가 확인)
-- 응답 상태: `ResponseEntity.created`·`noContent`·`accepted`를 돌려주는 메서드는 `@ResponseStatus`(201·204·202)도 함께 지정. 없으면 문서에 200으로 표시됨
-- 응답 형식은 `application/json` (`springdoc.default-produces-media-type`). 지정하지 않으면 `*/*`로 표시
-- 기동 로그의 springdoc "운영에서는 끄라"는 경고는 로그 수준으로 숨김. 로그인 뒤에서만 제공하므로 의도한 설정
-
 | 리소스 | 목록 | 단건 | 생성·수정 | 삭제 |
 |--------|------|------|-----------|------|
 | 프로젝트 | `GET /api/projects` | `GET /api/projects/{id}` | `POST /api/projects`, `PATCH /api/projects/{id}` | `DELETE /api/projects/{id}` |
@@ -491,6 +480,7 @@ deploy-check:
 | 지금 느린 케이스 | `GET /api/slowdowns?suiteId=` | | | |
 | 실패 원인 | `GET /api/failure-causes?from=&to=&suiteId=` | | | |
 | 변경 이력 | `GET /api/change-logs?targetType=&targetId=&projectId=&suiteId=&page=0&size=20` | | | |
+| 시스템 상태 | | `GET /api/system-status` (관리자, "시스템 상태") | | |
 
 - 케이스 검색 `q`: 이름·경로 부분 일치 (대소문자 무시, 앞뒤 공백 제거, `%`·`_`는 문자 그대로). 스위트별 실행 순서, 최대 100건. `suiteId`와 함께 쓰면 그 스위트 안에서만. 빈 검색어·200자 초과는 400
 - 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
@@ -526,6 +516,17 @@ deploy-check:
 | 케이스 | `{"suiteId": 1, "name": "결제 내역 조회", "request": {"method": "GET", "path": "/billing/v1/history?userId={{userId}}", "headers": {"Accept": ["application/json"]}, "body": null}, "assertions": [{"type": "statusCode", "anyOf": ["200"]}]}` |
 
 - 케이스 등록의 `afterCaseId`(선택): 같은 스위트의 그 케이스 바로 뒤 실행 순서로 등록하고 뒤 케이스 순서를 한 칸씩 밈. 다른 스위트의 케이스면 400, 없거나 삭제된 케이스면 404. 생략 시 마지막 (화면의 케이스 복제가 원본 바로 뒤에 두는 데 사용)
+
+### API 문서
+
+`GET /api/openapi`: OpenAPI 3.1 문서(JSON). 다른 API와 같이 로그인 필요 (API 토큰은 403). 화면은 web의 "API 문서"
+
+- 경로·요청·응답 모양은 컨트롤러에서, 설명은 컨트롤러 메서드 Javadoc(요약·설명)과 응답 레코드 Javadoc(`@param`, 필드 설명)에서 생성 (springdoc-openapi + therapi-runtime-javadoc)
+- 묶음(태그)은 컨트롤러의 `@Tag`, 순서·설명은 `OpenApiConfig.TAGS`. 로그인 전에 쓰는 요청은 `@SecurityRequirements`로 인증 표시 없음
+- 새 API는 `@Tag`(알려진 묶음)와 메서드 Javadoc이 있어야 함 (`OpenApiDocsTest`가 확인)
+- 응답 상태: `ResponseEntity.created`·`noContent`·`accepted`를 돌려주는 메서드는 `@ResponseStatus`(201·204·202)도 함께 지정. 없으면 문서에 200으로 표시됨
+- 응답 형식은 `application/json` (`springdoc.default-produces-media-type`). 지정하지 않으면 `*/*`로 표시
+- 기동 로그의 springdoc "운영에서는 끄라"는 경고는 로그 수준으로 숨김. 로그인 뒤에서만 제공하므로 의도한 설정
 
 ### 응답시간 추세
 
@@ -681,6 +682,39 @@ deploy-check:
 - 삭제는 소프트 삭제(보관). 204 응답, 하위 항목 연쇄 보관, 실행 이력은 유지
   - 프로젝트 → 환경·스위트·케이스·스케줄, 환경 → 해당 스케줄, 스위트 → 케이스·스케줄
   - 보관된 항목은 목록에서 제외되고 단건 조회·재삭제·실행은 404. 같은 이름으로 새로 등록 가능
+
+## 시스템 상태
+
+`GET /api/system-status`: 서버 설정·버전 상태 (관리자, 그 외 403). 설정은 지정 여부만, 주소·키 값은 포함하지 않음
+
+```json
+{
+  "build": {"version": "0.0.1-SNAPSHOT", "builtAt": "2026-10-10T07:36:42Z"},
+  "startedAt": "2026-10-10T07:40:03Z",
+  "databaseMigration": "29",
+  "secrets": {
+    "state": "ROTATING",
+    "undecryptable": [
+      {"project": {"id": 2, "name": "결제"}, "environment": null, "secret": null},
+      {"project": {"id": 2, "name": "결제"}, "environment": {"id": 3, "name": "dev"}, "secret": "token"}
+    ]
+  },
+  "defaultChannel": true,
+  "resultLinks": true,
+  "heartbeat": false,
+  "retention": {"rawResultDays": 30, "notificationDeliveryDays": 90}
+}
+```
+
+| 항목 | 내용 |
+|------|------|
+| `build` | Gradle 빌드 정보(`springBoot.buildInfo()`)의 버전·빌드 시각. 빌드 정보 없이 실행하면(IDE) null |
+| `startedAt` | 기동 완료 시각 |
+| `databaseMigration` | 적용된 마지막 Flyway 마이그레이션 버전 |
+| `secrets.state` | `DISABLED`(키 없음), `ENABLED`, `ROTATING`(이전 키 설정, 재암호화 확인 후 제거) |
+| `secrets.undecryptable` | 지금 키로 풀 수 없는 값. 프로젝트 Webhook 주소(`environment`·`secret` null)가 먼저, 환경 시크릿은 이름까지. 사용 중인 항목만, 조회할 때마다 다시 확인 |
+| `defaultChannel`·`resultLinks`·`heartbeat` | `SENTINEL_WEBHOOK_URL`·`SENTINEL_WEB_URL`·`SENTINEL_HEARTBEAT_URL` 지정 여부 |
+| `retention` | 결과 원문·알림 발송 이력 보관 일수 |
 
 ## 변경 이력
 

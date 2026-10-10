@@ -69,4 +69,13 @@ class EnvironmentSecretsDisabledTest {
 			.isEmpty();
 	}
 
+	@Test
+	void showsSecretsAsDisabledInTheSystemStatus() {
+		var json = assertThat(mvc.get().uri("/api/system-status")).hasStatusOk().bodyJson();
+		json.extractingPath("$.secrets.state").isEqualTo("DISABLED");
+		json.extractingPath("$.secrets.undecryptable").asArray().isEmpty();
+		json.extractingPath("$.defaultChannel").isEqualTo(false);
+		json.extractingPath("$.resultLinks").isEqualTo(false);
+	}
+
 }
