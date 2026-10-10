@@ -10,6 +10,7 @@ import com.sentinel.application.MaintenanceWindowService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -41,6 +43,7 @@ class MaintenanceWindowController {
 	}
 
 	/** 등록. 기간은 최대 7일, 이미 시작한 시각도 가능 (지금부터 점검) */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping
 	ResponseEntity<MaintenanceWindowItem> create(@Valid @RequestBody CreateMaintenanceWindowRequest request) {
 		MaintenanceWindowItem window = maintenanceWindowService.create(request.environmentId(), request.startsAt(),
@@ -63,6 +66,7 @@ class MaintenanceWindowController {
 	}
 
 	/** 삭제. 예정된 점검은 취소, 진행 중인 점검은 바로 끝남 */
+	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@DeleteMapping("/{windowId}")
 	ResponseEntity<Void> delete(@PathVariable long windowId) {
 		maintenanceWindowService.delete(windowId, currentUser.get().id());

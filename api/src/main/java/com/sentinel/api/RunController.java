@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -95,6 +97,7 @@ class RunController {
 	 * 케이스 실행은 백그라운드에서 진행하므로 완료 여부는 {@code GET /api/runs/{id}}의 status로 확인.
 	 * 동시 수동 실행 한도에 도달하면 429. 실패 다시 실행({@code rerunOf})은 원래 실행이 진행 중이거나 실패 케이스가 없으면 409
 	 */
+	@ResponseStatus(HttpStatus.ACCEPTED)
 	@PostMapping
 	ResponseEntity<TestRunDetail> create(@Valid @RequestBody CreateRunRequest request) {
 		long triggeredBy = currentUser.get().id();

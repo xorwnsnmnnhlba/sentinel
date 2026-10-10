@@ -11,6 +11,7 @@ import com.sentinel.application.ScheduleService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -45,6 +47,7 @@ class ScheduleController {
 	}
 
 	/** 등록. cron은 5자리(분 시 일 월 요일), 서버 시간대 기준 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping
 	ResponseEntity<ScheduleDetail> create(@Valid @RequestBody CreateScheduleRequest request) {
 		ScheduleDetail schedule = scheduleService.create(request.suiteId(), request.environmentId(), request.cron(),
@@ -73,6 +76,7 @@ class ScheduleController {
 	/**
 	 * 삭제(보관). 비활성화되며 실행 이력은 유지
 	 */
+	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@DeleteMapping("/{scheduleId}")
 	ResponseEntity<Void> delete(@PathVariable long scheduleId) {
 		scheduleService.delete(scheduleId, currentUser.get().id());

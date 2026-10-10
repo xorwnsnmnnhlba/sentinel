@@ -57,6 +57,7 @@ class UserController {
 	 */
 	// 로그인 없이 호출 (API 문서에 인증 표시 없음)
 	@SecurityRequirements
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping
 	ResponseEntity<UserService.UserSummary> create(@Valid @RequestBody CreateUserRequest request) {
 		UserService.UserSummary created = userService.acceptInvite(request.inviteToken(), request.name(),
