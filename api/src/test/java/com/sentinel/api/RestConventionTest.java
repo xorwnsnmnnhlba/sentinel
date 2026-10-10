@@ -1,10 +1,14 @@
 package com.sentinel.api;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.RecordComponent;
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
@@ -55,6 +59,37 @@ class RestConventionTest {
 	void everyApiPathIsUnderApiAndUsesLowerCaseWordsJoinedByHyphens() {
 		assertThat(routes().keySet()).allSatisfy(path -> assertThat(path)
 			.matches("/api(/([a-z]+(-[a-z]+)*|\\{[a-zA-Z]+}))+"));
+	}
+
+	@Test
+	void responsesNameTheResourcesTheyPointTo() {
+		// 다른 리소스는 {id, name} 객체로 가리킴. 숫자 ID만(suiteId)이나 이름만 따로(suiteName) 두지 않음
+		Set<String> violations = new TreeSet<>();
+		Set<Class<?>> visited = new HashSet<>();
+		mappings.getHandlerMethods()
+			.forEach((info, method) -> collect(method.getReturnType().getGenericParameterType(), visited, violations));
+		assertThat(violations).isEmpty();
+	}
+
+	private static void collect(Type type, Set<Class<?>> visited, Set<String> violations) {
+		if (type instanceof ParameterizedType parameterized) {
+			collect(parameterized.getRawType(), visited, violations);
+			for (Type argument : parameterized.getActualTypeArguments()) {
+				collect(argument, visited, violations);
+			}
+			return;
+		}
+		if (!(type instanceof Class<?> type_) || !type_.isRecord() || !type_.getName().startsWith("com.sentinel.")
+				|| !visited.add(type_)) {
+			return;
+		}
+		for (RecordComponent component : type_.getRecordComponents()) {
+			String name = component.getName();
+			if ((name.endsWith("Id") || name.endsWith("Name")) && !name.equals("id") && !name.equals("name")) {
+				violations.add(type_.getSimpleName() + "." + name);
+			}
+			collect(component.getGenericType(), visited, violations);
+		}
 	}
 
 	/** 경로별 메서드. API 경로만 */

@@ -5,6 +5,7 @@ import java.net.URI;
 import com.sentinel.api.request.CreatePasswordResetRequest;
 import com.sentinel.api.response.IssuedLinkResponse;
 import com.sentinel.api.response.PasswordResetResponse;
+import com.sentinel.application.IdName;
 import com.sentinel.application.auth.AuthenticatedUser;
 import com.sentinel.application.auth.UserService;
 import jakarta.validation.Valid;
@@ -45,7 +46,7 @@ class PasswordResetController {
 	@GetMapping("/{token}")
 	PasswordResetResponse get(@PathVariable String token) {
 		UserService.ResetInfo reset = userService.passwordReset(token);
-		return new PasswordResetResponse(reset.userId(), reset.email(), reset.expiresAt());
+		return new PasswordResetResponse(new IdName(reset.userId(), reset.email()), reset.expiresAt());
 	}
 
 }

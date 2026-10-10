@@ -164,8 +164,8 @@ class UserManagementTest {
 		String token = read(issued, "$.token");
 		assertThat(issued.getResponse().getHeader("Location")).isEqualTo("/api/password-resets/" + token);
 		var link = assertThat(mvc.get().uri("/api/password-resets/{token}", token)).hasStatusOk().bodyJson();
-		link.extractingPath("$.email").isEqualTo(email);
-		link.extractingPath("$.userId").isEqualTo(member.getId().intValue());
+		link.extractingPath("$.user.name").isEqualTo(email);
+		link.extractingPath("$.user.id").isEqualTo(member.getId().intValue());
 
 		// 다른 사용자의 비밀번호에는 쓸 수 없음 (위조와 같은 404)
 		assertThat(put("/api/users/" + adminId + "/password", null, """

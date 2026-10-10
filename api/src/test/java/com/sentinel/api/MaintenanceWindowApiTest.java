@@ -170,8 +170,8 @@ class MaintenanceWindowApiTest {
 			.bodyJson();
 		logs.extractingPath("$.content[*].action").isEqualTo(List.of("DELETED", "UPDATED", "CREATED"));
 		logs.extractingPath("$.content[1].fields").isEqualTo(List.of("endsAt", "reason"));
-		logs.extractingPath("$.content[0].targetName").isEqualTo("dev");
-		logs.extractingPath("$.content[0].projectId").isEqualTo(project.getId().intValue());
+		logs.extractingPath("$.content[0].target.name").isEqualTo("dev");
+		logs.extractingPath("$.content[0].project.id").isEqualTo(project.getId().intValue());
 	}
 
 	@Test

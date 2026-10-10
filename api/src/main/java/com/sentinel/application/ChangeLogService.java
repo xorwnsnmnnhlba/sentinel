@@ -5,8 +5,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.Predicate;
@@ -16,10 +18,13 @@ import com.sentinel.domain.ChangeLog.TargetType;
 import com.sentinel.domain.QChangeLog;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.ChangeLogRepository;
+import com.sentinel.infra.persistence.ProjectRepository;
+import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.infra.persistence.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +44,10 @@ public class ChangeLogService {
 	private final ChangeLogRepository changeLogs;
 
 	private final UserRepository users;
+
+	private final ProjectRepository projects;
+
+	private final TestSuiteRepository suites;
 
 	/** 등록·삭제 기록 */
 	@Transactional(propagation = Propagation.MANDATORY)
@@ -69,10 +78,33 @@ public class ChangeLogService {
 		PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE));
 		Page<ChangeLog> found = changeLogs.findNewestFirst(filter.toPredicate(), pageable);
 		Map<Long, IdName> actors = actors(found.getContent());
+		// 소속 프로젝트·스위트는 지금 이름 (삭제된 것도). 대상 이름은 변경 당시 이름
+		Map<Long, IdName> projectNames = names(projects,
+				found.getContent().stream().map(ChangeLog::getProjectId), project -> IdName.of(project));
+		Map<Long, IdName> suiteNames = names(suites, found.getContent().stream().map(ChangeLog::getSuiteId),
+				suite -> IdName.of(suite));
 		return PageResponse.of(found, found.getContent()
 			.stream()
-			.map(log -> ChangeLogItem.of(log, log.getActorId() == null ? null : actors.get(log.getActorId())))
+			.map(log -> ChangeLogItem.of(log, log.getActorId() == null ? null : actors.get(log.getActorId()),
+					reference(projectNames, log.getProjectId()), reference(suiteNames, log.getSuiteId())))
 			.toList());
+	}
+
+	private static <T> Map<Long, IdName> names(JpaRepository<T, Long> repository, Stream<Long> ids,
+			Function<T, IdName> name) {
+		List<Long> distinct = ids.filter(Objects::nonNull).distinct().toList();
+		if (distinct.isEmpty()) {
+			return Map.of();
+		}
+		return repository.findAllById(distinct)
+			.stream()
+			.map(name)
+			.collect(Collectors.toMap(IdName::id, Function.identity()));
+	}
+
+	/** 기록에는 ID만 있으므로 이름을 붙임. 행이 없어진 경우(정리된 데이터)는 이름 없이 */
+	private static IdName reference(Map<Long, IdName> names, Long id) {
+		return id == null ? null : names.getOrDefault(id, new IdName(id, null));
 	}
 
 	/** 변경한 사용자 이름(이메일). 삭제(보관)된 사용자도 조회 */
@@ -168,16 +200,26 @@ public class ChangeLogService {
 
 	/**
 	 * @param actor 변경한 사용자 {id, name(이메일)}. 이전 기록 등 알 수 없으면 null
+	 * @param project 소속 프로젝트 {id, name(지금 이름)}. 사용자·초대·휴일은 null
+	 * @param suite 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 null
 	 * @param fields 바뀐 항목 이름. 등록·삭제는 빈 목록
 	 */
-	public record ChangeLogItem(long id, Instant occurredAt, IdName actor, TargetType targetType, long targetId,
-			String targetName, Long projectId, Long suiteId, Action action, List<String> fields) {
+	public record ChangeLogItem(long id, Instant occurredAt, IdName actor, ChangeTarget target, IdName project,
+			IdName suite, Action action, List<String> fields) {
 
-		static ChangeLogItem of(ChangeLog log, IdName actor) {
-			return new ChangeLogItem(log.getId(), log.getCreatedAt(), actor, log.getTargetType(), log.getTargetId(),
-					log.getTargetName(), log.getProjectId(), log.getSuiteId(), log.getAction(), log.getFields());
+		static ChangeLogItem of(ChangeLog log, IdName actor, IdName project, IdName suite) {
+			return new ChangeLogItem(log.getId(), log.getCreatedAt(), actor,
+					new ChangeTarget(log.getTargetType(), log.getTargetId(), log.getTargetName()), project, suite,
+					log.getAction(), log.getFields());
 		}
 
+	}
+
+	/**
+	 * 바뀐 항목
+	 * @param name 변경 당시 이름. 삭제된 항목도 표시 (스케줄은 스위트 이름, 점검 시간은 환경 이름, 사용자·초대는 이메일)
+	 */
+	public record ChangeTarget(TargetType type, long id, String name) {
 	}
 
 }

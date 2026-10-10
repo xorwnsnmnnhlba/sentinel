@@ -62,8 +62,9 @@ class ChangeLogApiTest {
 				"CREATED");
 		// 요청 정의는 같은 값이라 바뀐 항목에서 제외
 		assertThat(JsonPath.<List<String>>read(logs, "$.content[1].fields")).containsExactly("name", "assertions");
-		assertThat(JsonPath.<String>read(logs, "$.content[1].targetName")).isEqualTo("health check");
-		assertThat(JsonPath.<Integer>read(logs, "$.content[0].projectId")).isEqualTo((int) project);
+		assertThat(JsonPath.<String>read(logs, "$.content[1].target.name")).isEqualTo("health check");
+		assertThat(JsonPath.<Integer>read(logs, "$.content[0].project.id")).isEqualTo((int) project);
+		assertThat(JsonPath.<String>read(logs, "$.content[0].project.name")).isNotBlank();
 		assertThat(JsonPath.<String>read(logs, "$.content[0].actor.name")).startsWith("tester-");
 		assertThat(JsonPath.<String>read(logs, "$.content[0].occurredAt")).isNotBlank();
 	}
@@ -124,7 +125,7 @@ class ChangeLogApiTest {
 		assertThat(JsonPath.<List<String>>read(logs, "$.content[1].fields")).containsExactly("skipHolidays");
 		assertThat(JsonPath.<List<String>>read(logs, "$.content[2].fields")).containsExactly("cron", "enabled");
 		// 스케줄은 스위트 이름으로 표시
-		assertThat(JsonPath.<String>read(logs, "$.content[0].targetName")).isEqualTo("smoke");
+		assertThat(JsonPath.<String>read(logs, "$.content[0].target.name")).isEqualTo("smoke");
 	}
 
 	@Test
@@ -148,7 +149,7 @@ class ChangeLogApiTest {
 		mvc.delete().uri("/api/projects/{id}", project).exchange();
 
 		String logs = logs("projectId=" + project);
-		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].targetType")).containsExactly("PROJECT", "CASE",
+		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].target.type")).containsExactly("PROJECT", "CASE",
 				"SUITE", "PROJECT");
 		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].action")).containsExactly("DELETED", "CREATED",
 				"CREATED", "CREATED");
@@ -162,7 +163,7 @@ class ChangeLogApiTest {
 		post("/api/suites", "{\"projectId\": %d, \"name\": \"smoke\"}".formatted(payments));
 
 		String billingLogs = logs("projectId=" + billing);
-		assertThat(JsonPath.<List<String>>read(billingLogs, "$.content[*].targetName")).containsExactly("smoke",
+		assertThat(JsonPath.<List<String>>read(billingLogs, "$.content[*].target.name")).containsExactly("smoke",
 				"billing");
 		assertThat(JsonPath.<Integer>read(billingLogs, "$.totalElements")).isEqualTo(2);
 
@@ -188,12 +189,12 @@ class ChangeLogApiTest {
 		String logs = logs("suiteId=" + smoke);
 
 		// 스위트 자신과 소속 케이스·스케줄만 (다른 스위트, 프로젝트·환경 제외)
-		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].targetType")).containsExactly("CASE", "SCHEDULE",
+		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].target.type")).containsExactly("CASE", "SCHEDULE",
 				"CASE", "SUITE");
-		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].targetName")).containsExactly("health check",
+		assertThat(JsonPath.<List<String>>read(logs, "$.content[*].target.name")).containsExactly("health check",
 				"smoke", "health", "smoke");
-		assertThat(JsonPath.<List<Integer>>read(logs, "$.content[*].suiteId")).containsOnly((int) smoke);
-		assertThat(JsonPath.<Object>read(logs("targetType=PROJECT&targetId=" + project), "$.content[0].suiteId"))
+		assertThat(JsonPath.<List<Integer>>read(logs, "$.content[*].suite.id")).containsOnly((int) smoke);
+		assertThat(JsonPath.<Object>read(logs("targetType=PROJECT&targetId=" + project), "$.content[0].suite"))
 			.isNull();
 	}
 
@@ -232,10 +233,10 @@ class ChangeLogApiTest {
 				admin -> assertThat(admin).startsWith("tester-"), self -> assertThat(self).isEqualTo(email),
 				admin -> assertThat(admin).startsWith("tester-"), self -> assertThat(self).isEqualTo(email),
 				self -> assertThat(self).isEqualTo(email));
-		assertThat(JsonPath.<List<Object>>read(userLogs, "$.content[*].projectId")).containsOnlyNulls();
+		assertThat(JsonPath.<List<Object>>read(userLogs, "$.content[*].project")).containsOnlyNulls();
 
 		String inviteLogs = logs("targetType=INVITE");
-		assertThat(JsonPath.<List<String>>read(inviteLogs, "$.content[*].targetName")).contains(email);
+		assertThat(JsonPath.<List<String>>read(inviteLogs, "$.content[*].target.name")).contains(email);
 		assertThat(userLogs + inviteLogs).doesNotContain(invite, reset, "member-password",
 				"changed-member-password", "new-member-password");
 	}

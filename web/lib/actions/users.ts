@@ -110,7 +110,7 @@ export async function resetPassword(token: string, _: ActionState, form: FormDat
   try {
     // 링크의 사용자를 서버에서 다시 확인 (화면이 보낸 값에 기대지 않음)
     const reset = await apiGet<PasswordResetLinkInfo>(`/api/password-resets/${encodeURIComponent(token)}`);
-    await apiSend("PUT", `/api/users/${reset.userId}/password`, { resetToken: token, password });
+    await apiSend("PUT", `/api/users/${reset.user.id}/password`, { resetToken: token, password });
   } catch (error) {
     return { error: message(error) };
   }

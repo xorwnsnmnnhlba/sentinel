@@ -151,7 +151,7 @@ class HolidayApiTest {
 		// 등록한 휴일마다 변경 이력
 		long christmas = ((Number) JsonPath.read(body(imported), "$.created[0].id")).longValue();
 		assertThat(mvc.get().uri("/api/change-logs?targetType=HOLIDAY&targetId={id}", christmas)).bodyJson()
-			.extractingPath("$.content[0].targetName")
+			.extractingPath("$.content[0].target.name")
 			.isEqualTo("2026-12-25 성탄절");
 	}
 
@@ -236,7 +236,7 @@ class HolidayApiTest {
 			.hasStatusOk()
 			.bodyJson();
 		logs.extractingPath("$.content[*].action").isEqualTo(List.of("DELETED", "CREATED"));
-		logs.extractingPath("$.content[0].targetName").isEqualTo("2026-10-09 한글날");
+		logs.extractingPath("$.content[0].target.name").isEqualTo("2026-10-09 한글날");
 		logs.extractingPath("$.content[0].actor.name").asString().startsWith("tester-");
 	}
 

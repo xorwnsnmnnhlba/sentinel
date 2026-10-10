@@ -239,8 +239,10 @@ export interface LinkInfo {
 }
 
 /** 재설정 링크 확인. 새 비밀번호는 이 사용자의 {@code PUT /api/users/{userId}/password}로 */
-export interface PasswordResetLinkInfo extends LinkInfo {
-  userId: number;
+export interface PasswordResetLinkInfo {
+  /** 새 비밀번호를 설정할 사용자 {id, name(이메일)} */
+  user: IdName;
+  expiresAt: string;
 }
 
 /** 가져오기 후보 케이스. name·request·assertions를 그대로(또는 고쳐) 가져오기에 사용 */
@@ -393,14 +395,12 @@ export interface ChangeLogItem {
   occurredAt: string;
   /** 변경한 사용자 {id, name(이메일)}. 알 수 없으면 null */
   actor: IdName | null;
-  targetType: ChangeTargetType;
-  targetId: number;
-  /** 변경 당시 이름 (스케줄은 스위트 이름, 사용자·초대는 이메일) */
-  targetName: string;
-  /** 사용자·초대는 null */
-  projectId: number | null;
+  /** 바뀐 항목. name은 변경 당시 이름 (스케줄은 스위트 이름, 사용자·초대는 이메일) */
+  target: { type: ChangeTargetType; id: number; name: string };
+  /** 소속 프로젝트 (지금 이름). 사용자·초대·휴일은 null */
+  project: IdName | null;
   /** 소속 스위트. 스위트는 자신, 케이스·스케줄은 소속 스위트, 그 외는 null */
-  suiteId: number | null;
+  suite: IdName | null;
   action: ChangeAction;
   /** 수정에서 값이 바뀐 항목 이름. 예: name, variables.userId, secrets.token */
   fields: string[];

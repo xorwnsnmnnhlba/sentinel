@@ -1,16 +1,16 @@
 import { ExpiredLink } from "@/components/auth/expired-link";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { apiGet, isApiError } from "@/lib/api/server";
-import type { LinkInfo } from "@/lib/api/types";
+import type { PasswordResetLinkInfo } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 
 export const metadata = { title: "비밀번호 재설정 · Sentinel" };
 
 export default async function ResetPasswordPage(props: PageProps<"/password-resets/[token]">) {
   const { token } = await props.params;
-  let reset: LinkInfo;
+  let reset: PasswordResetLinkInfo;
   try {
-    reset = await apiGet<LinkInfo>(`/api/password-resets/${token}`);
+    reset = await apiGet<PasswordResetLinkInfo>(`/api/password-resets/${token}`);
   } catch (error) {
     if (isApiError(error) && error.status === 404) {
       return (
@@ -25,7 +25,7 @@ export default async function ResetPasswordPage(props: PageProps<"/password-rese
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">비밀번호 재설정</h1>
         <p className="text-sm text-muted-foreground">
-          <span className="font-mono">{reset.email}</span> 계정의 새 비밀번호를 설정합니다
+          <span className="font-mono">{reset.user.name}</span> 계정의 새 비밀번호를 설정합니다
         </p>
         <p className="text-xs text-muted-foreground">링크 만료 {formatDateTime(reset.expiresAt)} KST</p>
       </div>

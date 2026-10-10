@@ -58,6 +58,7 @@ sentinel/
   - 목록은 가리키는 리소스를 한 번에 읽어 둔 뒤 이름을 채움 (`Preload`). 항목 수만큼 조회하지 않는지 `RelationQueryCountTest`가 확인
   - 2차: 실행 상세(`suiteId`+`suiteName` 등 → `project`·`suite`·`environment`, 결과의 `testCase`), 응답시간 추세·요약(`testCase`·`suite`·`environment`). CI 스크립트(`scripts/sentinel-run.sh`)의 실패 케이스 이름도 `.testCase.name`으로
   - 이름이 없는 실행을 가리킬 때는 ID 그대로 (`rerunOf`). 직전 실행은 `{id, startedAt}`
+  - 3차: 변경 이력(`targetType`·`targetId`·`targetName` → `target: {type, id, name}`, `projectId`·`suiteId` → `project`·`suite`, 프로젝트·스위트는 지금 이름), 케이스 가져오기 결과(`suite`), 재설정 링크 확인(`user`). `RestConventionTest`가 응답 레코드에 `xxxId`·`xxxName` 필드가 없는지 확인 (새 API가 어기면 빌드 실패)
 - 계정 리소스 정리 (2026-10-09): 한 개념이 두 경로로 나뉘던 것을 정리. 초대는 `/api/invites`(발급 `POST`, 확인 `GET /{token}`), 재설정 링크는 `/api/password-resets`(발급 `POST {userId}`, 확인 `GET /{token}`). 초대 수락은 계정을 만드는 것이므로 `POST /api/users`(초대 토큰), 비밀번호는 사용자의 하위 리소스로 `PUT /api/users/me/password`(현재 비밀번호)·`PUT /api/users/{id}/password`(재설정 토큰). 이전 `POST /api/users/invites`·`POST /api/invites/{token}`·`POST /api/users/{id}/password-resets`·`POST /api/password-resets/{token}`·`POST /api/users/me/password`
   - 초대 수락은 계정만 만들고 로그인은 `POST /api/sessions`로 따로 (리소스 생성 응답에 세션을 섞지 않음). 화면(BFF)이 두 요청을 이어서 처리
   - 인증 필터의 로그인 없이 허용하는 요청을 경로 접두어에서 "메서드 + 경로" 목록으로 좁힘 (같은 경로의 다른 메서드는 인증 필요)

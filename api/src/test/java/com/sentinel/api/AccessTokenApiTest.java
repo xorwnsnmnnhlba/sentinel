@@ -222,7 +222,7 @@ class AccessTokenApiTest {
 		MvcTestResult logs = get(session, "/api/change-logs?targetType=ACCESS_TOKEN");
 		var history = assertThat(logs).hasStatusOk().bodyJson();
 		history.extractingPath("$.content[*].action").isEqualTo(List.of("DELETED", "CREATED"));
-		history.extractingPath("$.content[0].targetName").isEqualTo("CI");
+		history.extractingPath("$.content[0].target.name").isEqualTo("CI");
 		history.extractingPath("$.content[0].actor.id").isEqualTo(user.getId().intValue());
 		assertThat(body(logs)).doesNotContain(token);
 	}

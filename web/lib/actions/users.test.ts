@@ -214,7 +214,7 @@ describe("resetPassword", () => {
     let received: unknown;
     server.use(
       http.get(springUrl("/api/password-resets/reset-token"), () =>
-        HttpResponse.json({ userId: 7, email: "member@sentinel.test", expiresAt: "2026-09-20T02:00:00Z" }),
+        HttpResponse.json({ user: { id: 7, name: "member@sentinel.test" }, expiresAt: "2026-09-20T02:00:00Z" }),
       ),
       http.put(springUrl("/api/users/7/password"), async ({ request }) => {
         received = await request.json();
