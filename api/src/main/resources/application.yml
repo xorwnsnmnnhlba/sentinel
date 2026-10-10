@@ -92,6 +92,8 @@ sentinel:
     # 시크릿 암호화 키 (Base64, 16·24·32바이트). 미지정 시 시크릿 등록 거부
     # 생성 예: openssl rand -base64 32
     key: ${SENTINEL_SECRET_KEY:}
+    # 키 교체 시 이전 키 (선택). 이 키로 저장된 값을 기동 시 현재 키로 다시 암호화. 확인 후 제거
+    previous-key: ${SENTINEL_SECRET_KEY_PREVIOUS:}
   notification:
     # 수신 Webhook 주소. 미지정 시 알림을 로그로 기록. 자격증명이므로 환경변수로 주입
     webhook-url: ${SENTINEL_WEBHOOK_URL:}

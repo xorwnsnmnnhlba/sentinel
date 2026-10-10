@@ -21,6 +21,7 @@ DB_PASSWORD_VALUE="db-password-must-not-appear"
 WEBHOOK_VALUE="https://hooks.example.com/services/must-not-appear"
 HEARTBEAT_VALUE="https://hc-ping.example.com/heartbeat-must-not-appear"
 SECRET_KEY_VALUE=$(printf '0123456789abcdef0123456789abcdef' | openssl base64 -A)
+PREVIOUS_KEY_VALUE=$(printf 'fedcba9876543210fedcba9876543210' | openssl base64 -A)
 
 # ---------- 인증서 ----------
 
@@ -229,6 +230,28 @@ valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_SECRET_KEY "$(printf 'short' | openssl base64 -A)"
 run "$D"
 check "암호화 키 길이 오류는 실패" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_SECRET_KEY는 Base64로 16·24·32바이트"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" SENTINEL_SECRET_KEY_PREVIOUS "$PREVIOUS_KEY_VALUE"
+run "$D"
+check "키 교체 중이면 이전 키 제거 안내" '[ "$status" -eq 0 ] && contains "! SENTINEL_SECRET_KEY_PREVIOUS 설정됨 (키 교체 중)"'
+check "이전 키는 출력하지 않음" '! contains "$PREVIOUS_KEY_VALUE"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" SENTINEL_SECRET_KEY_PREVIOUS "$SECRET_KEY_VALUE"
+run "$D"
+check "이전 키가 현재 키와 같으면 경고" 'contains "! SENTINEL_SECRET_KEY_PREVIOUS가 SENTINEL_SECRET_KEY와 같음"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" SENTINEL_SECRET_KEY_PREVIOUS "$(printf 'short' | openssl base64 -A)"
+run "$D"
+check "이전 키 길이 오류는 실패" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_SECRET_KEY_PREVIOUS는 Base64로 16·24·32바이트"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" SENTINEL_SECRET_KEY ""
+set_value "$D/sentinel.env" SENTINEL_SECRET_KEY_PREVIOUS "$PREVIOUS_KEY_VALUE"
+run "$D"
+check "새 키 없이 이전 키만 있으면 실패" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_SECRET_KEY_PREVIOUS만 있음"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_ADMIN_PASSWORD "initial-admin-password"
