@@ -2,7 +2,7 @@
 
 팀원이 사내망에서 쓰도록 서버에 띄우고 유지하는 절차. 컨테이너 구성과 설계 배경은 [design.md](design.md) "6. 실행 환경"
 
-최종 점검: 2026-10-07 (알림 이력·채널 고장 표시·휴일·스케줄 일괄 변경 반영)
+최종 점검: 2026-10-10 (암호화 키 교체·시스템 상태 반영)
 
 ## 결정 사항 (2026-09-26)
 
@@ -49,7 +49,7 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 6. 확인 (다른 PC 브라우저)
    - `https://<접속 이름>` 접속 시 인증서 경고 없음, 로그인 유지
    - `http://<접속 이름>`은 `https://`로 이동
-   - 대시보드 머리 아래에 "기본 알림 채널 주소(SENTINEL_WEBHOOK_URL)가 없어…" 안내가 없음 (있으면 `sentinel.env` 확인)
+   - 사이드바 "시스템 상태"(관리자): 암호화 키 "사용 중", 알림·감시 설정이 모두 "설정됨"(생존 신호는 설정한 경우), 보관 기간 (없는 항목은 `sentinel.env` 확인)
    - 사이드바 "알림 이력"의 "기본 채널 테스트 알림"(관리자)으로 기본 채널에 메시지가 오는지 확인
    - 생존 신호를 설정했다면 외부 감시 서비스에 첫 신호가 도착 (스케줄 폴링 주기 60초)
 7. 최초 관리자로 로그인 → 비밀번호 변경 → `sentinel.env`에서 `SENTINEL_ADMIN_PASSWORD` 줄 삭제 후 `docker compose up -d sentinel-api` → 사용자 화면에서 팀원 초대
@@ -94,7 +94,7 @@ docker image prune -f
 
 - 중단 시간: 컨테이너 교체 동안(수십 초) 접속 불가. 그 사이 놓친 스케줄 실행은 기동 후 1회만 실행
 - 마이그레이션은 api 기동 시 Flyway가 적용. 실패하면 api가 기동하지 않고 `--wait`가 오류로 종료
-- 확인: `docker compose ps`(모두 healthy), 화면 접속, `docker compose logs --since 10m sentinel-api`
+- 확인: `docker compose ps`(모두 healthy), 화면 "시스템 상태"의 빌드 시각·DB 마이그레이션이 새 버전, `docker compose logs --since 10m sentinel-api`
 
 ## 되돌리기
 
@@ -136,7 +136,7 @@ openssl rand -base64 32
    - `SENTINEL_SECRET_KEY=<새 키>`
 3. `scripts/preflight.sh`: "SENTINEL_SECRET_KEY_PREVIOUS 설정됨 (키 교체 중)" 경고 외 실패 0 확인
 4. `docker compose up -d sentinel-api` (환경변수를 다시 읽도록 컨테이너 재생성)
-5. 확인
+5. 확인: 화면 "시스템 상태"의 암호화 키가 "키 교체 중"이고 풀 수 없는 값 없음. 로그로도 확인 가능
 
    ```bash
    docker compose logs --since 10m sentinel-api | grep -E "Re-encrypted|cannot be decrypted"
@@ -145,7 +145,7 @@ openssl rand -base64 32
    - `Re-encrypted N secret value(s)`: 다시 암호화한 수. 저장된 값이 없거나 이미 새 키면 이 줄 없음
    - `cannot be decrypted` 경고가 있으면 이전 키가 틀렸거나 그 전에 이미 읽을 수 없던 값. 값은 지우지 않으므로 올바른 이전 키로 2~4 반복. 위치(`environment 3 secret 'token'`)의 값은 화면에서 다시 입력해도 됨
    - 화면에서 시크릿을 쓰는 스위트 실행, 프로젝트 "테스트 알림 보내기"
-6. `sentinel.env`에서 `SENTINEL_SECRET_KEY_PREVIOUS` 줄 삭제 후 `docker compose up -d sentinel-api`
+6. `sentinel.env`에서 `SENTINEL_SECRET_KEY_PREVIOUS` 줄 삭제 후 `docker compose up -d sentinel-api`. "시스템 상태"의 암호화 키가 "사용 중"
 7. 비밀번호 관리 도구에서 이전 키 폐기
 
 - 다시 암호화는 api 기동 시 요청을 받기 전에 끝남. 실패하면 기동하지 않고 `--wait`가 오류

@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Menu,
   Search,
+  ServerCog,
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -31,7 +32,10 @@ const navigation = [
   { href: "/holidays", label: "휴일", icon: CalendarOff, match: [] as string[] },
 ];
 
-const adminNavigation = [{ href: "/users", label: "사용자", icon: UsersRound, match: [] as string[] }];
+const adminNavigation = [
+  { href: "/users", label: "사용자", icon: UsersRound, match: [] as string[] },
+  { href: "/system", label: "시스템 상태", icon: ServerCog, match: [] as string[] },
+];
 
 /** 현재 화면에 해당하는 메뉴 주소. 해당 메뉴가 없으면(비밀번호 변경 등) undefined */
 export function activeHref(pathname: string): string | undefined {

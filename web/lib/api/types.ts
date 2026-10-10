@@ -556,3 +556,30 @@ export interface ChannelFailure {
   statusCode: number | null;
   error: string | null;
 }
+
+/** 시스템 상태 (관리자). 설정은 지정 여부만, 주소·키 값은 없음 (api/README.md "시스템 상태") */
+export interface SystemStatus {
+  /** 빌드 정보 없이 실행하면(IDE) null */
+  build: { version: string; builtAt: string } | null;
+  startedAt: string | null;
+  /** 적용된 마지막 DB 마이그레이션 버전 (예: "29") */
+  databaseMigration: string | null;
+  secrets: {
+    state: SecretState;
+    /** 지금 키로 풀 수 없는 값. 프로젝트 Webhook 주소는 environment·secret이 null */
+    undecryptable: UndecryptableSecret[];
+  };
+  defaultChannel: boolean;
+  resultLinks: boolean;
+  heartbeat: boolean;
+  retention: { rawResultDays: number; notificationDeliveryDays: number };
+}
+
+/** DISABLED: 키 없음, ENABLED: 사용 중, ROTATING: 키 교체 중 (이전 키 설정) */
+export type SecretState = "DISABLED" | "ENABLED" | "ROTATING";
+
+export interface UndecryptableSecret {
+  project: IdName;
+  environment: IdName | null;
+  secret: string | null;
+}
