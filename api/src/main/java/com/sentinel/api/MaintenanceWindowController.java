@@ -7,6 +7,7 @@ import com.sentinel.api.request.CreateMaintenanceWindowRequest;
 import com.sentinel.api.request.UpdateMaintenanceWindowRequest;
 import com.sentinel.application.MaintenanceWindowItem;
 import com.sentinel.application.MaintenanceWindowService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 환경 점검 시간. 점검 중에는 그 환경의 스케줄 실행을 건너뜀 (실행 기록·실패 알림 없음)
  */
 @RestController
+@Tag(name = "점검 시간")
 @RequestMapping("/api/maintenance-windows")
 @RequiredArgsConstructor
 class MaintenanceWindowController {
@@ -38,6 +40,7 @@ class MaintenanceWindowController {
 		return maintenanceWindowService.listOpen(environmentId);
 	}
 
+	/** 등록. 기간은 최대 7일, 이미 시작한 시각도 가능 (지금부터 점검) */
 	@PostMapping
 	ResponseEntity<MaintenanceWindowItem> create(@Valid @RequestBody CreateMaintenanceWindowRequest request) {
 		MaintenanceWindowItem window = maintenanceWindowService.create(request.environmentId(), request.startsAt(),
@@ -52,6 +55,7 @@ class MaintenanceWindowController {
 		return maintenanceWindowService.get(windowId);
 	}
 
+	/** 부분 변경 (연장·단축·사유). 생략한 필드는 유지, 이미 끝난 점검은 409 */
 	@PatchMapping("/{windowId}")
 	MaintenanceWindowItem update(@PathVariable long windowId, @RequestBody UpdateMaintenanceWindowRequest request) {
 		return maintenanceWindowService.update(windowId, request.startsAt(), request.endsAt(), request.reason(),

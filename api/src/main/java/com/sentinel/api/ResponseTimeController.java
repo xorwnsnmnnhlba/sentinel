@@ -3,6 +3,7 @@ package com.sentinel.api;
 import java.time.LocalDate;
 
 import com.sentinel.application.ResponseTimeService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 응답시간 추세. 기간은 {@code sentinel.schedule.zone} 기준 날짜(종료일 포함), 최대 90일
  */
 @RestController
+@Tag(name = "통계")
 @RequiredArgsConstructor
 class ResponseTimeController {
 

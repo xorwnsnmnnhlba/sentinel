@@ -8,6 +8,8 @@ import com.sentinel.api.response.PasswordResetResponse;
 import com.sentinel.application.IdName;
 import com.sentinel.application.auth.AuthenticatedUser;
 import com.sentinel.application.auth.UserService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 새 비밀번호 설정은 {@code PUT /api/users/{userId}/password}
  */
 @RestController
+@Tag(name = "비밀번호 재설정")
 @RequestMapping("/api/password-resets")
 @RequiredArgsConstructor
 class PasswordResetController {
@@ -43,6 +46,8 @@ class PasswordResetController {
 	}
 
 	/** 확인 (로그인 불필요). 만료·사용·위조는 모두 404 */
+	// 로그인 없이 호출 (API 문서에 인증 표시 없음)
+	@SecurityRequirements
 	@GetMapping("/{token}")
 	PasswordResetResponse get(@PathVariable String token) {
 		UserService.ResetInfo reset = userService.passwordReset(token);

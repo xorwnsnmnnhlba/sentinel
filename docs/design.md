@@ -53,6 +53,10 @@ sentinel/
 - URL에 동사 미사용. 상태 변경은 `PATCH` 부분 수정 (`PATCH /api/schedules/{id}` `{"enabled": false}`)
 - 실행 생성 입구는 `POST /api/runs` 하나. 대상은 본문의 `suiteId` 또는 `caseId` 중 정확히 하나
 - 생성은 201 + `Location`, 오류는 ProblemDetail
+- API 문서 (2026-10-10): OpenAPI 문서 자동 생성 (`GET /api/openapi`, springdoc-openapi). 1단계 api, 2단계 web(화면)
+  - REST 정리 뒤 CI 연동하는 팀원이 README 대신 실제 API에서 경로·요청·응답을 확인하도록
+  - 보는 곳·범위 (사용자 결정): 웹 화면에 직접 표시(같은 디자인, Swagger UI의 인라인 스타일 때문에 CSP 예외를 두지 않음), 로그인한 사용자만
+  - 설명은 이미 있는 컨트롤러·레코드 Javadoc을 그대로 사용 (주석과 문서가 따로 놀지 않도록). 묶음 이름은 한국어 `@Tag`
 - 관계 표기 (2026-10-09): 응답에서 다른 리소스를 가리킬 때는 `{id, name}` 객체. 숫자 ID만(`suiteId`) 또는 ID·이름 따로(`suiteId`+`suiteName`)를 섞어 쓰던 것을 통일. 요청 본문·조회 조건은 ID 그대로
   - 1차: 목록 리소스(환경·스위트의 `project`, 케이스의 `suite`, 스케줄의 `project`·`suite`·`environment`, 점검 시간의 `project`). 화면이 이름을 붙이려고 목록을 따로 받아 잇던 곳(스케줄·검색 화면)이 단순해짐
   - 목록은 가리키는 리소스를 한 번에 읽어 둔 뒤 이름을 채움 (`Preload`). 항목 수만큼 조회하지 않는지 `RelationQueryCountTest`가 확인

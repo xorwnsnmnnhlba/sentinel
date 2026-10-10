@@ -101,3 +101,8 @@ sentinel:
     read-timeout: 5s
     # 같은 케이스가 계속 실패하는 동안 실패 알림을 다시 보내는 간격. 새로 실패·복구는 바로 발송. 0s이면 실행마다 발송
     repeat-interval: 1h
+# API 문서 (OpenAPI JSON). 다른 API와 같이 로그인 필요, 화면은 web의 "API 문서"
+springdoc:
+  api-docs:
+    path: /api/openapi
+  writer-with-order-by-keys: true

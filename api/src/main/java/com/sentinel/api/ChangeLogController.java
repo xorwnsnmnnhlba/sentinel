@@ -4,6 +4,7 @@ import com.sentinel.application.ChangeLogService;
 import com.sentinel.application.ChangeLogService.ChangeLogItem;
 import com.sentinel.application.PageResponse;
 import com.sentinel.domain.ChangeLog;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 설정 변경 이력 조회. 기록은 각 등록·수정·삭제 API가 같은 트랜잭션에서 남김
  */
 @RestController
+@Tag(name = "변경 이력")
 @RequestMapping("/api/change-logs")
 @RequiredArgsConstructor
 class ChangeLogController {
