@@ -1,5 +1,7 @@
 package com.sentinel.infra.security;
 
+import java.util.Optional;
+
 import com.sentinel.application.secret.SecretCipher;
 import com.sentinel.application.secret.SecretKeyMissingException;
 
@@ -15,6 +17,11 @@ class DisabledSecretCipher implements SecretCipher {
 
 	@Override
 	public String decrypt(String cipherText) {
+		throw new SecretKeyMissingException();
+	}
+
+	@Override
+	public Optional<String> reEncrypt(String cipherText) {
 		throw new SecretKeyMissingException();
 	}
 

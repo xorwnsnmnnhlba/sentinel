@@ -213,6 +213,21 @@ check_app_env() {
     esac
   fi
 
+  # 키 교체 중에만 존재. 기동 시 이전 키로 저장된 값을 새 키로 다시 암호화
+  previous=$(value_of "$APP_ENV_FILE" SENTINEL_SECRET_KEY_PREVIOUS)
+  if [ -n "$previous" ]; then
+    bytes=$(printf '%s' "$previous" | openssl base64 -d -A 2>/dev/null | wc -c | tr -d ' ')
+    if [ -z "$value" ]; then
+      fail "SENTINEL_SECRET_KEY_PREVIOUS만 있음. 새 키(SENTINEL_SECRET_KEY)도 지정해야 api가 기동"
+    elif [ "$bytes" != 16 ] && [ "$bytes" != 24 ] && [ "$bytes" != 32 ]; then
+      fail "SENTINEL_SECRET_KEY_PREVIOUS는 Base64로 16·24·32바이트 (교체 전 키 그대로)"
+    elif [ "$previous" = "$value" ]; then
+      warn "SENTINEL_SECRET_KEY_PREVIOUS가 SENTINEL_SECRET_KEY와 같음. 교체할 것이 없으므로 제거"
+    else
+      warn "SENTINEL_SECRET_KEY_PREVIOUS 설정됨 (키 교체 중). 기동 로그의 재암호화 확인 후 sentinel.env에서 제거"
+    fi
+  fi
+
   if [ -n "$(value_of "$APP_ENV_FILE" SENTINEL_ADMIN_PASSWORD)" ]; then
     warn "SENTINEL_ADMIN_PASSWORD 설정됨. 최초 관리자로 로그인해 비밀번호를 바꾼 뒤 sentinel.env에서 제거"
   elif [ -z "$(value_of "$APP_ENV_FILE" SENTINEL_ADMIN_EMAIL)" ]; then

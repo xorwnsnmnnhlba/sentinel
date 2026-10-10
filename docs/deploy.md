@@ -62,7 +62,7 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 |------|------|
 | `.env` | 접속 주소, 인증서 방식 형식, HSTS 값 (내부 인증서와 함께 쓰면 경고) |
 | 보유 인증서 | 만료(30일 전 경고), 개인 키 짝, 접속 주소마다 인증서 포함 여부(와일드카드는 한 단계), 중간 인증서 포함 |
-| `sentinel.env` | 따옴표 사용, DB 필수 값, DB 주소(컨테이너 안 localhost 금지, RDS의 sslmode), 암호화 키 길이, 최초 관리자 비밀번호 잔존, 알림 링크 주소, 기본 알림 채널·생존 신호 주소 유무 (값은 출력하지 않음) |
+| `sentinel.env` | 따옴표 사용, DB 필수 값, DB 주소(컨테이너 안 localhost 금지, RDS의 sslmode), 암호화 키 길이, 이전 암호화 키(길이·새 키 유무·잔존), 최초 관리자 비밀번호 잔존, 알림 링크 주소, 기본 알림 채널·생존 신호 주소 유무 (값은 출력하지 않음) |
 
 ## 운영 시작 설정
 
@@ -122,12 +122,41 @@ openssl x509 -in proxy/certs/cert.pem -noout -enddate
 2. `scripts/preflight.sh`로 주소 포함·키 짝 확인
 3. `docker compose restart sentinel-proxy` (앞단만 재시작, api·web 영향 없음)
 
+## 암호화 키 교체
+
+키 유출이 의심되거나 키를 아는 담당자가 바뀌었을 때. 저장된 환경 시크릿과 프로젝트 Webhook 주소를 다시 입력하지 않고 새 키로 옮김
+
+```bash
+openssl rand -base64 32
+```
+
+1. 위 명령으로 새 키 생성 후 팀 비밀번호 관리 도구에 보관 (이전 키는 교체가 끝날 때까지 유지)
+2. `sentinel.env` 수정
+   - `SENTINEL_SECRET_KEY_PREVIOUS=<지금까지의 키>`
+   - `SENTINEL_SECRET_KEY=<새 키>`
+3. `scripts/preflight.sh`: "SENTINEL_SECRET_KEY_PREVIOUS 설정됨 (키 교체 중)" 경고 외 실패 0 확인
+4. `docker compose up -d sentinel-api` (환경변수를 다시 읽도록 컨테이너 재생성)
+5. 확인
+
+   ```bash
+   docker compose logs --since 10m sentinel-api | grep -E "Re-encrypted|cannot be decrypted"
+   ```
+
+   - `Re-encrypted N secret value(s)`: 다시 암호화한 수. 저장된 값이 없거나 이미 새 키면 이 줄 없음
+   - `cannot be decrypted` 경고가 있으면 이전 키가 틀렸거나 그 전에 이미 읽을 수 없던 값. 값은 지우지 않으므로 올바른 이전 키로 2~4 반복. 위치(`environment 3 secret 'token'`)의 값은 화면에서 다시 입력해도 됨
+   - 화면에서 시크릿을 쓰는 스위트 실행, 프로젝트 "테스트 알림 보내기"
+6. `sentinel.env`에서 `SENTINEL_SECRET_KEY_PREVIOUS` 줄 삭제 후 `docker compose up -d sentinel-api`
+7. 비밀번호 관리 도구에서 이전 키 폐기
+
+- 다시 암호화는 api 기동 시 요청을 받기 전에 끝남. 실패하면 기동하지 않고 `--wait`가 오류
+- 이전 키 없이 키만 바꾸면 기존 값을 읽지 못함 (시크릿을 쓰는 실행 400, 프로젝트 알림 실패). 이때도 이전 키를 넣고 다시 기동하면 복구
+
 ## 백업·보관
 
 | 대상 | 방법 |
 |------|------|
 | DB (케이스·실행 이력·사용자) | RDS 자동 백업 보존 기간 확인, 마이그레이션이 있는 업데이트 전 수동 스냅샷 |
-| `SENTINEL_SECRET_KEY` | 팀 비밀번호 관리 도구에 보관. 분실 시 환경의 시크릿과 프로젝트 Webhook을 모두 다시 입력 |
+| `SENTINEL_SECRET_KEY` | 팀 비밀번호 관리 도구에 보관. 분실 시 환경의 시크릿과 프로젝트 Webhook을 모두 다시 입력. 바꿀 때는 "암호화 키 교체" |
 | 알림 발송 이력 | DB에 90일 보관 후 자동 삭제 (`sentinel.retention.notification-retention`). 주소·본문은 기록하지 않음 |
 | `sentinel.env`·`.env`·`proxy/certs/` | 서버에만 존재. 서버 교체에 대비해 값의 보관 위치 기록 (파일째 공유 금지) |
 | `caddy_data` 볼륨 | 회사 인증서 방식에서는 보관 불필요 (내부 인증서 방식일 때만 인증 기관 키 보관) |
