@@ -115,7 +115,7 @@ docs: add branch convention
 | 항목 | 확인 방법 |
 |------|-----------|
 | 작업 단위 완결 | 브랜치 이름에 명시한 작업의 동작 확인 |
-| CI 통과 | PR의 **CI** 체크 통과 (`.github/workflows/ci.yml`: web lint·서식·테스트·빌드, api 테스트) |
+| CI 통과 | PR의 **CI** 체크 통과 (`.github/workflows/ci.yml`: web lint·서식·테스트·빌드, api 테스트, E2E, 배포 스크립트) |
 | 빌드·테스트 통과 (로컬) | api: `./gradlew build` / web: `npm run lint`, `npm run format:check`, `npm test`, `npm run build` |
 | 기동 확인 | 로컬 실행 후 변경 부분 동작 확인 |
 | 셀프 리뷰 | PR **Files changed** 탭에서 diff 확인 (디버그 코드, 시크릿, 불필요한 파일) |
