@@ -56,6 +56,14 @@ class EnvironmentSecretsTest {
 	}
 
 	@Test
+	void showsTheKeyAsInUseInTheSystemStatus() {
+		assertThat(mvc.get().uri("/api/system-status")).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.secrets.state")
+			.isEqualTo("ENABLED");
+	}
+
+	@Test
 	void keepsSecretValuesOutOfResponses() throws Exception {
 		Project project = fixtures.project();
 
