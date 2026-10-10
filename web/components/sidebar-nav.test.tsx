@@ -20,6 +20,7 @@ describe("activeHref", () => {
     expect(activeHref("/holidays")).toBe("/holidays");
     expect(activeHref("/notifications")).toBe("/notifications");
     expect(activeHref("/schedules")).toBe("/schedules");
+    expect(activeHref("/system")).toBe("/system");
   });
 
   it("highlights nothing for screens outside the menu or paths that only share a prefix", () => {

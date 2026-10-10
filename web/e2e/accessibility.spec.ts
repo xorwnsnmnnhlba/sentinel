@@ -95,6 +95,7 @@ for (const colorScheme of ["light", "dark"] as const) {
         "/notifications",
         "/schedules",
         "/api-docs",
+        "/system",
         "/settings/password",
       ];
       for (const path of paths) {
