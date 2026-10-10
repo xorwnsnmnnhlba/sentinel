@@ -1,1 +1,10 @@
+// 플러그인과 그 의존성은 Maven Central에서 먼저 찾고, 없으면 Gradle 플러그인 저장소
+// 플러그인 저장소만 쓰면 그 저장소의 일시 장애에 빌드가 실패 (2026-10-10 CI e2e 이미지 빌드)
+pluginManagement {
+	repositories {
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
 rootProject.name = 'sentinel'

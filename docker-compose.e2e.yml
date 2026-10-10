@@ -24,6 +24,8 @@ services:
 
   e2e-api:
     build: ./api
+    # CI는 이 이름으로 미리 빌드(GitHub Actions 캐시)한 이미지를 사용 (.github/workflows/ci.yml)
+    image: sentinel-e2e-api
     environment:
       DB_URL: jdbc:postgresql://e2e-postgres:5432/sentinel?currentSchema=sentinel
       DB_USERNAME: sentinel
@@ -48,6 +50,7 @@ services:
 
   e2e-web:
     build: ./web
+    image: sentinel-e2e-web
     environment:
       INTERNAL_API_URL: http://e2e-api:8080
       TZ: Asia/Seoul

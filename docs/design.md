@@ -307,6 +307,10 @@ runner 패키지는 Spring 의존성 없는 순수 자바로 유지. 제품의 �
   - 개발/운영 스택과 포트·데이터 분리 (web 13000, api 18080, DB는 컨테이너 내부 전용·매 실행 폐기)
   - async Server Component 화면은 단위 테스트 대상이 아니므로 이 경로로 검증
 - CI: GitHub Actions에서 PR·main 푸시마다 web(lint, 서식, 테스트, 빌드), api(Testcontainers 포함 테스트), E2E 병렬 실행
+  - 외부 저장소 장애 대비 (2026-10-10): Gradle 플러그인 저장소 일시 장애로 E2E 이미지 빌드가 실패한 뒤 도입
+    - api 플러그인과 그 의존성은 Maven Central 먼저, 없으면 Gradle 플러그인 저장소 (`api/settings.gradle`). Central만으로 모두 풀리는 것 확인
+    - E2E의 api·web 이미지는 GitHub Actions 캐시를 쓰는 빌더(`docker/build-push-action`)로 미리 빌드 후 스택 기동. `build.gradle`·`package-lock.json`이 그대로면 의존성 단계 재사용 (외부 다운로드 없음)
+    - 로컬 `npm run e2e:up`은 그대로 compose가 빌드 (이미지 이름만 `sentinel-e2e-api`·`sentinel-e2e-web`으로 고정)
 
 ```java
 public interface RequestExecutor {
