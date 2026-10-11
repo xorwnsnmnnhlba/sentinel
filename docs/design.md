@@ -445,6 +445,9 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 - OSV-Scanner는 공식 릴리스 실행 파일을 버전·체크섬 고정으로 사용 (외부 액션 미사용)
 - 작업 셸을 `bash`로 지정 (2026-10-11): 지정하지 않으면 `bash -e`로 실행되어 `pipefail`이 없음. 판정 결과를 `tee`로 요약에 남기는 단계가 판정 실패를 무시하고 통과했음(#142에서 24건을 찾고도 통과)
 - 도입 시 발견 (2026-10-10): api `spring-webmvc` 7.0.8 치명(9.8) 2건, Jackson·httpcore5 높음, web `next` 16.3.5 치명과 `sharp` 등 높음. 모두 수정 버전 있음 → 의존성 업데이트로 해결
+  - 해결 (2026-10-11): Spring Boot 4.1.1(`spring-webmvc` 7.0.9), Jackson은 Spring Boot가 아직 취약한 버전을 관리해 같은 minor 수정판으로 덮어씀(`build.gradle`의 `jackson-bom.version`·`jackson-2-bom.version`, 관리되면 제거). web은 `next` 16.4.0, `sharp`·`source-map-js`는 범위 안 업데이트
+  - `shadcn`은 개발 의존성으로: 빌드 때 CSS(`shadcn/tailwind.css`)만 쓰는 CLI. 올려서 고칠 버전이 없는 취약점(2.0.0 이상 전부)이 딸린 패키지와 함께 운영 점검 대상에서 빠짐
+  - api·web 이미지를 한 점검에서 함께 판정하므로 둘을 한 PR로 (한쪽만 고친 PR은 다른 쪽 때문에 통과할 수 없음)
 
 ## 6. 실행 환경
 
