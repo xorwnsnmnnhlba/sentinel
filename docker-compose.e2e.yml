@@ -68,7 +68,7 @@ services:
 
   # HTTPS 앞단. 운영과 같은 Caddyfile로 실제 경로(TLS, Host 전달, Secure 쿠키, Server Action 출처 확인) 검증
   e2e-proxy:
-    image: caddy:2.11.4-alpine
+    image: caddy:2.11.7-alpine
     environment:
       # 테스트 포트를 주소에 포함해야 HTTP→HTTPS 이동이 이 포트로 향함
       # sentinel.e2e.test는 사내 이름 역할 (HSTS 확인용, 브라우저가 127.0.0.1로 해석하도록 테스트에서 지정)
