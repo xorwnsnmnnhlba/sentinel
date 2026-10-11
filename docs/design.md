@@ -435,6 +435,16 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 후속 검토
 - 로그인 잠금은 메모리 보관. 여러 인스턴스로 늘리면 공유 저장소 필요
 
+### 의존성 취약점 점검 (2026-10-10)
+
+- 방식 (사용자 결정): Dependabot과 CI 점검을 함께. 비공개 저장소라 의존성 검토(dependency-review)·CodeQL은 유료 기능(GitHub Advanced Security)이 필요해 제외
+  - Dependabot (`.github/dependabot.yml`): 매주 월요일 생태계(Gradle·npm·Actions·Docker·compose)마다 minor·patch를 한 PR로. 큰 버전 이미지(Java·Node LTS)는 직접 결정하므로 제외. 취약점 경고·보안 수정 PR은 저장소 설정에서 켜야 동작
+  - CI 점검 (`.github/workflows/security.yml`): api·web 이미지를 OSV-Scanner로(실제 배포물 안의 Java 라이브러리·OS 패키지), web 운영 의존성은 npm audit으로. Next.js standalone 이미지에는 npm 패키지 정보가 남지 않아 이미지 점검으로는 보이지 않음
+- 막는 시점 (사용자 결정): 의존성을 바꾼 PR(`build.gradle`·`package-lock.json`·Dockerfile 등)만 막고, 매주 월요일 정기 점검은 실패로 표시. 새 취약점이 공개되는 날 무관한 PR까지 막히지 않도록
+- 막는 기준 (`scripts/vulnerabilities.sh`): 애플리케이션 의존성(Java 라이브러리·npm 운영 의존성)의 높음(CVSS 7.0·high) 이상 중 수정 버전이 있는 것. OS 패키지는 보고만 (대부분 수정판이 없고, 있어도 기본 이미지 갱신으로만 반영)
+- OSV-Scanner는 공식 릴리스 실행 파일을 버전·체크섬 고정으로 사용 (외부 액션 미사용)
+- 도입 시 발견 (2026-10-10): api `spring-webmvc` 7.0.8 치명(9.8) 2건, Jackson·httpcore5 높음, web `next` 16.3.5 치명과 `sharp` 등 높음. 모두 수정 버전 있음 → 의존성 업데이트로 해결
+
 ## 6. 실행 환경
 
 ### 컨테이너 구성

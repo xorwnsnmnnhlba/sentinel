@@ -82,6 +82,8 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 
 ## 업데이트
 
+보안 업데이트도 같은 절차. 매주 월요일 GitHub **Security** 점검(`.github/workflows/security.yml`)이 실패하면 새로 공개된 취약점이므로 의존성 업데이트 PR(Dependabot 또는 직접)을 머지한 뒤 반영
+
 ```bash
 git fetch
 # 새 DB 마이그레이션이 있으면 먼저 RDS 스냅샷

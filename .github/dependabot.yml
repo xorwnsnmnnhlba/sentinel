@@ -1,0 +1,75 @@
+# 의존성 업데이트 PR (매주 월요일 09:00 KST, 생태계마다 minor·patch를 한 PR로 묶음)
+# 취약점 경고와 보안 수정 PR은 저장소 설정에서 켜야 동작: Settings → Code security → Dependabot alerts, Dependabot security updates
+# 브랜치 이름은 Dependabot 규칙(dependabot/...)으로 docs/branch-convention.md의 예외
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /api
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    groups:
+      api:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    groups:
+      web:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    groups:
+      actions:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # 기본 이미지(Dockerfile)와 compose 이미지(PostgreSQL·Caddy). 큰 버전(Java·Node LTS 등)은 직접 결정하므로 제외
+  - package-ecosystem: docker
+    directories: [/api, /web]
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: chore
+      include: scope
