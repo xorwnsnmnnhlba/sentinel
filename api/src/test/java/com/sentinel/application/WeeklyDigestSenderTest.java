@@ -37,7 +37,10 @@ class WeeklyDigestSenderTest {
 	/** 2026-08-17 (월) 09:00 KST */
 	private static final Instant MONDAY_NINE = Instant.parse("2026-08-17T00:00:00Z");
 
-	@Autowired
+	/** 설치일 기본값. 테스트 날짜보다 훨씬 앞 */
+	private static final LocalDate LONG_AGO = LocalDate.of(2026, 1, 1);
+
+	/** 테스트마다 새로 만듦. 처리한 예정 시각(handled)을 기억하므로 공유하면 테스트 순서에 따라 결과가 달라짐 */
 	private WeeklyDigestSender sender;
 
 	@Autowired
@@ -64,8 +67,13 @@ class WeeklyDigestSenderTest {
 	@Autowired
 	private Transactions transactions;
 
+	@Autowired
+	private FixedInstallationDate installation;
+
 	@BeforeEach
 	void setUp() {
+		sender = new WeeklyDigestSender(properties, scheduleProperties, digests, deliveries, notifier, installation,
+				transactions, clock);
 		deliveries.deleteAllInBatch();
 		// 앞 주 요약은 이미 보냄
 		deliveries.save(new DigestDelivery(MONDAY_NINE.minus(Duration.ofDays(7)), LocalDate.of(2026, 8, 3),
@@ -74,6 +82,7 @@ class WeeklyDigestSenderTest {
 
 	@AfterEach
 	void cleanUp() {
+		installation.set(LONG_AGO);
 		deliveries.deleteAllInBatch();
 		fixtures.deleteAll();
 		notifier.reset();
@@ -128,7 +137,7 @@ class WeeklyDigestSenderTest {
 		WeeklyDigestSender failing = new WeeklyDigestSender(properties, scheduleProperties, digests, deliveries,
 				notification -> {
 					throw new IllegalStateException("webhook down");
-				}, transactions, clock);
+				}, installation, transactions, clock);
 		clock.set(MONDAY_NINE.plusSeconds(30));
 
 		// 발송 실패해도 기록이 남음
@@ -137,6 +146,37 @@ class WeeklyDigestSenderTest {
 		// 재시작(새 인스턴스)해도 DB 기록으로 판단
 		assertThat(sender.sendIfDue()).isFalse();
 		assertThat(notifier.sent()).isEmpty();
+	}
+
+	@Test
+	void skipsADigestForAPeriodThatEndedBeforeInstallation() {
+		// 08-17 (월) 설치. 첫 예정 시각의 요약 기간(08-10 ~ 08-16)은 설치 전
+		installation.set(LocalDate.of(2026, 8, 17));
+		clock.set(MONDAY_NINE.plusSeconds(30));
+
+		assertThat(sender.sendIfDue()).isFalse();
+		assertThat(notifier.sent()).isEmpty();
+		// 기록을 남겨 다시 확인하지 않음 (재시작해도 같은 판단)
+		assertThat(deliveries.existsByScheduledAt(MONDAY_NINE)).isTrue();
+		assertThat(sender.sendIfDue()).isFalse();
+	}
+
+	@Test
+	void sendsADigestWhenInstalledWithinThePeriod() {
+		// 기간 마지막 날(08-16) 설치면 설치 뒤 실행이 들어 있을 수 있으므로 발송
+		installation.set(LocalDate.of(2026, 8, 16));
+		clock.set(MONDAY_NINE.plusSeconds(30));
+
+		assertThat(sender.sendIfDue()).isTrue();
+		assertThat(notifier.sent()).extracting(Notification::title).containsExactly("[Sentinel] 주간 요약 08-10 ~ 08-16");
+	}
+
+	@Test
+	void sendsWhenTheInstallationDateIsUnknown() {
+		installation.set(null);
+		clock.set(MONDAY_NINE.plusSeconds(30));
+
+		assertThat(sender.sendIfDue()).isTrue();
 	}
 
 	@Test
@@ -169,6 +209,12 @@ class WeeklyDigestSenderTest {
 		@Primary
 		RecordingNotifier recordingNotifier() {
 			return new RecordingNotifier();
+		}
+
+		@Bean
+		@Primary
+		FixedInstallationDate fixedInstallationDate() {
+			return new FixedInstallationDate(LONG_AGO);
 		}
 
 	}
