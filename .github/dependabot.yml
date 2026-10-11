@@ -27,6 +27,14 @@ updates:
     groups:
       web:
         update-types: [minor, patch]
+    ignore:
+      # eslint-config-next가 쓰는 eslint-plugin-react(7.37.5)가 ESLint 10 미지원 (2026-10-11, lint 중단). 지원되면 제거
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      # Node는 LTS만 사용 (사용자 결정). 타입은 실행 버전(node:24-alpine, CI node-version 24)과 같은 큰 버전으로 유지
+      # 다음 LTS로 옮길 때 Dockerfile·CI·@types/node를 함께 직접 변경 (Docker 이미지의 큰 버전도 아래에서 제외)
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: chore
       include: scope
