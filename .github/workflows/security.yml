@@ -37,6 +37,10 @@ jobs:
   dependencies:
     name: dependencies (vulnerabilities)
     runs-on: ubuntu-latest
+    # 셸을 지정해야 pipefail 적용 (기본값 bash -e는 파이프 앞 명령의 실패를 무시). 판정 단계가 tee로 이어져 필요
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
