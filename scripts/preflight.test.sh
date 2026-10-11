@@ -25,7 +25,7 @@ PREVIOUS_KEY_VALUE=$(printf 'fedcba9876543210fedcba9876543210' | openssl base64 
 
 # ---------- 인증서 ----------
 
-# 회사 인증 기관 (중간 인증서 역할)
+# 인증 기관 (중간 인증서 역할)
 openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=Test Company CA" \
   -keyout "$WORK/ca.key" -out "$WORK/ca.crt" >/dev/null 2>&1
 
@@ -180,7 +180,7 @@ check "중간 인증서가 없으면 경고" '[ "$status" -eq 0 ] && contains "!
 valid_setup "$D"
 set_value "$D/.env" SENTINEL_SITE_ADDRESS "localhost, sentinel.team.internal"
 run "$D"
-check "회사 인증서에 localhost를 쓰면 경고" 'contains "! localhost는 회사 인증서에 없어"'
+check "보유 인증서에 localhost를 쓰면 경고" 'contains "! localhost는 보유 인증서에 없어"'
 
 valid_setup "$D"
 set_value "$D/.env" SENTINEL_TLS internal

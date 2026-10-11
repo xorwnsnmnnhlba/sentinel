@@ -199,7 +199,7 @@ class SchedulePollingTest {
 		ScheduleDetail skipping = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", true, ACTOR);
 		ScheduleDetail running = scheduleService.create(suite.getId(), environment.getId(), "10 9 * * *", ACTOR);
 		// 2026-09-18(금)만 휴일. 휴일 판단은 서버 설정 시간대(KST) 날짜 기준
-		holidays.create(LocalDate.parse("2026-09-18"), "창립기념일", ACTOR);
+		holidays.create(LocalDate.parse("2026-09-18"), "임시공휴일", ACTOR);
 
 		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
 		List<Long> onHoliday = poller.poll();

@@ -77,7 +77,7 @@ export default async function AccessTokensPage() {
         <pre className="overflow-x-auto border-b bg-muted p-4 font-mono text-xs">{runCommand(baseUrl)}</pre>
         <p className="p-4 text-xs text-muted-foreground">
           끝날 때까지 기다린 뒤 모두 통과 0, 실패 1, 실행하지 못함 2로 끝남. 스위트 ID는 스위트 화면
-          주소(/suites/번호)의 번호, 환경 ID는 프로젝트 화면 환경 이름 옆의 번호. 사내 인증 기관 인증서를 쓰면
+          주소(/suites/번호)의 번호, 환경 ID는 프로젝트 화면 환경 이름 옆의 번호. 내부 인증 기관 인증서를 쓰면
           SENTINEL_CA_CERT에 루트 인증서 경로 지정. GitHub Actions 예시는 저장소의 api/README.md &quot;API 토큰&quot;
         </p>
       </Panel>

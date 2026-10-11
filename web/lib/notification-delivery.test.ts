@@ -55,7 +55,7 @@ describe("resultHint", () => {
     [{ ...sent, delivered: false, statusCode: null, error: "TIMEOUT" }, "채널 응답이 늦음"],
     [
       { ...sent, delivered: false, statusCode: null, error: "CONNECTION_FAILED" },
-      "사내망·프록시에서 채널 주소로 나갈 수 있는지 확인",
+      "내부망·프록시에서 채널 주소로 나갈 수 있는지 확인",
     ],
     [{ ...sent, delivered: false, statusCode: null, error: "BLOCKED_DESTINATION" }, null],
   ])("%j → %s", (item, hint) => {

@@ -59,7 +59,7 @@ export default async function HolidaysPage(props: PageProps<"/holidays">) {
                   label="이름"
                   required
                   maxLength={MAX_NAME_LENGTH}
-                  placeholder="예: 추석, 창립기념일"
+                  placeholder="예: 추석, 임시공휴일"
                 />
               </FormDialog>
             </>

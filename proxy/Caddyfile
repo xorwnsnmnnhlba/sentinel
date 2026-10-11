@@ -4,9 +4,9 @@
 # SENTINEL_SITE_ADDRESS  접속 주소. 예: sentinel.example.com, localhost
 # SENTINEL_UPSTREAM      전달 대상 (기본 sentinel-web:3000, E2E 스택은 e2e-web:3000)
 # SENTINEL_API_UPSTREAM  API 토큰 요청 전달 대상 (기본 sentinel-api:8080, E2E 스택은 e2e-api:8080)
-# SENTINEL_HSTS_MAX_AGE  HSTS 유지 시간(초). 0이면 미사용(기본). 팀원 PC가 이미 신뢰하는 인증서(회사·Let's Encrypt)일 때만 사용
+# SENTINEL_HSTS_MAX_AGE  HSTS 유지 시간(초). 0이면 미사용(기본). 사용자 PC가 이미 신뢰하는 인증서(기관 발급·Let's Encrypt)일 때만 사용
 # SENTINEL_TLS           인증서 방식
-#   internal                           Caddy 내부 인증 기관 (사내 주소용, 기본값). 루트 인증서를 PC마다 신뢰 등록
+#   internal                           Caddy 내부 인증 기관 (내부 주소용, 기본값). 루트 인증서를 PC마다 신뢰 등록
 #   admin@example.com                  Let's Encrypt 자동 발급 (공개 도메인, 80·443 포트가 인터넷에서 접근 가능해야 함)
 #   /certs/cert.pem /certs/key.pem     보유한 인증서 (proxy/certs에 두면 컨테이너의 /certs로 연결)
 {
@@ -29,7 +29,7 @@
 
 	# HSTS: 브라우저가 이 주소를 기간 동안 HTTPS로만 열도록 기억 (첫 접속 이후 평문 HTTP 가로채기 차단)
 	# localhost 제외: HSTS는 포트와 무관하게 호스트 전체에 적용되어 같은 PC의 http://localhost:3000 개발 서버까지 막힘
-	# includeSubDomains 미사용: 회사 도메인의 다른 서비스까지 HTTPS 강제 방지
+	# includeSubDomains 미사용: 같은 도메인의 다른 서비스까지 HTTPS 강제 방지
 	@hsts not host localhost
 	header @hsts Strict-Transport-Security "max-age={$SENTINEL_HSTS_MAX_AGE:0}"
 

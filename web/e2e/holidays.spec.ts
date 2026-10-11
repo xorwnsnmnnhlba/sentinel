@@ -10,7 +10,7 @@ const api = process.env.E2E_API_URL ?? "http://localhost:18080";
 const stamp = Date.now();
 const year = 2090 + (stamp % 10);
 const date = `${year}-${String((stamp % 12) + 1).padStart(2, "0")}-${String((stamp % 28) + 1).padStart(2, "0")}`;
-const name = `창립기념일-${stamp}`;
+const name = `임시공휴일-${stamp}`;
 /** 붙여넣기용 해. 위 날짜와 겹치지 않는 범위 */
 const pasteYear = 2040 + (stamp % 40);
 

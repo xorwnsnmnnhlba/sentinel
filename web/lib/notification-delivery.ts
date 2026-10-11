@@ -50,7 +50,7 @@ export function resultHint(
       case "TIMEOUT":
         return "채널 응답이 늦음";
       case "CONNECTION_FAILED":
-        return "사내망·프록시에서 채널 주소로 나갈 수 있는지 확인";
+        return "내부망·프록시에서 채널 주소로 나갈 수 있는지 확인";
       default:
         return null;
     }

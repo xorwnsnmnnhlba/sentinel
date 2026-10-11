@@ -30,7 +30,7 @@ class WebhookPayloadTest {
 			.isEqualTo(WebhookPayload.Format.TEAMS);
 		assertThat(WebhookPayload.formatOf("https://company.webhook.office.com/webhookb2/abc"))
 			.isEqualTo(WebhookPayload.Format.TEAMS);
-		// 비슷하지만 다른 주소, 사내 중계, 잘못된 주소는 공통 텍스트
+		// 비슷하지만 다른 주소, 자체 중계 서버, 잘못된 주소는 공통 텍스트
 		assertThat(WebhookPayload.formatOf("https://hooks.slack.com.evil.example/x")).isEqualTo(WebhookPayload.Format.TEXT);
 		assertThat(WebhookPayload.formatOf("https://notslack-hooks.slack.com/x")).isEqualTo(WebhookPayload.Format.TEXT);
 		assertThat(WebhookPayload.formatOf("https://webhook.office.com.example/x")).isEqualTo(WebhookPayload.Format.TEXT);
