@@ -203,7 +203,7 @@ class HolidayApiTest {
 	void onlyAdministratorsCanCreateOrDelete() {
 		long hangul = id(create("2026-10-09", "한글날"));
 		String password = UUID.randomUUID().toString();
-		User member = users.save(new User("member-" + UUID.randomUUID() + "@sentinel.test", "팀원",
+		User member = users.save(new User("member-" + UUID.randomUUID() + "@sentinel.test", "구성원",
 				TestAuthConfiguration.passwordHash(password), User.Role.MEMBER));
 		String session = "Bearer " + authService.login(member.getEmail(), password).token();
 

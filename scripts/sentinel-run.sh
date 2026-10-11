@@ -14,7 +14,7 @@
 # 환경변수
 #   SENTINEL_URL      Sentinel 주소 (HTTPS 앞단). 끝의 / 없이
 #   SENTINEL_TOKEN    API 토큰 (화면의 "API 토큰"에서 발급). 출력하지 않음
-#   SENTINEL_CA_CERT  사내 인증 기관(Caddy internal) 루트 인증서 경로. 공인 인증서면 생략
+#   SENTINEL_CA_CERT  내부 인증 기관(Caddy internal) 루트 인증서 경로. 공인 인증서면 생략
 #
 # 필요: bash, curl, jq (GitHub Actions 러너에 기본 설치)
 set -euo pipefail

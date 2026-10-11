@@ -52,7 +52,7 @@ describe("FailingChannelList", () => {
 
     expect(items[1]).toHaveTextContent("기본 채널 · Teams");
     expect(items[1]).toHaveTextContent("연결하지 못했습니다");
-    expect(items[1]).toHaveTextContent("사내망·프록시에서 채널 주소로 나갈 수 있는지 확인");
+    expect(items[1]).toHaveTextContent("내부망·프록시에서 채널 주소로 나갈 수 있는지 확인");
     expect(within(items[1]).getByRole("link")).toHaveAttribute("href", "/notifications?failed=true");
   });
 });

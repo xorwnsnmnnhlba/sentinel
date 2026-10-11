@@ -51,7 +51,7 @@ sentinel/
 
 ### 1. 사전 준비
 - Docker (컨테이너 실행, 테스트)
-- PostgreSQL: 로컬 `localhost:5432`의 `sentinel` DB(기본값) 또는 개발기 RDS
+- PostgreSQL: 로컬 `localhost:5432`의 `sentinel` DB(기본값) 또는 AWS RDS
   - `sentinel` 스키마와 테이블은 기동 시 Flyway가 생성
 - 로컬 개발 시: JDK 25, Node.js 20.9.0 이상
 
@@ -89,13 +89,13 @@ cp .env.example .env
 
 | 변수 (`.env`) | 기본값 | 설명 |
 |------|--------|------|
-| `SENTINEL_SITE_ADDRESS` | `localhost` | 접속 주소. 다른 PC가 쓰는 이름 또는 IP (사내 DNS·hosts에 등록된 이름). 쉼표로 여러 개 지정 가능 (예: `localhost, sentinel.team.internal`) |
+| `SENTINEL_SITE_ADDRESS` | `localhost` | 접속 주소. 다른 PC가 쓰는 이름 또는 IP (내부 DNS·hosts에 등록된 이름). 쉼표로 여러 개 지정 가능 (예: `localhost, sentinel.team.internal`) |
 | `SENTINEL_TLS` | `internal` | 인증서 방식. 아래 표 |
-| `SENTINEL_HSTS_MAX_AGE` | `0` | HSTS 유지 시간(초). 0이면 미사용. 팀원 PC가 이미 신뢰하는 인증서(회사·Let's Encrypt)일 때만 사용. localhost에는 보내지 않음 |
+| `SENTINEL_HSTS_MAX_AGE` | `0` | HSTS 유지 시간(초). 0이면 미사용. 사용자 PC가 이미 신뢰하는 인증서(기관 발급·Let's Encrypt)일 때만 사용. localhost에는 보내지 않음 |
 
 | `SENTINEL_TLS` | 용도 | 준비 |
 |------|------|------|
-| `internal` | 사내 주소 | Caddy 내부 인증 기관이 발급. 루트 인증서를 접속하는 PC마다 신뢰 등록 (아래) |
+| `internal` | 내부 주소 | Caddy 내부 인증 기관이 발급. 루트 인증서를 접속하는 PC마다 신뢰 등록 (아래) |
 | 이메일 주소 | 공개 도메인 | Let's Encrypt 자동 발급·갱신. 80·443 포트가 인터넷에서 접근 가능해야 함 |
 | `/certs/cert.pem /certs/key.pem` | 보유한 인증서 | `proxy/certs/`에 `cert.pem`·`key.pem` 배치 (git 제외) |
 
@@ -112,9 +112,9 @@ docker compose cp sentinel-proxy:/data/caddy/pki/authorities/local/root.crt ./se
 - 세션 쿠키는 `Secure`라 HTTPS로만 전달. `http://<IP>:3000` 같은 평문 접속은 막혀 있고, 열더라도 로그인이 유지되지 않음
 - `sentinel.env`의 `SENTINEL_WEB_URL`(실패 알림의 결과 링크)도 `https://<접속 주소>`로 지정
 
-#### 팀 배포
+#### 서버 배포
 
-서버 준비, 회사 인증서 배치, 배포 전 점검(`scripts/preflight.sh`), 업데이트·되돌리기, 인증서 교체, 백업은 [docs/deploy.md](docs/deploy.md)
+서버 준비, 보유 인증서 배치, 배포 전 점검(`scripts/preflight.sh`), 업데이트·되돌리기, 인증서 교체, 백업은 [docs/deploy.md](docs/deploy.md)
 
 ### 3. 샘플 케이스 등록·실행
 

@@ -18,7 +18,7 @@ Sentinel 백엔드. 테스트 케이스 실행(러너), 스케줄 실행, 결과
 | Tomcat (내장) | 11.0.22 |
 | HikariCP | 7.0.2 |
 | PostgreSQL JDBC | 42.7.11 |
-| DB | PostgreSQL 18, 개발기 AWS RDS `sentinel` 스키마 |
+| DB | PostgreSQL 18, AWS RDS `sentinel` 스키마 |
 | Flyway | 12.4.0 |
 | QueryDSL | 7.7 (OpenFeign 포크, 조건 조회·일괄 변경. Boot 미관리라 버전 명시) |
 | SnakeYAML Engine | 3.0.1 (케이스 가져오기의 문서 해석, Boot 미관리라 버전 명시) |
@@ -384,7 +384,7 @@ SENTINEL_URL=https://sentinel.example.com SENTINEL_TOKEN=snt_... \
 ```
 
 - 스위트 ID는 스위트 화면 주소(`/suites/3`)의 번호, 환경 ID는 프로젝트 화면 환경 이름 옆의 `#번호`
-- 사내 인증 기관(Caddy `internal`) 인증서를 쓰면 `SENTINEL_CA_CERT`에 그 루트 인증서 경로. 회사 인증서처럼 러너가 이미 신뢰하면 생략
+- 내부 인증 기관(Caddy `internal`) 인증서를 쓰면 `SENTINEL_CA_CERT`에 그 루트 인증서 경로. 기관 발급 인증서처럼 러너가 이미 신뢰하면 생략
 - 토큰은 표준 입력의 curl 설정으로 넘겨 프로세스 목록·출력에 남기지 않음. 시간 초과여도 실행은 서버에서 계속됨
 - `--junit 파일`: 끝난 실행의 결과를 JUnit XML로 저장 (통과·실패·중지 모두, 시간 초과는 저장하지 않음). 받지 못하면 경고만 하고 종료 코드는 실행 결과 기준
 - 테스트: `bash scripts/sentinel-run.test.sh` (흉내 낸 API 서버로 시나리오별 종료 코드·출력 확인, CI의 scripts 작업)
@@ -398,7 +398,7 @@ SENTINEL_URL=https://sentinel.example.com SENTINEL_TOKEN=snt_... \
 - `properties`: 실행 ID·상태·환경, 결과 화면 주소(`sentinel.notification.web-base-url` 지정 시)
 - 요청·응답 원문은 넣지 않음 (CI 로그·산출물은 볼 수 있는 사람이 더 많음). 판정 메시지는 저장 시 이미 시크릿을 가린 값. XML에 넣을 수 없는 제어 문자는 제거
 
-GitHub Actions 예시. Sentinel이 사내망에 있으면 사내망에 둔 러너(self-hosted)에서 실행 (GitHub 호스팅 러너는 사내 주소에 닿지 않음). 스크립트는 배포하는 저장소에 복사해 두고 사용
+GitHub Actions 예시. Sentinel이 내부망에 있으면 내부망에 둔 러너(self-hosted)에서 실행 (GitHub 호스팅 러너는 내부 주소에 닿지 않음). 스크립트는 배포하는 저장소에 복사해 두고 사용
 
 ```yaml
 deploy-check:
@@ -412,7 +412,7 @@ deploy-check:
         SENTINEL_TOKEN: ${{ secrets.SENTINEL_TOKEN }}
         SENTINEL_CA_CERT: /etc/ssl/sentinel-root.crt
       run: bash scripts/sentinel-run.sh --suite 3 --environment 2 --timeout 600 --junit sentinel.xml
-    # 실패해도 결과 표를 남기도록 always(). JUnit XML을 읽는 액션은 팀이 쓰는 것으로 (예: dorny/test-reporter)
+    # 실패해도 결과 표를 남기도록 always(). JUnit XML을 읽는 액션은 쓰는 것으로 (예: dorny/test-reporter)
     - name: Sentinel 결과 표
       if: always()
       uses: dorny/test-reporter@v1
@@ -802,7 +802,7 @@ Sentinel 중지·서버 절전·DB 연결 끊김 등으로 스케줄이 제때 �
 모니터링 공백 알림은 Sentinel이 다시 켜진 뒤에야 가므로, 멈춘 즉시 알도록 외부 감시 서비스에 신호를 보냄. 신호가 끊기면 외부 서비스가 알림
 
 - 스케줄 폴링(60초)마다 DB 조회가 성공하면 `sentinel.heartbeat.url`로 GET 1회 (스위트 실행 전). DB 접속 실패 중에는 보내지 않음
-- healthchecks.io(무료), Uptime Kuma(푸시 모니터), Better Stack(하트비트) 등 GET 신호 주소를 받는 서비스. 사내망에서 그 서비스에 접속할 수 있어야 함
+- healthchecks.io(무료), Uptime Kuma(푸시 모니터), Better Stack(하트비트) 등 GET 신호 주소를 받는 서비스. 내부망에서 그 서비스에 접속할 수 있어야 함
 - 외부 서비스의 기간·유예 시간은 1분·10분 이상 권장. 신호는 스위트 실행 시간만큼 늦어질 수 있음 (긴 스위트가 있으면 유예를 그만큼 늘림)
 - 주소는 자격증명(주소만 알면 신호를 보내거나 끊을 수 있음). 환경변수로 주입하고 로그·오류 메시지에 남기지 않음. 잘못된 형식이면 기동 실패
 - 실패는 처음 1회만 WARN(상태 코드나 `timeout`·`connection failed`), 다시 성공하면 INFO 1회. 폴링은 계속
@@ -837,7 +837,7 @@ Skipped schedule 4 (suite 3) at 2026-09-29T01:10:00Z: environment 2 is under mai
 
 ### 휴일
 
-공휴일·창립기념일 등 대상 시스템도 쉬는 날에 스케줄 실행을 건너뜀. 평일 cron(`1-5`)만으로는 거를 수 없는 날용. 스케줄마다 휴일 건너뛰기(`skipHolidays`)를 켠 경우만 해당 (24시간 감시 스케줄은 휴일에도 실행)
+공휴일·임시공휴일 등 대상 시스템도 쉬는 날에 스케줄 실행을 건너뜀. 평일 cron(`1-5`)만으로는 거를 수 없는 날용. 스케줄마다 휴일 건너뛰기(`skipHolidays`)를 켠 경우만 해당 (24시간 감시 스케줄은 휴일에도 실행)
 
 | API | 설명 |
 |-----|------|
@@ -1031,7 +1031,7 @@ Purged raw request/response of 1200 result(s) in 300 run(s) started before 2026-
   |------|------|
   | `hooks.slack.com` | Slack Block Kit: 굵은 제목 머리, 본문, 링크 버튼(`결과 보기`·`대시보드 보기`), 성격별 색 막대 |
   | `*.logic.azure.com`·`*.powerplatform.com`(Teams 워크플로), `*.webhook.office.com`(기존 커넥터) | Teams Adaptive Card: 성격별 제목 색, 줄마다 글 상자, 링크 버튼 |
-  | 그 외 (사내 중계 등) | `{"text": "제목\n본문\n결과: 주소"}` 한 필드 (예전과 같음) |
+  | 그 외 (자체 중계 서버 등) | `{"text": "제목\n본문\n결과: 주소"}` 한 필드 (예전과 같음) |
 
   - 성격: 실패·장애(빨강), 악화·공백(주황), 복구·회복(초록), 요약·확인(회색). Teams는 Attention·Warning·Good·Default
   - 두 서식 모두 알림 미리보기용 `text`(제목)를 함께 보냄. Slack 본문은 서식 문법(`*`, `_`)으로 해석되지 않도록 일반 텍스트로 보내고 블록 글자 수 제한(머리 150자, 본문 3,000자)을 넘으면 자름

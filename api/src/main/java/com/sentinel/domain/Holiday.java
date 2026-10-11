@@ -26,7 +26,7 @@ public class Holiday extends ArchivableEntity {
 	@Column(name = "holiday_date", nullable = false)
 	private LocalDate date;
 
-	/** 예: 추석, 창립기념일 */
+	/** 예: 추석, 임시공휴일 */
 	@Column(nullable = false, length = MAX_NAME_LENGTH)
 	private String name;
 

@@ -37,7 +37,7 @@ class OpenApiConfig {
 			.info(new Info().title("Sentinel API")
 				.version("v1")
 				.description("""
-						사내 API 모니터링 도구 Sentinel의 REST API.
+						자체 호스팅 API 모니터링 도구 Sentinel의 REST API.
 						모든 리소스는 최상위 컬렉션이고 관계는 조회 조건(?projectId=)으로 좁힘. \
 						응답에서 다른 리소스는 {id, name} 객체로 가리킴. 오류는 ProblemDetail(detail에 사유).
 						API 토큰(snt_)은 실행 시작(POST /api/runs)과 그 결과 조회(GET /api/runs/{id})만 가능."""))

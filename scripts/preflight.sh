@@ -103,7 +103,7 @@ check_certificate() {
   cert_list=$(cert_names "$cert")
   while IFS= read -r name; do
     if [ "$name" = "localhost" ]; then
-      warn "localhost는 회사 인증서에 없어 서버에서 https://localhost 접속 시 인증서 경고. 접속 주소에서 빼는 것을 권장"
+      warn "localhost는 보유 인증서에 없어 서버에서 https://localhost 접속 시 인증서 경고. 접속 주소에서 빼는 것을 권장"
     elif covers "$cert_list" "$name"; then
       ok "인증서가 $name 포함"
     else
@@ -113,7 +113,7 @@ check_certificate() {
 
   # 서버 인증서만 있으면 중간 인증 기관을 모르는 PC에서 신뢰 오류. cert.pem에는 서버 → 중간 순으로 모두 포함
   if [ "$(grep -c 'BEGIN CERTIFICATE' "$cert")" -lt 2 ]; then
-    warn "cert.pem에 인증서가 1개. 회사 인증서가 중간 인증 기관을 거치면 서버 인증서 뒤에 중간 인증서를 이어 붙여야 함"
+    warn "cert.pem에 인증서가 1개. 보유 인증서가 중간 인증 기관을 거치면 서버 인증서 뒤에 중간 인증서를 이어 붙여야 함"
   else
     ok "cert.pem에 중간 인증서 포함 ($(grep -c 'BEGIN CERTIFICATE' "$cert")개)"
   fi
@@ -131,7 +131,7 @@ check_proxy_env() {
   site=$(value_of "$ENV_FILE" SENTINEL_SITE_ADDRESS)
   names=$(site_names "${site:-localhost}")
   if [ "$names" = "localhost" ]; then
-    warn "접속 주소가 localhost뿐. 다른 PC는 접속 불가 (SENTINEL_SITE_ADDRESS에 사내 DNS 이름 지정)"
+    warn "접속 주소가 localhost뿐. 다른 PC는 접속 불가 (SENTINEL_SITE_ADDRESS에 내부 DNS 이름 지정)"
   else
     ok "접속 주소: $(printf '%s' "$names" | tr '\n' ' ')"
   fi
@@ -243,7 +243,7 @@ check_app_env() {
     if printf '%s\n' "$names" | grep -qxF "$web_host"; then
       ok "알림 링크 주소가 접속 주소와 일치 ($web_host)"
     else
-      warn "SENTINEL_WEB_URL($web_host)이 접속 주소에 없음. 팀원이 여는 https://<접속 주소>로 지정"
+      warn "SENTINEL_WEB_URL($web_host)이 접속 주소에 없음. 사용자가 여는 https://<접속 주소>로 지정"
     fi
   fi
 
