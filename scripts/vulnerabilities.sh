@@ -21,15 +21,15 @@ OSV_ROWS='
     | .ranges[]?.events[]? | .fixed // empty] | length > 0) as $fixed
 | [ (if (["Maven", "npm"] | index($p.package.ecosystem)) and $score >= 7 and $fixed then "block" else "report" end),
     $p.package.ecosystem, "\($p.package.name)@\($p.package.version)", ($g.max_severity // "-"),
-    ($g.ids | join(", ")), (if $fixed then "있음" else "없음" end) ]
+    ($g.ids | join(", ")), (if $fixed then "yes" else "no" end) ]
 | @tsv'
 
 NPM_ROWS='
 (.vulnerabilities // {}) | to_entries[] | .value as $v
 | ($v.fixAvailable != false) as $fixed
 | [ (if ($v.severity == "high" or $v.severity == "critical") and $fixed then "block" else "report" end),
-    "npm", "\($v.name) (영향 범위 \($v.range))", $v.severity,
-    ([$v.via[]? | objects | .url // empty] | unique | join(", ")), (if $fixed then "있음" else "없음" end) ]
+    "npm", "\($v.name) (affected \($v.range))", $v.severity,
+    ([$v.via[]? | objects | .url // empty] | unique | join(", ")), (if $fixed then "yes" else "no" end) ]
 | @tsv'
 
 rows=$(mktemp)
@@ -39,7 +39,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --osv | --npm)
       if [ $# -lt 2 ] || [ ! -f "$2" ]; then
-        echo "결과 파일 없음: ${2:-}" >&2
+        echo "Result file not found: ${2:-}" >&2
         exit 2
       fi
       if [ "$1" = --osv ]; then program=$OSV_ROWS; else program=$NPM_ROWS; fi
@@ -47,7 +47,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     *)
-      echo "사용법: $0 [--osv 파일]... [--npm 파일]..." >&2
+      echo "Usage: $0 [--osv file]... [--npm file]..." >&2
       exit 2
       ;;
   esac
@@ -55,21 +55,21 @@ done
 
 blocking=$(grep -c '^block' "$rows" || true)
 
-echo "## 의존성 취약점"
+echo "## Dependency vulnerabilities"
 echo
 if [ "$blocking" -gt 0 ]; then
-  echo "수정 버전이 있는 높음 이상 취약점 ${blocking}건. 의존성을 올려 해결"
+  echo "${blocking} high or critical vulnerabilities with a fixed version. Upgrade the dependencies"
   echo
-  echo "| 생태계 | 패키지 | 심각도 | ID | 수정판 |"
+  echo "| Ecosystem | Package | Severity | ID | Fix available |"
   echo "|--------|--------|--------|----|--------|"
   grep '^block' "$rows" | sort -u | awk -F'\t' '{ printf "| %s | `%s` | %s | %s | %s |\n", $2, $3, $4, $5, $6 }'
 else
-  echo "막을 취약점 없음 (애플리케이션 의존성의 수정 가능한 높음 이상 0건)"
+  echo "No blocking vulnerabilities (0 fixable high or critical in application dependencies)"
 fi
 echo
-echo "보고만 (막지 않음)"
+echo "Reported only (not blocking)"
 echo
 # 생태계별 건수. 없으면 "없음" (grep 대신 awk: 일치가 없어도 실패하지 않음)
-awk -F'\t' '$1 == "report" { count[$2]++; total++ } END { if (total == 0) print "- 없음"; for (e in count) printf "- %s: %d건\n", e, count[e] }' "$rows" | sort
+awk -F'\t' '$1 == "report" { count[$2]++; total++ } END { if (total == 0) print "- none"; for (e in count) printf "- %s: %d\n", e, count[e] }' "$rows" | sort
 
 [ "$blocking" -eq 0 ]

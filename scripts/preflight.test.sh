@@ -123,7 +123,7 @@ check() {
     passed=$((passed + 1))
   else
     failed=$((failed + 1))
-    printf 'FAIL: %s\n  조건: %s\n  종료 코드: %s\n%s\n\n' "$description" "$condition" "$status" "$output"
+    printf 'FAIL: %s\n  condition: %s\n  exit code: %s\n%s\n\n' "$description" "$condition" "$status" "$output"
   fi
 }
 
@@ -133,153 +133,153 @@ D="$WORK/site"
 
 valid_setup "$D"
 run "$D"
-check "문제없는 설정은 통과" '[ "$status" -eq 0 ] && contains "실패 0 · 경고 0"'
-check "주소를 인증서가 포함" 'contains "✔ 인증서가 sentinel.team.internal 포함"'
-check "중간 인증서 포함 확인" 'contains "✔ cert.pem에 중간 인증서 포함 (2개)"'
-check "비밀번호는 출력하지 않음" '! contains "$DB_PASSWORD_VALUE"'
-check "Webhook 주소는 출력하지 않음" '! contains "$WEBHOOK_VALUE" && ! contains "must-not-appear"'
-check "생존 신호 주소는 출력하지 않음" '! contains "$HEARTBEAT_VALUE" && ! contains "heartbeat-must-not-appear"'
-check "암호화 키는 출력하지 않음" '! contains "$SECRET_KEY_VALUE"'
+check "a valid setup passes" '[ "$status" -eq 0 ] && contains "Failures: 0, warnings: 0"'
+check "the certificate covers the site address" 'contains "✔ Certificate covers sentinel.team.internal"'
+check "detects the intermediate certificate" 'contains "✔ cert.pem includes the intermediate certificate (2 certificates)"'
+check "does not print the password" '! contains "$DB_PASSWORD_VALUE"'
+check "does not print the webhook URL" '! contains "$WEBHOOK_VALUE" && ! contains "must-not-appear"'
+check "does not print the heartbeat URL" '! contains "$HEARTBEAT_VALUE" && ! contains "heartbeat-must-not-appear"'
+check "does not print the encryption key" '! contains "$SECRET_KEY_VALUE"'
 
 valid_setup "$D"
 set_value "$D/.env" SENTINEL_SITE_ADDRESS "sentinel.team.internal, 10.0.0.5"
 run "$D"
-check "IP 주소도 SAN으로 확인" '[ "$status" -eq 0 ] && contains "✔ 인증서가 10.0.0.5 포함"'
+check "matches IP addresses against the SAN" '[ "$status" -eq 0 ] && contains "✔ Certificate covers 10.0.0.5"'
 
 valid_setup "$D"
 set_value "$D/.env" SENTINEL_SITE_ADDRESS "https://monitor.team.internal:443"
 run "$D"
-check "인증서에 없는 주소는 실패" '[ "$status" -eq 1 ] && contains "✘ 인증서가 monitor.team.internal 을(를) 포함하지 않음"'
+check "fails for an address the certificate does not cover" '[ "$status" -eq 1 ] && contains "✘ Certificate does not cover monitor.team.internal"'
 
 valid_setup "$D" wildcard
 set_value "$D/.env" SENTINEL_SITE_ADDRESS "monitor.team.internal, a.b.team.internal"
 run "$D"
-check "와일드카드는 한 단계 하위 이름 포함" 'contains "✔ 인증서가 monitor.team.internal 포함"'
-check "와일드카드는 두 단계 하위 이름 미포함" 'contains "✘ 인증서가 a.b.team.internal 을(를) 포함하지 않음"'
+check "a wildcard covers one level of subdomain" 'contains "✔ Certificate covers monitor.team.internal"'
+check "a wildcard does not cover two levels" 'contains "✘ Certificate does not cover a.b.team.internal"'
 
 valid_setup "$D"
 cp "$WORK/other.key" "$D/proxy/certs/key.pem"
 run "$D"
-check "짝이 맞지 않는 키는 실패" '[ "$status" -eq 1 ] && contains "✘ 개인 키가 인증서와 짝이 맞지 않음"'
+check "fails for a key that does not match" '[ "$status" -eq 1 ] && contains "✘ Private key does not match the certificate"'
 
 valid_setup "$D"
 rm "$D/proxy/certs/key.pem"
 run "$D"
-check "인증서 파일이 없으면 실패" '[ "$status" -eq 1 ] && contains "✘ 인증서 파일 없음"'
+check "fails when a certificate file is missing" '[ "$status" -eq 1 ] && contains "✘ Certificate file missing"'
 
 valid_setup "$D" expired
 run "$D"
-check "만료된 인증서는 실패" '[ "$status" -eq 1 ] && contains "✘ 인증서 만료됨"'
+check "fails for an expired certificate" '[ "$status" -eq 1 ] && contains "✘ Certificate expired"'
 
 valid_setup "$D" soon
 run "$D"
-check "곧 만료되는 인증서는 경고" '[ "$status" -eq 0 ] && contains "! 인증서가 30일 안에 만료"'
+check "warns when the certificate expires soon" '[ "$status" -eq 0 ] && contains "! Certificate expires within 30 days"'
 
 valid_setup "$D"
 cp "$WORK/server.crt" "$D/proxy/certs/cert.pem"
 run "$D"
-check "중간 인증서가 없으면 경고" '[ "$status" -eq 0 ] && contains "! cert.pem에 인증서가 1개"'
+check "warns without an intermediate certificate" '[ "$status" -eq 0 ] && contains "! cert.pem holds 1 certificate"'
 
 valid_setup "$D"
 set_value "$D/.env" SENTINEL_SITE_ADDRESS "localhost, sentinel.team.internal"
 run "$D"
-check "보유 인증서에 localhost를 쓰면 경고" 'contains "! localhost는 보유 인증서에 없어"'
+check "warns about localhost with certificate files" 'contains "! localhost is not in the certificate"'
 
 valid_setup "$D"
 set_value "$D/.env" SENTINEL_TLS internal
 set_value "$D/.env" SENTINEL_SITE_ADDRESS localhost
 run "$D"
-check "내부 인증서에 HSTS를 쓰면 경고" 'contains "! 내부 인증서에 HSTS 사용"'
-check "localhost뿐이면 경고" 'contains "! 접속 주소가 localhost뿐"'
+check "warns about HSTS with the internal CA" 'contains "! HSTS with the internal CA"'
+check "warns when the site address is localhost only" 'contains "! Site address is localhost only"'
 
 valid_setup "$D"
 set_value "$D/.env" SENTINEL_HSTS_MAX_AGE "1y"
 run "$D"
-check "HSTS 값은 숫자" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_HSTS_MAX_AGE는 초 단위 숫자"'
+check "HSTS max age must be a number" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_HSTS_MAX_AGE must be a number of seconds"'
 
 valid_setup "$D"
 set_value "$D/.env" SENTINEL_TLS "/etc/cert.pem /etc/key.pem"
 run "$D"
-check "인증서 경로 형식 오류는 실패" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_TLS 형식 오류"'
+check "fails for an invalid certificate path format" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_TLS has an invalid format"'
 
 valid_setup "$D"
 rm "$D/.env"
 run "$D"
-check ".env가 없으면 실패" '[ "$status" -eq 1 ] && contains "✘ .env 없음"'
+check "fails without .env" '[ "$status" -eq 1 ] && contains "✘ .env missing"'
 
 valid_setup "$D"
 remove_value "$D/sentinel.env" DB_PASSWORD
 run "$D"
-check "DB 비밀번호가 없으면 실패" '[ "$status" -eq 1 ] && contains "✘ DB_PASSWORD 비어 있음"'
+check "fails without a DB password" '[ "$status" -eq 1 ] && contains "✘ DB_PASSWORD is empty"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" DB_PASSWORD "\"$DB_PASSWORD_VALUE\""
 run "$D"
-check "따옴표 값은 키 이름만 알리고 실패" '[ "$status" -eq 1 ] && contains "✘ sentinel.env의 DB_PASSWORD 값에 따옴표 사용"'
-check "따옴표 오류에도 값은 출력하지 않음" '! contains "$DB_PASSWORD_VALUE"'
+check "fails for quoted values, naming only the key" '[ "$status" -eq 1 ] && contains "✘ sentinel.env: DB_PASSWORD value is quoted"'
+check "does not print the quoted value" '! contains "$DB_PASSWORD_VALUE"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" DB_URL "jdbc:postgresql://localhost:5432/sentinel"
 run "$D"
-check "컨테이너 안의 localhost DB는 실패" '[ "$status" -eq 1 ] && contains "✘ DB_URL이 localhost"'
+check "fails for a localhost DB inside the container" '[ "$status" -eq 1 ] && contains "✘ DB_URL points to localhost"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" DB_URL "jdbc:postgresql://dev.rds.amazonaws.com:5432/app?currentSchema=sentinel"
 run "$D"
-check "RDS 주소에 sslmode가 없으면 경고" '[ "$status" -eq 0 ] && contains "! DB_URL에 sslmode 없음"'
-check "DB 주소는 호스트만 표시" 'contains "✔ DB: dev.rds.amazonaws.com"'
+check "warns when an RDS address has no sslmode" '[ "$status" -eq 0 ] && contains "! DB_URL has no sslmode"'
+check "shows only the DB host" 'contains "✔ DB: dev.rds.amazonaws.com"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_SECRET_KEY "$(printf 'short' | openssl base64 -A)"
 run "$D"
-check "암호화 키 길이 오류는 실패" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_SECRET_KEY는 Base64로 16·24·32바이트"'
+check "fails for an encryption key of the wrong length" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_SECRET_KEY must be Base64 for 16, 24 or 32 bytes"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_SECRET_KEY_PREVIOUS "$PREVIOUS_KEY_VALUE"
 run "$D"
-check "키 교체 중이면 이전 키 제거 안내" '[ "$status" -eq 0 ] && contains "! SENTINEL_SECRET_KEY_PREVIOUS 설정됨 (키 교체 중)"'
-check "이전 키는 출력하지 않음" '! contains "$PREVIOUS_KEY_VALUE"'
+check "reminds to remove the previous key during rotation" '[ "$status" -eq 0 ] && contains "! SENTINEL_SECRET_KEY_PREVIOUS is set (key rotation in progress)"'
+check "does not print the previous key" '! contains "$PREVIOUS_KEY_VALUE"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_SECRET_KEY_PREVIOUS "$SECRET_KEY_VALUE"
 run "$D"
-check "이전 키가 현재 키와 같으면 경고" 'contains "! SENTINEL_SECRET_KEY_PREVIOUS가 SENTINEL_SECRET_KEY와 같음"'
+check "warns when the previous key equals the current key" 'contains "! SENTINEL_SECRET_KEY_PREVIOUS equals SENTINEL_SECRET_KEY"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_SECRET_KEY_PREVIOUS "$(printf 'short' | openssl base64 -A)"
 run "$D"
-check "이전 키 길이 오류는 실패" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_SECRET_KEY_PREVIOUS는 Base64로 16·24·32바이트"'
+check "fails for a previous key of the wrong length" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_SECRET_KEY_PREVIOUS must be Base64 for 16, 24 or 32 bytes"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_SECRET_KEY ""
 set_value "$D/sentinel.env" SENTINEL_SECRET_KEY_PREVIOUS "$PREVIOUS_KEY_VALUE"
 run "$D"
-check "새 키 없이 이전 키만 있으면 실패" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_SECRET_KEY_PREVIOUS만 있음"'
+check "fails with only the previous key" '[ "$status" -eq 1 ] && contains "✘ Only SENTINEL_SECRET_KEY_PREVIOUS is set"'
 
 valid_setup "$D"
 chmod 644 "$D/sentinel.env"
 run "$D"
-check "sentinel.env를 다른 계정이 읽을 수 있으면 경고" '[ "$status" -eq 0 ] && contains "! sentinel.env 권한 -rw-r--r--" && contains "chmod 600 sentinel.env"'
+check "warns when other accounts can read sentinel.env" '[ "$status" -eq 0 ] && contains "! sentinel.env permissions -rw-r--r--" && contains "chmod 600 sentinel.env"'
 
 valid_setup "$D"
 chmod 640 "$D/proxy/certs/key.pem"
 run "$D"
-check "개인 키를 그룹이 읽을 수 있어도 경고" '[ "$status" -eq 0 ] && contains "! key.pem 권한 -rw-r-----" && contains "chmod 600 proxy/certs/key.pem"'
+check "warns when the group can read the private key" '[ "$status" -eq 0 ] && contains "! key.pem permissions -rw-r-----" && contains "chmod 600 proxy/certs/key.pem"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_ADMIN_PASSWORD "initial-admin-password"
 run "$D"
-check "최초 관리자 비밀번호가 남아 있으면 경고" 'contains "! SENTINEL_ADMIN_PASSWORD 설정됨" && ! contains "initial-admin-password"'
+check "warns while the initial admin password remains" 'contains "! SENTINEL_ADMIN_PASSWORD is set" && ! contains "initial-admin-password"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_WEB_URL "https://localhost"
 run "$D"
-check "알림 링크 주소가 접속 주소와 다르면 경고" 'contains "! SENTINEL_WEB_URL(localhost)이 접속 주소에 없음"'
+check "warns when the alert link address is not a site address" 'contains "! SENTINEL_WEB_URL (localhost) is not a site address"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_HEARTBEAT_URL ""
 run "$D"
-check "생존 신호 주소가 없으면 경고" '[ "$status" -eq 0 ] && contains "! SENTINEL_HEARTBEAT_URL 없음"'
+check "warns without a heartbeat URL" '[ "$status" -eq 0 ] && contains "! SENTINEL_HEARTBEAT_URL missing"'
 
-printf '%d 통과, %d 실패\n' "$passed" "$failed"
+printf '%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
