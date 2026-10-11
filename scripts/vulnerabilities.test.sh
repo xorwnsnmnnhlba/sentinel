@@ -19,7 +19,7 @@ check() {
     passed=$((passed + 1))
   else
     failed=$((failed + 1))
-    echo "✘ $1"
+    echo "✘ $1 (종료 코드 $status)"
     printf '%s\n' "$output" | sed 's/^/    /'
   fi
 }
