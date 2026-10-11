@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.1.0'
+	id 'org.springframework.boot' version '4.1.1'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -12,6 +12,11 @@ java {
 		languageVersion = JavaLanguageVersion.of(25)
 	}
 }
+
+// Spring Boot 4.1.1이 관리하는 Jackson(3.1.5·2.21.5)에 높음 취약점이 있어 같은 minor의 수정판으로 올림 (2026-10-11)
+// Spring Boot가 수정판을 관리하게 되면 제거 (.github/workflows/security.yml로 확인)
+ext['jackson-bom.version'] = '3.1.7'
+ext['jackson-2-bom.version'] = '2.21.7'
 
 // 시스템 상태 화면의 버전·빌드 시각 (META-INF/build-info.properties → BuildProperties)
 springBoot {
