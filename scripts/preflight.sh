@@ -3,7 +3,7 @@
 #
 #   scripts/preflight.sh
 #
-# 확인 항목: .env(접속 주소·인증서 방식·HSTS), 보유 인증서(주소 포함·키 짝·만료·중간 인증서), sentinel.env(필수 값·형식)
+# 확인 항목: .env(접속 주소·인증서 방식·HSTS), 보유 인증서(주소 포함·키 짝·만료·중간 인증서·개인 키 권한), sentinel.env(파일 권한·필수 값·형식)
 # 값은 출력하지 않음. 비밀번호·키·Webhook 주소는 있는지와 형식만 확인
 # 실패(✘)가 있으면 종료 코드 1. 경고(!)는 배포는 가능하나 확인 필요
 #
@@ -40,6 +40,18 @@ check_quotes() {
   while IFS= read -r key; do
     fail "$(basename "$file")의 $key 값에 따옴표 사용 (따옴표까지 값이 됨)"
   done < <(grep -E "^[[:space:]]*[A-Z_][A-Z0-9_]*=[\"']" "$file" | sed -E 's/^[[:space:]]*([A-Z0-9_]+)=.*/\1/')
+}
+
+# 다른 계정이 읽을 수 있으면 권한 문자열(ls -l, 예: -rw-r--r--) 출력. 그룹·기타 권한이 없으면 출력 없음
+# stat 옵션이 GNU·BSD(macOS)에서 달라 ls 출력의 5~10번째 글자(그룹·기타 rwx)로 판단
+loose_permissions() {
+  local mode
+  # 파일 이름이 아니라 권한 열만 읽으므로 ls 출력 해석 문제(SC2012) 해당 없음
+  # shellcheck disable=SC2012
+  mode=$(ls -l "$1" | cut -c1-10)
+  if [ "$(printf '%s' "$mode" | cut -c5-10)" != "------" ]; then
+    printf '%s' "$mode"
+  fi
 }
 
 # 접속 주소 목록. "https://a.example:443, b" → "a.example", "b"
@@ -90,6 +102,12 @@ check_certificate() {
     warn "인증서가 ${EXPIRY_WARNING_DAYS}일 안에 만료 ($(openssl x509 -in "$cert" -noout -enddate | sed 's/notAfter=//')). 교체 절차는 docs/deploy.md"
   else
     ok "인증서 유효 (만료 $(openssl x509 -in "$cert" -noout -enddate | sed 's/notAfter=//'))"
+  fi
+
+  local perms
+  perms=$(loose_permissions "$key")
+  if [ -n "$perms" ]; then
+    warn "$(basename "$key") 권한 $perms. 서버의 다른 계정이 개인 키를 읽을 수 있음 (chmod 600 proxy/certs/$(basename "$key"))"
   fi
 
   # 공개키를 비교하여 키와 인증서가 한 쌍인지 확인
@@ -176,6 +194,12 @@ check_app_env() {
     return
   fi
   check_quotes "$APP_ENV_FILE"
+
+  # 편집기·스크립트가 파일을 새로 만들면 chmod 600이 풀릴 수 있음
+  value=$(loose_permissions "$APP_ENV_FILE")
+  if [ -n "$value" ]; then
+    warn "sentinel.env 권한 $value. 서버의 다른 계정이 DB 비밀번호·암호화 키를 읽을 수 있음 (chmod 600 sentinel.env)"
+  fi
 
   for key in DB_URL DB_USERNAME DB_PASSWORD; do
     if [ -z "$(value_of "$APP_ENV_FILE" "$key")" ]; then
