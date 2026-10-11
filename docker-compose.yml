@@ -57,7 +57,7 @@ services:
 
   # HTTPS 앞단. 설정은 proxy/Caddyfile, 접속 주소·인증서 방식은 루트 .env (.env.example 참고)
   sentinel-proxy:
-    image: caddy:2.11.4-alpine
+    image: caddy:2.11.7-alpine
     container_name: sentinel-proxy
     logging: *logging
     environment:
