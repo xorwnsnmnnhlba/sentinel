@@ -43,6 +43,7 @@ main ──●────────●────────●──
 | `chore` | 빌드, 의존성, 설정, 인프라 |
 
 ### 표기 원칙
+- Dependabot PR은 Dependabot 규칙(`dependabot/...`)을 그대로 사용 (예외)
 - `feature`가 아닌 `feat` 사용. Conventional Commits 커밋 타입과 단어 통일, 다른 타입과 길이 균형
 - 한글, 대문자, 공백, `_` 사용 금지. 셸, CI, Docker 태그에서 문제 소지
 - 이슈 사용 시 번호 포함: `feat/api-12-schedule-polling`
@@ -116,6 +117,7 @@ docs: add branch convention
 |------|-----------|
 | 작업 단위 완결 | 브랜치 이름에 명시한 작업의 동작 확인 |
 | CI 통과 | PR의 **CI** 체크 통과 (`.github/workflows/ci.yml`: web lint·서식·테스트·빌드, api 테스트, E2E, 배포 스크립트) |
+| 취약점 점검 통과 | 의존성을 바꾼 PR은 **Security** 체크 통과 (`.github/workflows/security.yml`). 실패하면 표의 패키지를 수정 버전으로 올림 |
 | 빌드·테스트 통과 (로컬) | api: `./gradlew build` / web: `npm run lint`, `npm run format:check`, `npm test`, `npm run build` |
 | 기동 확인 | 로컬 실행 후 변경 부분 동작 확인 |
 | 셀프 리뷰 | PR **Files changed** 탭에서 diff 확인 (디버그 코드, 시크릿, 불필요한 파일) |

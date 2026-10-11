@@ -1,0 +1,86 @@
+# 의존성 취약점 점검. 의존성을 바꾼 PR은 막고, 매주 월요일 정기 점검은 새로 공개된 취약점을 실패로 표시
+# - api·web 이미지: OSV-Scanner로 실제 이미지 안의 Java 라이브러리·OS 패키지
+# - web 운영 의존성: npm audit (Next.js standalone 이미지에는 npm 패키지 정보가 남지 않아 이미지 점검으로는 보이지 않음)
+# 막는 기준은 scripts/vulnerabilities.sh (애플리케이션 의존성의 높음 이상 중 수정 버전이 있는 것)
+name: Security
+
+on:
+  pull_request:
+    paths:
+      - api/build.gradle
+      - api/settings.gradle
+      - api/gradle/**
+      - api/Dockerfile
+      - web/package.json
+      - web/package-lock.json
+      - web/Dockerfile
+      - scripts/vulnerabilities.sh
+      - .github/workflows/security.yml
+  schedule:
+    # 월요일 09:00 KST
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  OSV_SCANNER_VERSION: v2.6.0
+  # osv-scanner_linux_amd64 체크섬 (공식 릴리스의 osv-scanner_SHA256SUMS). 버전을 올리면 함께 변경
+  OSV_SCANNER_SHA256: ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108
+
+jobs:
+  dependencies:
+    name: dependencies (vulnerabilities)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # devDependencies 제외. 취약점이 있으면 0이 아닌 코드로 끝나므로 판정은 마지막 단계에서
+      # 레지스트리 오류로 결과가 비면 통과로 오인하지 않도록 결과 모양 확인
+      - name: web 운영 의존성 점검
+        working-directory: web
+        run: |
+          npm audit --omit=dev --json > "$RUNNER_TEMP/npm-audit.json" || true
+          jq -e '.metadata.vulnerabilities' "$RUNNER_TEMP/npm-audit.json" > /dev/null
+      # 이미지는 E2E와 같은 캐시(main에서 저장)로 빌드. 의존성이 그대로면 대부분 재사용
+      - uses: docker/setup-buildx-action@v4
+      - name: api 이미지 빌드
+        uses: docker/build-push-action@v7
+        with:
+          context: api
+          load: true
+          provenance: false
+          tags: sentinel-e2e-api
+          cache-from: type=gha,scope=e2e-api
+      - name: web 이미지 빌드
+        uses: docker/build-push-action@v7
+        with:
+          context: web
+          load: true
+          provenance: false
+          tags: sentinel-e2e-web
+          cache-from: type=gha,scope=e2e-web
+      - name: OSV-Scanner 설치
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/osv-scanner" \
+            "https://github.com/google/osv-scanner/releases/download/$OSV_SCANNER_VERSION/osv-scanner_linux_amd64"
+          echo "$OSV_SCANNER_SHA256  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+      # 종료 코드 1은 취약점 있음 (판정은 다음 단계), 그 외는 점검 오류로 실패
+      - name: 이미지 점검
+        run: |
+          for image in api web; do
+            "$RUNNER_TEMP/osv-scanner" scan image --format json "sentinel-e2e-$image:latest" \
+              > "$RUNNER_TEMP/osv-$image.json" || [ $? -eq 1 ]
+          done
+      - name: 판정
+        run: |
+          bash scripts/vulnerabilities.sh --osv "$RUNNER_TEMP/osv-api.json" --osv "$RUNNER_TEMP/osv-web.json" \
+            --npm "$RUNNER_TEMP/npm-audit.json" | tee -a "$GITHUB_STEP_SUMMARY"

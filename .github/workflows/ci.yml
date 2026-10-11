@@ -104,6 +104,8 @@ jobs:
       - run: bash scripts/preflight.test.sh
       # CI 연동 스크립트 (실행 대기). 흉내 낸 API 서버에 시나리오별로 실행
       - run: bash scripts/sentinel-run.test.sh
+      # 의존성 취약점 판정 (.github/workflows/security.yml에서 사용)
+      - run: bash scripts/vulnerabilities.test.sh
 
   api:
     name: api (test)
