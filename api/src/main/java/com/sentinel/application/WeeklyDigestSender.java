@@ -23,6 +23,7 @@ import org.springframework.transaction.TransactionException;
  * 주간 요약 알림 발송. 스케줄 폴링 주기마다 가장 최근 예정 시각이 지났는지 확인하고, 그 예정 시각에 보낸 기록이 없으면 발송.
  * <p>
  * 예정 시각에 꺼져 있었으면(노트북 절전 등) 켜진 뒤 1회 발송. 7일이 지난 예정 시각은 보내지 않음 (다음 요약과 겹침).
+ * 설치 전에 끝난 기간의 요약은 보내지 않고 기록만 남김 (새로 설치하자마자 실행이 없던 지난주 요약이 가지 않도록).
  * 발송 기록을 먼저 남기고 보내므로 발송 실패 시 다시 보내지 않음 (같은 요약이 반복 발송되지 않도록). DB 접속 실패는 다음 주기에 다시 확인
  */
 @Component
@@ -47,6 +48,8 @@ class WeeklyDigestSender {
 
 	private final Notifier notifier;
 
+	private final InstallationDate installation;
+
 	private final Transactions transactions;
 
 	private final Clock clock;
@@ -69,6 +72,14 @@ class WeeklyDigestSender {
 		try {
 			if (transactions.readOnly(status -> deliveries.existsByScheduledAt(scheduledAt))) {
 				handled = scheduledAt;
+				return false;
+			}
+			LocalDate installedOn = installation.installedOn();
+			if (installedOn != null && to.isBefore(installedOn)) {
+				transactions.writeWithoutResult(status -> deliveries.save(new DigestDelivery(scheduledAt, from, to)));
+				handled = scheduledAt;
+				log.info("Skipped weekly digest for {} ~ {}: the period ended before installation on {}", from, to,
+						installedOn);
 				return false;
 			}
 			Notification digest = digests.build(from, to);
