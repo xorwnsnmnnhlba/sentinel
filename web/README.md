@@ -280,7 +280,7 @@ Vitest + MSW + React Testing Library. 설정은 `vitest.config.mts`
 | components | jsdom | `components/**/*.test.tsx` | Server Action을 테스트용 함수로 대체, 사용자 조작(user-event)으로 검증 |
 
 - 테스트 파일은 대상 파일 옆에 `*.test.ts(x)`로 작성
-- MSW는 처리하지 않은 요청을 실패로 처리(`onUnhandledRequest: "error"`). 테스트마다 `server.use()`로 필요한 응답만 지정
+- MSW는 처리하지 않은 요청을 실패로 처리(`onUnhandledFrame: "error"`, msw 3). 테스트마다 `server.use()`로 필요한 응답만 지정
 - `redirect()`·`notFound()`는 throw된 오류의 digest로 확인 (`test/next.ts`)
 - async Server Component 화면(`page.tsx`)은 Vitest 미지원(Next.js 문서)으로 제외. 추후 E2E로 검증
 - Radix UI 목록(Select 등)은 jsdom에 레이아웃이 없어 접근성 트리에서 숨김으로 판정. 키보드로 열고 목록 안 텍스트로 선택

@@ -15,6 +15,6 @@ afterEach(() => {
 });
 
 // 처리하지 않은 요청은 실패로 처리하여 의도하지 않은 Spring 호출 방지
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
