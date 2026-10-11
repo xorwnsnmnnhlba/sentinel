@@ -45,7 +45,7 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
    - `SENTINEL_WEB_URL=https://sentinel.<내부 도메인>`: 실패 알림의 결과 링크
    - `SENTINEL_WEBHOOK_URL`: 기본 알림 채널. Slack·Teams 수신 Webhook (주소 자체가 자격증명). 프로젝트 Webhook이 없는 프로젝트의 실패·복구 알림, DB 연결 실패·복구, 모니터링 공백, 주간 요약(월 09:00)이 이 채널로. 없으면 로그에만 남음
    - `SENTINEL_HEARTBEAT_URL`: 외부 감시 서비스의 생존 신호 주소 (주소 자체가 자격증명). 서버가 멈추면 외부 서비스가 알림 (`api/README.md` "외부 생존 신호")
-4. 점검: `scripts/preflight.sh`에서 실패 0 확인. 값은 출력하지 않음
+4. 점검: `scripts/preflight.sh`의 마지막 줄 `Failures: 0` 확인. 값은 출력하지 않음 (출력은 영어)
 5. 기동: `docker compose up -d --build --wait`
 6. 확인 (다른 PC 브라우저)
    - `https://<접속 이름>` 접속 시 인증서 경고 없음, 로그인 유지
@@ -137,7 +137,7 @@ openssl rand -base64 32
 2. `sentinel.env` 수정
    - `SENTINEL_SECRET_KEY_PREVIOUS=<지금까지의 키>`
    - `SENTINEL_SECRET_KEY=<새 키>`
-3. `scripts/preflight.sh`: "SENTINEL_SECRET_KEY_PREVIOUS 설정됨 (키 교체 중)" 경고 외 실패 0 확인
+3. `scripts/preflight.sh`: "SENTINEL_SECRET_KEY_PREVIOUS is set (key rotation in progress)" 경고 외 `Failures: 0` 확인
 4. `docker compose up -d sentinel-api` (환경변수를 다시 읽도록 컨테이너 재생성)
 5. 확인: 화면 "시스템 상태"의 암호화 키가 "키 교체 중"이고 풀 수 없는 값 없음. 로그로도 확인 가능
 

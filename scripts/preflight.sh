@@ -38,7 +38,7 @@ value_of() {
 check_quotes() {
   local file=$1 key
   while IFS= read -r key; do
-    fail "$(basename "$file")의 $key 값에 따옴표 사용 (따옴표까지 값이 됨)"
+    fail "$(basename "$file"): $key value is quoted (the quotes become part of the value)"
   done < <(grep -E "^[[:space:]]*[A-Z_][A-Z0-9_]*=[\"']" "$file" | sed -E 's/^[[:space:]]*([A-Z0-9_]+)=.*/\1/')
 }
 
@@ -88,60 +88,60 @@ covers() {
 check_certificate() {
   local cert=$1 key=$2 names=$3 cert_list name
   if [ ! -f "$cert" ] || [ ! -f "$key" ]; then
-    fail "인증서 파일 없음: proxy/certs/$(basename "$cert"), proxy/certs/$(basename "$key")"
+    fail "Certificate file missing: proxy/certs/$(basename "$cert"), proxy/certs/$(basename "$key")"
     return
   fi
   if ! openssl x509 -in "$cert" -noout 2>/dev/null; then
-    fail "$(basename "$cert")를 인증서(PEM)로 읽을 수 없음"
+    fail "$(basename "$cert") is not a readable PEM certificate"
     return
   fi
 
   if ! openssl x509 -in "$cert" -noout -checkend 0 >/dev/null 2>&1; then
-    fail "인증서 만료됨 ($(openssl x509 -in "$cert" -noout -enddate | sed 's/notAfter=//'))"
+    fail "Certificate expired ($(openssl x509 -in "$cert" -noout -enddate | sed 's/notAfter=//'))"
   elif ! openssl x509 -in "$cert" -noout -checkend $((EXPIRY_WARNING_DAYS * 86400)) >/dev/null 2>&1; then
-    warn "인증서가 ${EXPIRY_WARNING_DAYS}일 안에 만료 ($(openssl x509 -in "$cert" -noout -enddate | sed 's/notAfter=//')). 교체 절차는 docs/deploy.md"
+    warn "Certificate expires within ${EXPIRY_WARNING_DAYS} days ($(openssl x509 -in "$cert" -noout -enddate | sed 's/notAfter=//')). See docs/deploy.md to replace it"
   else
-    ok "인증서 유효 (만료 $(openssl x509 -in "$cert" -noout -enddate | sed 's/notAfter=//'))"
+    ok "Certificate valid (expires $(openssl x509 -in "$cert" -noout -enddate | sed 's/notAfter=//'))"
   fi
 
   local perms
   perms=$(loose_permissions "$key")
   if [ -n "$perms" ]; then
-    warn "$(basename "$key") 권한 $perms. 서버의 다른 계정이 개인 키를 읽을 수 있음 (chmod 600 proxy/certs/$(basename "$key"))"
+    warn "$(basename "$key") permissions $perms: other accounts on the server can read the private key (chmod 600 proxy/certs/$(basename "$key"))"
   fi
 
   # 공개키를 비교하여 키와 인증서가 한 쌍인지 확인
   if [ "$(openssl x509 -in "$cert" -noout -pubkey 2>/dev/null)" = "$(openssl pkey -in "$key" -pubout 2>/dev/null)" ] &&
     [ -n "$(openssl pkey -in "$key" -pubout 2>/dev/null)" ]; then
-    ok "개인 키가 인증서와 한 쌍"
+    ok "Private key matches the certificate"
   else
-    fail "개인 키가 인증서와 짝이 맞지 않음 (또는 암호가 걸린 키. Caddy는 암호 없는 키만 사용)"
+    fail "Private key does not match the certificate (or is passphrase-protected; Caddy needs an unencrypted key)"
   fi
 
   cert_list=$(cert_names "$cert")
   while IFS= read -r name; do
     if [ "$name" = "localhost" ]; then
-      warn "localhost는 보유 인증서에 없어 서버에서 https://localhost 접속 시 인증서 경고. 접속 주소에서 빼는 것을 권장"
+      warn "localhost is not in the certificate, so https://localhost on the server shows a certificate warning. Consider removing it from the site address"
     elif covers "$cert_list" "$name"; then
-      ok "인증서가 $name 포함"
+      ok "Certificate covers $name"
     else
-      fail "인증서가 $name 을(를) 포함하지 않음 (인증서 이름: $(printf '%s' "$cert_list" | tr '\n' ' '))"
+      fail "Certificate does not cover $name (certificate names: $(printf '%s' "$cert_list" | tr '\n' ' '))"
     fi
   done <<<"$names"
 
   # 서버 인증서만 있으면 중간 인증 기관을 모르는 PC에서 신뢰 오류. cert.pem에는 서버 → 중간 순으로 모두 포함
   if [ "$(grep -c 'BEGIN CERTIFICATE' "$cert")" -lt 2 ]; then
-    warn "cert.pem에 인증서가 1개. 보유 인증서가 중간 인증 기관을 거치면 서버 인증서 뒤에 중간 인증서를 이어 붙여야 함"
+    warn "cert.pem holds 1 certificate. If an intermediate CA issued the certificate, append the intermediate certificate after the server certificate"
   else
-    ok "cert.pem에 중간 인증서 포함 ($(grep -c 'BEGIN CERTIFICATE' "$cert")개)"
+    ok "cert.pem includes the intermediate certificate ($(grep -c 'BEGIN CERTIFICATE' "$cert") certificates)"
   fi
 }
 
 check_proxy_env() {
   local site tls names hsts mode=internal
-  section ".env (HTTPS 앞단)"
+  section ".env (HTTPS proxy)"
   if [ ! -f "$ENV_FILE" ]; then
-    fail ".env 없음. cp .env.example .env 후 작성"
+    fail ".env missing. Run cp .env.example .env and fill it in"
     return
   fi
   check_quotes "$ENV_FILE"
@@ -149,40 +149,40 @@ check_proxy_env() {
   site=$(value_of "$ENV_FILE" SENTINEL_SITE_ADDRESS)
   names=$(site_names "${site:-localhost}")
   if [ "$names" = "localhost" ]; then
-    warn "접속 주소가 localhost뿐. 다른 PC는 접속 불가 (SENTINEL_SITE_ADDRESS에 내부 DNS 이름 지정)"
+    warn "Site address is localhost only. Other PCs cannot connect (set an internal DNS name in SENTINEL_SITE_ADDRESS)"
   else
-    ok "접속 주소: $(printf '%s' "$names" | tr '\n' ' ')"
+    ok "Site address: $(printf '%s' "$names" | tr '\n' ' ')"
   fi
 
   tls=$(value_of "$ENV_FILE" SENTINEL_TLS)
   case "${tls:-internal}" in
     internal)
-      ok "인증서 방식: Caddy 내부 인증 기관 (PC마다 루트 인증서 신뢰 등록 필요)"
+      ok "Certificate source: Caddy internal CA (each PC must trust the root certificate)"
       ;;
     /certs/*" "/certs/*)
       mode=files
-      ok "인증서 방식: 보유 인증서 파일"
+      ok "Certificate source: certificate files"
       local cert_path=${tls%% *} key_path=${tls##* }
       check_certificate "$ROOT/proxy/certs/${cert_path#/certs/}" "$ROOT/proxy/certs/${key_path#/certs/}" "$names"
       ;;
     *@*)
       mode=acme
-      warn "인증서 방식: Let's Encrypt. 공개 DNS와 인터넷에서 80·443 접근이 필요"
+      warn "Certificate source: Let's Encrypt. Requires public DNS and ports 80 and 443 reachable from the internet"
       ;;
     *)
-      fail "SENTINEL_TLS 형식 오류. internal, 이메일 주소, \"/certs/cert.pem /certs/key.pem\" 중 하나"
+      fail "SENTINEL_TLS has an invalid format. Use internal, an email address, or \"/certs/cert.pem /certs/key.pem\""
       ;;
   esac
 
   hsts=$(value_of "$ENV_FILE" SENTINEL_HSTS_MAX_AGE)
   if [ -z "$hsts" ] || [ "$hsts" = "0" ]; then
-    ok "HSTS 미사용 (SENTINEL_HSTS_MAX_AGE=0)"
+    ok "HSTS off (SENTINEL_HSTS_MAX_AGE=0)"
   elif ! [[ "$hsts" =~ ^[0-9]+$ ]]; then
-    fail "SENTINEL_HSTS_MAX_AGE는 초 단위 숫자"
+    fail "SENTINEL_HSTS_MAX_AGE must be a number of seconds"
   elif [ "$mode" = internal ]; then
-    warn "내부 인증서에 HSTS 사용. 루트 인증서를 등록하지 않은 PC는 경고를 넘길 수 없어 접속 불가"
+    warn "HSTS with the internal CA: PCs that have not trusted the root certificate cannot bypass the warning and cannot connect"
   else
-    ok "HSTS 사용 (max-age=$hsts)"
+    ok "HSTS on (max-age=$hsts)"
   fi
 }
 
@@ -190,7 +190,7 @@ check_app_env() {
   local key value db_host bytes web_host names
   section "sentinel.env (api)"
   if [ ! -f "$APP_ENV_FILE" ]; then
-    fail "sentinel.env 없음. cp sentinel.env.example sentinel.env 후 작성"
+    fail "sentinel.env missing. Run cp sentinel.env.example sentinel.env and fill it in"
     return
   fi
   check_quotes "$APP_ENV_FILE"
@@ -198,12 +198,12 @@ check_app_env() {
   # 편집기·스크립트가 파일을 새로 만들면 chmod 600이 풀릴 수 있음
   value=$(loose_permissions "$APP_ENV_FILE")
   if [ -n "$value" ]; then
-    warn "sentinel.env 권한 $value. 서버의 다른 계정이 DB 비밀번호·암호화 키를 읽을 수 있음 (chmod 600 sentinel.env)"
+    warn "sentinel.env permissions $value: other accounts on the server can read the DB password and encryption key (chmod 600 sentinel.env)"
   fi
 
   for key in DB_URL DB_USERNAME DB_PASSWORD; do
     if [ -z "$(value_of "$APP_ENV_FILE" "$key")" ]; then
-      fail "$key 비어 있음"
+      fail "$key is empty"
     fi
   done
 
@@ -212,15 +212,15 @@ check_app_env() {
     db_host=$(printf '%s' "$value" | sed -E 's#^jdbc:postgresql://([^:/?]+).*#\1#')
     case "$db_host" in
       localhost | 127.0.0.1)
-        fail "DB_URL이 localhost. 컨테이너 안의 localhost는 컨테이너 자신이므로 host.docker.internal 또는 RDS 주소 사용"
+        fail "DB_URL points to localhost. Inside a container localhost is the container itself; use host.docker.internal or the RDS address"
         ;;
       host.docker.internal)
-        ok "DB: 서버의 PostgreSQL (host.docker.internal)"
+        ok "DB: PostgreSQL on this server (host.docker.internal)"
         ;;
       *)
         ok "DB: $db_host"
         if ! printf '%s' "$value" | grep -q 'sslmode='; then
-          warn "DB_URL에 sslmode 없음. RDS는 sslmode=require 권장 (DB 비밀번호·데이터 암호화 전송)"
+          warn "DB_URL has no sslmode. sslmode=require is recommended for RDS (encrypts the DB password and data in transit)"
         fi
         ;;
     esac
@@ -228,12 +228,12 @@ check_app_env() {
 
   value=$(value_of "$APP_ENV_FILE" SENTINEL_SECRET_KEY)
   if [ -z "$value" ]; then
-    warn "SENTINEL_SECRET_KEY 없음. 환경 시크릿(토큰·API 키) 등록과 프로젝트별 알림 Webhook 지정 불가"
+    warn "SENTINEL_SECRET_KEY missing. Environment secrets (tokens, API keys) and project webhooks cannot be registered"
   else
     bytes=$(printf '%s' "$value" | openssl base64 -d -A 2>/dev/null | wc -c | tr -d ' ')
     case "$bytes" in
-      16 | 24 | 32) ok "SENTINEL_SECRET_KEY 형식 정상 (${bytes}바이트). 분실 시 저장된 시크릿·프로젝트 Webhook 복구 불가, 별도 보관" ;;
-      *) fail "SENTINEL_SECRET_KEY는 Base64로 16·24·32바이트 (생성: openssl rand -base64 32)" ;;
+      16 | 24 | 32) ok "SENTINEL_SECRET_KEY format OK (${bytes} bytes). If lost, stored secrets and project webhooks cannot be recovered; keep it somewhere safe" ;;
+      *) fail "SENTINEL_SECRET_KEY must be Base64 for 16, 24 or 32 bytes (generate: openssl rand -base64 32)" ;;
     esac
   fi
 
@@ -242,46 +242,46 @@ check_app_env() {
   if [ -n "$previous" ]; then
     bytes=$(printf '%s' "$previous" | openssl base64 -d -A 2>/dev/null | wc -c | tr -d ' ')
     if [ -z "$value" ]; then
-      fail "SENTINEL_SECRET_KEY_PREVIOUS만 있음. 새 키(SENTINEL_SECRET_KEY)도 지정해야 api가 기동"
+      fail "Only SENTINEL_SECRET_KEY_PREVIOUS is set. The api needs the new key in SENTINEL_SECRET_KEY to start"
     elif [ "$bytes" != 16 ] && [ "$bytes" != 24 ] && [ "$bytes" != 32 ]; then
-      fail "SENTINEL_SECRET_KEY_PREVIOUS는 Base64로 16·24·32바이트 (교체 전 키 그대로)"
+      fail "SENTINEL_SECRET_KEY_PREVIOUS must be Base64 for 16, 24 or 32 bytes (the key before rotation, unchanged)"
     elif [ "$previous" = "$value" ]; then
-      warn "SENTINEL_SECRET_KEY_PREVIOUS가 SENTINEL_SECRET_KEY와 같음. 교체할 것이 없으므로 제거"
+      warn "SENTINEL_SECRET_KEY_PREVIOUS equals SENTINEL_SECRET_KEY. Nothing to rotate; remove it"
     else
-      warn "SENTINEL_SECRET_KEY_PREVIOUS 설정됨 (키 교체 중). 기동 로그의 재암호화 확인 후 sentinel.env에서 제거"
+      warn "SENTINEL_SECRET_KEY_PREVIOUS is set (key rotation in progress). Remove it from sentinel.env after the startup log confirms re-encryption"
     fi
   fi
 
   if [ -n "$(value_of "$APP_ENV_FILE" SENTINEL_ADMIN_PASSWORD)" ]; then
-    warn "SENTINEL_ADMIN_PASSWORD 설정됨. 최초 관리자로 로그인해 비밀번호를 바꾼 뒤 sentinel.env에서 제거"
+    warn "SENTINEL_ADMIN_PASSWORD is set. Log in as the initial administrator, change the password, then remove it from sentinel.env"
   elif [ -z "$(value_of "$APP_ENV_FILE" SENTINEL_ADMIN_EMAIL)" ]; then
-    warn "최초 관리자 계정 미설정. 사용자가 없는 첫 배포라면 로그인할 수 없음"
+    warn "No initial administrator configured. On a first deployment with no users, nobody can log in"
   fi
 
   value=$(value_of "$APP_ENV_FILE" SENTINEL_WEB_URL)
   names=$(site_names "$( [ -f "$ENV_FILE" ] && value_of "$ENV_FILE" SENTINEL_SITE_ADDRESS)")
   if [ -z "$value" ]; then
-    warn "SENTINEL_WEB_URL 없음. 실패 알림에 결과 링크가 붙지 않음"
+    warn "SENTINEL_WEB_URL missing. Failure alerts will not include result links"
   else
     web_host=$(site_names "$value")
     if printf '%s\n' "$names" | grep -qxF "$web_host"; then
-      ok "알림 링크 주소가 접속 주소와 일치 ($web_host)"
+      ok "Alert link address matches the site address ($web_host)"
     else
-      warn "SENTINEL_WEB_URL($web_host)이 접속 주소에 없음. 사용자가 여는 https://<접속 주소>로 지정"
+      warn "SENTINEL_WEB_URL ($web_host) is not a site address. Use the https://<site address> that users open"
     fi
   fi
 
   if [ -z "$(value_of "$APP_ENV_FILE" SENTINEL_WEBHOOK_URL)" ]; then
-    warn "SENTINEL_WEBHOOK_URL 없음. 프로젝트 Webhook이 없는 프로젝트의 실패 알림과 DB 연결 실패·모니터링 공백·주간 요약은 로그로만 기록"
+    warn "SENTINEL_WEBHOOK_URL missing. Failure alerts for projects without a project webhook, DB connection failures, monitoring gaps and weekly digests are only logged"
   fi
 
   if [ -z "$(value_of "$APP_ENV_FILE" SENTINEL_HEARTBEAT_URL)" ]; then
-    warn "SENTINEL_HEARTBEAT_URL 없음. Sentinel이 멈추면 다시 켜질 때까지 알 수 없음"
+    warn "SENTINEL_HEARTBEAT_URL missing. If Sentinel stops, nobody notices until it starts again"
   fi
 }
 
 check_proxy_env
 check_app_env
 
-printf '\n실패 %d · 경고 %d\n' "$failures" "$warnings"
+printf '\nFailures: %d, warnings: %d\n' "$failures" "$warnings"
 [ "$failures" -eq 0 ]

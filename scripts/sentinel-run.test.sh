@@ -28,10 +28,10 @@ def run(status, results):
     return {"id": 7, "status": status, "plannedCount": 2, "results": results,
             "summary": {"total": len(results), "passed": passed, "failed": failed, "errors": errors}}
 
-PASS = {"testCase": {"id": 1, "name": "주문 조회"}, "verdict": "PASSED", "errorReason": None, "assertionResults": []}
-FAIL = {"testCase": {"id": 1, "name": "결제 승인"}, "verdict": "FAILED", "errorReason": None,
+PASS = {"testCase": {"id": 1, "name": "Get order"}, "verdict": "PASSED", "errorReason": None, "assertionResults": []}
+FAIL = {"testCase": {"id": 1, "name": "Approve payment"}, "verdict": "FAILED", "errorReason": None,
         "assertionResults": [{"description": "status in [2xx]", "passed": False}]}
-ERROR = {"testCase": {"id": 1, "name": "환불"}, "verdict": "ERROR", "errorReason": "TIMEOUT", "assertionResults": []}
+ERROR = {"testCase": {"id": 1, "name": "Refund"}, "verdict": "ERROR", "errorReason": "TIMEOUT", "assertionResults": []}
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
@@ -122,26 +122,26 @@ check() {
   fi
 }
 
-check "통과하면 0" pass 0 "통과: 전체 2건, 통과 2, 실패 0, 오류 0" --suite 3 --environment 2 --interval 0
-check "시작 주소 안내" pass 0 "실행 #7 시작: $URL/runs/7" --suite 3 --environment 2 --interval 0
-check "진행 상황" pass 0 "진행 중: 1/2건" --suite 3 --environment 2 --interval 0
-check "실패하면 1과 케이스 목록" fail 1 "  - 결제 승인: status in [2xx]" --suite 3 --environment 2 --interval 0
-check "오류 사유" fail 1 "  - 환불: TIMEOUT" --suite 3 --environment 2 --interval 0
-check "중지된 실행은 2" canceled 2 "실행이 끝나지 않았습니다 (CANCELED)" --suite 3 --environment 2 --interval 0
-check "토큰 거부는 2" unauthorized 2 "토큰이 없거나 만료·폐기되었습니다" --suite 3 --environment 2
-check "동시 실행 한도는 2" busy 2 "진행 중인 수동 실행이 많습니다" --suite 3 --environment 2
-check "결과 조회 실패는 2" gone 2 "HTTP 404 test run 7 not found" --suite 3 --environment 2 --interval 0
-check "시간 초과는 2" slow 2 "시간 초과 (1초)" --suite 3 --environment 2 --timeout 1 --interval 0.2
-check "숫자가 아닌 ID" pass 2 "숫자 ID를 지정해 주세요" --suite abc --environment 2
+check "exits 0 when all pass" pass 0 "Passed: 2 cases, 2 passed, 0 failed, 0 errors" --suite 3 --environment 2 --interval 0
+check "prints the run URL" pass 0 "Started run #7: $URL/runs/7" --suite 3 --environment 2 --interval 0
+check "prints progress" pass 0 "Running: 1/2 cases" --suite 3 --environment 2 --interval 0
+check "exits 1 and lists failing cases" fail 1 "  - Approve payment: status in [2xx]" --suite 3 --environment 2 --interval 0
+check "prints the error reason" fail 1 "  - Refund: TIMEOUT" --suite 3 --environment 2 --interval 0
+check "exits 2 for a canceled run" canceled 2 "The run did not finish (CANCELED)" --suite 3 --environment 2 --interval 0
+check "exits 2 when the token is rejected" unauthorized 2 "The token is missing, expired or revoked" --suite 3 --environment 2
+check "exits 2 at the concurrent run limit" busy 2 "Too many manual runs in progress" --suite 3 --environment 2
+check "exits 2 when the result cannot be read" gone 2 "HTTP 404 test run 7 not found" --suite 3 --environment 2 --interval 0
+check "exits 2 on timeout" slow 2 "Timed out after 1s" --suite 3 --environment 2 --timeout 1 --interval 0.2
+check "rejects non-numeric IDs" pass 2 "Specify numeric IDs" --suite abc --environment 2
 
 # 연결 실패 (닫힌 포트)
 output=$(SENTINEL_URL="http://127.0.0.1:9" SENTINEL_TOKEN="$TOKEN" "$BASH" "$SCRIPT" --suite 3 --environment 2 2>&1)
 code=$?
-if [[ "$code" == 2 && "$output" == *"Sentinel에 연결하지 못했습니다"* ]]; then
+if [[ "$code" == 2 && "$output" == *"Could not connect to Sentinel"* ]]; then
   passed=$((passed + 1))
 else
   failed=$((failed + 1))
-  echo "FAIL 연결 실패: $output"
+  echo "FAIL connection failure: $output"
 fi
 
 # --junit: 끝난 실행은 통과·실패 모두 저장, 시간 초과는 저장하지 않음, 받지 못하면 경고만 (종료 코드는 실행 결과)
@@ -167,19 +167,19 @@ junit_check() {
   fi
 }
 
-junit_check "통과도 저장" pass 0 yes "JUnit XML: $WORK/report.xml"
-junit_check "실패도 저장" fail 1 yes "JUnit XML: $WORK/report.xml"
-junit_check "중지도 저장" canceled 2 yes "JUnit XML: $WORK/report.xml"
-junit_check "시간 초과는 저장 안 함" slow 2 no "시간 초과" --timeout 1 --interval 0.2
-junit_check "받지 못하면 경고만" xml-broken 0 no "경고: JUnit XML을 받지 못했습니다: HTTP 500"
+junit_check "saves a passed run" pass 0 yes "JUnit XML: $WORK/report.xml"
+junit_check "saves a failed run" fail 1 yes "JUnit XML: $WORK/report.xml"
+junit_check "saves a canceled run" canceled 2 yes "JUnit XML: $WORK/report.xml"
+junit_check "does not save on timeout" slow 2 no "Timed out" --timeout 1 --interval 0.2
+junit_check "only warns when the XML cannot be downloaded" xml-broken 0 no "Warning: could not download the JUnit XML: HTTP 500"
 
 # 사용법은 맨 위 주석만
 usage=$("$BASH" "$SCRIPT" --help 2>&1)
-if [[ "$usage" == *"종료 코드"* && "$usage" != *"set -euo"* ]]; then
+if [[ "$usage" == *"Exit codes"* && "$usage" != *"set -euo"* ]]; then
   passed=$((passed + 1))
 else
   failed=$((failed + 1))
-  echo "FAIL 사용법: $usage"
+  echo "FAIL usage: $usage"
 fi
 
 # 요청 내용: 본문, 토큰 헤더 (주소 끝의 /는 제거)
@@ -192,14 +192,14 @@ if [[ "$(cat "$WORK/body")" == '{"suiteId": 3, "environmentId": 2}' ]] &&
   passed=$((passed + 1))
 else
   failed=$((failed + 1))
-  echo "FAIL 요청 내용"
+  echo "FAIL request contents"
   cat "$WORK/body" "$WORK/requests"
 fi
 
 # 환경변수 없음
 if SENTINEL_URL="" SENTINEL_TOKEN="" "$BASH" "$SCRIPT" --suite 3 --environment 2 >/dev/null 2>&1; then
   failed=$((failed + 1))
-  echo "FAIL 환경변수 없이 성공"
+  echo "FAIL succeeded without environment variables"
 else
   passed=$((passed + 1))
 fi
