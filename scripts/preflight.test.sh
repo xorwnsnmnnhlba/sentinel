@@ -77,6 +77,7 @@ valid_setup() {
   mkdir -p "$dir/proxy/certs"
   cat "$WORK/$name.crt" "$WORK/ca.crt" >"$dir/proxy/certs/cert.pem"
   cp "$WORK/$name.key" "$dir/proxy/certs/key.pem"
+  chmod 600 "$dir/proxy/certs/key.pem"
   cat >"$dir/.env" <<EOF
 # 주석
 SENTINEL_SITE_ADDRESS=sentinel.team.internal
@@ -93,18 +94,20 @@ SENTINEL_WEB_URL=https://sentinel.team.internal
 SENTINEL_ADMIN_EMAIL=admin@example.com
 SENTINEL_SECRET_KEY=$SECRET_KEY_VALUE
 EOF
+  chmod 600 "$dir/sentinel.env"
 }
 
 # 키 값 바꾸기 (없으면 추가). $1 파일, $2 키, $3 값
+# 원래 파일에 덮어써 권한(chmod 600) 유지. mv로 바꾸면 새 파일 권한이 되어 권한 경고가 섞임
 set_value() {
   grep -v "^$2=" "$1" >"$1.tmp"
   printf '%s=%s\n' "$2" "$3" >>"$1.tmp"
-  mv "$1.tmp" "$1"
+  cat "$1.tmp" >"$1" && rm "$1.tmp"
 }
 
 remove_value() {
   grep -v "^$2=" "$1" >"$1.tmp"
-  mv "$1.tmp" "$1"
+  cat "$1.tmp" >"$1" && rm "$1.tmp"
 }
 
 # ---------- 확인 ----------
@@ -252,6 +255,16 @@ set_value "$D/sentinel.env" SENTINEL_SECRET_KEY ""
 set_value "$D/sentinel.env" SENTINEL_SECRET_KEY_PREVIOUS "$PREVIOUS_KEY_VALUE"
 run "$D"
 check "새 키 없이 이전 키만 있으면 실패" '[ "$status" -eq 1 ] && contains "✘ SENTINEL_SECRET_KEY_PREVIOUS만 있음"'
+
+valid_setup "$D"
+chmod 644 "$D/sentinel.env"
+run "$D"
+check "sentinel.env를 다른 계정이 읽을 수 있으면 경고" '[ "$status" -eq 0 ] && contains "! sentinel.env 권한 -rw-r--r--" && contains "chmod 600 sentinel.env"'
+
+valid_setup "$D"
+chmod 640 "$D/proxy/certs/key.pem"
+run "$D"
+check "개인 키를 그룹이 읽을 수 있어도 경고" '[ "$status" -eq 0 ] && contains "! key.pem 권한 -rw-r-----" && contains "chmod 600 proxy/certs/key.pem"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" SENTINEL_ADMIN_PASSWORD "initial-admin-password"

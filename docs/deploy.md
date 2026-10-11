@@ -2,7 +2,7 @@
 
 사용자가 내부망에서 쓰도록 서버에 띄우고 유지하는 절차. 컨테이너 구성과 설계 배경은 [design.md](design.md) "6. 실행 환경"
 
-최종 점검: 2026-10-10 (암호화 키 교체·시스템 상태 반영)
+최종 점검: 2026-10-11 (새 서버 리허설: 이 문서 그대로 설치·재부팅·업데이트·키 교체·인증서 교체 확인)
 
 ## 결정 사항 (2026-09-26)
 
@@ -30,7 +30,7 @@
 git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 ```
 
-1. 보유 인증서 배치 (`proxy/certs/`, git 제외)
+1. 보유 인증서 배치 (`proxy/certs/`, git 제외). 새로 받은 저장소에는 폴더가 없으므로 `mkdir -p proxy/certs`
    - `cert.pem`: 서버 인증서 뒤에 중간 인증서를 이어 붙인 파일 (서버 → 중간 순). 중간 인증서가 빠지면 일부 PC에서 신뢰 오류
    - `key.pem`: 암호가 없는 개인 키. `chmod 600 proxy/certs/key.pem`
 2. `.env` 작성 (`cp .env.example .env`)
@@ -39,6 +39,7 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
    - `SENTINEL_HSTS_MAX_AGE=300`: 처음에는 5분. 확인을 마치면 31536000(1년)으로 변경 후 `docker compose up -d sentinel-proxy`
 3. `sentinel.env` 작성 (`cp sentinel.env.example sentinel.env`, `chmod 600 sentinel.env`)
    - `DB_URL`: `jdbc:postgresql://<RDS 엔드포인트>:5432/<DB>?currentSchema=sentinel&sslmode=require`
+   - `DB_USERNAME`·`DB_PASSWORD`: DB 계정
    - `SENTINEL_SECRET_KEY`: `openssl rand -base64 32`로 생성. 환경 시크릿(토큰·API 키)과 프로젝트별 알림 Webhook 주소를 암호화. 없으면 둘 다 등록할 수 없음. 분실하면 저장된 값을 복호화할 수 없으므로 비밀번호 관리 도구에 따로 보관
    - `SENTINEL_ADMIN_EMAIL`·`SENTINEL_ADMIN_PASSWORD`: 사용자가 없을 때 1회 생성되는 최초 관리자
    - `SENTINEL_WEB_URL=https://sentinel.<내부 도메인>`: 실패 알림의 결과 링크
@@ -61,8 +62,8 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 | 구분 | 확인 |
 |------|------|
 | `.env` | 접속 주소, 인증서 방식 형식, HSTS 값 (내부 인증서와 함께 쓰면 경고) |
-| 보유 인증서 | 만료(30일 전 경고), 개인 키 짝, 접속 주소마다 인증서 포함 여부(와일드카드는 한 단계), 중간 인증서 포함 |
-| `sentinel.env` | 따옴표 사용, DB 필수 값, DB 주소(컨테이너 안 localhost 금지, RDS의 sslmode), 암호화 키 길이, 이전 암호화 키(길이·새 키 유무·잔존), 최초 관리자 비밀번호 잔존, 알림 링크 주소, 기본 알림 채널·생존 신호 주소 유무 (값은 출력하지 않음) |
+| 보유 인증서 | 만료(30일 전 경고), 개인 키 짝, 개인 키 권한(다른 계정이 읽을 수 있으면 경고), 접속 주소마다 인증서 포함 여부(와일드카드는 한 단계), 중간 인증서 포함 |
+| `sentinel.env` | 파일 권한(다른 계정이 읽을 수 있으면 경고), 따옴표 사용, DB 필수 값, DB 주소(컨테이너 안 localhost 금지, RDS의 sslmode), 암호화 키 길이, 이전 암호화 키(길이·새 키 유무·잔존), 최초 관리자 비밀번호 잔존, 알림 링크 주소, 기본 알림 채널·생존 신호 주소 유무 (값은 출력하지 않음) |
 
 ## 운영 시작 설정
 
