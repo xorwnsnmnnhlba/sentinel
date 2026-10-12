@@ -41,6 +41,10 @@ export async function createPasswordReset(baseUrl: string, userId: number): Prom
 }
 
 export async function deleteUser(userId: number): Promise<ActionState> {
+  // 바인딩된 인자도 클라이언트가 바꿀 수 있으므로 숫자 ID만 ("1/../../projects/5" 같은 값이 다른 API 경로가 되지 않도록)
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    return { error: "삭제할 사용자를 다시 선택해 주세요" };
+  }
   try {
     await apiSend("DELETE", `/api/users/${userId}`);
   } catch (error) {
