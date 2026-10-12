@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sentinel.application.notification.Notification;
+import com.sentinel.application.notification.NotificationProperties;
 import com.sentinel.application.notification.RecordingNotifier;
 import com.sentinel.application.notification.RunResultNotifier;
 import com.sentinel.domain.TestSchedule;
@@ -33,6 +34,10 @@ import static org.mockito.Mockito.when;
  */
 class SchedulePollerDatabaseOutageTest {
 
+	private static final NotificationProperties NOTIFICATION = new NotificationProperties(null, null,
+			Duration.ofSeconds(3), Duration.ofSeconds(5), Duration.ofHours(1));
+
+
 	private final TestScheduleRepository schedules = mock(TestScheduleRepository.class);
 
 	private final RecordingNotifier notifier = new RecordingNotifier();
@@ -54,7 +59,7 @@ class SchedulePollerDatabaseOutageTest {
 		poller = new SchedulePoller(schedules, mock(TestRunService.class), mock(RunResultNotifier.class), notifier,
 				new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60), Duration.ofMinutes(10)), clock,
 				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), monitoringGaps, heartbeat,
-				mock(HolidayRepository.class));
+				mock(HolidayRepository.class), NOTIFICATION);
 	}
 
 	@Test
@@ -149,7 +154,7 @@ class SchedulePollerDatabaseOutageTest {
 				new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60), Duration.ofMinutes(10)), clock,
 				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), monitoringGaps, () -> {
 					throw new IllegalStateException("broken");
-				}, mock(HolidayRepository.class));
+				}, mock(HolidayRepository.class), NOTIFICATION);
 		dueSchedule(Instant.parse("2026-09-18T23:00:00Z"));
 		when(monitoringGaps.record(any(), any(), anyInt())).thenReturn(true);
 
@@ -198,7 +203,7 @@ class SchedulePollerDatabaseOutageTest {
 					throw new IllegalStateException("webhook down");
 				}, new ScheduleProperties(true, ZoneId.of("Asia/Seoul"), Duration.ofSeconds(60), Duration.ofMinutes(10)), clock,
 				new Transactions(transactionManager), mock(MaintenanceWindowRepository.class), mock(MonitoringGapService.class),
-				Heartbeat.NONE, mock(HolidayRepository.class));
+				Heartbeat.NONE, mock(HolidayRepository.class), NOTIFICATION);
 		databaseDown();
 
 		assertThat(failingNotifierPoller.poll()).isEmpty();

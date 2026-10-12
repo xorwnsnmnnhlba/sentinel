@@ -711,6 +711,19 @@ describe("schedules", () => {
     });
   });
 
+  it("asks to reload when someone else changed the schedule first", async () => {
+    server.use(
+      http.patch(springUrl("/api/schedules/5"), () =>
+        problem(409, "modified by another request; reload and try again"),
+      ),
+    );
+
+    await expect(updateSchedule(5, undefined, form({ cron: "30 17 * * 1-5", environmentId: "4" }))).resolves.toEqual({
+      error: "다른 곳에서 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요",
+    });
+    expect(refresh).toHaveBeenCalled();
+  });
+
   it.each([true, false])("sends enabled=%s", async (enabled) => {
     const bodies = capture("patch", "/api/schedules/5", () => HttpResponse.json({ id: 5 }));
 

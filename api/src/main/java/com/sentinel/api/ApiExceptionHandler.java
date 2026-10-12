@@ -11,6 +11,7 @@ import com.sentinel.application.TooManyRunsException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,6 +19,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 class ApiExceptionHandler {
+
+	/** web이 이 문구로 동시 수정 충돌을 구분 (lib/actions) */
+	static final String CONCURRENT_MODIFICATION = "modified by another request; reload and try again";
+
 
 	@ExceptionHandler(NotFoundException.class)
 	ProblemDetail handleNotFound(NotFoundException ex) {
@@ -53,6 +58,12 @@ class ApiExceptionHandler {
 	@ExceptionHandler(ConflictException.class)
 	ProblemDetail handleConflict(ConflictException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	/** 낙관적 잠금 충돌. 같은 항목을 다른 요청이 먼저 고침 (화면은 다시 불러온 뒤 재시도 안내) */
+	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+	ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, CONCURRENT_MODIFICATION);
 	}
 
 	/**
