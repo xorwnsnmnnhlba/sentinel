@@ -40,6 +40,7 @@ function isPrefetch(request: NextRequest): boolean {
 }
 
 export const config = {
-  // 정적 자원과 /api/**(BFF 프록시, JSON 응답이며 Spring이 401로 판단)는 제외
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  // 정적 자원과 /api/**(BFF 프록시, JSON 응답이며 Spring이 401로 판단)는 제외.
+  // api/처럼 /까지 적어야 /api-docs 같은 화면이 빠지지 않음 (빠지면 CSP·로그인 확인 없이 렌더링)
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico).*)"],
 };

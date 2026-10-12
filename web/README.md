@@ -178,7 +178,11 @@ proxy.ts                    모든 화면 요청의 앞단 (로그인 확인, CS
 
 ## 인증
 
-- 세션 토큰은 Next.js가 httpOnly 쿠키(`sentinel_session`)로 보관. 브라우저 스크립트에서 읽을 수 없고 Spring에는 `Authorization: Bearer` 헤더로 전달
+- 세션 토큰은 Next.js가 httpOnly 쿠키로 보관. 브라우저 스크립트에서 읽을 수 없고 Spring에는 `Authorization: Bearer` 헤더로 전달
+  - 이름: 운영(HTTPS)은 `__Host-sentinel_session`, 로컬 http 개발은 `sentinel_session`. `__Host-`는 브라우저가 Secure·`Path=/`·Domain 없음을 강제하여 같은 상위 도메인의 다른 사이트가 쿠키를 심을 수 없음
+  - 삭제(로그아웃)도 같은 속성으로 보냄. `__Host-` 쿠키는 Secure·`Path=/`가 없는 Set-Cookie를 브라우저가 무시
+  - 이름이 바뀐 배포 직후에는 로그인한 사용자가 한 번 다시 로그인
+- 초대·재설정 화면은 주소의 토큰을 인코딩해 api 경로에 붙임 (`lib/api/link-paths.ts`). 화면 주소의 토큰은 Next.js가 풀어서 전달하므로 `../users/1` 같은 값이 다른 API 경로가 되지 않도록
 - `proxy.ts`(Next.js 16에서 `middleware` 대체)가 쿠키 없는 요청을 로그인 화면으로 보냄. 토큰 유효성 판단은 Spring 몫. 로그인·초대·재설정 화면은 예외
 - 조회 중 401이면 오류 화면 대신 로그인 화면으로 이동 (세션 만료)
 - 로그인 실패 문구는 서버와 동일하게 사유를 구분하지 않음

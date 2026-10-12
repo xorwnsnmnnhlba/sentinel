@@ -1,5 +1,6 @@
 import { ExpiredLink } from "@/components/auth/expired-link";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
+import { passwordResetApiPath } from "@/lib/api/link-paths";
 import { apiGet, isApiError } from "@/lib/api/server";
 import type { PasswordResetLinkInfo } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
@@ -10,7 +11,7 @@ export default async function ResetPasswordPage(props: PageProps<"/password-rese
   const { token } = await props.params;
   let reset: PasswordResetLinkInfo;
   try {
-    reset = await apiGet<PasswordResetLinkInfo>(`/api/password-resets/${token}`);
+    reset = await apiGet<PasswordResetLinkInfo>(passwordResetApiPath(token));
   } catch (error) {
     if (isApiError(error) && error.status === 404) {
       return (

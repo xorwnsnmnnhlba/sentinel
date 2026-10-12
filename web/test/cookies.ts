@@ -13,8 +13,15 @@ export const cookieStore = {
     testCookies.set(name, value);
     testCookieOptions.set(name, options);
   },
-  delete(name: string) {
+  /** 이름만 또는 속성과 함께 (next/headers와 같은 두 형태). 속성은 testCookieOptions에 기록 */
+  delete(target: string | ({ name: string } & Record<string, unknown>)) {
+    if (typeof target === "string") {
+      testCookies.delete(target);
+      return;
+    }
+    const { name, ...options } = target;
     testCookies.delete(name);
+    testCookieOptions.set(name, options);
   },
   has(name: string) {
     return testCookies.has(name);

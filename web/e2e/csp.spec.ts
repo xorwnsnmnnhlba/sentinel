@@ -20,6 +20,22 @@ test("화면 응답마다 새 nonce로 정책 발급", async ({ request }) => {
   expect(first).toContain("frame-ancestors 'none'");
 });
 
+test("/api로 시작하는 화면(API 문서)도 정책 적용과 로그인 확인", async ({ page, request }) => {
+  // 로그인 전에는 앞단(proxy)이 로그인 화면으로 보냄
+  const anonymous = await request.get("/api-docs", { maxRedirects: 0 });
+  expect(anonymous.status()).toBe(307);
+  expect(anonymous.headers()["location"]).toContain("/login");
+
+  await page.goto("/login");
+  await page.getByLabel("이메일").fill("admin@sentinel.test");
+  await page.getByLabel("비밀번호").fill("e2e-admin-password");
+  await page.getByRole("button", { name: "로그인" }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+
+  const response = await page.goto("/api-docs");
+  nonceOf(response?.headers()["content-security-policy"]);
+});
+
 test("페이지의 모든 스크립트에 응답 헤더의 nonce 부여", async ({ request }) => {
   const response = await request.get("/login");
   const nonce = nonceOf(response.headers()["content-security-policy"]);

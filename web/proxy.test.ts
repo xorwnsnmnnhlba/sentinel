@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 
-import { proxy } from "./proxy";
+import { config, proxy } from "./proxy";
 
 function request(path: string, loggedIn: boolean, headers: Record<string, string> = {}) {
   return new NextRequest(`https://sentinel.test${path}`, {
@@ -45,6 +45,17 @@ describe("proxy", () => {
     expect(nonceOf(policy)).not.toBe(nonceOf(second.headers.get("content-security-policy")));
     // Next.js가 렌더링 중 nonce를 읽는 요청 헤더에도 같은 정책
     expect(first.headers.get("x-middleware-request-content-security-policy")).toBe(policy);
+  });
+
+  it("runs for every page including /api-docs, but not for the BFF proxy or static files", () => {
+    const matcher = new RegExp(`^${config.matcher[0]}$`);
+
+    expect(matcher.test("/api-docs")).toBe(true);
+    expect(matcher.test("/apis")).toBe(true);
+    expect(matcher.test("/runs/1")).toBe(true);
+    expect(matcher.test("/api/runs/1")).toBe(false);
+    expect(matcher.test("/_next/static/chunk.js")).toBe(false);
+    expect(matcher.test("/favicon.ico")).toBe(false);
   });
 
   it("still requires a session for link prefetches but skips the policy", () => {
