@@ -47,10 +47,11 @@ public class AuthFilter extends OncePerRequestFilter {
 	private static final Set<String> OPEN_METHODS = Set.of("OPTIONS");
 
 	/**
-	 * 경로 해석에 따라 다른 API로 닿을 수 있는 표기. 점 세그먼트, 경로 매개변수(;), 인코딩된 . / \, 빈 세그먼트(//).
-	 * 이런 경로는 링크 API로 보지 않고 항상 인증 요구 (라우팅의 경로 정리 방식에 기대지 않음)
+	 * 경로 해석에 따라 다른 API로 닿을 수 있는 표기. 점 세그먼트, 경로 매개변수(;), 퍼센트 인코딩(%), 빈 세그먼트(//).
+	 * 이런 경로는 로그인 전 요청으로 보지 않고 항상 인증 요구 (라우팅의 경로 정리 방식에 기대지 않음).
+	 * API 경로는 숫자 ID와 고정 단어뿐이라 정상 요청에는 인코딩이 없음 (/%61pi/runs처럼 글자를 인코딩한 우회 방지)
 	 */
-	private static final Pattern AMBIGUOUS_PATH = Pattern.compile("(^|/)\\.{1,2}(/|$)|;|%2[eEfF]|%5[cC]|//");
+	private static final Pattern AMBIGUOUS_PATH = Pattern.compile("(^|/)\\.{1,2}(/|$)|;|%|//");
 
 	/** API 토큰으로 부를 수 있는 요청. 숫자 ID만 (다른 경로 표기로 우회 불가) */
 	private static final Pattern RUN_DETAIL = Pattern.compile("^/api/runs/\\d+$");
@@ -82,10 +83,12 @@ public class AuthFilter extends OncePerRequestFilter {
 	}
 
 	private boolean requiresAuthentication(HttpServletRequest request) {
-		String path = request.getRequestURI();
-		if (!path.startsWith("/api/") || OPEN_METHODS.contains(request.getMethod())) {
+		if (OPEN_METHODS.contains(request.getMethod())) {
 			return false;
 		}
+		// 이 필터는 /api/*에만 등록되므로(AuthConfig) 여기까지 온 요청은 모두 API. 서블릿 컨테이너는 풀어 쓴 경로로 필터를 고르므로
+		// 원문이 /api/로 시작하지 않아도(/%61pi/...) API로 처리됨. 원문으로 API 여부를 다시 판단하지 않음
+		String path = request.getRequestURI();
 		// 로그아웃(DELETE /api/sessions/current)은 토큰이 있어야 처리 가능하므로 열지 않음
 		return AMBIGUOUS_PATH.matcher(path).find()
 				|| OPEN_ROUTES.stream().noneMatch(route -> route.matches(request.getMethod(), path));

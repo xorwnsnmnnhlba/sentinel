@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import com.sentinel.TestcontainersConfiguration;
+import com.sentinel.application.auth.AccessTokenService;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.TestFixtures;
 import com.sentinel.domain.Project;
@@ -38,6 +39,9 @@ class AuthPathTest {
 
 	@Autowired
 	private TestFixtures fixtures;
+
+	@Autowired
+	private AccessTokenService accessTokens;
 
 	@AfterEach
 	void cleanUp() {
@@ -71,11 +75,47 @@ class AuthPathTest {
 
 	@ParameterizedTest
 	@ValueSource(strings = { "/api/invites/%2e%2e", "/api/invites/..;", "/api/password-resets/%2e%2e",
-			"/api/users/1/password/../../../projects" })
+			"/api/users/1/password/../../../projects", "/api/invites/%61bc", "/api/password-resets/%7e" })
 	void treatsAmbiguousOpenPathsAsProtected(String path) throws IOException {
 		// 인증 필터가 거부하거나 Tomcat이 먼저 거부 (400). 처리기·다른 API에는 닿지 않음
 		assertThat(raw(path.contains("password") ? "PUT" : "GET", path, "{}"))
 			.matches("(?s)HTTP/1\\.1 (401|400) .*");
+	}
+
+	/**
+	 * 경로 문자를 인코딩해도 보호 API에 닿지 않음. Tomcat·Spring은 풀어서 /api/로 처리하지만 필터가 원문을 보면 다른 경로로 착각
+	 * (2026-10-12 독립 리뷰에서 발견: 원문이 /api/로 시작하지 않으면 인증 없이 통과)
+	 */
+	@ParameterizedTest
+	@ValueSource(strings = { "/%61pi/projects", "/a%70i/projects", "/%61%70%69/environments", "/%61pi/runs",
+			"/api/%70rojects", "/%61pi/change-logs", "/%61pi/sessions/current" })
+	void requiresAuthenticationForPercentEncodedPaths(String path) throws IOException {
+		Project project = fixtures.project();
+
+		String response = rawGet(path, null);
+
+		assertThat(response).matches("(?s)HTTP/1\\.1 (401|400) .*").doesNotContain(project.getName());
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "/%61pi/runs", "/%61pi/runs/1", "/%61pi/projects" })
+	void doesNotLetAnAccessTokenThroughPercentEncodedPaths(String path) throws IOException {
+		// HTTPS 앞단은 API 토큰 요청(Authorization: Bearer snt_...)을 web을 거치지 않고 Spring으로 바로 전달
+		Project project = fixtures.project();
+		String token = accessTokens.issue(fixtures.user().getId(), "ci", 30).token();
+
+		assertThat(rawGet(path, "Bearer snt_not-a-real-token")).matches("(?s)HTTP/1\\.1 (401|400) .*")
+			.doesNotContain(project.getName());
+		// 유효한 토큰도 허용 목록(POST /api/runs, GET /api/runs/{id})의 원문 경로가 아니면 거부
+		assertThat(rawGet(path, "Bearer " + token)).matches("(?s)HTTP/1\\.1 (403|400) .*")
+			.doesNotContain(project.getName());
+	}
+
+	@ParameterizedTest
+	@CsvSource({ "POST, /%61pi/sessions", "POST, /a%70i/users", "GET, /%61pi/invites/some-token" })
+	void doesNotOpenLoginRequestsThroughPercentEncodedPaths(String method, String path) throws IOException {
+		// 로그인 전 요청도 원문이 정확히 같을 때만 열림 (인코딩한 표기는 인증 요구)
+		assertThat(raw(method, path, "{}")).startsWith("HTTP/1.1 401 ");
 	}
 
 	@ParameterizedTest
@@ -102,12 +142,17 @@ class AuthPathTest {
 		}
 	}
 
-	/** 클라이언트 라이브러리의 경로 정리를 피하려고 요청 줄을 그대로 전송 */
 	private String rawGet(String path) throws IOException {
+		return rawGet(path, null);
+	}
+
+	/** 클라이언트 라이브러리의 경로 정리를 피하려고 요청 줄을 그대로 전송 */
+	private String rawGet(String path, String authorization) throws IOException {
 		try (Socket socket = new Socket("127.0.0.1", port)) {
 			socket.setSoTimeout(5000);
 			OutputStream out = socket.getOutputStream();
-			out.write(("GET " + path + " HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+			String header = authorization == null ? "" : "Authorization: " + authorization + "\r\n";
+			out.write(("GET " + path + " HTTP/1.1\r\nHost: localhost\r\n" + header + "Connection: close\r\n\r\n")
 				.getBytes(StandardCharsets.US_ASCII));
 			out.flush();
 			InputStream in = socket.getInputStream();
