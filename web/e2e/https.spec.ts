@@ -32,8 +32,9 @@ test("HTTPS 앞단을 거쳐 로그인하면 Secure 세션 쿠키 발급", async
   // Server Action의 출처 확인(Origin과 Host 비교)이 앞단을 거쳐도 통과해야 로그인 완료
   await expect(mainMenu(page).getByRole("link", { name: "프로젝트" })).toBeVisible();
   expect(page.url()).toMatch(/^https:\/\/localhost:13443\//);
-  const session = (await context.cookies()).find((cookie) => cookie.name === "sentinel_session");
-  expect(session).toMatchObject({ secure: true, httpOnly: true, sameSite: "Lax" });
+  // 운영 빌드는 __Host- 접두어 (Secure·Path=/·Domain 없음을 브라우저가 강제)
+  const session = (await context.cookies()).find((cookie) => cookie.name === "__Host-sentinel_session");
+  expect(session).toMatchObject({ secure: true, httpOnly: true, sameSite: "Lax", path: "/" });
 });
 
 test("로그인 상태여도 BFF 프록시로는 쓰기 요청 불가 (쓰기는 Server Action만)", async ({ page }) => {
