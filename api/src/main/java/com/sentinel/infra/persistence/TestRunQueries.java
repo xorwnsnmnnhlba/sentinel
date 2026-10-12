@@ -77,6 +77,9 @@ public interface TestRunQueries {
 	/** 진행 중이면 완료 처리 @return 갱신한 행 수. 그사이 중지됐으면 0 */
 	long completeIfRunning(long runId, Instant finishedAt);
 
+	/** 진행 중이면 중단 처리 (실행 도중 예상하지 못한 오류) @return 갱신한 행 수. 이미 끝났으면 0 */
+	long abortIfRunning(long runId, Instant abortedAt);
+
 	/** 진행 중이면 중지 처리 @return 갱신한 행 수. 이미 끝났으면 0 */
 	long cancelIfRunning(long runId, long canceledBy, Instant canceledAt);
 
