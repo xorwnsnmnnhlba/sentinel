@@ -12,7 +12,8 @@ class RequestExecutorConfig {
 
 	@Bean
 	RequestExecutor requestExecutor(RunnerHttpProperties properties) {
-		return new RestClientRequestExecutor(properties.connectTimeout(), properties.readTimeout());
+		return new RestClientRequestExecutor(properties.connectTimeout(), properties.readTimeout(),
+				properties.totalTimeout(), (int) properties.maxResponseSize().toBytes());
 	}
 
 	@Bean

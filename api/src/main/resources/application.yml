@@ -70,7 +70,12 @@ sentinel:
   runner:
     http:
       connect-timeout: 5s
+      # 응답을 기다리는 제한 시간. 읽을 때마다 다시 잼
       read-timeout: 30s
+      # 응답 본문을 다 받을 때까지의 전체 제한 시간. 조금씩 늦게 보내는 응답이 실행을 붙잡지 않도록
+      total-timeout: 2m
+      # 받는 응답 본문의 최대 크기. 넘는 부분은 받지 않고 연결을 끊음 (저장은 64KB까지)
+      max-response-size: 10MB
     retry:
       # 응답을 받지 못한 전송을 다시 보내는 최대 횟수 (0~3, 0이면 재시도 없음)와 다시 보내기 전 대기
       # 연결 실패는 모든 메서드, 타임아웃·연결 끊김은 조회 메서드(GET·HEAD·OPTIONS)만

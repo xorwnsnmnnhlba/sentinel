@@ -310,6 +310,10 @@ curl -i -X POST localhost:8080/api/runs \
   - 압축 요청(`Accept-Encoding`) 없음, 쿠키 저장·자동 전송 없음 (케이스에 적은 헤더만 전송)
 - 연결 재사용. 1초 이상 쉰 연결은 사용 전 확인, 30초 이상 쉰 연결은 정리. 동시 연결 한도 200 (Tomcat 기본 요청 스레드 수)
 - 제한 시간: 연결 `sentinel.runner.http.connect-timeout`(기본 5초) 초과 시 `CONNECTION_FAILED`, 응답 대기 `read-timeout`(기본 30초) 초과 시 `TIMEOUT`
+  - `read-timeout`은 읽을 때마다 다시 재므로, 본문을 조금씩 늦게 보내는 응답은 끝나지 않을 수 있음. 본문을 다 받을 때까지의 전체 제한 `total-timeout`(기본 2분)을 넘으면 연결을 끊고 `TIMEOUT`
+  - 한계: 전체 제한은 본문을 읽는 동안 확인. 응답 헤더를 조금씩 늦게 보내는 경우는 읽기 한 번마다 `read-timeout`만 적용
+- 응답 본문 크기: `max-response-size`(기본 10MB)까지만 받고 넘는 부분은 받지 않고 연결을 끊음 (메모리 보호). 판정·추출은 받은 부분으로, 저장은 다시 64KB까지
+  - 남은 본문을 읽지 않고 연결을 버림 (닫기만 하면 HTTP 클라이언트가 연결을 다시 쓰려고 남은 본문을 끝까지 읽음)
 - 수동 실행은 실행마다 가상 스레드 하나에서 진행 (대부분 GW 응답 대기이므로 스레드를 점유하지 않음). 동시 수동 실행 수는 `sentinel.runner.manual.max-concurrent`(기본 4, 1 미만이면 기동 실패)
 
 ### 전송 오류 재시도
