@@ -7,11 +7,15 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import com.sentinel.application.notification.Notification;
 import com.sentinel.application.notification.NotificationFormat;
+import com.sentinel.application.notification.NotificationProperties;
 import com.sentinel.application.notification.Notifier;
 import com.sentinel.application.notification.RunResultNotifier;
 import com.sentinel.domain.MaintenanceWindow;
@@ -24,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
@@ -70,6 +75,15 @@ class SchedulePoller {
 
 	private final HolidayRepository holidays;
 
+	/** 실행 오류 알림을 같은 내용으로 다시 보내는 간격 (실패 알림의 재알림 간격과 같은 설정) */
+	private final NotificationProperties notificationProperties;
+
+	/**
+	 * 스케줄별 마지막으로 보낸 실행 오류 알림. 시작조차 못 하는 스케줄(시크릿을 풀 수 없음 등)이 매 주기 같은 알림을 보내지 않도록.
+	 * 정상 실행되면 지움. 스케줄러 단일 스레드에서만 사용
+	 */
+	private final Map<Long, SentError> sentErrors = new HashMap<>();
+
 	/** DB 접속 실패 시작 시각. 정상 시 null. 스케줄러 단일 스레드에서만 갱신 */
 	private volatile Instant databaseUnavailableSince;
 
@@ -106,13 +120,21 @@ class SchedulePoller {
 					long runId = testRunService.runSuite(trigger.suiteId(), trigger.environmentId(),
 							TestRun.Trigger.SCHEDULED, null);
 					runIds.add(runId);
+					sentErrors.remove(scheduleId);
 					notifyRunResult(runId);
 				}
 			}
+			catch (ObjectOptimisticLockingFailureException ex) {
+				// 그사이 사용자가 스케줄을 고침 (낙관적 잠금). 다음 주기에 바뀐 내용으로 다시 판단하므로 오류 알림 없음
+				log.info("Schedule {} changed while being claimed; it is checked again on the next poll", scheduleId);
+			}
 			catch (RuntimeException ex) {
 				log.error("Scheduled run failed for schedule {}", scheduleId, ex);
-				send(new Notification("[Sentinel] 스케줄 " + scheduleId + " 실행 오류",
-						List.of("시각: " + format(now), "사유: " + ex.getMessage()), Notification.Tone.FAILURE, List.of()));
+				if (shouldNotifyError(scheduleId, ex.getMessage(), now)) {
+					send(new Notification("[Sentinel] 스케줄 " + scheduleId + " 실행 오류",
+							List.of("시각: " + format(now), "사유: " + ex.getMessage()), Notification.Tone.FAILURE,
+							List.of()));
+				}
 			}
 		}
 		return runIds;
@@ -140,6 +162,20 @@ class SchedulePoller {
 		}
 		schedule.markTriggered(now, properties.zone());
 		return new Trigger(schedule.getSuite().getId(), schedule.getEnvironment().getId());
+	}
+
+	/** 같은 스케줄의 같은 오류는 재알림 간격이 지나야 다시 알림. 사유가 바뀌면 바로 알림 */
+	private boolean shouldNotifyError(long scheduleId, String message, Instant now) {
+		SentError last = sentErrors.get(scheduleId);
+		if (last != null && Objects.equals(last.message(), message)
+				&& now.isBefore(last.sentAt().plus(notificationProperties.repeatInterval()))) {
+			return false;
+		}
+		sentErrors.put(scheduleId, new SentError(message, now));
+		return true;
+	}
+
+	private record SentError(String message, Instant sentAt) {
 	}
 
 	/** 예정 시각보다 기준 시간 넘게 늦은 스케줄이 있으면 공백 기록·알림 */

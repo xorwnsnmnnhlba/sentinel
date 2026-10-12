@@ -594,6 +594,9 @@ function secretsOf(form: FormData): Record<string, string | null> | string {
 }
 
 /** Spring 오류를 화면용 메시지로 변환. 그 외 오류(연결 실패 등)는 내부 정보 없이 고정 문구 */
+/** Spring이 동시 수정 충돌(409)에 붙이는 문구 (api ApiExceptionHandler.CONCURRENT_MODIFICATION) */
+const CONCURRENT_MODIFICATION = "modified by another request";
+
 function failure(error: unknown): ActionState {
   if (isApiError(error)) {
     switch (error.status) {
@@ -606,6 +609,11 @@ function failure(error: unknown): ActionState {
       case 404:
         return { error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다" };
       case 409:
+        // 같은 항목을 다른 곳에서 먼저 고침 (Spring 낙관적 잠금). 이름 중복과 구분하고 최신 내용을 보이도록 화면 재조회
+        if (error.detail.includes(CONCURRENT_MODIFICATION)) {
+          refresh();
+          return { error: "다른 곳에서 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요" };
+        }
         return { error: "이미 사용 중인 이름입니다" };
       case 429:
         // 동시 수동 실행 한도 (실행은 만들어지지 않음)

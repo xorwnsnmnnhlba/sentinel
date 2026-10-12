@@ -53,6 +53,7 @@ sentinel/
 - URL에 동사 미사용. 상태 변경은 `PATCH` 부분 수정 (`PATCH /api/schedules/{id}` `{"enabled": false}`)
 - 실행 생성 입구는 `POST /api/runs` 하나. 대상은 본문의 `suiteId` 또는 `caseId` 중 정확히 하나
 - 생성은 201 + `Location`, 오류는 ProblemDetail
+- 동시 수정 (2026-10-12, 독립 리뷰): 스케줄·환경·케이스에 낙관적 잠금(`@Version`, V30). Hibernate는 바뀐 엔티티의 모든 열을 쓰므로, 폴러의 다음 실행 시각 갱신이 사용자의 끄기·삭제를 되돌리거나 두 사람이 고친 시크릿 중 하나가 사라질 수 있었음. 충돌은 409(전용 문구), 화면은 "다른 곳에서 먼저 수정" 안내 후 재조회. 폴러는 충돌을 오류 알림 없이 다음 주기로
 - API 문서 (2026-10-10): OpenAPI 문서 자동 생성 (`GET /api/openapi`, springdoc-openapi). 1단계 api, 2단계 web(화면)
   - REST 정리 뒤 CI를 연동하는 사용자가 README 대신 실제 API에서 경로·요청·응답을 확인하도록
   - 보는 곳·범위 (사용자 결정): 웹 화면에 직접 표시(같은 디자인, Swagger UI의 인라인 스타일 때문에 CSP 예외를 두지 않음), 로그인한 사용자만

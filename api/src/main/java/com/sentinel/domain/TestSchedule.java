@@ -14,6 +14,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,6 +30,12 @@ import org.springframework.scheduling.support.CronExpression;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TestSchedule extends BaseEntity {
+
+	/** 낙관적 잠금 (V30). 동시에 고친 나중 요청은 실패하여 앞 요청의 변경을 덮어쓰지 않음 */
+	@Version
+	@Getter(AccessLevel.NONE)
+	@Column(nullable = false)
+	private long version;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "suite_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))

@@ -18,6 +18,7 @@ import jakarta.persistence.ForeignKey;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -34,6 +35,12 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TestCase extends ArchivableEntity {
+
+	/** 낙관적 잠금 (V30). 동시에 고친 나중 요청은 실패하여 앞 요청의 변경을 덮어쓰지 않음 */
+	@Version
+	@Getter(AccessLevel.NONE)
+	@Column(nullable = false)
+	private long version;
 
 	static final int MAX_EXTRACTORS = 20;
 
