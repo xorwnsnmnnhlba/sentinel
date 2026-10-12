@@ -100,7 +100,7 @@ class SchedulePoller {
 		List<Long> runIds = new ArrayList<>();
 		for (Long scheduleId : due.stream().map(Due::scheduleId).toList()) {
 			try {
-				Trigger trigger = transactions.write(status -> claim(scheduleId, now));
+				Trigger trigger = transactions.write(status -> claim(scheduleId));
 				if (trigger != null) {
 					// 스케줄 실행은 주체 없음
 					long runId = testRunService.runSuite(trigger.suiteId(), trigger.environmentId(),
@@ -118,8 +118,12 @@ class SchedulePoller {
 		return runIds;
 	}
 
-	/** 실행할 스케줄의 다음 실행 시각을 옮기고 실행 대상 반환. 환경이 점검 중이거나 휴일이면 건너뛰고 null */
-	private Trigger claim(long scheduleId, Instant now) {
+	/**
+	 * 실행할 스케줄의 다음 실행 시각을 옮기고 실행 대상 반환. 환경이 점검 중이거나 휴일이면 건너뛰고 null.
+	 * 시각은 스케줄마다 다시 읽음: 앞 스케줄의 스위트 실행이 길면 폴링 시작 시각과 크게 달라져 점검·휴일 판단과 다음 실행 시각이 어긋남
+	 */
+	private Trigger claim(long scheduleId) {
+		Instant now = clock.instant();
 		TestSchedule schedule = schedules.findById(scheduleId).orElse(null);
 		if (schedule == null || !schedule.isDue(now)) {
 			return null;

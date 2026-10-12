@@ -147,6 +147,16 @@ class TestRunQueriesImpl implements TestRunQueries {
 	}
 
 	@Override
+	public long abortIfRunning(long runId, Instant abortedAt) {
+		return queries.update(run)
+			.set(run.status, TestRun.Status.ABORTED)
+			.set(run.finishedAt, abortedAt)
+			.set(run.updatedAt, abortedAt)
+			.where(run.id.eq(runId), run.status.eq(TestRun.Status.RUNNING))
+			.execute();
+	}
+
+	@Override
 	public long cancelIfRunning(long runId, long canceledBy, Instant canceledAt) {
 		return queries.update(run)
 			.set(run.status, TestRun.Status.CANCELED)

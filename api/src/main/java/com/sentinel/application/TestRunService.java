@@ -380,7 +380,28 @@ public class TestRunService {
 				spec.getBody());
 	}
 
+	/**
+	 * 실행 도중 예상하지 못한 오류(DB 연결 끊김 등)는 실행을 중단 처리한 뒤 다시 던짐. 그대로 두면 재기동 전까지
+	 * RUNNING으로 남아 다시 실행·원문 정리·집계가 막힘. 중단 처리도 실패하면(DB가 아직 끊김) 기동 시 정리({@link StaleRunRecovery})
+	 */
 	private long executeAndRecord(Prepared prepared) {
+		try {
+			return recordCases(prepared);
+		}
+		catch (RuntimeException ex) {
+			try {
+				transactions.write(status -> runs.abortIfRunning(prepared.runId(), clock.instant()));
+				log.warn("Run {} aborted after an unexpected error", prepared.runId());
+			}
+			catch (RuntimeException abortFailure) {
+				ex.addSuppressed(abortFailure);
+				log.warn("Run {} could not be marked aborted; it stays RUNNING until the next restart", prepared.runId());
+			}
+			throw ex;
+		}
+	}
+
+	private long recordCases(Prepared prepared) {
 		long startedAt = System.nanoTime();
 		Map<TestResult.Verdict, Integer> counts = new EnumMap<>(TestResult.Verdict.class);
 		// 추출한 값이 더해지는 실행 범위의 변수와 가릴 값

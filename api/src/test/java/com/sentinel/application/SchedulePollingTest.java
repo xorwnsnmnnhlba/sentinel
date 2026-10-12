@@ -13,12 +13,14 @@ import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.runner.HttpExchange;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -391,6 +393,45 @@ class SchedulePollingTest {
 
 		assertThat(poller.poll()).hasSize(1);
 		assertThat(notifier.sent()).isEmpty();
+	}
+
+	@Test
+	void judgesEachScheduleAtTheMomentItsTurnComes() {
+		// 앞 스케줄의 스위트가 15분 걸리는 동안 다른 환경의 점검(09:20 ~ 09:40)이 시작됨
+		TestSuite slow = fixtures.suite(suite.getProject());
+		fixtures.testCase(slow, HttpMethod.GET, "/slow", null, null);
+		Environment other = fixtures.environment(suite.getProject(), "other", Map.of());
+		ScheduleDetail first = scheduleService.create(slow.getId(), environment.getId(), "5 9 * * *", ACTOR);
+		ScheduleDetail second = scheduleService.create(suite.getId(), other.getId(), "10 9 * * *", ACTOR);
+		maintenanceWindows.create(other.getId(), Instant.parse("2026-09-18T00:20:00Z"),
+				Instant.parse("2026-09-18T00:40:00Z"), "GW 배포", ACTOR);
+		executor.respondWith(request -> {
+			if (request.uri().getPath().endsWith("/slow")) {
+				clock.advance(Duration.ofMinutes(15));
+			}
+			return new HttpExchange(request, 200, Map.of(), "", Duration.ofMillis(5));
+		});
+		clock.set(Instant.parse("2026-09-18T00:10:00Z"));
+
+		List<Long> runIds = poller.poll();
+
+		// 두 번째 스케줄은 실제 차례(09:25, 점검 중)에 판단해 건너뜀. 폴링 시작 시각(09:10)으로 보면 실행됨
+		assertThat(runIds).hasSize(1);
+		assertThat(scheduleService.get(first.id()).lastTriggeredAt()).isEqualTo("2026-09-18T00:10:00Z");
+		ScheduleDetail skipped = scheduleService.get(second.id());
+		assertThat(skipped.lastTriggeredAt()).isNull();
+		assertThat(skipped.nextRunAt()).isEqualTo("2026-09-19T00:10:00Z");
+	}
+
+	@Test
+	void recoversLeftoverRunsBeforeSchedulingStarts() {
+		// 스케줄 작업은 컨텍스트 갱신 이벤트에 시작. 기동 완료 이벤트에서 정리하면 첫 폴링이 만든 실행까지 중단됨
+		assertThat(staleRunRecovery).isInstanceOf(SmartInitializingSingleton.class);
+		TestRun stale = runs.save(TestRun.start(suite, environment, TestRun.Trigger.SCHEDULED, NINE_AM_KST));
+
+		staleRunRecovery.afterSingletonsInstantiated();
+
+		assertThat(testRunService.getRun(stale.getId()).status()).isEqualTo(TestRun.Status.ABORTED);
 	}
 
 	@Test
