@@ -9,6 +9,7 @@ import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.MutableClock;
+import com.sentinel.application.auth.AccessTokenService;
 import com.sentinel.application.auth.AuthService;
 import com.sentinel.domain.User;
 import com.sentinel.infra.persistence.UserRepository;
@@ -60,6 +61,9 @@ class UserManagementTest {
 
 	@Autowired
 	private MutableClock clock;
+
+	@Autowired
+	private AccessTokenService accessTokens;
 
 	private String adminToken;
 
@@ -184,6 +188,69 @@ class UserManagementTest {
 		// 링크 발급은 관리자만
 		assertThat(post("/api/password-resets", authService.login(email, "brand-new-password").token(), """
 				{"userId": %d}""".formatted(member.getId()))).hasStatus(HttpStatus.FORBIDDEN);
+	}
+
+	@Test
+	void acceptingAnInviteVoidsTheOtherInvitesForTheSameEmail() {
+		// 관리자가 초대를 다시 보냈고 두 번째 링크로 가입. 첫 링크가 남아 있으면 계정 삭제 뒤 다시 가입할 수 있음
+		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
+		String first = read(post("/api/invites", adminToken, """
+				{"email": "%s", "role": "ADMIN"}""".formatted(email)), "$.token");
+		String second = read(post("/api/invites", adminToken, """
+				{"email": "%s", "role": "MEMBER"}""".formatted(email)), "$.token");
+
+		assertThat(post("/api/users", null, """
+				{"inviteToken": "%s", "name": "구성원", "password": "member-password"}""".formatted(second)))
+			.hasStatus(HttpStatus.CREATED);
+
+		assertThat(mvc.get().uri("/api/invites/{token}", first)).hasStatus(HttpStatus.NOT_FOUND);
+		long memberId = users.findByEmailAndArchivedAtIsNull(email).orElseThrow().getId();
+		assertThat(mvc.delete().uri("/api/users/{id}", memberId).header("Authorization", "Bearer " + adminToken))
+			.hasStatus(HttpStatus.NO_CONTENT);
+		assertThat(post("/api/users", null, """
+				{"inviteToken": "%s", "name": "다시", "password": "member-password"}""".formatted(first)))
+			.hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void deletingAUserVoidsThePendingInvitesForTheirEmail() {
+		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
+		// 초대를 보낸 뒤 그 이메일의 계정이 초대 수락 없이 따로 생긴 경우 (초대는 남아 있음)
+		String leftover = read(post("/api/invites", adminToken, """
+				{"email": "%s", "role": "ADMIN"}""".formatted(email)), "$.token");
+		User member = users.save(new User(email, "구성원", TestAuthConfiguration.passwordHash("member-password"), User.Role.MEMBER));
+
+		assertThat(mvc.delete().uri("/api/users/{id}", member.getId()).header("Authorization", "Bearer " + adminToken))
+			.hasStatus(HttpStatus.NO_CONTENT);
+
+		assertThat(mvc.get().uri("/api/invites/{token}", leftover)).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(tokens.findAll()).noneMatch(token -> email.equals(token.getEmail()));
+	}
+
+	@Test
+	void resettingAPasswordRevokesApiTokensButChangingItKeepsThem() {
+		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
+		User member = users.save(new User(email, "구성원", TestAuthConfiguration.passwordHash("old-password-1"), User.Role.MEMBER));
+		String apiToken = accessTokens.issue(member.getId(), "ci", 30).token();
+		String kept = accessTokens.issue(adminId, "admin ci", 30).token();
+
+		// 본인 비밀번호 변경은 API 토큰 유지 (CI가 갑자기 끊기지 않도록)
+		assertThat(put("/api/users/me/password", adminToken, """
+				{"currentPassword": "%s", "newPassword": "new-password-1234"}""".formatted(ADMIN_PASSWORD)))
+			.hasStatus(HttpStatus.NO_CONTENT);
+		assertThat(accessTokens.authenticate(kept)).isPresent();
+
+		// 재설정 링크(계정 복구)는 그 사용자의 API 토큰도 폐기
+		String admin = authService.login(users.findById(adminId).orElseThrow().getEmail(), "new-password-1234").token();
+		String link = read(post("/api/password-resets", admin, """
+				{"userId": %d}""".formatted(member.getId())), "$.token");
+		assertThat(accessTokens.authenticate(apiToken)).isPresent();
+		assertThat(put("/api/users/" + member.getId() + "/password", null, """
+				{"resetToken": "%s", "password": "brand-new-password"}""".formatted(link)))
+			.hasStatus(HttpStatus.NO_CONTENT);
+
+		assertThat(accessTokens.authenticate(apiToken)).isEmpty();
+		assertThat(accessTokens.authenticate(kept)).isPresent();
 	}
 
 	@Test

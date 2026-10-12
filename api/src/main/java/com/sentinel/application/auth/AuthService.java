@@ -42,6 +42,12 @@ public class AuthService {
 	private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
 	/**
+	 * 없는 계정의 로그인에도 같은 시간이 걸리도록 비교할 해시. 기동 시 한 번 만든 실제 BCrypt 해시
+	 * (형식이 틀린 해시는 비교 없이 바로 실패해 응답 시간으로 계정 유무가 드러남)
+	 */
+	private final String dummyHash = passwordEncoder.encode(newToken());
+
+	/**
 	 * @return 세션 토큰 원문. 저장하지 않으며 응답 후 다시 조회 불가
 	 * @throws InvalidCredentialsException 계정 없음·보관됨·비밀번호 불일치
 	 * @throws TooManyLoginAttemptsException 반복된 실패로 잠긴 이메일 ({@link LoginThrottle})
@@ -55,7 +61,7 @@ public class AuthService {
 		if (user == null || password == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
 			// 존재하지 않는 계정도 같은 시간이 걸리도록 더미 해시와 비교
 			if (user == null && password != null) {
-				passwordEncoder.matches(password, "$2a$10$ijklmnopqrstuvwxyzABCDE.FGHIJKLMNOPQRSTUVWXYZabcdefghi");
+				passwordEncoder.matches(password, dummyHash);
 			}
 			loginThrottle.recordFailure(normalized, now);
 			throw new InvalidCredentialsException();
@@ -140,6 +146,11 @@ public class AuthService {
 	 * @param token 세션 토큰 원문
 	 */
 	public record Login(String token, AuthenticatedUser user) {
+	}
+
+	/** 테스트용. 없는 계정 비교에 쓰는 해시 */
+	String dummyHash() {
+		return dummyHash;
 	}
 
 }

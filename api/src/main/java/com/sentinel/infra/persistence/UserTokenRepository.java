@@ -11,4 +11,7 @@ public interface UserTokenRepository extends JpaRepository<UserToken, Long> {
 
 	void deleteByUserId(Long userId);
 
+	/** 아직 쓰지 않은 같은 종류·이메일의 링크 (예: 남은 초대) */
+	long deleteByTypeAndEmailAndUsedAtIsNull(UserToken.Type type, String email);
+
 }

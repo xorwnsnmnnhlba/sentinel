@@ -1,6 +1,7 @@
 package com.sentinel.domain;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,10 +25,8 @@ final class SecretValues {
 			return text;
 		}
 		String masked = text;
-		for (String secret : secretValues) {
-			if (secret != null && secret.length() >= MIN_LENGTH) {
-				masked = masked.replace(secret, SensitiveHeaders.MASK);
-			}
+		for (String secret : longestFirst(secretValues)) {
+			masked = masked.replace(secret, SensitiveHeaders.MASK);
 		}
 		return masked;
 	}
@@ -45,6 +44,18 @@ final class SecretValues {
 
 	public static Set<String> of(Collection<String> values) {
 		return Set.copyOf(values);
+	}
+
+	/**
+	 * 긴 값부터. 짧은 값이 긴 값의 일부면 먼저 가렸을 때 긴 값이 더는 일치하지 않아 나머지가 드러남
+	 * (예: pass와 password123에서 pass를 먼저 가리면 ****word123)
+	 */
+	private static List<String> longestFirst(Collection<String> secretValues) {
+		return secretValues.stream()
+			.filter(secret -> secret != null && secret.length() >= MIN_LENGTH)
+			.distinct()
+			.sorted(Comparator.comparingInt(String::length).reversed())
+			.toList();
 	}
 
 }
