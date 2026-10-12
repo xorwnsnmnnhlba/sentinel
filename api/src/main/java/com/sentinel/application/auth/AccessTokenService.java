@@ -103,6 +103,20 @@ public class AccessTokenService {
 	}
 
 	/**
+	 * 사용자의 남은 토큰을 모두 폐기 (비밀번호 재설정 등 계정 복구 시). 토큰마다 변경 이력을 남김
+	 * @return 폐기한 토큰 수
+	 */
+	@Transactional
+	public int revokeAll(long userId) {
+		List<AccessToken> active = tokens.findByUserIdAndRevokedAtIsNullOrderByIdDesc(userId);
+		active.forEach(token -> {
+			token.revoke(clock.instant());
+			changeLog.record(userId, target(token), Action.DELETED);
+		});
+		return active.size();
+	}
+
+	/**
 	 * 토큰으로 사용자 확인. 접두어가 없거나 모르는 토큰, 만료·폐기된 토큰, 삭제된 사용자면 빈 값. 확인되면 마지막 사용 시각 기록
 	 */
 	@Transactional

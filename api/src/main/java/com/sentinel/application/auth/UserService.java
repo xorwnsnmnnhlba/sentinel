@@ -40,6 +40,8 @@ public class UserService {
 
 	private final AuthService authService;
 
+	private final AccessTokenService accessTokens;
+
 	private final AuthProperties properties;
 
 	private final Clock clock;
@@ -100,6 +102,8 @@ public class UserService {
 		}
 		User user = users.save(new User(invite.getEmail(), name, authService.encodePassword(password), invite.getRole()));
 		invite.use(clock.instant());
+		// 같은 이메일로 다시 보낸 다른 초대도 무효화. 남겨 두면 계정 삭제 뒤 예전 링크로 다시 가입할 수 있음
+		tokens.deleteByTypeAndEmailAndUsedAtIsNull(UserToken.Type.INVITE, invite.getEmail());
 		changeLog.record(user.getId(), target(user), Action.CREATED);
 		return UserSummary.of(user);
 	}
@@ -143,6 +147,8 @@ public class UserService {
 		user.changePasswordHash(authService.encodePassword(password));
 		reset.use(clock.instant());
 		authService.logoutEverywhere(user.getId());
+		// 재설정은 계정 복구 절차이므로 탈취된 세션으로 발급했을 수 있는 API 토큰도 폐기 (본인 비밀번호 변경은 CI가 끊기지 않도록 유지)
+		accessTokens.revokeAll(user.getId());
 		changeLog.record(user.getId(), target(user), Action.UPDATED, List.of("password"));
 	}
 
@@ -180,6 +186,8 @@ public class UserService {
 		user.archive(clock.instant());
 		authService.logoutEverywhere(userId);
 		tokens.deleteByUserId(userId);
+		// 이 이메일로 보낸 남은 초대도 삭제. 남겨 두면 삭제된 사람이 예전 링크로 다시 가입할 수 있음
+		tokens.deleteByTypeAndEmailAndUsedAtIsNull(UserToken.Type.INVITE, user.getEmail());
 		changeLog.record(requestedBy, target(user), Action.DELETED);
 	}
 
