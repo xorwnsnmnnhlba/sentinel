@@ -1,4 +1,5 @@
 import { AcceptInviteForm } from "@/components/auth/accept-invite-form";
+import { inviteApiPath } from "@/lib/api/link-paths";
 import { apiGet, isApiError } from "@/lib/api/server";
 import type { LinkInfo } from "@/lib/api/types";
 import { ExpiredLink } from "@/components/auth/expired-link";
@@ -9,7 +10,7 @@ export const metadata = { title: "초대 수락 · Sentinel" };
 /** 로그인 전에 여는 화면. 토큰 자체가 자격증명이므로 세션 없이 조회 */
 export default async function AcceptInvitePage(props: PageProps<"/invites/[token]">) {
   const { token } = await props.params;
-  const invite = await linkInfo(`/api/invites/${token}`);
+  const invite = await linkInfo(inviteApiPath(token));
   if (!invite) {
     return (
       <ExpiredLink description="초대 링크가 만료되었거나 이미 사용되었습니다. 관리자에게 새 링크를 요청해 주세요" />

@@ -98,6 +98,15 @@ describe("deleteUser", () => {
     expect(refresh).toHaveBeenCalledOnce();
   });
 
+  it.each([0, -1, 1.5, Number.NaN, "1/../../projects/5" as unknown as number])(
+    "refuses an id that is not a positive integer (%s) without calling the api",
+    async (userId) => {
+      // 처리하지 않은 요청은 MSW가 실패로 처리하므로 api를 부르면 테스트가 실패
+      await expect(deleteUser(userId)).resolves.toEqual({ error: "삭제할 사용자를 다시 선택해 주세요" });
+      expect(refresh).not.toHaveBeenCalled();
+    },
+  );
+
   it("shows why the delete was refused", async () => {
     server.use(http.delete(springUrl("/api/users/7"), () => problem(400, "the last administrator cannot be deleted")));
 
