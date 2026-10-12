@@ -1,5 +1,6 @@
 package com.sentinel.infra.http;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
@@ -22,6 +23,7 @@ import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.core5.http.io.EofSensorInputStream;
 import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
 import org.springframework.http.HttpHeaders;
@@ -46,15 +48,41 @@ public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable
 	 */
 	private static final int MAX_CONNECTIONS = 200;
 
+	/** 기본 응답 본문 전체 제한 시간. 알림 Webhook 등 설정이 따로 없는 사용처 */
+	static final Duration DEFAULT_TOTAL_TIMEOUT = Duration.ofMinutes(2);
+
+	/** 기본 응답 본문 최대 크기 */
+	static final int DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+
 	private final CloseableHttpClient httpClient;
 
 	private final RestClient restClient;
 
+	private final Duration totalTimeout;
+
+	private final int maxResponseBytes;
+
 	public RestClientRequestExecutor(Duration connectTimeout, Duration readTimeout) {
-		this(connectTimeout, readTimeout, DestinationGuard.system());
+		this(connectTimeout, readTimeout, DEFAULT_TOTAL_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES);
+	}
+
+	/**
+	 * @param totalTimeout 응답 본문을 다 받을 때까지의 전체 제한 시간 (읽을 때마다 다시 재는 readTimeout과 별개)
+	 * @param maxResponseBytes 받는 응답 본문의 최대 바이트. 넘는 부분은 받지 않고 연결을 끊음
+	 */
+	public RestClientRequestExecutor(Duration connectTimeout, Duration readTimeout, Duration totalTimeout,
+			int maxResponseBytes) {
+		this(connectTimeout, readTimeout, totalTimeout, maxResponseBytes, DestinationGuard.system());
 	}
 
 	RestClientRequestExecutor(Duration connectTimeout, Duration readTimeout, DestinationGuard destinationGuard) {
+		this(connectTimeout, readTimeout, DEFAULT_TOTAL_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, destinationGuard);
+	}
+
+	RestClientRequestExecutor(Duration connectTimeout, Duration readTimeout, Duration totalTimeout,
+			int maxResponseBytes, DestinationGuard destinationGuard) {
+		this.totalTimeout = totalTimeout;
+		this.maxResponseBytes = maxResponseBytes;
 		this.httpClient = HttpClients.custom()
 			.setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
 				// 연결 직전 주소 해석을 확인 단계와 하나로 묶음. 리다이렉트는 따라가지 않으므로 요청 주소만 확인하면 됨
@@ -97,7 +125,7 @@ public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable
 					request,
 					response.getStatusCode().value(),
 					toMap(response.getHeaders()),
-					readBody(response.getBody(), response.getHeaders()),
+					readBody(response.getBody(), response.getHeaders(), startedAt),
 					elapsedSince(startedAt)));
 		}
 		catch (RestClientException ex) {
@@ -135,8 +163,44 @@ public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable
 		return map;
 	}
 
-	private static String readBody(InputStream body, HttpHeaders headers) throws IOException {
-		return new String(body.readAllBytes(), charsetOf(headers));
+	/**
+	 * 응답 본문을 최대 크기·전체 제한 시간 안에서 읽음. 넘으면 남은 본문을 읽지 않고 연결을 끊음
+	 * (닫기만 하면 HTTP 클라이언트가 연결을 다시 쓰려고 남은 본문을 끝까지 읽음)
+	 * <ul>
+	 * <li>크기 초과: 앞부분만 본문으로 사용 (저장 시에는 다시 {@code TestResult.MAX_BODY_BYTES}로 자름)</li>
+	 * <li>시간 초과: 타임아웃({@link SocketTimeoutException})으로 처리. 1바이트씩 늦게 보내는 응답이 실행을 붙잡지 않도록</li>
+	 * </ul>
+	 * 읽기 한 번은 readTimeout까지 걸릴 수 있으므로 실제 대기는 전체 제한 시간 + readTimeout 이내
+	 */
+	private String readBody(InputStream body, HttpHeaders headers, long startedAt) throws IOException {
+		long deadline = startedAt + totalTimeout.toNanos();
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		byte[] buffer = new byte[8192];
+		int read;
+		while ((read = body.read(buffer)) != -1) {
+			if (System.nanoTime() - deadline > 0) {
+				abort(body);
+				throw new SocketTimeoutException("response not completed within " + totalTimeout);
+			}
+			int room = maxResponseBytes - out.size();
+			if (read > room) {
+				out.write(buffer, 0, room);
+				abort(body);
+				break;
+			}
+			out.write(buffer, 0, read);
+		}
+		return out.toString(charsetOf(headers));
+	}
+
+	/** 남은 본문을 읽지 않고 연결을 버림. 연결 풀에 돌려주지 않음 */
+	private static void abort(InputStream body) throws IOException {
+		if (body instanceof EofSensorInputStream sensor) {
+			sensor.abort();
+		}
+		else {
+			body.close();
+		}
 	}
 
 	private static Charset charsetOf(HttpHeaders headers) {

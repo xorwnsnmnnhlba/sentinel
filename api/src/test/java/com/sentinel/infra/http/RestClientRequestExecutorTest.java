@@ -72,6 +72,46 @@ class RestClientRequestExecutorTest {
 	}
 
 	@Test
+	void keepsOnlyTheFirstBytesOfAResponseLargerThanTheLimitAndCanSendAgain() {
+		RestClientRequestExecutor limited = new RestClientRequestExecutor(Duration.ofSeconds(2), Duration.ofSeconds(1),
+				Duration.ofSeconds(10), 1024, DestinationGuard.system());
+		extraExecutors.add(limited);
+
+		long started = System.nanoTime();
+
+		// 5000바이트를 0.3초마다 나눠 보내는 응답 (전체 3초). 한도(1024)를 넘는 순간 남은 본문을 받지 않고 끊음
+		HttpExchange exchange = limited.execute(ResolvedRequest.of(HttpMethod.GET, url("/large-body")));
+
+		assertThat(exchange.statusCode()).isEqualTo(200);
+		assertThat(exchange.body()).hasSize(1024).matches("a+");
+		assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(2000));
+		// 남은 본문을 읽지 않고 버린 연결은 다시 쓰지 않으므로 다음 요청도 정상
+		assertThat(limited.execute(ResolvedRequest.of(HttpMethod.GET, url("/users/1"))).statusCode()).isEqualTo(200);
+	}
+
+	@Test
+	void abortsAResponseBodyThatTakesLongerThanTheTotalTimeout() {
+		// 0.2초마다 조금씩 보내 읽기 제한(1초)에는 걸리지 않지만 전체 4초 걸리는 응답
+		RestClientRequestExecutor limited = new RestClientRequestExecutor(Duration.ofSeconds(2), Duration.ofSeconds(1),
+				Duration.ofSeconds(1), RestClientRequestExecutor.DEFAULT_MAX_RESPONSE_BYTES, DestinationGuard.system());
+		extraExecutors.add(limited);
+		long started = System.nanoTime();
+
+		assertThatThrownBy(() -> limited.execute(ResolvedRequest.of(HttpMethod.GET, url("/slow-body"))))
+			.isInstanceOfSatisfying(RequestExecutionException.class,
+					ex -> assertThat(ex.reason()).isEqualTo(RequestExecutionException.Reason.TIMEOUT));
+		// 전체 제한(1초) + 읽기 한 번 안에 끝남. 남은 본문(약 3초)을 끝까지 받지 않음
+		assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(2500));
+	}
+
+	@Test
+	void readsASlowResponseBodyWithinTheTotalTimeout() {
+		HttpExchange exchange = executor.execute(ResolvedRequest.of(HttpMethod.GET, url("/slow-body")));
+
+		assertThat(exchange.body()).hasSize(2000);
+	}
+
+	@Test
 	void sendsHeadersAndUtf8Body() {
 		ResolvedRequest request = new ResolvedRequest(HttpMethod.POST, URI.create(url("/users")),
 				Map.of("Authorization", List.of("Bearer test-token"), "Content-Type", List.of("application/json")),
