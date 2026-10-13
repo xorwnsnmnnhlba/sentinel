@@ -65,6 +65,16 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// Docker 이미지의 의존성 레이어용 (api/Dockerfile). dependencies 작업은 의존성 목록(POM)만 받으므로 jar까지 내려받음
+// 소스만 바뀐 빌드는 이 레이어를 재사용하여 네트워크 없이 컴파일 (Maven Central 일시 장애 영향 없음)
+tasks.register('downloadDependencies') {
+	def classpaths = files(configurations.compileClasspath, configurations.annotationProcessor,
+			configurations.runtimeClasspath)
+	doLast {
+		classpaths.files
+	}
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
 }

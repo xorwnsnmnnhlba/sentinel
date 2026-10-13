@@ -81,6 +81,14 @@ Lombok은 IntelliJ 번들 플러그인으로 인식. **Settings → Build, Execu
 
 테스트는 Testcontainers 기반이므로 Docker 실행 필요. DB 환경변수·RDS 접속 불필요
 
+Gradle 배포판은 체크섬 고정 (`gradle/wrapper/gradle-wrapper.properties`의 `distributionSha256Sum`). 내려받은 배포판이 다르면 wrapper가 실행을 거부. 버전을 올릴 때는 공식 체크섬(`https://services.gradle.org/distributions/gradle-<버전>-bin.zip.sha256`)과 함께 변경
+
+```bash
+./gradlew wrapper --gradle-version <버전> --gradle-distribution-sha256-sum <체크섬>
+```
+
+Docker 이미지(`Dockerfile`)는 의존성 단계(`downloadDependencies`: jar까지 내려받음)와 컴파일 단계를 나누고, 컴파일은 네트워크 없이(`--network=none`, `--offline`) 실행. 소스만 바뀐 빌드는 Maven Central 없이 끝나고, 빠진 의존성은 빌드 실패로 바로 드러남
+
 | 컨테이너 | 이미지 | 용도 |
 |----------|--------|------|
 | PostgreSQL | `postgres:18-alpine` | 스프링 컨텍스트·JPA 테스트 (`TestcontainersConfiguration`) |

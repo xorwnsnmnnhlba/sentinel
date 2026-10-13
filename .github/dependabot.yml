@@ -42,6 +42,7 @@ updates:
       prefix: chore
       include: scope
 
+  # 액션은 커밋 SHA로 고정(# 버전 주석). Dependabot이 SHA와 주석을 함께 갱신
   - package-ecosystem: github-actions
     directory: /
     schedule:

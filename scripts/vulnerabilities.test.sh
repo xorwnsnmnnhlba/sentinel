@@ -88,6 +88,22 @@ check "passes without vulnerabilities" '[ "$status" -eq 0 ] && contains "No bloc
 run --osv "$WORK/block.json" --npm "$WORK/empty-npm.json"
 check "combines several results" '[ "$status" -eq 1 ] && contains "1 high or critical vulnerabilities"'
 
+# --expect: 점검기가 jar를 놓쳐 취약점 0건으로 통과하는 것을 막음. 바로 앞 결과 파일만 확인
+run --osv "$WORK/report.json" --expect Maven --expect Ubuntu --expect Go
+check "passes when the expected ecosystems were scanned" '[ "$status" -eq 0 ] && contains "Scanned packages" && contains "- report.json: Go 1, Maven 2, Ubuntu:26.04 1"'
+
+run --osv "$WORK/empty-osv.json" --expect Maven
+check "errors when an expected ecosystem is missing" '[ "$status" -eq 2 ] && contains "No Maven packages in empty-osv.json" && ! contains "No blocking vulnerabilities"'
+
+run --osv "$WORK/report.json" --osv "$WORK/empty-osv.json" --expect Maven
+check "checks only the preceding result" '[ "$status" -eq 2 ] && contains "No Maven packages in empty-osv.json"'
+
+run --osv "$WORK/report.json" --expect Ubuntu:26
+check "matches the ecosystem name, not a prefix of the version" '[ "$status" -eq 2 ] && contains "No Ubuntu:26 packages"'
+
+run --expect Maven --osv "$WORK/report.json"
+check "errors when --expect comes before --osv" '[ "$status" -eq 2 ] && contains "--expect needs an ecosystem and must follow --osv"'
+
 run --osv "$WORK/missing.json"
 check "errors when a result file is missing" '[ "$status" -eq 2 ] && contains "Result file not found"'
 

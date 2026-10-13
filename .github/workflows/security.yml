@@ -1,5 +1,6 @@
 # 의존성 취약점 점검. 의존성을 바꾼 PR은 막고, 매주 월요일 정기 점검은 새로 공개된 취약점을 실패로 표시
-# - api·web 이미지: OSV-Scanner로 실제 이미지 안의 Java 라이브러리·OS 패키지
+# - api·web·HTTPS 앞단(Caddy) 이미지: OSV-Scanner로 실제 이미지 안의 Java 라이브러리·Go 모듈·OS 패키지
+#   Caddy(Go 모듈·OS 패키지)는 보고만. 수정은 Caddy 새 버전 이미지로만 가능 (Dependabot docker-compose)
 # - web 운영 의존성: npm audit (Next.js standalone 이미지에는 npm 패키지 정보가 남지 않아 이미지 점검으로는 보이지 않음)
 # 막는 기준은 scripts/vulnerabilities.sh (애플리케이션 의존성의 높음 이상 중 수정 버전이 있는 것)
 name: Security
@@ -14,6 +15,7 @@ on:
       - web/package.json
       - web/package-lock.json
       - web/Dockerfile
+      - docker-compose.yml
       - scripts/vulnerabilities.sh
       - .github/workflows/security.yml
   schedule:
@@ -42,8 +44,8 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       # devDependencies 제외. 취약점이 있으면 0이 아닌 코드로 끝나므로 판정은 마지막 단계에서
@@ -54,9 +56,9 @@ jobs:
           npm audit --omit=dev --json > "$RUNNER_TEMP/npm-audit.json" || true
           jq -e '.metadata.vulnerabilities' "$RUNNER_TEMP/npm-audit.json" > /dev/null
       # 이미지는 E2E와 같은 캐시(main에서 저장)로 빌드. 의존성이 그대로면 대부분 재사용
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: api 이미지 빌드
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: api
           load: true
@@ -64,7 +66,7 @@ jobs:
           tags: sentinel-e2e-api
           cache-from: type=gha,scope=e2e-api
       - name: web 이미지 빌드
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: web
           load: true
@@ -77,14 +79,64 @@ jobs:
             "https://github.com/google/osv-scanner/releases/download/$OSV_SCANNER_VERSION/osv-scanner_linux_amd64"
           echo "$OSV_SCANNER_SHA256  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
           chmod +x "$RUNNER_TEMP/osv-scanner"
+      # 운영과 같은 태그 (docker-compose.yml의 sentinel-proxy)
+      - name: Caddy 이미지 받기
+        run: |
+          proxy_image=$(sed -nE 's/^[[:space:]]+image:[[:space:]]+(caddy:[^[:space:]]+).*/\1/p' docker-compose.yml | head -n 1)
+          test -n "$proxy_image"
+          docker pull "$proxy_image"
+          echo "PROXY_IMAGE=$proxy_image" >> "$GITHUB_ENV"
       # 종료 코드 1은 취약점 있음 (판정은 다음 단계), 그 외는 점검 오류로 실패
+      # --all-packages: 취약점 없는 패키지도 출력하여 판정 단계에서 jar·Go 모듈을 실제로 읽었는지 확인
       - name: 이미지 점검
         run: |
-          for image in api web; do
-            "$RUNNER_TEMP/osv-scanner" scan image --format json "sentinel-e2e-$image:latest" \
-              > "$RUNNER_TEMP/osv-$image.json" || [ $? -eq 1 ]
+          for target in api=sentinel-e2e-api:latest web=sentinel-e2e-web:latest proxy="$PROXY_IMAGE"; do
+            "$RUNNER_TEMP/osv-scanner" scan image --all-packages --format json "${target#*=}" \
+              > "$RUNNER_TEMP/osv-${target%%=*}.json" || [ $? -eq 1 ]
           done
+      # --expect: 이미지마다 있어야 할 패키지가 결과에 없으면 점검 누락으로 실패 (취약점 0건으로 오인 방지)
       - name: 판정
         run: |
-          bash scripts/vulnerabilities.sh --osv "$RUNNER_TEMP/osv-api.json" --osv "$RUNNER_TEMP/osv-web.json" \
+          bash scripts/vulnerabilities.sh \
+            --osv "$RUNNER_TEMP/osv-api.json" --expect Maven \
+            --osv "$RUNNER_TEMP/osv-web.json" --expect Alpine \
+            --osv "$RUNNER_TEMP/osv-proxy.json" --expect Go \
             --npm "$RUNNER_TEMP/npm-audit.json" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # 정기 점검(수동 실행 포함) 결과를 저장소 이슈로 알림. 실패 메일은 cron을 마지막으로 바꾼 사람에게만 가서 놓치기 쉬움
+  # 실패하면 이슈를 열고(이미 열려 있으면 댓글), 다시 통과하면 닫음. 취소된 실행은 무시
+  report:
+    name: report (scheduled)
+    needs: dependencies
+    if: always() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: Weekly security check failed
+      RESULT: ${{ needs.dependencies.result }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: 이슈 열기·닫기
+        run: |
+          number=$(gh issue list --state open --limit 200 --json number,title \
+            --jq '[.[] | select(.title == env.TITLE) | .number] | first // empty')
+          if [ "$RESULT" = success ]; then
+            if [ -n "$number" ]; then
+              gh issue close "$number" --comment "다시 통과: $RUN_URL"
+            fi
+          elif [ "$RESULT" = failure ]; then
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --body "다시 실패: $RUN_URL"
+            else
+              gh issue create --title "$TITLE" --body "$(printf '%s\n\n%s\n%s' \
+                "매주 월요일 의존성 취약점 점검 실패: $RUN_URL" \
+                "- 실행 요약(Summary)의 표에서 막힌 의존성 확인 후 의존성 업데이트 PR(Dependabot 또는 직접) 머지, 서버 업데이트 (docs/deploy.md \"업데이트\")" \
+                "- 점검 오류(결과 없음, 패키지 누락)면 해당 단계 로그 확인. 다음 정기 점검이 통과하면 이 이슈는 자동으로 닫힘")"
+            fi
+          fi
