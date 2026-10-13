@@ -144,6 +144,19 @@ else
   echo "FAIL connection failure: $output"
 fi
 
+# http:// 원격 주소·방식 없는 주소는 토큰을 보내기 전에 거부 (요청 기록이 비어 있어야 함)
+for insecure in "http://sentinel.example.com" "http://127.0.0.1.example.com" "sentinel.example.com" "http://localhost.example.com:8080"; do
+  : >"$WORK/requests"
+  output=$(SENTINEL_URL="$insecure" SENTINEL_TOKEN="$TOKEN" "$BASH" "$SCRIPT" --suite 3 --environment 2 2>&1)
+  code=$?
+  if [[ "$code" == 2 && "$output" == *"SENTINEL_URL must start with https://"* && ! -s "$WORK/requests" ]]; then
+    passed=$((passed + 1))
+  else
+    failed=$((failed + 1))
+    echo "FAIL insecure URL $insecure: exit $code $output"
+  fi
+done
+
 # --junit: 끝난 실행은 통과·실패 모두 저장, 시간 초과는 저장하지 않음, 받지 못하면 경고만 (종료 코드는 실행 결과)
 junit_check() {
   local name="$1" scenario="$2" expected="$3" saved="$4" needle="$5"

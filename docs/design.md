@@ -495,7 +495,10 @@ docker compose up -d --build --wait
 
 ### 유의사항
 - TZ 지정 필수. 컨테이너 기본이 UTC라 미지정 시 크론이 9시간 어긋남
-- 시크릿은 --env-file로 분리. 환경변수 직접 전달 시 docker inspect와 셸 히스토리에 잔존. sentinel.env는 .gitignore 등록
+- 시크릿은 env_file(sentinel.env)로 분리. 환경변수 직접 전달 시 셸 히스토리에 잔존. sentinel.env는 .gitignore 등록
+- env_file 값 해석 (2026-10-13 확인, Compose v5.6): 따옴표 없는 값·큰따옴표 값의 `$이름`은 변수 치환(`pa$word` → `pa`), 따옴표 없는 값의 ` #` 뒤는 주석. 작은따옴표 값만 그대로 전달. `docker run --env-file`(따옴표까지 값)과 규칙이 달라 예전 "따옴표 금지" 안내가 틀렸음. `scripts/preflight.sh`가 키 이름만 출력하여 점검
+- 업데이트는 `docker compose pull --ignore-buildable` + `build --pull`로 베이스 이미지 보안 패치 반영. `up --build`만으로는 서버에 남은 이전 베이스 이미지 사용
+- E2E 스택 포트는 127.0.0.1에만 개방. 고정된 테스트 관리자 계정·암호화 키가 공개 저장소에 있으므로 다른 PC 접근 차단
 - 컨테이너 간 통신은 localhost가 아닌 컨테이너 이름 사용 (INTERNAL_API_URL=http://sentinel-api:8080)
 - restart always는 무한 재시작 루프 가능. `unless-stopped` 사용(수동 중지 시 재시작 안 함). 초기 세팅 시 docker compose logs -f로 정상 기동 확인 후 진행. docker ps에 Restarting 상태로 표시되면 해당 상황
 - 컨테이너 안의 localhost는 컨테이너 자신. 호스트의 PostgreSQL은 host.docker.internal로 접속 (compose에 `host-gateway` 매핑 명시)

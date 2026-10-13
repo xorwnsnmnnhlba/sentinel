@@ -4,6 +4,7 @@
 #   docker compose -f docker-compose.e2e.yml down -v
 #
 # - 운영/개발 스택(docker-compose.yml)과 포트·볼륨이 겹치지 않도록 별도 포트 사용 (HTTPS 13443, HTTP 13080, api 18080)
+# - 포트는 모두 127.0.0.1에만 개방. 관리자 계정·암호화 키가 공개된 고정값이므로 다른 PC에서 접근 차단
 # - DB는 컨테이너 내부 통신만 사용(호스트 포트 미개방). 데이터는 down -v로 매번 폐기
 # - 비밀번호는 이 일회용 컨테이너 전용. 실제 자격증명 아님
 name: sentinel-e2e
@@ -37,7 +38,7 @@ services:
       SENTINEL_ADMIN_PASSWORD: e2e-admin-password
       TZ: Asia/Seoul
     ports:
-      - "18080:8080"
+      - "127.0.0.1:18080:8080"
     depends_on:
       e2e-postgres:
         condition: service_healthy
@@ -78,8 +79,8 @@ services:
       SENTINEL_TLS: internal
       SENTINEL_HSTS_MAX_AGE: 300
     ports:
-      - "13443:13443"
-      - "13080:80"
+      - "127.0.0.1:13443:13443"
+      - "127.0.0.1:13080:80"
     volumes:
       - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
