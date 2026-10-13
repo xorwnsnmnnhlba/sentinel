@@ -450,6 +450,13 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 - 막는 시점 (사용자 결정): 의존성을 바꾼 PR(`build.gradle`·`package-lock.json`·Dockerfile 등)만 막고, 매주 월요일 정기 점검은 실패로 표시. 새 취약점이 공개되는 날 무관한 PR까지 막히지 않도록
 - 막는 기준 (`scripts/vulnerabilities.sh`): 애플리케이션 의존성(Java 라이브러리·npm 운영 의존성)의 높음(CVSS 7.0·high) 이상 중 수정 버전이 있는 것. OS 패키지는 보고만 (대부분 수정판이 없고, 있어도 기본 이미지 갱신으로만 반영)
 - OSV-Scanner는 공식 릴리스 실행 파일을 버전·체크섬 고정으로 사용 (외부 액션 미사용)
+- 점검 누락 방지 (2026-10-14, 독립 리뷰): 기본 출력은 취약점 있는 패키지만 담아, 점검기가 jar를 읽지 못해도 0건으로 통과. `--all-packages`로 출력하고 판정에서 이미지마다 있어야 할 생태계(api Maven, web Alpine, Caddy Go)가 없으면 실패(`--expect`). 요약에 이미지별 점검 패키지 수 표시
+- HTTPS 앞단(Caddy) 이미지도 점검 (2026-10-14): Go 모듈·OS 패키지라 보고만. 수정은 Caddy 새 버전 이미지로만 가능(Dependabot docker-compose). `docker-compose.yml`이 바뀐 PR도 점검
+- 정기 점검 실패 알림 (2026-10-14): 실패 메일은 cron을 마지막으로 바꾼 사람에게만 가므로 저장소 이슈("Weekly security check failed")를 열고, 다시 통과하면 닫음. 공개 저장소는 60일 동안 활동이 없으면 GitHub이 정기 실행을 멈추므로 Actions 탭의 안내 확인 (docs/deploy.md "업데이트")
+- 공급망 고정 (2026-10-14, 독립 리뷰)
+  - GitHub Actions는 커밋 SHA로 고정하고 버전은 주석(`# v7.0.1`). 태그는 옮길 수 있어 같은 이름으로 다른 코드가 실행될 수 있음. Dependabot이 SHA와 주석을 함께 갱신
+  - Gradle 배포판 체크섬 고정(`distributionSha256Sum`). CI의 setup-gradle은 wrapper jar만 검증
+  - api Docker 빌드의 의존성 단계에서 jar까지 받고 컴파일은 네트워크 없이. `dependencies` 작업은 POM만 받아 캐시가 맞아도 컴파일 때 Maven Central에서 jar를 받았음 (2026-10-12 CI e2e에서 Maven Central 일시 404로 실패)
 - 작업 셸을 `bash`로 지정 (2026-10-11): 지정하지 않으면 `bash -e`로 실행되어 `pipefail`이 없음. 판정 결과를 `tee`로 요약에 남기는 단계가 판정 실패를 무시하고 통과했음(#142에서 24건을 찾고도 통과)
 - 도입 시 발견 (2026-10-10): api `spring-webmvc` 7.0.8 치명(9.8) 2건, Jackson·httpcore5 높음, web `next` 16.3.5 치명과 `sharp` 등 높음. 모두 수정 버전 있음 → 의존성 업데이트로 해결
   - 해결 (2026-10-11): Spring Boot 4.1.1(`spring-webmvc` 7.0.9), Jackson은 Spring Boot가 아직 취약한 버전을 관리해 같은 minor 수정판으로 덮어씀(`build.gradle`의 `jackson-bom.version`·`jackson-2-bom.version`, 관리되면 제거). web은 `next` 16.4.0, `sharp`·`source-map-js`는 범위 안 업데이트
