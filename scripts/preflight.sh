@@ -30,16 +30,54 @@ fail() {
 section() { printf '\n[%s]\n' "$1"; }
 
 # KEY=VALUE 파일의 값. 주석 줄 제외, 같은 키가 여럿이면 마지막 값 (docker compose와 같은 규칙). 윈도 줄바꿈 제거
+# docker compose처럼 감싼 따옴표를 벗기고, 따옴표 없는 값은 " #" 뒤(주석)를 버림
 value_of() {
-  sed -n "s/^[[:space:]]*$2=//p" "$1" | tr -d '\r' | tail -n 1
+  local raw
+  raw=$(sed -n "s/^[[:space:]]*$2=//p" "$1" | tr -d '\r' | tail -n 1)
+  case "$raw" in
+    \'*)
+      raw=${raw#\'}
+      printf '%s' "${raw%%\'*}"
+      ;;
+    \"*)
+      raw=${raw#\"}
+      printf '%s' "${raw%%\"*}"
+      ;;
+    *) printf '%s' "$raw" | sed -E 's/[[:space:]]+#.*$//; s/[[:space:]]+$//' ;;
+  esac
 }
 
-# docker --env-file은 따옴표까지 값으로 읽음. 키 이름만 출력
-check_quotes() {
-  local file=$1 key
-  while IFS= read -r key; do
-    fail "$(basename "$file"): $key value is quoted (the quotes become part of the value)"
-  done < <(grep -E "^[[:space:]]*[A-Z_][A-Z0-9_]*=[\"']" "$file" | sed -E 's/^[[:space:]]*([A-Z0-9_]+)=.*/\1/')
+# docker compose가 값을 바꾸는 경우 실패. 키 이름만 출력
+# - 따옴표 없는 값·큰따옴표 값: $이름은 변수로 치환 ($$는 $ 하나)
+# - 따옴표 없는 값: " #" 뒤는 주석으로 버림
+# - 큰따옴표 값: \n 등 이스케이프 해석
+# 작은따옴표 값은 그대로 전달
+check_values() {
+  local name line key raw
+  name=$(basename "$1")
+  while IFS= read -r line; do
+    key=${line%%=*}
+    raw=${line#*=}
+    case "$raw" in
+      \'*)
+        if [[ "${raw#\'}" != *\'* ]]; then
+          fail "$name: $key has an unclosed single quote"
+        fi
+        ;;
+      \"*)
+        if [[ "$raw" == *[\$\\]* ]]; then
+          fail "$name: $key is double-quoted and contains \$ or \\, which docker compose changes. Use single quotes ('...')"
+        fi
+        ;;
+      *)
+        if [[ "${raw//\$\$/}" == *\$* ]]; then
+          fail "$name: $key contains \$, which docker compose replaces with a variable. Wrap the value in single quotes ('...')"
+        elif [[ "$raw" =~ [[:space:]]# ]]; then
+          fail "$name: $key contains ' #', and docker compose drops the rest as a comment. Wrap the value in single quotes ('...') or put the comment on its own line"
+        fi
+        ;;
+    esac
+  done < <(grep -E "^[[:space:]]*[A-Z_][A-Z0-9_]*=" "$1" | tr -d '\r' | sed -E 's/^[[:space:]]+//')
 }
 
 # 다른 계정이 읽을 수 있으면 권한 문자열(ls -l, 예: -rw-r--r--) 출력. 그룹·기타 권한이 없으면 출력 없음
@@ -144,7 +182,7 @@ check_proxy_env() {
     fail ".env missing. Run cp .env.example .env and fill it in"
     return
   fi
-  check_quotes "$ENV_FILE"
+  check_values "$ENV_FILE"
 
   site=$(value_of "$ENV_FILE" SENTINEL_SITE_ADDRESS)
   names=$(site_names "${site:-localhost}")
@@ -187,13 +225,13 @@ check_proxy_env() {
 }
 
 check_app_env() {
-  local key value db_host bytes web_host names
+  local key value db_host bytes web_host names sslmode
   section "sentinel.env (api)"
   if [ ! -f "$APP_ENV_FILE" ]; then
     fail "sentinel.env missing. Run cp sentinel.env.example sentinel.env and fill it in"
     return
   fi
-  check_quotes "$APP_ENV_FILE"
+  check_values "$APP_ENV_FILE"
 
   # 편집기·스크립트가 파일을 새로 만들면 chmod 600이 풀릴 수 있음
   value=$(loose_permissions "$APP_ENV_FILE")
@@ -219,9 +257,14 @@ check_app_env() {
         ;;
       *)
         ok "DB: $db_host"
-        if ! printf '%s' "$value" | grep -q 'sslmode='; then
-          warn "DB_URL has no sslmode. sslmode=require is recommended for RDS (encrypts the DB password and data in transit)"
-        fi
+        # PostgreSQL JDBC 기본값 prefer와 allow·disable은 암호화 없이 접속할 수 있음. 모르는 값이면 api가 기동하지 않음
+        sslmode=$(printf '%s' "$value" | sed -nE 's/.*[?&]sslmode=([^&]*).*/\1/p')
+        case "$sslmode" in
+          require | verify-ca | verify-full) ok "DB connection encrypted (sslmode=$sslmode)" ;;
+          "") warn "DB_URL has no sslmode. sslmode=require is recommended for RDS (encrypts the DB password and data in transit)" ;;
+          disable | allow | prefer) warn "DB_URL has sslmode=$sslmode, which may connect without encryption. sslmode=require is recommended for RDS" ;;
+          *) fail "DB_URL has an unknown sslmode ($sslmode). Use require, verify-ca or verify-full" ;;
+        esac
         ;;
     esac
   fi

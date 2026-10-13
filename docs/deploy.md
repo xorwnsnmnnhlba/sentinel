@@ -38,6 +38,7 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
    - `SENTINEL_TLS=/certs/cert.pem /certs/key.pem`
    - `SENTINEL_HSTS_MAX_AGE=300`: 처음에는 5분. 확인을 마치면 31536000(1년)으로 변경 후 `docker compose up -d sentinel-proxy`
 3. `sentinel.env` 작성 (`cp sentinel.env.example sentinel.env`, `chmod 600 sentinel.env`)
+   - 값에 `$`·`\`·` #`가 있으면 작은따옴표로 감쌈 (`DB_PASSWORD='pa$word'`). 따옴표가 없거나 큰따옴표면 docker compose가 `$이름`을 변수로 바꿔(`pa$word` → `pa`) DB 접속 실패. `.env`도 같은 규칙
    - `DB_URL`: `jdbc:postgresql://<RDS 엔드포인트>:5432/<DB>?currentSchema=sentinel&sslmode=require`
    - `DB_USERNAME`·`DB_PASSWORD`: DB 계정
    - `SENTINEL_SECRET_KEY`: `openssl rand -base64 32`로 생성. 환경 시크릿(토큰·API 키)과 프로젝트별 알림 Webhook 주소를 암호화. 없으면 둘 다 등록할 수 없음. 분실하면 저장된 값을 복호화할 수 없으므로 비밀번호 관리 도구에 따로 보관
@@ -61,9 +62,9 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 
 | 구분 | 확인 |
 |------|------|
-| `.env` | 접속 주소, 인증서 방식 형식, HSTS 값 (내부 인증서와 함께 쓰면 경고) |
+| `.env` | 값 작성 형식(아래 `sentinel.env`와 같음), 접속 주소, 인증서 방식 형식, HSTS 값 (내부 인증서와 함께 쓰면 경고) |
 | 보유 인증서 | 만료(30일 전 경고), 개인 키 짝, 개인 키 권한(다른 계정이 읽을 수 있으면 경고), 접속 주소마다 인증서 포함 여부(와일드카드는 한 단계), 중간 인증서 포함 |
-| `sentinel.env` | 파일 권한(다른 계정이 읽을 수 있으면 경고), 따옴표 사용, DB 필수 값, DB 주소(컨테이너 안 localhost 금지, RDS의 sslmode), 암호화 키 길이, 이전 암호화 키(길이·새 키 유무·잔존), 최초 관리자 비밀번호 잔존, 알림 링크 주소, 기본 알림 채널·생존 신호 주소 유무 (값은 출력하지 않음) |
+| `sentinel.env` | 파일 권한(다른 계정이 읽을 수 있으면 경고), 값 작성 형식(docker compose가 바꾸는 `$`·` #`·큰따옴표 안의 `\`, 닫히지 않은 작은따옴표), DB 필수 값, DB 주소(컨테이너 안 localhost 금지, RDS의 sslmode: 없거나 `prefer` 등 평문 가능 값이면 경고, 모르는 값이면 실패), 암호화 키 길이, 이전 암호화 키(길이·새 키 유무·잔존), 최초 관리자 비밀번호 잔존, 알림 링크 주소, 기본 알림 채널·생존 신호 주소 유무 (값은 출력하지 않음) |
 
 ## 운영 시작 설정
 
@@ -91,10 +92,13 @@ git fetch
 git diff --stat HEAD origin/main -- api/src/main/resources/db/migration
 git pull --ff-only
 scripts/preflight.sh
-docker compose up -d --build --wait
+docker compose pull --ignore-buildable
+docker compose build --pull
+docker compose up -d --wait
 docker image prune -f
 ```
 
+- 베이스 이미지(JDK·Node·Caddy)는 같은 태그(`25-jre`·`24-alpine` 등)로 보안 패치가 나오므로 매번 새로 받음. `--build`만 쓰면 서버에 있던 이미지를 그대로 사용
 - 중단 시간: 컨테이너 교체 동안(수십 초) 접속 불가. 그 사이 놓친 스케줄 실행은 기동 후 1회만 실행
 - 마이그레이션은 api 기동 시 Flyway가 적용. 실패하면 api가 기동하지 않고 `--wait`가 오류로 종료
 - 확인: `docker compose ps`(모두 healthy), 화면 "시스템 상태"의 빌드 시각·DB 마이그레이션이 새 버전, `docker compose logs --since 10m sentinel-api`
@@ -133,7 +137,7 @@ openssl x509 -in proxy/certs/cert.pem -noout -enddate
 openssl rand -base64 32
 ```
 
-1. 위 명령으로 새 키 생성 후 비밀번호 관리 도구에 보관 (이전 키는 교체가 끝날 때까지 유지)
+1. 위 명령으로 새 키 생성 후 비밀번호 관리 도구에 보관 (이전 키는 아래 7까지 유지)
 2. `sentinel.env` 수정
    - `SENTINEL_SECRET_KEY_PREVIOUS=<지금까지의 키>`
    - `SENTINEL_SECRET_KEY=<새 키>`
@@ -149,17 +153,20 @@ openssl rand -base64 32
    - `cannot be decrypted` 경고가 있으면 이전 키가 틀렸거나 그 전에 이미 읽을 수 없던 값. 값은 지우지 않으므로 올바른 이전 키로 2~4 반복. 위치(`environment 3 secret 'token'`)의 값은 화면에서 다시 입력해도 됨
    - 화면에서 시크릿을 쓰는 스위트 실행, 프로젝트 "테스트 알림 보내기"
 6. `sentinel.env`에서 `SENTINEL_SECRET_KEY_PREVIOUS` 줄 삭제 후 `docker compose up -d sentinel-api`. "시스템 상태"의 암호화 키가 "사용 중"
-7. 비밀번호 관리 도구에서 이전 키 폐기
+7. 이전 키는 교체 전에 만든 DB 백업이 모두 사라질 때까지 "폐기 예정"으로 보관 (RDS 자동 백업 보존 기간이 지나고, 교체 전 수동 스냅샷을 지운 뒤 폐기)
+   - 교체 전 백업의 시크릿·Webhook은 이전 키로 암호화되어 있음. 이전 키를 버리면 그 백업으로 복원했을 때 다시 입력해야 함
+   - 유출 의심으로 교체했다면 이전 키로 풀 수 있는 실제 값(토큰·Webhook)도 발급처에서 바꿈. 키만 바꾸면 백업과 유출된 사본의 값은 그대로 유효
 
 - 다시 암호화는 api 기동 시 요청을 받기 전에 끝남. 실패하면 기동하지 않고 `--wait`가 오류
 - 이전 키 없이 키만 바꾸면 기존 값을 읽지 못함 (시크릿을 쓰는 실행 400, 프로젝트 알림 실패). 이때도 이전 키를 넣고 다시 기동하면 복구
+- 교체 전 백업으로 복원한 경우: 현재 키는 `SENTINEL_SECRET_KEY`에 둔 채 이전 키를 `SENTINEL_SECRET_KEY_PREVIOUS`에 넣고 기동하면 복원된 값을 새 키로 다시 암호화 (3~6과 같음)
 
 ## 백업·보관
 
 | 대상 | 방법 |
 |------|------|
 | DB (케이스·실행 이력·사용자) | RDS 자동 백업 보존 기간 확인, 마이그레이션이 있는 업데이트 전 수동 스냅샷 |
-| `SENTINEL_SECRET_KEY` | 비밀번호 관리 도구에 보관. 분실 시 환경의 시크릿과 프로젝트 Webhook을 모두 다시 입력. 바꿀 때는 "암호화 키 교체" |
+| `SENTINEL_SECRET_KEY` | 비밀번호 관리 도구에 보관. 분실 시 환경의 시크릿과 프로젝트 Webhook을 모두 다시 입력. 바꿀 때는 "암호화 키 교체". 교체 전 키는 그 전에 만든 DB 백업이 남아 있는 동안 함께 보관 |
 | 알림 발송 이력 | DB에 90일 보관 후 자동 삭제 (`sentinel.retention.notification-retention`). 주소·본문은 기록하지 않음 |
 | `sentinel.env`·`.env`·`proxy/certs/` | 서버에만 존재. 서버 교체에 대비해 값의 보관 위치 기록 (파일째 공유 금지) |
 | `caddy_data` 볼륨 | 보유 인증서 방식에서는 보관 불필요 (내부 인증서 방식일 때만 인증 기관 키 보관) |

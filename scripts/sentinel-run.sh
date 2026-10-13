@@ -15,7 +15,7 @@
 #      the run was canceled or aborted, or the wait timed out
 #
 # Environment variables
-#   SENTINEL_URL      Sentinel address (HTTPS proxy), without a trailing /
+#   SENTINEL_URL      Sentinel address (https://, HTTPS proxy), without a trailing /. http:// only for localhost
 #   SENTINEL_TOKEN    API token (issued at /settings/access-tokens in Sentinel). Never printed
 #   SENTINEL_CA_CERT  Root certificate path for the internal CA (Caddy internal). Omit for public certificates
 #
@@ -69,6 +69,11 @@ for tool in curl jq; do
 done
 
 base="${SENTINEL_URL%/}"
+# http:// 이면 토큰이 평문으로 전송됨. 같은 PC(localhost)만 허용. 주소에 방식이 없으면 curl이 http로 간주
+if [[ ! "$base" =~ ^https:// && ! "$base" =~ ^http://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?$ ]]; then
+  echo "SENTINEL_URL must start with https:// (the token would be sent in plain text). http:// is allowed only for localhost" >&2
+  exit 2
+fi
 curl_options=(--silent --show-error --max-time 30)
 if [[ -n "${SENTINEL_CA_CERT:-}" ]]; then
   curl_options+=(--cacert "$SENTINEL_CA_CERT")

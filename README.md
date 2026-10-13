@@ -61,7 +61,7 @@ sentinel/
 cp sentinel.env.example sentinel.env
 ```
 
-`sentinel.env`의 `DB_PASSWORD` 입력 후 실행. 값에 따옴표 사용 금지(`--env-file`은 따옴표까지 값으로 인식)
+`sentinel.env`의 `DB_PASSWORD` 입력 후 실행. 값에 `$`·`\`·` #`가 있으면 작은따옴표로 감쌈(`DB_PASSWORD='pa$word'`). 따옴표가 없으면 docker compose가 `$이름`을 변수로 바꾸고 ` #` 뒤를 주석으로 버림
 
 ```bash
 docker compose up -d --build --wait

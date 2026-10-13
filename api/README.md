@@ -390,6 +390,7 @@ SENTINEL_URL=https://sentinel.example.com SENTINEL_TOKEN=snt_... \
 
 - 스위트 ID는 스위트 화면 주소(`/suites/3`)의 번호, 환경 ID는 프로젝트 화면 환경 이름 옆의 `#번호`
 - 내부 인증 기관(Caddy `internal`) 인증서를 쓰면 `SENTINEL_CA_CERT`에 그 루트 인증서 경로. 기관 발급 인증서처럼 러너가 이미 신뢰하면 생략
+- `SENTINEL_URL`은 `https://`만 허용 (토큰이 평문으로 전송되지 않도록). `http://`는 같은 PC(`localhost`·`127.0.0.1`·`[::1]`)만, 그 외는 요청 전에 종료 코드 2
 - 토큰은 표준 입력의 curl 설정으로 넘겨 프로세스 목록·출력에 남기지 않음. 시간 초과여도 실행은 서버에서 계속됨
 - `--junit 파일`: 끝난 실행의 결과를 JUnit XML로 저장 (통과·실패·중지 모두, 시간 초과는 저장하지 않음). 받지 못하면 경고만 하고 종료 코드는 실행 결과 기준
 - 테스트: `bash scripts/sentinel-run.test.sh` (흉내 낸 API 서버로 시나리오별 종료 코드·출력 확인, CI의 scripts 작업)

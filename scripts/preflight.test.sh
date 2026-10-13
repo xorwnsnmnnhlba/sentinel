@@ -212,11 +212,54 @@ remove_value "$D/sentinel.env" DB_PASSWORD
 run "$D"
 check "fails without a DB password" '[ "$status" -eq 1 ] && contains "✘ DB_PASSWORD is empty"'
 
+# docker compose는 따옴표 없는 값·큰따옴표 값의 $이름을 변수로 바꾸고, 따옴표 없는 값의 " #" 뒤를 주석으로 버림
 valid_setup "$D"
-set_value "$D/sentinel.env" DB_PASSWORD "\"$DB_PASSWORD_VALUE\""
+set_value "$D/sentinel.env" DB_PASSWORD "$DB_PASSWORD_VALUE\$x"
 run "$D"
-check "fails for quoted values, naming only the key" '[ "$status" -eq 1 ] && contains "✘ sentinel.env: DB_PASSWORD value is quoted"'
-check "does not print the quoted value" '! contains "$DB_PASSWORD_VALUE"'
+check "fails for \$ in an unquoted value, naming only the key" '[ "$status" -eq 1 ] && contains "✘ sentinel.env: DB_PASSWORD contains \$, which docker compose replaces"'
+check "does not print the value with \$" '! contains "$DB_PASSWORD_VALUE"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" DB_PASSWORD "$DB_PASSWORD_VALUE #x"
+run "$D"
+check "fails for ' #' in an unquoted value" '[ "$status" -eq 1 ] && contains "✘ sentinel.env: DB_PASSWORD contains '"' #'"'" && ! contains "$DB_PASSWORD_VALUE"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" DB_PASSWORD "\"$DB_PASSWORD_VALUE\$x\""
+run "$D"
+check "fails for \$ in a double-quoted value" '[ "$status" -eq 1 ] && contains "✘ sentinel.env: DB_PASSWORD is double-quoted and contains"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" DB_PASSWORD "'$DB_PASSWORD_VALUE"
+run "$D"
+check "fails for an unclosed single quote" '[ "$status" -eq 1 ] && contains "✘ sentinel.env: DB_PASSWORD has an unclosed single quote"'
+
+# 작은따옴표 값은 그대로 전달되므로 통과. 따옴표를 벗긴 값으로 점검 (키 길이, 인증서 방식)
+valid_setup "$D"
+set_value "$D/sentinel.env" DB_PASSWORD "'$DB_PASSWORD_VALUE\$x #y\\z'"
+set_value "$D/sentinel.env" SENTINEL_SECRET_KEY "'$SECRET_KEY_VALUE'"
+set_value "$D/sentinel.env" DB_USERNAME "sentinel\$\$admin"
+set_value "$D/.env" SENTINEL_TLS "\"/certs/cert.pem /certs/key.pem\""
+set_value "$D/.env" SENTINEL_HSTS_MAX_AGE "'31536000'"
+run "$D"
+check "passes single-quoted values, \$\$ and plain double quotes" '[ "$status" -eq 0 ] && contains "Failures: 0, warnings: 0"'
+check "reads values without their quotes" 'contains "✔ SENTINEL_SECRET_KEY format OK (32 bytes)" && contains "✔ Certificate source: certificate files" && contains "✔ HSTS on (max-age=31536000)"'
+check "does not print the single-quoted value" '! contains "$DB_PASSWORD_VALUE"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" DB_URL "jdbc:postgresql://dev.rds.amazonaws.com:5432/app?sslmode=verify-full&currentSchema=sentinel"
+run "$D"
+check "accepts sslmode=verify-full" '[ "$status" -eq 0 ] && contains "✔ DB connection encrypted (sslmode=verify-full)"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" DB_URL "jdbc:postgresql://dev.rds.amazonaws.com:5432/app?currentSchema=sentinel&sslmode=prefer"
+run "$D"
+check "warns for an sslmode that allows plain connections" '[ "$status" -eq 0 ] && contains "! DB_URL has sslmode=prefer, which may connect without encryption"'
+
+valid_setup "$D"
+set_value "$D/sentinel.env" DB_URL "jdbc:postgresql://dev.rds.amazonaws.com:5432/app?currentSchema=sentinel&sslmode=requir"
+run "$D"
+check "fails for an unknown sslmode" '[ "$status" -eq 1 ] && contains "✘ DB_URL has an unknown sslmode (requir)"'
 
 valid_setup "$D"
 set_value "$D/sentinel.env" DB_URL "jdbc:postgresql://localhost:5432/sentinel"
