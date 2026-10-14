@@ -226,6 +226,17 @@ export interface UserSummary {
   createdAt: string;
 }
 
+/** 대기 중인 초대 (수락·만료·취소 전). 링크(토큰)는 발급 응답에서만 볼 수 있어 없음 */
+export interface PendingInvite {
+  id: number;
+  email: string;
+  role: "ADMIN" | "MEMBER";
+  createdAt: string;
+  expiresAt: string;
+  /** 발급한 관리자 이메일 */
+  invitedBy: string | null;
+}
+
 /** 초대·재설정 링크 발급 결과. token은 발급 응답에서만 확인 가능 */
 export interface IssuedLink {
   token: string;

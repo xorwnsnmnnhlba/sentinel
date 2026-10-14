@@ -447,6 +447,9 @@ deploy-check:
 | `PUT /api/users/{id}/password` | 없음 (재설정 토큰) | 재설정 링크로 새 비밀번호 설정. 본문 `{"resetToken": "...", "password": "..."}`. 204. 다른 사용자의 링크는 404 |
 | `POST /api/invites` | 관리자 | 초대 링크 발급. 본문 `{"email": "...", "role": "MEMBER"}`. 201 + `Location` + `{"token": "...", "expiresAt": "..."}` |
 | `GET /api/invites/{token}` | 없음 | 초대 링크 확인 (대상 이메일) |
+| `GET /api/pending-invites` | 관리자 | 대기 중인 초대 (수락·만료·취소 전), 최근 발급 순. `[{id, email, role, createdAt, expiresAt, invitedBy(발급자 이메일)}]`. 링크(토큰)는 발급 응답에서만 볼 수 있어 없음 |
+| `GET /api/pending-invites/{id}` | 관리자 | 대기 중인 초대 1건. 없거나 수락·만료·취소된 초대는 404 |
+| `DELETE /api/pending-invites/{id}` | 관리자 | 초대 취소. 204. 보낸 링크는 바로 확인·수락 모두 404. 없거나 수락·만료·취소된 초대는 404 |
 | `POST /api/password-resets` | 관리자 | 재설정 링크 발급. 본문 `{"userId": 7}`. 201 + `Location` + `{"token", "expiresAt"}` |
 | `GET /api/password-resets/{token}` | 없음 | 재설정 링크 확인. `{user: {id, name(이메일)}, expiresAt}` |
 
@@ -454,6 +457,7 @@ deploy-check:
 - 링크 토큰은 1회용이며 저장은 해시로만. 만료·사용·위조는 모두 404로 동일하게 응답
 - 비밀번호는 10자 이상. 변경·재설정 시 해당 사용자의 모든 세션 종료
 - 재설정 링크로 비밀번호를 바꾸면(계정 복구) 그 사용자의 API 토큰도 모두 폐기. 본인 비밀번호 변경은 CI가 끊기지 않도록 API 토큰 유지 (필요하면 "API 토큰" 화면에서 폐기)
+- 대기 중인 초대 관리는 `/api/invites/{token}`(로그인 없이 열린 링크 확인)과 겹치지 않도록 숫자 ID를 쓰는 `/api/pending-invites`로 분리
 - 초대를 수락하면 같은 이메일로 보낸 다른 초대는 무효. 사용자를 삭제하면 그 이메일로 남은 초대도 삭제 (예전 링크로 다시 가입하지 못하도록)
 - 자기 자신 삭제와 마지막 관리자 삭제는 400으로 거부
 - 링크 전달은 사람이 직접 (메신저 등). 링크 자체가 자격증명이므로 공개 채널 금지
@@ -741,7 +745,7 @@ deploy-check:
 |------|------|------|
 | `PROJECT`·`ENVIRONMENT`·`SUITE`·`CASE`·`SCHEDULE`·`MAINTENANCE_WINDOW` | 등록·수정·삭제 (케이스 가져오기는 케이스마다 등록) | 요청한 사용자 |
 | `ACCESS_TOKEN` | API 토큰 발급(`CREATED`)·폐기(`DELETED`) (대상 이름은 토큰 이름) | 토큰 주인 |
-| `INVITE` | 초대 링크 발급 (대상 이름은 이메일) | 관리자 |
+| `INVITE` | 초대 링크 발급(`CREATED`)·취소(`DELETED`) (대상 이름은 이메일) | 관리자 |
 | `HOLIDAY` | 휴일 등록·삭제 (대상 이름은 "날짜 이름", 예: `2026-10-09 한글날`) | 관리자 |
 | `USER` | 가입(초대 수락), 비밀번호 변경·재설정, 재설정 링크 발급, 삭제 | 가입·비밀번호는 본인, 링크 발급·삭제는 관리자 |
 

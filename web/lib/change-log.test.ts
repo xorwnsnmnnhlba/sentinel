@@ -53,6 +53,7 @@ describe("actionLabel", () => {
   it("names sign-ups and invites after what happened", () => {
     expect(actionLabel({ target: { type: "USER" }, action: "CREATED" })).toBe("가입");
     expect(actionLabel({ target: { type: "INVITE" }, action: "CREATED" })).toBe("발급");
+    expect(actionLabel({ target: { type: "INVITE" }, action: "DELETED" })).toBe("취소");
     expect(actionLabel({ target: { type: "USER" }, action: "UPDATED" })).toBe("수정");
     expect(actionLabel({ target: { type: "CASE" }, action: "CREATED" })).toBe("등록");
     expect(actionLabel({ target: { type: "CASE" }, action: "DELETED" })).toBe("삭제");

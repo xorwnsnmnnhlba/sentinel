@@ -11,7 +11,10 @@ import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.MutableClock;
 import com.sentinel.application.auth.AccessTokenService;
 import com.sentinel.application.auth.AuthService;
+import com.sentinel.domain.ChangeLog;
 import com.sentinel.domain.User;
+import com.sentinel.domain.UserToken;
+import com.sentinel.infra.persistence.ChangeLogRepository;
 import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.infra.persistence.UserSessionRepository;
 import com.sentinel.infra.persistence.UserTokenRepository;
@@ -31,6 +34,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * 초대·비밀번호 재설정·비밀번호 변경·사용자 삭제. 링크 토큰은 1회용이고 만료가 있으며 값은 저장하지 않음
@@ -64,6 +68,9 @@ class UserManagementTest {
 
 	@Autowired
 	private AccessTokenService accessTokens;
+
+	@Autowired
+	private ChangeLogRepository changeLogs;
 
 	private String adminToken;
 
@@ -191,6 +198,103 @@ class UserManagementTest {
 	}
 
 	@Test
+	void listsPendingInvitesNewestFirstWithoutTheirLinks() {
+		String expired = "expired-" + UUID.randomUUID() + "@sentinel.test";
+		invite(expired);
+		clock.advance(Duration.ofDays(6));
+		// 세션도 만료되므로 다시 로그인
+		String adminEmail = users.findById(adminId).orElseThrow().getEmail();
+		adminToken = authService.login(adminEmail, ADMIN_PASSWORD).token();
+		String acceptedToken = invite("accepted-" + UUID.randomUUID() + "@sentinel.test");
+		String older = "older-" + UUID.randomUUID() + "@sentinel.test";
+		invite(older);
+		clock.advance(Duration.ofMinutes(1));
+		String newer = "newer-" + UUID.randomUUID() + "@sentinel.test";
+		String newerToken = read(post("/api/invites", adminToken, """
+				{"email": "%s", "role": "ADMIN"}""".formatted(newer)), "$.token");
+		assertThat(post("/api/users", null, """
+				{"inviteToken": "%s", "name": "가입", "password": "member-password"}""".formatted(acceptedToken)))
+			.hasStatus(HttpStatus.CREATED);
+		// 첫 초대는 7일 유효라 하루 더 지나면 만료
+		clock.advance(Duration.ofDays(1));
+		adminToken = authService.login(adminEmail, ADMIN_PASSWORD).token();
+
+		MvcTestResult listed = get("/api/pending-invites", adminToken);
+
+		var list = assertThat(listed).hasStatusOk().bodyJson();
+		list.extractingPath("$[*].email").asArray().containsExactly(newer, older);
+		list.extractingPath("$[0].role").isEqualTo("ADMIN");
+		list.extractingPath("$[1].role").isEqualTo("MEMBER");
+		list.extractingPath("$[0].invitedBy").isEqualTo(adminEmail);
+		list.extractingPath("$[0].createdAt").isNotNull();
+		list.extractingPath("$[0].expiresAt").isEqualTo("2026-10-03T00:01:00Z");
+		// 링크(토큰)는 발급 응답에서만
+		assertThat(body(listed)).doesNotContain(newerToken).doesNotContain(expired).doesNotContain("token");
+		// 만료된 초대는 조회·취소 대상도 아님
+		long expiredId = tokens.findAll()
+			.stream()
+			.filter(saved -> expired.equals(saved.getEmail()))
+			.findFirst()
+			.orElseThrow()
+			.getId();
+		assertThat(get("/api/pending-invites/" + expiredId, adminToken)).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(delete("/api/pending-invites/" + expiredId, adminToken)).hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void revokesAPendingInviteSoItsLinkStopsWorking() {
+		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
+		String token = invite(email);
+		long inviteId = ((Number) JsonPath.read(body(get("/api/pending-invites", adminToken)), "$[0].id")).longValue();
+		assertThat(get("/api/pending-invites/" + inviteId, adminToken)).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.email")
+			.isEqualTo(email);
+
+		assertThat(delete("/api/pending-invites/" + inviteId, adminToken)).hasStatus(HttpStatus.NO_CONTENT);
+
+		// 확인·수락 모두 위조와 같은 404
+		assertThat(mvc.get().uri("/api/invites/{token}", token)).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(post("/api/users", null, """
+				{"inviteToken": "%s", "name": "구성원", "password": "member-password"}""".formatted(token)))
+			.hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(get("/api/pending-invites", adminToken)).bodyJson().extractingPath("$.length()").isEqualTo(0);
+		assertThat(get("/api/pending-invites/" + inviteId, adminToken)).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(changeLogs.findAll()).filteredOn(log -> log.getTargetType() == ChangeLog.TargetType.INVITE)
+			.extracting(ChangeLog::getTargetId, ChangeLog::getAction, ChangeLog::getActorId, ChangeLog::getTargetName)
+			.contains(tuple(inviteId, ChangeLog.Action.DELETED, adminId, email));
+
+		// 이미 취소된 초대
+		assertThat(delete("/api/pending-invites/" + inviteId, adminToken)).hasStatus(HttpStatus.NOT_FOUND)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("invite " + inviteId + " not found");
+	}
+
+	@Test
+	void cannotRevokeAcceptedInvitesOrOtherLinks() {
+		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
+		String token = invite(email);
+		long inviteId = tokens.findAll().getFirst().getId();
+		assertThat(post("/api/users", null, """
+				{"inviteToken": "%s", "name": "구성원", "password": "member-password"}""".formatted(token)))
+			.hasStatus(HttpStatus.CREATED);
+		long memberId = users.findByEmailAndArchivedAtIsNull(email).orElseThrow().getId();
+		assertThat(post("/api/password-resets", adminToken, """
+				{"userId": %d}""".formatted(memberId))).hasStatus(HttpStatus.CREATED);
+		long resetId = tokens.findAll()
+			.stream()
+			.filter(saved -> saved.getType() == UserToken.Type.PASSWORD_RESET)
+			.findFirst()
+			.orElseThrow()
+			.getId();
+
+		assertThat(delete("/api/pending-invites/" + inviteId, adminToken)).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(delete("/api/pending-invites/" + resetId, adminToken)).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(tokens.count()).isEqualTo(2);
+	}
+
+	@Test
 	void acceptingAnInviteVoidsTheOtherInvitesForTheSameEmail() {
 		// 관리자가 초대를 다시 보냈고 두 번째 링크로 가입. 첫 링크가 남아 있으면 계정 삭제 뒤 다시 가입할 수 있음
 		String email = "member-" + UUID.randomUUID() + "@sentinel.test";
@@ -283,6 +387,15 @@ class UserManagementTest {
 		assertThat(get("/api/users/" + adminId, memberToken)).hasStatus(HttpStatus.FORBIDDEN);
 		assertThat(post("/api/invites", memberToken, """
 				{"email": "other@sentinel.test"}""")).hasStatus(HttpStatus.FORBIDDEN);
+		invite("pending-" + UUID.randomUUID() + "@sentinel.test");
+		long inviteId = tokens.findAll().getFirst().getId();
+		assertThat(get("/api/pending-invites", memberToken)).hasStatus(HttpStatus.FORBIDDEN);
+		assertThat(get("/api/pending-invites/" + inviteId, memberToken)).hasStatus(HttpStatus.FORBIDDEN);
+		assertThat(delete("/api/pending-invites/" + inviteId, memberToken)).hasStatus(HttpStatus.FORBIDDEN);
+		// 초대 확인(GET /api/invites/{token})과 달리 로그인 필요
+		assertThat(mvc.get().uri("/api/pending-invites")).hasStatus(HttpStatus.UNAUTHORIZED);
+		assertThat(mvc.delete().uri("/api/pending-invites/{id}", inviteId)).hasStatus(HttpStatus.UNAUTHORIZED);
+		assertThat(tokens.count()).isEqualTo(1);
 		assertThat(get("/api/users", adminToken)).hasStatusOk().bodyJson().extractingPath("$.length()").isEqualTo(2);
 	}
 
@@ -315,6 +428,16 @@ class UserManagementTest {
 	private MvcTestResult post(String uri, String token, String body) {
 		var request = mvc.post().uri(uri).contentType(MediaType.APPLICATION_JSON).content(body.isEmpty() ? "{}" : body);
 		return (token == null ? request : request.header("Authorization", "Bearer " + token)).exchange();
+	}
+
+	/** 구성원 초대 발급, 토큰 원문 반환 */
+	private String invite(String email) {
+		return read(post("/api/invites", adminToken, """
+				{"email": "%s", "role": "MEMBER"}""".formatted(email)), "$.token");
+	}
+
+	private MvcTestResult delete(String uri, String token) {
+		return mvc.delete().uri(uri).header("Authorization", "Bearer " + token).exchange();
 	}
 
 	private MvcTestResult put(String uri, String token, String body) {

@@ -8,7 +8,7 @@ import { setSessionCookie } from "@/lib/api/session";
 import type { AuthenticatedUser, IssuedLink, PasswordResetLinkInfo, UserSummary } from "@/lib/api/types";
 
 /**
- * 사용자 초대·삭제, 비밀번호 변경·재설정.
+ * 사용자 초대·초대 취소·삭제, 비밀번호 변경·재설정.
  * 초대·재설정 링크의 토큰은 발급 응답에서만 확인할 수 있어 화면에 한 번만 표시
  */
 
@@ -25,10 +25,31 @@ export async function invite(baseUrl: string, _: LinkState, form: FormData): Pro
   }
   try {
     const issued = await apiSend<IssuedLink>("POST", "/api/invites", { email, role });
+    // 대기 중인 초대 목록에 바로 보이도록. 링크를 보여 주는 대화상자의 상태는 유지됨
+    refresh();
     return { link: `${baseUrl}/invites/${issued!.token}`, expiresAt: issued!.expiresAt };
   } catch (error) {
     return { error: message(error) };
   }
+}
+
+/** 초대 취소. 보낸 링크는 바로 쓸 수 없게 됨 */
+export async function revokeInvite(inviteId: number): Promise<ActionState> {
+  // 바인딩된 인자도 클라이언트가 바꿀 수 있으므로 숫자 ID만 (다른 API 경로가 되지 않도록)
+  if (!Number.isSafeInteger(inviteId) || inviteId <= 0) {
+    return { error: "취소할 초대를 다시 선택해 주세요" };
+  }
+  try {
+    await apiSend("DELETE", `/api/pending-invites/${inviteId}`);
+  } catch (error) {
+    if (isApiError(error) && error.status === 404) {
+      refresh();
+      return { error: "이미 수락·취소되었거나 만료된 초대입니다" };
+    }
+    return { error: message(error) };
+  }
+  refresh();
+  return {};
 }
 
 export async function createPasswordReset(baseUrl: string, userId: number): Promise<LinkState> {
