@@ -6,9 +6,9 @@ import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { deleteUser } from "@/lib/actions/users";
+import { deleteUser, revokeInvite } from "@/lib/actions/users";
 import { apiGet } from "@/lib/api/server";
-import type { AuthenticatedUser, UserSummary } from "@/lib/api/types";
+import type { AuthenticatedUser, PendingInvite, UserSummary } from "@/lib/api/types";
 import { historyHref } from "@/lib/change-log";
 import { formatDateTime } from "@/lib/format";
 import { siteUrl } from "@/lib/site-url";
@@ -17,8 +17,9 @@ export const metadata = { title: "사용자 · Sentinel" };
 
 /** 관리자 전용. 일반 사용자는 Spring이 403으로 응답하여 오류 화면 표시 */
 export default async function UsersPage() {
-  const [users, me, baseUrl] = await Promise.all([
+  const [users, invites, me, baseUrl] = await Promise.all([
     apiGet<UserSummary[]>("/api/users"),
+    apiGet<PendingInvite[]>("/api/pending-invites"),
     apiGet<AuthenticatedUser>("/api/sessions/current"),
     siteUrl(),
   ]);
@@ -78,8 +79,63 @@ export default async function UsersPage() {
           </Table>
         )}
       </Panel>
+
+      <Panel title="대기 중인 초대" count={invites.length} meta="수락·만료·취소되면 목록에서 빠짐">
+        {invites.length === 0 ? (
+          <PanelEmpty message="대기 중인 초대가 없습니다" />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>이메일</TableHead>
+                <TableHead>역할</TableHead>
+                <TableHead>발급자</TableHead>
+                <TableHead>만료 (KST)</TableHead>
+                <TableHead className="w-12">
+                  <span className="sr-only">작업</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invites.map((pending) => (
+                <TableRow key={pending.id}>
+                  <TableCell className="font-medium">{pending.email}</TableCell>
+                  <TableCell>
+                    <Badge variant={pending.role === "ADMIN" ? "default" : "secondary"}>
+                      {pending.role === "ADMIN" ? "관리자" : "구성원"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{pending.invitedBy ?? "-"}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {formatDateTime(pending.expiresAt)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <ActionMenu label={`${pending.email} 초대 작업`} items={inviteMenu(pending.id)}>
+                      <DeleteDialog
+                        menuId="revoke"
+                        title={`"${pending.email}" 초대 취소`}
+                        description="보낸 링크로는 더 이상 가입할 수 없습니다. 다시 초대하려면 새 링크를 발급하세요."
+                        confirmLabel="초대 취소"
+                        action={revokeInvite.bind(null, pending.id)}
+                      />
+                    </ActionMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Panel>
     </div>
   );
+}
+
+/** 링크는 다시 볼 수 없으므로(발급 때만) 취소와 이력만 */
+function inviteMenu(inviteId: number): ActionMenuItem[] {
+  return [
+    { id: "history", label: "변경 이력", icon: "history", href: historyHref("INVITE", inviteId) },
+    { id: "revoke", label: "초대 취소", icon: "delete", destructive: true },
+  ];
 }
 
 /** 초대·재설정 링크에 쓸 주소. 요청 헤더 기준이라 배포 주소를 따로 설정하지 않아도 됨 */

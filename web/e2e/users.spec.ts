@@ -123,3 +123,27 @@ test("관리자가 사용자를 삭제하면 로그인할 수 없음", async ({ 
     "이메일 또는 비밀번호가 올바르지 않습니다",
   );
 });
+
+test("관리자가 대기 중인 초대를 취소하면 그 링크로 가입할 수 없음", async ({ page }) => {
+  const invited = `revoked-${stamp}@sentinel.test`;
+  await login(page, admin.email, admin.password);
+  await page.goto("/users");
+  await page.getByRole("button", { name: "사용자 초대" }).click();
+  await page.getByLabel("이메일").fill(invited);
+  await page.getByRole("button", { name: "초대 링크 발급" }).click();
+  const link = String(await page.getByLabel("발급된 링크").inputValue());
+  await page.keyboard.press("Escape");
+
+  // 발급하면 바로 대기 목록에 보임 (링크는 다시 볼 수 없음)
+  const pending = page.locator("section", { has: page.getByRole("heading", { name: /대기 중인 초대/ }) });
+  await expect(pending.getByRole("row", { name: new RegExp(invited) })).toContainText("구성원");
+  await expect(pending).not.toContainText("/invites/");
+
+  await chooseAction(page, `${invited} 초대 작업`, "초대 취소");
+  await page.getByRole("alertdialog").getByRole("button", { name: "초대 취소" }).click();
+  await expect(page.getByRole("alertdialog")).toBeHidden();
+  await expect(pending.getByRole("row", { name: new RegExp(invited) })).toHaveCount(0);
+
+  await page.goto(link);
+  await expect(page.getByRole("heading", { name: "링크를 사용할 수 없습니다" })).toBeVisible();
+});

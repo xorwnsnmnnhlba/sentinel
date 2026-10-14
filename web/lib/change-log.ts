@@ -30,13 +30,16 @@ export const TARGET_LABELS: Record<ChangeTargetType, string> = {
 
 const ACTION_LABELS: Record<ChangeAction, string> = { CREATED: "등록", UPDATED: "수정", DELETED: "삭제" };
 
-/** 동작 이름. 사용자 등록은 가입, 초대 등록은 초대 발급 */
+/** 동작 이름. 사용자 등록은 가입, 초대 등록·삭제는 발급·취소 */
 export function actionLabel(item: { target: Pick<ChangeLogItem["target"], "type">; action: ChangeAction }): string {
   if (item.action === "CREATED" && item.target.type === "USER") {
     return "가입";
   }
   if (item.action === "CREATED" && item.target.type === "INVITE") {
     return "발급";
+  }
+  if (item.action === "DELETED" && item.target.type === "INVITE") {
+    return "취소";
   }
   return ACTION_LABELS[item.action];
 }

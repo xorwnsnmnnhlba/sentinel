@@ -6,7 +6,15 @@ import { testCookies } from "@/test/cookies";
 import { problem, server, springUrl } from "@/test/msw";
 import { captureRedirect } from "@/test/next";
 
-import { acceptInvite, changePassword, createPasswordReset, deleteUser, invite, resetPassword } from "./users";
+import {
+  acceptInvite,
+  changePassword,
+  createPasswordReset,
+  deleteUser,
+  invite,
+  resetPassword,
+  revokeInvite,
+} from "./users";
 
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 
@@ -37,6 +45,8 @@ describe("invite", () => {
       expiresAt: "2026-09-27T00:00:00Z",
     });
     expect(received).toEqual({ email: "a@b.c", role: "ADMIN" });
+    // 대기 중인 초대 목록 갱신
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
   it("defaults to the member role and requires an email", async () => {
@@ -87,6 +97,37 @@ describe("password reset link", () => {
       expiresAt: "2026-09-20T02:00:00Z",
     });
     expect(received).toEqual({ userId: 7 });
+  });
+});
+
+describe("revokeInvite", () => {
+  it("refreshes the list after revoking", async () => {
+    server.use(http.delete(springUrl("/api/pending-invites/4"), () => new HttpResponse(null, { status: 204 })));
+
+    await expect(revokeInvite(4)).resolves.toEqual({});
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, "4/../../users/1" as unknown as number])(
+    "refuses an id that is not a positive integer (%s) without calling the api",
+    async (inviteId) => {
+      await expect(revokeInvite(inviteId)).resolves.toEqual({ error: "취소할 초대를 다시 선택해 주세요" });
+      expect(refresh).not.toHaveBeenCalled();
+    },
+  );
+
+  it("explains an invite that was already accepted, revoked or expired and refreshes the list", async () => {
+    server.use(http.delete(springUrl("/api/pending-invites/4"), () => problem(404, "invite 4 not found")));
+
+    await expect(revokeInvite(4)).resolves.toEqual({ error: "이미 수락·취소되었거나 만료된 초대입니다" });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("explains that only administrators may revoke", async () => {
+    server.use(http.delete(springUrl("/api/pending-invites/4"), () => problem(403, "administrator role is required")));
+
+    await expect(revokeInvite(4)).resolves.toEqual({ error: "권한이 없습니다. 관리자만 사용할 수 있습니다" });
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
 

@@ -3,6 +3,9 @@ package com.sentinel.application.auth;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.sentinel.application.ChangeLogService;
 import com.sentinel.application.ChangeLogService.Target;
@@ -25,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 가입은 관리자 초대로만 이루어지며, 초대·재설정 링크의 토큰은 1회용이고 만료가 있음.
  * 토큰 원문은 발급 응답에서만 확인할 수 있고 저장은 해시로만 함.
  * <p>
- * 초대 발급, 가입(초대 수락), 재설정 링크 발급, 비밀번호 변경·재설정, 삭제는 변경 이력을 남김. 비밀번호·토큰 값은 남기지 않음
+ * 초대 발급·취소, 가입(초대 수락), 재설정 링크 발급, 비밀번호 변경·재설정, 삭제는 변경 이력을 남김. 비밀번호·토큰 값은 남기지 않음
  */
 @Service
 @RequiredArgsConstructor
@@ -78,6 +81,42 @@ public class UserService {
 				properties.inviteValidity(), invitedBy));
 		changeLog.record(invitedBy, new Target(TargetType.INVITE, saved.getId(), normalized, null), Action.CREATED);
 		return new IssuedToken(token, saved.getExpiresAt());
+	}
+
+	/**
+	 * 대기 중인 초대 (수락·만료·취소되지 않은 것), 최근 발급 순. 토큰 원문은 저장하지 않으므로 링크는 다시 볼 수 없음
+	 */
+	@Transactional(readOnly = true)
+	public List<PendingInvite> pendingInvites() {
+		List<UserToken> invites = tokens
+			.findByTypeAndUsedAtIsNullAndExpiresAtAfterOrderByIdDesc(UserToken.Type.INVITE, clock.instant());
+		// 발급한 관리자가 나중에 삭제되었어도 이메일은 표시 (삭제는 보관이므로 행이 남음)
+		Map<Long, User> inviters = users
+			.findAllById(invites.stream().map(UserToken::getCreatedBy).distinct().toList())
+			.stream()
+			.collect(Collectors.toMap(User::getId, Function.identity()));
+		return invites.stream().map(invite -> PendingInvite.of(invite, inviters.get(invite.getCreatedBy()))).toList();
+	}
+
+	/**
+	 * @throws NotFoundException 없거나 수락·만료·취소된 초대
+	 */
+	@Transactional(readOnly = true)
+	public PendingInvite pendingInvite(long inviteId) {
+		UserToken invite = pending(inviteId);
+		return PendingInvite.of(invite, users.findById(invite.getCreatedBy()).orElse(null));
+	}
+
+	/**
+	 * 초대 취소. 보낸 링크는 바로 쓸 수 없게 됨 (확인·수락 모두 404)
+	 * @throws NotFoundException 없거나 수락·만료·취소된 초대
+	 */
+	@Transactional
+	public void revokeInvite(long inviteId, long revokedBy) {
+		UserToken invite = pending(inviteId);
+		tokens.delete(invite);
+		changeLog.record(revokedBy, new Target(TargetType.INVITE, invite.getId(), invite.getEmail(), null),
+				Action.DELETED);
 	}
 
 	/** 초대 링크 확인. 화면에서 대상 이메일을 보여주기 위한 용도 */
@@ -199,6 +238,12 @@ public class UserService {
 		return users.findByArchivedAtIsNullOrderByEmail().stream().filter(User::isAdmin).count();
 	}
 
+	private UserToken pending(long inviteId) {
+		return tokens.findById(inviteId)
+			.filter(token -> token.getType() == UserToken.Type.INVITE && token.isUsable(clock.instant()))
+			.orElseThrow(() -> new NotFoundException("invite", inviteId));
+	}
+
 	private UserToken usable(String token, UserToken.Type type) {
 		UserToken found = token == null ? null : tokens.findByTokenHash(AuthService.hash(token)).orElse(null);
 		if (found == null || found.getType() != type || !found.isUsable(clock.instant())) {
@@ -230,6 +275,17 @@ public class UserService {
 	}
 
 	public record InviteInfo(String email, Instant expiresAt) {
+	}
+
+	/** @param invitedBy 발급한 관리자의 이메일 (찾을 수 없으면 null) */
+	public record PendingInvite(long id, String email, User.Role role, Instant createdAt, Instant expiresAt,
+			String invitedBy) {
+
+		static PendingInvite of(UserToken invite, User inviter) {
+			return new PendingInvite(invite.getId(), invite.getEmail(), invite.getRole(), invite.getCreatedAt(),
+					invite.getExpiresAt(), inviter == null ? null : inviter.getEmail());
+		}
+
 	}
 
 	/** @param userId 비밀번호를 바꿀 사용자 ({@code PUT /api/users/{userId}/password}) */
