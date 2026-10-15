@@ -1,0 +1,46 @@
+# 코드 보안 분석 (CodeQL). 공개 저장소라 무료. 결과는 GitHub Security → Code scanning
+# - java-kotlin: api (빌드 없이 소스 분석, build-mode none)
+# - javascript-typescript: web
+# - actions: 워크플로 자체 (권한 과다, 신뢰할 수 없는 입력을 셸에 넣는 패턴 등)
+# 저장소 설정의 기본 설정(Default setup)과 함께 쓰지 않음 (이 파일이 고급 설정 역할)
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # 월요일 09:30 KST. 새로 추가된 분석 규칙을 코드 변경 없이도 적용
+    - cron: "30 0 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: codeql (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # 결과 업로드
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, java-kotlin, javascript-typescript]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          # 기본 규칙 + 보안 확장 규칙 (오탐이 많으면 기본으로 되돌림)
+          queries: security-extended
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:${{ matrix.language }}

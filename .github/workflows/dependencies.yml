@@ -1,0 +1,49 @@
+# 의존성 그래프와 PR 의존성 검토
+# - submit: main의 Gradle 의존성(전이 포함)을 GitHub 의존성 그래프에 제출. Gradle은 저장소 파일만으로는 그래프가 만들어지지
+#   않아, 제출하지 않으면 Dependabot 취약점 경고가 api 의존성을 보지 못함 (npm·Actions는 GitHub가 직접 읽음)
+# - review: PR에서 새로 들어오거나 바뀐 의존성에 높음 이상 취약점이 있으면 실패 (운영 의존성만). npm·Actions 대상.
+#   Gradle 변경은 PR에서 제출하지 않으므로(Dependabot PR은 쓰기 권한 없음) Security 점검(OSV, 이미지 기준)이 담당
+name: Dependencies
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - api/build.gradle
+      - api/settings.gradle
+      - api/gradle/**
+      - .github/workflows/dependencies.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    name: dependency graph (gradle)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      # 의존성 그래프 제출
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: zulu
+          java-version: 25
+      - uses: gradle/actions/dependency-submission@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          build-root-directory: api
+
+  review:
+    name: dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # 막는 기준은 Security 점검과 같게: 높음 이상, 운영 의존성
+          fail-on-severity: high
+          fail-on-scopes: runtime
