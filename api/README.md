@@ -460,6 +460,7 @@ deploy-check:
 - 대기 중인 초대 관리는 `/api/invites/{token}`(로그인 없이 열린 링크 확인)과 겹치지 않도록 숫자 ID를 쓰는 `/api/pending-invites`로 분리
 - 초대를 수락하면 같은 이메일로 보낸 다른 초대는 무효. 사용자를 삭제하면 그 이메일로 남은 초대도 삭제 (예전 링크로 다시 가입하지 못하도록)
 - 자기 자신 삭제와 마지막 관리자 삭제는 400으로 거부
+- 만료된 로그인 세션과 초대·재설정 링크(사용 여부와 무관)는 매일 정리 배치(`sentinel.retention.cron`, `sentinel.retention.enabled`)에서 삭제. 만료되면 쓰이지 않으므로 동작은 같음. 로그: `Deleted N expired session(s) and M expired invite/password reset link(s)`. API 토큰은 대상 아님
 - 링크 전달은 사람이 직접 (메신저 등). 링크 자체가 자격증명이므로 공개 채널 금지
 
 | 설정 | 기본값 | 설명 |
