@@ -8,3 +8,5 @@ sentinel.env
 proxy/certs/
 # 내부 인증 기관 루트 인증서를 내보낸 파일 (README의 내보내기 명령 기준). PC별 신뢰 등록용이라 저장소에 두지 않음
 sentinel-root.crt
+# CI 의존성 점검이 만드는 임시 잠금 파일 (api/gradle/ci/runtime-lockfile.init.gradle). 의존성 잠금은 쓰지 않음
+api/gradle.lockfile

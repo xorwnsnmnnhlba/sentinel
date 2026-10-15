@@ -1,0 +1,11 @@
+// CI 의존성 점검 전용 init 스크립트 (.github/workflows/security.yml). build.gradle은 바꾸지 않음
+// 앱 실행 클래스패스(runtimeClasspath)만 잠가 Gradle이 실제로 해석한 좌표·버전을 api/gradle.lockfile로 기록
+//
+//   ./gradlew --init-script gradle/ci/runtime-lockfile.init.gradle dependencies --configuration runtimeClasspath --write-locks
+//
+// 이미지 점검은 jar에서 Maven 좌표를 추정하다 틀리는 경우가 많아(Spring·Tomcat 등) 정확한 목록이 필요
+gradle.allprojects { project ->
+	project.configurations.matching { it.name == 'runtimeClasspath' }.configureEach {
+		resolutionStrategy.activateDependencyLocking()
+	}
+}

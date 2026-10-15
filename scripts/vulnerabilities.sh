@@ -2,11 +2,13 @@
 # 의존성 취약점 판정. OSV-Scanner 이미지 점검 결과와 npm audit 결과(JSON)를 읽어 Markdown 요약을 출력하고,
 # 막아야 할 취약점이 있으면 종료 코드 1 (.github/workflows/security.yml)
 #
-#   scripts/vulnerabilities.sh [--osv osv-scanner.json [--expect ecosystem]...]... [--npm npm-audit.json]...
+#   scripts/vulnerabilities.sh [--osv osv-scanner.json [--expect ecosystem | --expect-package name]...]... [--npm npm-audit.json]...
 #
-# --expect  바로 앞 --osv 결과에 그 생태계(Maven, Go, Alpine 등. "Alpine"은 "Alpine:v3.22"도 포함) 패키지가 없으면 종료 코드 2
-#           점검기가 jar 등을 놓치면 취약점 0건으로 통과하므로 확인. OSV-Scanner를 --all-packages로 실행해야 함
-#           (기본 출력에는 취약점 있는 패키지만 있음)
+# --expect          바로 앞 --osv 결과에 그 생태계(Maven, Go, Alpine 등. "Alpine"은 "Alpine:v3.22"도 포함) 패키지가 없으면 종료 코드 2
+#                   점검기가 jar 등을 놓치면 취약점 0건으로 통과하므로 확인
+# --expect-package  바로 앞 --osv 결과에 그 이름(예: org.springframework:spring-core)의 패키지가 없으면 종료 코드 2
+#                   점검기가 좌표를 잘못 추정하면 패키지는 있어도 취약점 조회가 빗나가므로 정확한 이름으로 확인
+# 둘 다 OSV-Scanner를 --all-packages로 실행해야 함 (기본 출력에는 취약점 있는 패키지만 있음)
 #
 # 막는 기준: 애플리케이션 의존성(Java 라이브러리, npm 운영 의존성)의 높음(CVSS 7.0·high) 이상 중 수정 버전이 있는 것
 # 그 외(OS 패키지, 수정판 없음, 보통 이하)는 보고만. OS 패키지는 대부분 수정판이 없고 있어도 기본 이미지 갱신으로만 반영됨
@@ -74,14 +76,27 @@ while [ $# -gt 0 ]; do
       fi
       shift 2
       ;;
+    --expect-package)
+      if [ $# -lt 2 ] || [ -z "$last_osv" ]; then
+        echo "--expect-package needs a package name and must follow --osv" >&2
+        exit 2
+      fi
+      count=$(jq --arg n "$2" '[.results[]?.packages[]?.package.name | select(. == $n)] | length' "$last_osv")
+      if [ "$count" -eq 0 ]; then
+        echo "No $2 in $(basename "$last_osv"). The scan missed it, misread its name or ran without --all-packages; not judging" >&2
+        exit 2
+      fi
+      shift 2
+      ;;
     *)
-      echo "Usage: $0 [--osv file [--expect ecosystem]...]... [--npm file]..." >&2
+      echo "Usage: $0 [--osv file [--expect ecosystem | --expect-package name]...]... [--npm file]..." >&2
       exit 2
       ;;
   esac
 done
 
-blocking=$(grep -c '^block' "$rows" || true)
+# 같은 패키지를 이미지·Gradle 목록 두 곳에서 찾을 수 있어 중복 행 제외 후 계산
+blocking=$(grep '^block' "$rows" | sort -u | grep -c . || true)
 
 echo "## Dependency vulnerabilities"
 echo
