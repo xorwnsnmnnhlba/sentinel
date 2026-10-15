@@ -88,6 +88,10 @@ check "passes without vulnerabilities" '[ "$status" -eq 0 ] && contains "No bloc
 run --osv "$WORK/block.json" --npm "$WORK/empty-npm.json"
 check "combines several results" '[ "$status" -eq 1 ] && contains "1 high or critical vulnerabilities"'
 
+# 같은 패키지를 이미지와 Gradle 목록에서 모두 찾으면 한 번만 셈
+run --osv "$WORK/block.json" --osv "$WORK/block.json"
+check "counts a vulnerability found in two results once" '[ "$status" -eq 1 ] && contains "1 high or critical vulnerabilities"'
+
 # --expect: 점검기가 jar를 놓쳐 취약점 0건으로 통과하는 것을 막음. 바로 앞 결과 파일만 확인
 run --osv "$WORK/report.json" --expect Maven --expect Ubuntu --expect Go
 check "passes when the expected ecosystems were scanned" '[ "$status" -eq 0 ] && contains "Scanned packages" && contains "- report.json: Go 1, Maven 2, Ubuntu:26.04 1"'
@@ -100,6 +104,19 @@ check "checks only the preceding result" '[ "$status" -eq 2 ] && contains "No Ma
 
 run --osv "$WORK/report.json" --expect Ubuntu:26
 check "matches the ecosystem name, not a prefix of the version" '[ "$status" -eq 2 ] && contains "No Ubuntu:26 packages"'
+
+# --expect-package: 패키지는 있어도 좌표를 잘못 읽으면(org.apache.tomcat-embed-core:...) 취약점 조회가 빗나가므로 정확한 이름 확인
+run --osv "$WORK/report.json" --expect-package org.example:nofix --expect-package perl
+check "passes when the expected packages were scanned by their exact names" '[ "$status" -eq 0 ] && contains "No blocking vulnerabilities"'
+
+run --osv "$WORK/report.json" --expect-package org.example
+check "requires the exact package name" '[ "$status" -eq 2 ] && contains "No org.example in report.json" && ! contains "No blocking vulnerabilities"'
+
+run --osv "$WORK/report.json" --osv "$WORK/empty-osv.json" --expect-package org.example:nofix
+check "checks the package only in the preceding result" '[ "$status" -eq 2 ] && contains "No org.example:nofix in empty-osv.json"'
+
+run --expect-package org.example:nofix --osv "$WORK/report.json"
+check "errors when --expect-package comes before --osv" '[ "$status" -eq 2 ] && contains "--expect-package needs a package name and must follow --osv"'
 
 run --expect Maven --osv "$WORK/report.json"
 check "errors when --expect comes before --osv" '[ "$status" -eq 2 ] && contains "--expect needs an ecosystem and must follow --osv"'

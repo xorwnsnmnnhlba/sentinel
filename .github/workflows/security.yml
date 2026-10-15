@@ -1,5 +1,7 @@
 # 의존성 취약점 점검. 의존성을 바꾼 PR은 막고, 매주 월요일 정기 점검은 새로 공개된 취약점을 실패로 표시
-# - api·web·HTTPS 앞단(Caddy) 이미지: OSV-Scanner로 실제 이미지 안의 Java 라이브러리·Go 모듈·OS 패키지
+# - api Java 의존성: Gradle이 해석한 앱 실행 클래스패스(runtimeClasspath)를 잠금 파일로 뽑아 OSV-Scanner로 점검
+#   이미지 점검은 jar에서 Maven 좌표를 추정하다 틀려(api 패키지 100개 중 47개, Spring·Tomcat 등) 취약점 조회가 빗나감
+# - api·web·HTTPS 앞단(Caddy) 이미지: OSV-Scanner로 실제 이미지 안의 OS 패키지·Go 모듈 (Java 라이브러리도 함께 보고)
 #   Caddy(Go 모듈·OS 패키지)는 보고만. 수정은 Caddy 새 버전 이미지로만 가능 (Dependabot docker-compose)
 # - web 운영 의존성: npm audit (Next.js standalone 이미지에는 npm 패키지 정보가 남지 않아 이미지 점검으로는 보이지 않음)
 # 막는 기준은 scripts/vulnerabilities.sh (애플리케이션 의존성의 높음 이상 중 수정 버전이 있는 것)
@@ -79,6 +81,18 @@ jobs:
             "https://github.com/google/osv-scanner/releases/download/$OSV_SCANNER_VERSION/osv-scanner_linux_amd64"
           echo "$OSV_SCANNER_SHA256  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
           chmod +x "$RUNNER_TEMP/osv-scanner"
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: zulu
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      # build.gradle은 그대로 두고 init 스크립트로 이번 실행에서만 잠금 파일 생성 (api/gradle/ci/runtime-lockfile.init.gradle)
+      - name: api 의존성 목록 (Gradle)
+        working-directory: api
+        run: |
+          ./gradlew --init-script gradle/ci/runtime-lockfile.init.gradle dependencies \
+            --configuration runtimeClasspath --write-locks > /dev/null
+          test -s gradle.lockfile
       # 운영과 같은 태그 (docker-compose.yml의 sentinel-proxy)
       - name: Caddy 이미지 받기
         run: |
@@ -94,11 +108,16 @@ jobs:
             "$RUNNER_TEMP/osv-scanner" scan image --all-packages --format json "${target#*=}" \
               > "$RUNNER_TEMP/osv-${target%%=*}.json" || [ $? -eq 1 ]
           done
-      # --expect: 이미지마다 있어야 할 패키지가 결과에 없으면 점검 누락으로 실패 (취약점 0건으로 오인 방지)
+          "$RUNNER_TEMP/osv-scanner" scan source --all-packages --format json --lockfile api/gradle.lockfile \
+            > "$RUNNER_TEMP/osv-gradle.json" || [ $? -eq 1 ]
+      # --expect·--expect-package: 있어야 할 생태계·패키지가 결과에 없으면 점검 누락으로 실패 (취약점 0건으로 오인 방지)
+      # Gradle 목록은 정확한 좌표로 확인 (이미지 점검이 잘못 읽던 핵심 라이브러리)
       - name: 판정
         run: |
           bash scripts/vulnerabilities.sh \
-            --osv "$RUNNER_TEMP/osv-api.json" --expect Maven \
+            --osv "$RUNNER_TEMP/osv-gradle.json" --expect-package org.springframework:spring-core \
+              --expect-package org.apache.tomcat.embed:tomcat-embed-core --expect-package org.postgresql:postgresql \
+            --osv "$RUNNER_TEMP/osv-api.json" --expect Ubuntu \
             --osv "$RUNNER_TEMP/osv-web.json" --expect Alpine \
             --osv "$RUNNER_TEMP/osv-proxy.json" --expect Go \
             --npm "$RUNNER_TEMP/npm-audit.json" | tee -a "$GITHUB_STEP_SUMMARY"

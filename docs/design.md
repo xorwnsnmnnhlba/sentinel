@@ -465,8 +465,13 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 - 작업 셸을 `bash`로 지정 (2026-10-11): 지정하지 않으면 `bash -e`로 실행되어 `pipefail`이 없음. 판정 결과를 `tee`로 요약에 남기는 단계가 판정 실패를 무시하고 통과했음(#142에서 24건을 찾고도 통과)
 - 도입 시 발견 (2026-10-10): api `spring-webmvc` 7.0.8 치명(9.8) 2건, Jackson·httpcore5 높음, web `next` 16.3.5 치명과 `sharp` 등 높음. 모두 수정 버전 있음 → 의존성 업데이트로 해결
   - 해결 (2026-10-11): Spring Boot 4.1.1(`spring-webmvc` 7.0.9), Jackson은 Spring Boot가 아직 취약한 버전을 관리해 같은 minor 수정판으로 덮어씀(`build.gradle`의 `jackson-bom.version`·`jackson-2-bom.version`, 관리되면 제거). web은 `next` 16.4.0, `sharp`·`source-map-js`는 범위 안 업데이트
-- Gradle 의존성 그래프 제출 후 발견 (2026-10-15): 내장 Tomcat 11.0.24 치명 3건(CVE-2026-68525·65905·65182, 8월 26일 공개). OSV 이미지 점검(10-14)에는 0건으로 나와 놓쳤음. 원인은 점검기가 jar에서 Maven 좌표를 잘못 추정(`org.apache.tomcat-embed-core:tomcat-embed-core`)하여 취약점 조회가 빗나간 것. api 이미지 Maven 패키지 100개 중 47개(Spring Framework·Spring Boot·Tomcat·Hibernate·PostgreSQL JDBC 등)가 실제 좌표와 다름 → 이미지 점검은 Java 의존성의 PR 점검으로 불충분 (후속 과제). 모두 Tomcat 자체 인증(FORM·DIGEST)·서블릿 보안 제약 관련이라 이 앱(인증은 AuthFilter)에는 해당하지 않으나, Spring Boot가 아직 취약한 버전을 관리해 같은 minor 최신 수정판 11.0.27로 덮어씀(`build.gradle`의 `tomcat.version`, 관리되면 제거)
+- Gradle 의존성 그래프 제출 후 발견 (2026-10-15): 내장 Tomcat 11.0.24 치명 3건(CVE-2026-68525·65905·65182, 8월 26일 공개). OSV 이미지 점검(10-14)에는 0건으로 나와 놓쳤음. 원인은 점검기가 jar에서 Maven 좌표를 잘못 추정(`org.apache.tomcat-embed-core:tomcat-embed-core`)하여 취약점 조회가 빗나간 것. api 이미지 Maven 패키지 100개 중 47개(Spring Framework·Spring Boot·Tomcat·Hibernate·PostgreSQL JDBC 등)가 실제 좌표와 다름 → 이미지 점검은 Java 의존성의 PR 점검으로 불충분. 모두 Tomcat 자체 인증(FORM·DIGEST)·서블릿 보안 제약 관련이라 이 앱(인증은 AuthFilter)에는 해당하지 않으나, Spring Boot가 아직 취약한 버전을 관리해 같은 minor 최신 수정판 11.0.27로 덮어씀(`build.gradle`의 `tomcat.version`, 관리되면 제거)
   - 같은 제출에서 나온 Jackson 3.1.5·commons-lang3 3.16.0 경고는 Gradle 빌드 도구(Spring Boot 플러그인) 클래스패스. 앱에는 3.1.7·3.20.0이 들어가고 이미지에 없음
+- Java 의존성은 Gradle 해석 결과로 점검 (2026-10-15): Security 점검에서 init 스크립트(`api/gradle/ci/runtime-lockfile.init.gradle`)로 앱 실행 클래스패스만 잠근 임시 `gradle.lockfile`(정확한 좌표 110개)을 만들어 OSV로 점검. `build.gradle`은 그대로이고 잠금 파일은 커밋하지 않음(`.gitignore`)
+  - 확인: 같은 방식으로 Tomcat 11.0.24를 점검하면 치명 3건으로 막히고 11.0.27은 통과 (이미지 점검은 같은 버전을 0건으로 통과시켰음)
+  - 누락 확인을 생태계(`--expect Maven`)에서 정확한 좌표(`--expect-package org.springframework:spring-core` 등)로 바꿈. 좌표를 잘못 읽으면 패키지 수는 맞아도 걸러지지 않던 문제
+  - api 이미지 점검은 OS 패키지 확인용으로 유지(`--expect Ubuntu`). 같은 취약점이 두 결과에 모두 나오면 한 번만 셈
+  - Gradle 의존성 그래프 제출에서 빌드 도구 클래스패스(`classpath`) 제외. 앱·이미지에 없는 의존성의 Dependabot 경고 방지
   - `shadcn`은 개발 의존성으로: 빌드 때 CSS(`shadcn/tailwind.css`)만 쓰는 CLI. 올려서 고칠 버전이 없는 취약점(2.0.0 이상 전부)이 딸린 패키지와 함께 운영 점검 대상에서 빠짐
   - api·web 이미지를 한 점검에서 함께 판정하므로 둘을 한 PR로 (한쪽만 고친 PR은 다른 쪽 때문에 통과할 수 없음)
 
