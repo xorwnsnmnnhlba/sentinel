@@ -7,21 +7,21 @@ Sentinel 백엔드. 테스트 케이스 실행(러너), 스케줄 실행, 결과
 | 구분 | 버전 |
 |------|------|
 | Java | 25 (로컬 Azul Zulu 25.0.4.1) |
-| Gradle | 9.7.1 (Wrapper) |
-| Spring Boot | 4.1.0 |
-| Spring Framework | 7.0.8 |
-| Spring Data JPA | 4.1.0 |
-| Hibernate ORM | 7.4.1.Final |
+| Gradle | 9.8.1 (Wrapper, 배포판 체크섬 고정) |
+| Spring Boot | 4.1.1 |
+| Spring Framework | 7.0.9 |
+| Spring Data JPA | 4.1.1 |
+| Hibernate ORM | 7.4.5.Final |
 | Jakarta Persistence | 3.2.0 |
-| Hibernate Validator | 9.1.0.Final |
-| Jackson | 3.1.4 |
-| Tomcat (내장) | 11.0.22 |
+| Hibernate Validator | 9.1.3.Final |
+| Jackson | 3.1.7 (취약점 수정판으로 직접 지정, `build.gradle`) |
+| Tomcat (내장) | 11.0.27 (취약점 수정판으로 직접 지정, `build.gradle`) |
 | HikariCP | 7.0.2 |
-| PostgreSQL JDBC | 42.7.11 |
+| PostgreSQL JDBC | 42.7.13 |
 | DB | PostgreSQL 18, AWS RDS `sentinel` 스키마 |
 | Flyway | 12.4.0 |
 | QueryDSL | 7.7 (OpenFeign 포크, 조건 조회·일괄 변경. Boot 미관리라 버전 명시) |
-| SnakeYAML Engine | 3.0.1 (케이스 가져오기의 문서 해석, Boot 미관리라 버전 명시) |
+| SnakeYAML Engine | 3.2 (케이스 가져오기의 문서 해석, Boot 미관리라 버전 명시) |
 | Testcontainers | 2.0.5 |
 | Lombok | 1.18.46 (`@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor(access = PROTECTED)`만 사용, `lombok.config`로 제한) |
 
