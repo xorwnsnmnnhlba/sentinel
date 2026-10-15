@@ -446,6 +446,10 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 ### 의존성 취약점 점검 (2026-10-10)
 
 - 방식 (사용자 결정): Dependabot과 CI 점검을 함께. 비공개 저장소라 의존성 검토(dependency-review)·CodeQL은 유료 기능(GitHub Advanced Security)이 필요해 제외
+  - 공개 저장소로 바꾼 뒤 추가 (2026-10-15): 둘 다 무료
+  - CodeQL (`.github/workflows/codeql.yml`): api(Java, 빌드 없이 소스 분석)·web(TypeScript)·워크플로(Actions)를 PR·main·매주 분석. 보안 확장 규칙(`security-extended`). 결과는 Security → Code scanning
+  - 의존성 검토 (`.github/workflows/dependencies.yml`의 review): PR에서 새로 들어오거나 바뀐 운영 의존성의 높음 이상 취약점이면 실패. 이미지 전체를 보는 Security 점검과 달리 PR의 변경분만 봄
+  - Gradle 의존성 그래프 제출 (같은 파일의 submit): GitHub 의존성 그래프에 Java 패키지가 하나도 없었음(npm 867·Actions 7만). Gradle은 저장소 파일만으로 그래프가 만들어지지 않아 Dependabot 취약점 경고가 api 의존성을 보지 못하던 상태. main에서 해석한 의존성(전이 포함)을 제출. PR에서는 제출하지 않으므로(Dependabot PR은 쓰기 권한 없음) Gradle 변경의 PR 검토는 Security 점검(OSV)이 담당
   - Dependabot (`.github/dependabot.yml`): 매주 월요일 생태계(Gradle·npm·Actions·Docker·compose)마다 minor·patch를 한 PR로. 큰 버전 이미지(Java·Node LTS)는 직접 결정하므로 제외. 취약점 경고·보안 수정 PR은 저장소 설정에서 켜야 동작
   - CI 점검 (`.github/workflows/security.yml`): api·web 이미지를 OSV-Scanner로(실제 배포물 안의 Java 라이브러리·OS 패키지), web 운영 의존성은 npm audit으로. Next.js standalone 이미지에는 npm 패키지 정보가 남지 않아 이미지 점검으로는 보이지 않음
 - 막는 시점 (사용자 결정): 의존성을 바꾼 PR(`build.gradle`·`package-lock.json`·Dockerfile 등)만 막고, 매주 월요일 정기 점검은 실패로 표시. 새 취약점이 공개되는 날 무관한 PR까지 막히지 않도록

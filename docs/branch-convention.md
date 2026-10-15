@@ -117,7 +117,8 @@ docs: add branch convention
 |------|-----------|
 | 작업 단위 완결 | 브랜치 이름에 명시한 작업의 동작 확인 |
 | CI 통과 | PR의 **CI** 체크 통과 (`.github/workflows/ci.yml`: web lint·서식·테스트·빌드, api 테스트, E2E, 배포 스크립트) |
-| 취약점 점검 통과 | 의존성을 바꾼 PR은 **Security** 체크 통과 (`.github/workflows/security.yml`). 실패하면 표의 패키지를 수정 버전으로 올림 |
+| 취약점 점검 통과 | 의존성을 바꾼 PR은 **Security** 체크 통과 (`.github/workflows/security.yml`). 실패하면 표의 패키지를 수정 버전으로 올림. 모든 PR은 **dependency review**(새로 들어온 npm·Actions 의존성) 통과 (`.github/workflows/dependencies.yml`) |
+| 코드 분석 확인 | **CodeQL** 체크(`.github/workflows/codeql.yml`)가 새 경고를 남기면 PR의 경고를 확인하고 수정하거나, 오탐이면 Security → Code scanning에서 사유와 함께 닫음 |
 | 빌드·테스트 통과 (로컬) | api: `./gradlew build` / web: `npm run lint`, `npm run format:check`, `npm test`, `npm run build` |
 | 기동 확인 | 로컬 실행 후 변경 부분 동작 확인 |
 | 셀프 리뷰 | PR **Files changed** 탭에서 diff 확인 (디버그 코드, 시크릿, 불필요한 파일) |
