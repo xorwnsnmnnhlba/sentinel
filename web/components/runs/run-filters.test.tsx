@@ -23,6 +23,7 @@ const environments: EnvironmentItem[] = [
     baseUrl: "http://dev",
     variables: {},
     secretNames: [],
+    version: 0,
   },
   {
     id: 200,
@@ -31,6 +32,7 @@ const environments: EnvironmentItem[] = [
     baseUrl: "http://stg",
     variables: {},
     secretNames: [],
+    version: 0,
   },
 ];
 

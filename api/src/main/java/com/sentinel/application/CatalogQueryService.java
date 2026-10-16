@@ -148,9 +148,10 @@ public class CatalogQueryService {
 	/**
 	 * @param variables 비밀이 아닌 값만 저장하므로 값 포함
 	 * @param secretNames 시크릿 이름만 노출. 값은 조회 불가
+	 * @param version 수정할 때 함께 보내면 그사이 다른 곳에서 고쳤는지 확인 (낙관적 잠금)
 	 */
 	public record EnvironmentItem(long id, IdName project, String name, String baseUrl, Map<String, String> variables,
-			List<String> secretNames) {
+			List<String> secretNames, long version) {
 
 		/** 엔티티의 변수 목록은 실시간 뷰이므로 복사 (수정 전후 비교가 같은 목록을 보지 않도록). 입력 순서 유지 */
 		public EnvironmentItem {
@@ -160,7 +161,8 @@ public class CatalogQueryService {
 
 		static EnvironmentItem of(Environment environment) {
 			return new EnvironmentItem(environment.getId(), IdName.of(environment.getProject()), environment.getName(),
-					environment.getBaseUrl(), environment.getVariables(), environment.getSecretNames());
+					environment.getBaseUrl(), environment.getVariables(), environment.getSecretNames(),
+					environment.getVersion());
 		}
 
 	}
@@ -177,15 +179,16 @@ public class CatalogQueryService {
 	/**
 	 * @param assertions 비어 있으면 기본 판정(status in [2xx]) 적용
 	 * @param extractors 응답 값 추출 규칙
+	 * @param version 수정할 때 함께 보내면 그사이 다른 곳에서 고쳤는지 확인 (낙관적 잠금)
 	 */
 	public record CaseItem(long id, IdName suite, String name, Request request, List<Assertion> assertions,
-			List<Extractor> extractors) {
+			List<Extractor> extractors, long version) {
 
 		static CaseItem of(TestCase testCase) {
 			RequestSpec spec = testCase.getRequest();
 			return new CaseItem(testCase.getId(), IdName.of(testCase.getSuite()), testCase.getName(),
 					new Request(spec.getMethod(), spec.getPath(), spec.getHeaders(), spec.getBody()),
-					testCase.getAssertions(), testCase.getExtractors());
+					testCase.getAssertions(), testCase.getExtractors(), testCase.getVersion());
 		}
 
 	}

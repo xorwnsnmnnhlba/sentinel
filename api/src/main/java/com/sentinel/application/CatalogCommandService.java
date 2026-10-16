@@ -146,9 +146,13 @@ public class CatalogCommandService {
 	 * @param variables 지정 시 전체 교체
 	 * @param secrets 이름별 반영. 값이 있으면 등록·교체, null이면 삭제, 목록에 없는 이름은 유지
 	 */
-	public EnvironmentItem updateEnvironment(long environmentId, String name, String baseUrl,
+	/**
+	 * @param expectedVersion 수정 화면을 열 때 읽은 version. 다르면 거부 ({@link StaleVersionException}), null이면 확인하지 않음
+	 */
+	public EnvironmentItem updateEnvironment(long environmentId, Long expectedVersion, String name, String baseUrl,
 			Map<String, String> variables, Map<String, String> secrets, long actorId) {
 		Environment environment = findEnvironment(environmentId);
+		StaleVersionException.check("environment", environmentId, expectedVersion, environment.getVersion());
 		EnvironmentItem before = EnvironmentItem.of(environment);
 		long projectId = environment.getProject().getId();
 		if (name != null) {
@@ -172,7 +176,9 @@ public class CatalogCommandService {
 			secrets.keySet().stream().sorted().forEach(secretName -> changes.add("secrets." + secretName));
 		}
 		changeLog.record(actorId, target(environment), Action.UPDATED, changes.fields());
-		return after;
+		// 응답의 version이 저장 후 값이 되도록 반영 (그 값으로 다시 수정할 수 있게)
+		environments.flush();
+		return EnvironmentItem.of(environment);
 	}
 
 	public SuiteItem createSuite(long projectId, String name, String description, long actorId) {
@@ -282,10 +288,14 @@ public class CatalogCommandService {
 	 * @param assertions 지정 시 전체 교체. 빈 목록이면 기본 판정으로 복귀
 	 * @param extractors 지정 시 전체 교체
 	 */
-	public CaseItem updateCase(long caseId, String name, Request request, List<Assertion> assertions,
+	/**
+	 * @param expectedVersion 수정 화면을 열 때 읽은 version. 다르면 거부 ({@link StaleVersionException}), null이면 확인하지 않음
+	 */
+	public CaseItem updateCase(long caseId, Long expectedVersion, String name, Request request, List<Assertion> assertions,
 			List<Extractor> extractors, long actorId) {
 		TestCase testCase = testCases.findByIdAndArchivedAtIsNull(caseId)
 			.orElseThrow(() -> new NotFoundException("test case", caseId));
+		StaleVersionException.check("test case", caseId, expectedVersion, testCase.getVersion());
 		CaseItem before = CaseItem.of(testCase);
 		long suiteId = testCase.getSuite().getId();
 		if (name != null) {
@@ -309,7 +319,8 @@ public class CatalogCommandService {
 					.compare("assertions", before.assertions(), after.assertions())
 					.compare("extractors", before.extractors(), after.extractors())
 					.fields());
-		return after;
+		testCases.flush();
+		return CaseItem.of(testCase);
 	}
 
 	public void archiveProject(long projectId, long actorId) {

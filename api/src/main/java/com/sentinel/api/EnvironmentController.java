@@ -64,8 +64,8 @@ class EnvironmentController {
 	 */
 	@PatchMapping("/{environmentId}")
 	EnvironmentItem update(@PathVariable long environmentId, @RequestBody UpdateEnvironmentRequest request) {
-		return commands.updateEnvironment(environmentId, request.name(), request.baseUrl(), request.variables(),
-				request.secrets(), currentUser.get().id());
+		return commands.updateEnvironment(environmentId, request.version(), request.name(), request.baseUrl(),
+				request.variables(), request.secrets(), currentUser.get().id());
 	}
 
 	/**

@@ -143,6 +143,7 @@ export async function updateEnvironment(environmentId: number, _: ActionState, f
     baseUrl: raw(form, "baseUrl"),
     variables,
     secrets,
+    version: versionOf(form),
   });
 }
 
@@ -203,7 +204,8 @@ export async function deleteCase(caseId: number): Promise<ActionState> {
 }
 
 /** 케이스 저장 결과. 오류 시 화면에 목록으로 표시 */
-export type CaseActionState = { errors?: string[] } | undefined;
+/** @property version 저장했지만 화면에 남을 때(실행 실패) 저장된 케이스의 version. 이어서 저장할 때 사용 */
+export type CaseActionState = { errors?: string[]; version?: number } | undefined;
 
 /**
  * 케이스 등록. 성공 시 스위트 화면으로 이동
@@ -252,7 +254,9 @@ async function saveCase(
   }
   let saved: CaseItem | null;
   try {
-    saved = await apiSend<CaseItem>(method, path, { ...extra, ...validation.payload });
+    // 수정은 화면을 연 때의 version을 함께 보냄 (그사이 다른 곳에서 고쳤으면 409)
+    const version = method === "PATCH" ? { version: draft.version } : {};
+    saved = await apiSend<CaseItem>(method, path, { ...extra, ...validation.payload, ...version });
   } catch (error) {
     const message = failure(error)?.error;
     return { errors: message ? [message] : [] };
@@ -271,7 +275,7 @@ async function saveCase(
       // 등록은 끝났으므로 다시 누르면 같은 케이스가 또 등록됨. 수정 화면으로 옮겨 안내
       redirect(`/cases/${saved!.id}?notice=run-failed`);
     }
-    return { errors: [`저장했지만 실행하지 못했습니다. ${reason}`.trim()] };
+    return { errors: [`저장했지만 실행하지 못했습니다. ${reason}`.trim()], version: saved!.version };
   }
   redirect(`/runs/${run!.id}`);
 }
@@ -594,6 +598,17 @@ function secretsOf(form: FormData): Record<string, string | null> | string {
 }
 
 /** Spring 오류를 화면용 메시지로 변환. 그 외 오류(연결 실패 등)는 내부 정보 없이 고정 문구 */
+/**
+ * 수정 화면을 연 때의 version (components/catalog/opened-version). 없거나 형식이 다르면 보내지 않음 (Spring은 확인 생략)
+ * 브라우저가 임의 값을 보낼 수 있지만 다르면 거부될 뿐이라 자기 저장만 막힘
+ */
+function versionOf(form: FormData): number | undefined {
+  // 빈 문자열은 Number("")가 0이 되므로 숫자 형식부터 확인
+  const raw = form.get("version");
+  const value = typeof raw === "string" && /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
+  return Number.isSafeInteger(value) ? value : undefined;
+}
+
 /** Spring이 동시 수정 충돌(409)에 붙이는 문구 (api ApiExceptionHandler.CONCURRENT_MODIFICATION) */
 const CONCURRENT_MODIFICATION = "modified by another request";
 

@@ -85,6 +85,11 @@ export type CaseDraft = {
   body: string;
   assertions: AssertionDraft[];
   extractors: ExtractorDraft[];
+  /**
+   * 수정 화면을 연 때의 케이스 version (등록은 없음). 저장 요청에 함께 보내 그사이 다른 곳에서 고쳤으면 거부 (낙관적 잠금).
+   * 편집 상태와 함께 보관하므로 화면이 새로 그려져도 유지되어, 충돌 뒤 다시 누른 저장이 옛 내용으로 덮어쓰지 않음
+   */
+  version?: number;
 };
 
 /** Spring 등록·수정 요청 본문 (suiteId 제외) */
@@ -139,6 +144,7 @@ export function toDraft(item: CaseItem): CaseDraft {
     body: item.request.body ?? "",
     assertions: item.assertions.map(assertionDraftOf),
     extractors: item.extractors.map((extractor) => ({ ...extractor })),
+    version: item.version,
   };
 }
 
@@ -408,7 +414,9 @@ export function isCaseDraft(value: unknown): value is CaseDraft {
     Array.isArray(draft.assertions) &&
     draft.assertions.every(isAssertionDraft) &&
     Array.isArray(draft.extractors) &&
-    draft.extractors.every(isExtractorDraft)
+    draft.extractors.every(isExtractorDraft) &&
+    (draft.version === undefined ||
+      (typeof draft.version === "number" && Number.isSafeInteger(draft.version) && draft.version >= 0))
   );
 }
 

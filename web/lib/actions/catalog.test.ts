@@ -141,6 +141,37 @@ describe("environments", () => {
     expect(bodies).toEqual([{ name: "dev", baseUrl: "https://gw", variables: {}, secrets: {} }]);
   });
 
+  it("sends the version the edit dialog was opened with", async () => {
+    const bodies = capture("patch", "/api/environments/4", () => HttpResponse.json({}));
+
+    await updateEnvironment(4, undefined, form({ name: "dev", baseUrl: "https://gw", version: "7" }));
+
+    expect(bodies).toEqual([{ name: "dev", baseUrl: "https://gw", variables: {}, secrets: {}, version: 7 }]);
+  });
+
+  it.each(["", "-1", "1.5", "abc"])("leaves out a malformed version %j so Spring skips the check", async (version) => {
+    const bodies = capture("patch", "/api/environments/4", () => HttpResponse.json({}));
+
+    await updateEnvironment(4, undefined, form({ name: "dev", baseUrl: "https://gw", version }));
+
+    expect(bodies).toEqual([{ name: "dev", baseUrl: "https://gw", variables: {}, secrets: {} }]);
+  });
+
+  it("explains that someone else saved the environment first and reloads the page", async () => {
+    server.use(
+      http.patch(springUrl("/api/environments/4"), () =>
+        problem(409, "modified by another request; reload and try again"),
+      ),
+    );
+
+    await expect(
+      updateEnvironment(4, undefined, form({ name: "dev", baseUrl: "https://gw", version: "7" })),
+    ).resolves.toEqual({
+      error: "다른 곳에서 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요",
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
   it("sends secrets by name, with null for removals", async () => {
     const bodies = capture("patch", "/api/environments/4", () => HttpResponse.json({}));
 
@@ -534,6 +565,30 @@ describe("cases", () => {
         extractors: [],
       },
     ]);
+  });
+
+  it("sends the version the editor was opened with on update, never on create", async () => {
+    const updated = capture("patch", "/api/cases/9", () => HttpResponse.json({ id: 9 }));
+    const created = capture("post", "/api/cases", () => HttpResponse.json({ id: 12 }, { status: 201 }));
+
+    await captureRedirect(() => updateCase(9, 4, { ...draft, version: 5 }));
+    await captureRedirect(() => createCase(4, { ...draft, version: 5 }));
+
+    expect(updated).toEqual([expect.objectContaining({ version: 5 })]);
+    expect(created).toEqual([expect.not.objectContaining({ version: expect.anything() })]);
+  });
+
+  it("returns the saved version when the case stays on the form so the next save uses it", async () => {
+    capture("patch", "/api/cases/9", () => HttpResponse.json({ id: 9, version: 6 }));
+    capture("post", "/api/runs", () => problem(404, "environment 3 not found"));
+
+    await expect(updateCase(9, 4, { ...draft, version: 5 }, 3)).resolves.toMatchObject({ version: 6 });
+  });
+
+  it.each([-1, 1.5, "5"])("rejects a malformed version %j in the draft", async (version) => {
+    await expect(updateCase(9, 4, { ...draft, version: version as number })).resolves.toEqual({
+      errors: ["요청 형식이 올바르지 않습니다"],
+    });
   });
 
   it("saves and then runs only this case, opening its result", async () => {

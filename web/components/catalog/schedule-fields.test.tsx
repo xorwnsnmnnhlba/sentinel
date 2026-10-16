@@ -18,6 +18,7 @@ const dev: EnvironmentItem = {
   baseUrl: "https://gw.dev",
   variables: {},
   secretNames: [],
+  version: 0,
 };
 const staging: EnvironmentItem = {
   id: 2,
@@ -26,6 +27,7 @@ const staging: EnvironmentItem = {
   baseUrl: "https://gw.stg",
   variables: {},
   secretNames: [],
+  version: 0,
 };
 
 const schedule: ScheduleDetail = {

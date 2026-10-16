@@ -7,6 +7,7 @@ import com.sentinel.application.auth.TooManyLoginAttemptsException;
 import com.sentinel.application.auth.UnauthenticatedException;
 import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.NotFoundException;
+import com.sentinel.application.StaleVersionException;
 import com.sentinel.application.TooManyRunsException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
@@ -60,9 +61,12 @@ class ApiExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
 	}
 
-	/** 낙관적 잠금 충돌. 같은 항목을 다른 요청이 먼저 고침 (화면은 다시 불러온 뒤 재시도 안내) */
-	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-	ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+	/**
+	 * 낙관적 잠금 충돌. 같은 항목을 다른 요청이 먼저 고침 (화면은 다시 불러온 뒤 재시도 안내).
+	 * 동시에 겹친 요청(저장 시점 확인)과, 수정 화면을 연 뒤 다른 곳에서 고친 경우(요청의 version 확인) 모두 같은 응답
+	 */
+	@ExceptionHandler({ ObjectOptimisticLockingFailureException.class, StaleVersionException.class })
+	ProblemDetail handleOptimisticLock(RuntimeException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, CONCURRENT_MODIFICATION);
 	}
 

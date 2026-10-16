@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ActionMenu } from "@/components/catalog/action-menu";
 import { DeleteDialog } from "@/components/catalog/delete-dialog";
 import { EnvironmentFields, ProjectFields, SuiteFields } from "@/components/catalog/entity-fields";
+import { OpenedVersion } from "@/components/catalog/opened-version";
 import { FormDialog } from "@/components/catalog/form-dialog";
 import {
   EDIT_DELETE,
@@ -157,6 +158,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
                           submitLabel="저장"
                           action={updateEnvironment.bind(null, environment.id)}
                         >
+                          <OpenedVersion version={environment.version} />
                           <EnvironmentFields environment={environment} />
                         </FormDialog>
                         <FormDialog

@@ -38,7 +38,6 @@ public class TestCase extends ArchivableEntity {
 
 	/** 낙관적 잠금 (V30). 동시에 고친 나중 요청은 실패하여 앞 요청의 변경을 덮어쓰지 않음 */
 	@Version
-	@Getter(AccessLevel.NONE)
 	@Column(nullable = false)
 	private long version;
 
