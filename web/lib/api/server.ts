@@ -10,6 +10,9 @@ import { sessionToken } from "./session";
  */
 export const apiBaseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8080";
 
+/** 끝의 / 제외 (경로를 이어 붙일 때 // 가 되지 않도록. Spring은 // 경로를 항상 인증 요구) */
+const apiOrigin = apiBaseUrl.replace(/\/+$/, "");
+
 /**
  * Spring ProblemDetail 응답 오류. throw 대상이므로 Error 객체에 status·detail을 더한 형태 (클래스 미사용).
  * 판별은 instanceof 대신 isApiError 사용
@@ -43,21 +46,12 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
  * 세션 토큰을 다른 서버로 보내게 되므로 거부 (지금 호출은 모두 고정된 /api/로 시작하지만 실수로 바뀌어도 막음).
  * "/a"로 시작하는 경로는 항상 기본 주소의 서버를 가리킴
  */
-function apiUrl(path: string): URL {
+function apiUrl(path: string): string {
   if (!path.startsWith("/api/")) {
     throw new Error("API path must be a /api/ path on the API server");
   }
-  // 경로/쿼리만 허용: 스킴, 역슬래시, 공백·제어문자 등은 거부
-  if (path.includes("://") || path.includes("\\") || /[\u0000-\u001F\u007F\s]/.test(path)) {
-    throw new Error("API path contains invalid characters");
-  }
-
-  const base = new URL(apiBaseUrl);
-  const url = new URL(path, base);
-  if (url.origin !== base.origin) {
-    throw new Error("API URL must stay on the configured API origin");
-  }
-  return url;
+  // 고정된 "/api/" 뒤에만 이어 붙여 경로가 호스트를 바꿀 수 없음이 코드 모양으로 드러나게 함 (CodeQL js/request-forgery)
+  return `${apiOrigin}/api/${path.slice("/api/".length)}`;
 }
 
 /** 로그인 화면으로 이동. 세션 만료·미로그인 상태에서 보호된 화면을 열 때 사용 */
