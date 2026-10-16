@@ -134,6 +134,20 @@ describe("validateDraft request", () => {
     });
   });
 
+  it.each(["__proto__", "constructor", "toString"])(
+    "keeps a header named %s as an ordinary header (CodeQL js/remote-property-injection)",
+    (name) => {
+      // 일반 객체였을 때는 상속 값(Object.prototype 등)이 잡혀 push가 TypeError로 실패
+      const result = validateDraft(draft({ path: "/health", headers: [{ name, value: "x" }] }));
+
+      expect(result.ok).toBe(true);
+      const headers = result.ok ? result.payload.request.headers : {};
+      expect(Object.keys(headers)).toEqual([name]);
+      expect(JSON.parse(JSON.stringify(headers))).toEqual(JSON.parse(`{"${name}": ["x"]}`));
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    },
+  );
+
   it("collects every problem at once", () => {
     const errors = errorsOf(
       validateDraft(

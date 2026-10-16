@@ -235,7 +235,8 @@ export function validateDraft(draft: CaseDraft): CaseValidation {
     errors.push(`경로는 ${MAX_PATH}자 이하로 입력해 주세요`);
   }
 
-  const headers: Headers = {};
+  // 프로토타입 없는 객체: 헤더 이름이 "__proto__"·"constructor"면 일반 객체에서는 상속 값이 잡혀 push가 예외 (저장 실패)
+  const headers: Headers = Object.create(null);
   draft.headers.forEach((row, index) => {
     const headerName = row.name.trim();
     if (headerName === "" && row.value.trim() === "") {
