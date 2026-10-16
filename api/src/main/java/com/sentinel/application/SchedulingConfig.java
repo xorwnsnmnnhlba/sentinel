@@ -2,6 +2,7 @@ package com.sentinel.application;
 
 import java.time.Clock;
 
+import com.sentinel.application.auth.ExpiredCredentialCleanup;
 import com.sentinel.infra.http.HttpHeartbeat;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.LoggerFactory;
@@ -31,6 +32,8 @@ class SchedulingConfig implements SchedulingConfigurer {
 
 	private final NotificationDeliveryService notificationDeliveries;
 
+	private final ExpiredCredentialCleanup credentialCleanup;
+
 	private final DigestProperties digestProperties;
 
 	private final WeeklyDigestSender digestSender;
@@ -59,6 +62,8 @@ class SchedulingConfig implements SchedulingConfigurer {
 					new CronTrigger(retentionProperties.cron(), properties.zone())));
 			// 원문 정리와 따로 등록 (한쪽이 실패해도 다른 쪽은 실행)
 			registrar.addCronTask(new CronTask(notificationDeliveries::deleteExpired,
+					new CronTrigger(retentionProperties.cron(), properties.zone())));
+			registrar.addCronTask(new CronTask(credentialCleanup::deleteExpired,
 					new CronTrigger(retentionProperties.cron(), properties.zone())));
 		}
 	}

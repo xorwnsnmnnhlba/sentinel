@@ -6,6 +6,9 @@ import java.util.Optional;
 
 import com.sentinel.domain.UserToken;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UserTokenRepository extends JpaRepository<UserToken, Long> {
 
@@ -18,5 +21,10 @@ public interface UserTokenRepository extends JpaRepository<UserToken, Long> {
 
 	/** 아직 쓰지 않은 같은 종류·이메일의 링크 (예: 남은 초대) */
 	long deleteByTypeAndEmailAndUsedAtIsNull(UserToken.Type type, String email);
+
+	/** 만료된 초대·재설정 링크 삭제 (사용 여부와 무관, 만료되면 쓸 수 없음). 한 번에 삭제 */
+	@Modifying
+	@Query("delete from UserToken t where t.expiresAt <= :now")
+	int deleteExpired(@Param("now") Instant now);
 
 }
