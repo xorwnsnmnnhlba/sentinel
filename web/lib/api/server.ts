@@ -47,7 +47,17 @@ function apiUrl(path: string): URL {
   if (!path.startsWith("/api/")) {
     throw new Error("API path must be a /api/ path on the API server");
   }
-  return new URL(path, apiBaseUrl);
+  // 경로/쿼리만 허용: 스킴, 역슬래시, 공백·제어문자 등은 거부
+  if (path.includes("://") || path.includes("\\") || /[\u0000-\u001F\u007F\s]/.test(path)) {
+    throw new Error("API path contains invalid characters");
+  }
+
+  const base = new URL(apiBaseUrl);
+  const url = new URL(path, base);
+  if (url.origin !== base.origin) {
+    throw new Error("API URL must stay on the configured API origin");
+  }
+  return url;
 }
 
 /** 로그인 화면으로 이동. 세션 만료·미로그인 상태에서 보호된 화면을 열 때 사용 */
