@@ -139,8 +139,8 @@ public class UserService {
 		if (users.findByEmailAndArchivedAtIsNull(invite.getEmail()).isPresent()) {
 			throw new ConflictException("email '" + invite.getEmail() + "' is already in use");
 		}
+		claim(invite);
 		User user = users.save(new User(invite.getEmail(), name, authService.encodePassword(password), invite.getRole()));
-		invite.use(clock.instant());
 		// 같은 이메일로 다시 보낸 다른 초대도 무효화. 남겨 두면 계정 삭제 뒤 예전 링크로 다시 가입할 수 있음
 		tokens.deleteByTypeAndEmailAndUsedAtIsNull(UserToken.Type.INVITE, invite.getEmail());
 		changeLog.record(user.getId(), target(user), Action.CREATED);
@@ -183,8 +183,8 @@ public class UserService {
 		requireStrongPassword(password);
 		User user = users.findByIdAndArchivedAtIsNull(reset.getUserId())
 			.orElseThrow(() -> new NotFoundException("user", reset.getUserId()));
+		claim(reset);
 		user.changePasswordHash(authService.encodePassword(password));
-		reset.use(clock.instant());
 		authService.logoutEverywhere(user.getId());
 		// 재설정은 계정 복구 절차이므로 탈취된 세션으로 발급했을 수 있는 API 토큰도 폐기 (본인 비밀번호 변경은 CI가 끊기지 않도록 유지)
 		accessTokens.revokeAll(user.getId());
@@ -242,6 +242,16 @@ public class UserService {
 		return tokens.findById(inviteId)
 			.filter(token -> token.getType() == UserToken.Type.INVITE && token.isUsable(clock.instant()))
 			.orElseThrow(() -> new NotFoundException("invite", inviteId));
+	}
+
+	/**
+	 * 링크를 이 요청이 사용한 것으로 기록. 읽은 뒤 그사이 같은 링크로 다른 요청이 먼저 썼거나 취소·삭제되면 404
+	 * (엔티티 갱신은 마지막 쓰기가 이겨 1회용 링크가 두 번 쓰일 수 있었음). 실패하면 트랜잭션이 되돌려져 계정 생성·비밀번호 변경도 취소
+	 */
+	private void claim(UserToken token) {
+		if (tokens.markUsed(token.getId(), clock.instant()) == 0) {
+			throw new NotFoundException("link", 0);
+		}
 	}
 
 	private UserToken usable(String token, UserToken.Type type) {

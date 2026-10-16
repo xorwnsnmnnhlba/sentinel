@@ -13,7 +13,7 @@ export default async function AcceptInvitePage(props: PageProps<"/invites/[token
   const invite = await linkInfo(inviteApiPath(token));
   if (!invite) {
     return (
-      <ExpiredLink description="초대 링크가 만료되었거나 이미 사용되었습니다. 관리자에게 새 링크를 요청해 주세요" />
+      <ExpiredLink description="초대 링크가 만료되었거나 이미 사용·취소되었습니다. 관리자에게 새 링크를 요청해 주세요" />
     );
   }
 

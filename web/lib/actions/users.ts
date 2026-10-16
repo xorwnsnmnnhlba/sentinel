@@ -153,7 +153,7 @@ function message(error: unknown): string {
       case 403:
         return "권한이 없습니다. 관리자만 사용할 수 있습니다";
       case 404:
-        return "링크가 만료되었거나 이미 사용되었습니다. 새 링크를 요청해 주세요";
+        return "링크가 만료되었거나 이미 사용·취소되었습니다. 새 링크를 요청해 주세요";
       case 409:
         return "이미 사용 중인 이메일입니다";
     }
