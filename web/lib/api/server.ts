@@ -10,6 +10,9 @@ import { sessionToken } from "./session";
  */
 export const apiBaseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8080";
 
+/** 끝의 / 제외 (경로를 이어 붙일 때 // 가 되지 않도록. Spring은 // 경로를 항상 인증 요구) */
+const apiOrigin = apiBaseUrl.replace(/\/+$/, "");
+
 /**
  * Spring ProblemDetail 응답 오류. throw 대상이므로 Error 객체에 status·detail을 더한 형태 (클래스 미사용).
  * 판별은 instanceof 대신 isApiError 사용
@@ -29,12 +32,26 @@ export function isApiError(error: unknown): error is ApiError {
  * 세션 쿠키가 있으면 Spring에는 Authorization 헤더로 전달 (Spring은 쿠키를 모름)
  */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const url = apiUrl(path);
   const token = await sessionToken();
   const headers = new Headers(init?.headers);
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  return fetch(new URL(path, apiBaseUrl), { ...init, headers, cache: "no-store" });
+  return fetch(url, { ...init, headers, cache: "no-store" });
+}
+
+/**
+ * Spring 주소. /api/로 시작하는 경로만 받음. "//host/..."나 "https://..."는 new URL이 기본 주소를 무시하여
+ * 세션 토큰을 다른 서버로 보내게 되므로 거부 (지금 호출은 모두 고정된 /api/로 시작하지만 실수로 바뀌어도 막음).
+ * "/a"로 시작하는 경로는 항상 기본 주소의 서버를 가리킴
+ */
+function apiUrl(path: string): string {
+  if (!path.startsWith("/api/")) {
+    throw new Error("API path must be a /api/ path on the API server");
+  }
+  // 고정된 "/api/" 뒤에만 이어 붙여 경로가 호스트를 바꿀 수 없음이 코드 모양으로 드러나게 함 (CodeQL js/request-forgery)
+  return `${apiOrigin}/api/${path.slice("/api/".length)}`;
 }
 
 /** 로그인 화면으로 이동. 세션 만료·미로그인 상태에서 보호된 화면을 열 때 사용 */

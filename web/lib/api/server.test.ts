@@ -7,6 +7,16 @@ import { captureNavigation, captureRedirect } from "@/test/next";
 
 import { apiError, apiGet, apiGetOrNotFound, apiSend, isApiError } from "./server";
 
+describe("api paths", () => {
+  it.each(["//evil.example/api/projects", "https://evil.example/api/projects", "/projects", "api/projects"])(
+    "refuses %s so the session token never leaves the API server (CodeQL js/request-forgery)",
+    async (path) => {
+      // 처리하지 않은 요청은 MSW가 실패로 처리하므로 보내면 다른 오류가 남
+      await expect(apiGet(path)).rejects.toThrow("API path must be a /api/ path on the API server");
+    },
+  );
+});
+
 describe("apiGet", () => {
   it("returns parsed JSON", async () => {
     server.use(http.get(springUrl("/api/projects"), () => HttpResponse.json([{ id: 1, name: "billing" }])));

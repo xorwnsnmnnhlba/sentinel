@@ -48,7 +48,8 @@ describe("CaseEditor", () => {
 
     await user.click(screen.getByRole("button", { name: "등록" }));
     await screen.findByText("저장했지만 실행하지 못했습니다.");
-    await user.click(screen.getByRole("button", { name: "등록" }));
+    // 오류 문구는 저장 처리가 끝나기 전에 그려질 수 있어(await 뒤의 상태 변경은 바로 반영) 버튼이 "저장 중…"에서 돌아올 때까지 대기
+    await user.click(await screen.findByRole("button", { name: "등록" }));
 
     await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
     expect(action.mock.calls.map(([draft]) => draft.version)).toEqual([5, 6]);
