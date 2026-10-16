@@ -167,6 +167,8 @@ export interface EnvironmentItem {
   variables: Record<string, string>;
   /** 시크릿 이름. 값은 조회 불가 (암호화 저장) */
   secretNames: string[];
+  /** 수정 요청에 함께 보내면 그사이 다른 곳에서 고쳤는지 확인 (낙관적 잠금) */
+  version: number;
 }
 
 /** 판정 규칙. type별 필드는 api/README.md "판정 규칙 (assertions)" 참고 */
@@ -191,6 +193,8 @@ export interface CaseItem {
   /** 비어 있으면 기본 판정(status in [2xx]) */
   assertions: Assertion[];
   extractors: Extractor[];
+  /** 수정 요청에 함께 보내면 그사이 다른 곳에서 고쳤는지 확인 (낙관적 잠금) */
+  version: number;
 }
 
 /** 스위트 정기 실행. cron은 5자리(분 시 일 월 요일), zone 기준 해석 */

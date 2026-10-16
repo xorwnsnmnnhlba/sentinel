@@ -103,6 +103,10 @@ export function CaseEditor({
       if (result?.errors?.length) {
         setErrors(result.errors);
       }
+      // 저장은 됐고 화면에 남는 경우(실행 실패). 이어서 저장할 때 방금 저장한 version 기준
+      if (result?.version !== undefined) {
+        update({ version: result.version });
+      }
     });
   }
 

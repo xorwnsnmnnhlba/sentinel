@@ -66,7 +66,7 @@ class CaseController {
 	 */
 	@PatchMapping("/{caseId}")
 	CaseItem update(@PathVariable long caseId, @RequestBody UpdateCaseRequest request) {
-		return commands.updateCase(caseId, request.name(), request.request(), request.assertions(),
+		return commands.updateCase(caseId, request.version(), request.name(), request.request(), request.assertions(),
 				request.extractors(), currentUser.get().id());
 	}
 

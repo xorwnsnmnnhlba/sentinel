@@ -25,10 +25,35 @@ function renderEditor(action: Action, initial: CaseDraft = emptyDraft(), environ
 const valid: CaseDraft = { ...emptyDraft(), name: "health", path: "/health" };
 
 function environment(id: number, name: string): EnvironmentItem {
-  return { id, project: { id: 1, name: "project-1" }, name, baseUrl: "http://gw", variables: {}, secretNames: [] };
+  return {
+    id,
+    project: { id: 1, name: "project-1" },
+    name,
+    baseUrl: "http://gw",
+    variables: {},
+    secretNames: [],
+    version: 0,
+  };
 }
 
 describe("CaseEditor", () => {
+  it("keeps the opened version and switches to the saved one when the case stays on the form", async () => {
+    // 저장은 됐지만 실행에 실패해 화면에 남으면, 이어서 저장할 때 방금 저장한 version으로 보냄 (아니면 자기 저장과 충돌)
+    const user = userEvent.setup();
+    const action = vi
+      .fn<Action>()
+      .mockResolvedValueOnce({ errors: ["저장했지만 실행하지 못했습니다."], version: 6 })
+      .mockResolvedValueOnce(undefined);
+    renderEditor(action, { ...valid, version: 5 });
+
+    await user.click(screen.getByRole("button", { name: "등록" }));
+    await screen.findByText("저장했지만 실행하지 못했습니다.");
+    await user.click(screen.getByRole("button", { name: "등록" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+    expect(action.mock.calls.map(([draft]) => draft.version)).toEqual([5, 6]);
+  });
+
   it("builds a request with headers, body and rules", async () => {
     const user = userEvent.setup();
     const action = vi.fn<Action>(async () => undefined);

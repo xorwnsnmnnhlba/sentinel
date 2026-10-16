@@ -12,6 +12,7 @@ const dev: EnvironmentItem = {
   baseUrl: "https://gw.dev.internal",
   variables: { apiPrefix: "/api" },
   secretNames: ["token"],
+  version: 0,
 };
 
 describe("EnvironmentFields", () => {

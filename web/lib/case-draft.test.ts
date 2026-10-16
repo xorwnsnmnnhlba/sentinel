@@ -33,6 +33,7 @@ describe("toDraft", () => {
     const item: CaseItem = {
       id: 1,
       suite: { id: 2, name: "suite-2" },
+      version: 3,
       name: "결제 요청",
       request: {
         method: "POST",
@@ -62,6 +63,8 @@ describe("toDraft", () => {
       { name: "Accept", value: "text/plain" },
       { name: "Content-Type", value: "application/json" },
     ]);
+    // 수정 화면을 연 때의 version을 편집 상태에 보관 (저장 요청에 함께 보냄)
+    expect(form.version).toBe(3);
     expect(form.assertions[0]).toEqual({ type: "statusCode", anyOf: "200, 2xx" });
     expect(form.assertions[3]).toMatchObject({ expected: "1000" });
     // 문자열 "1000"은 따옴표를 포함해 표시하여 저장 시 숫자로 바뀌지 않음
@@ -79,6 +82,7 @@ describe("toDraft", () => {
     const form = toDraft({
       id: 1,
       suite: { id: 1, name: "suite-1" },
+      version: 0,
       name: "a",
       request: { method: "GET", path: "/", headers: {}, body: null },
       assertions: [],
@@ -335,6 +339,7 @@ describe("expected value round trip", () => {
       const form = toDraft({
         id: 1,
         suite: { id: 1, name: "suite-1" },
+        version: 0,
         name: "a",
         request: { method: "GET", path: "/", headers: {}, body: null },
         assertions: [{ type: "jsonPath", path: "$.a", operator: "EQUALS", expected }],
