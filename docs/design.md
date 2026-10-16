@@ -455,7 +455,7 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
   - 공개 저장소로 바꾼 뒤 추가 (2026-10-15): 둘 다 무료
   - CodeQL (`.github/workflows/codeql.yml`): api(Java, 빌드 없이 소스 분석)·web(TypeScript)·워크플로(Actions)를 PR·main·매주 분석. 보안 확장 규칙(`security-extended`). 결과는 Security → Code scanning
     - 첫 main 분석 결과 (2026-10-15, 6건) 검토 (2026-10-16)
-      - 수정 2건: 헤더 이름이 `__proto__`·`constructor`·`toString`이면 케이스 저장이 예외로 실패(`js/remote-property-injection`, 프로토타입 없는 객체로), web의 Spring 요청이 경로 대신 전체 주소를 받으면 세션 토큰을 다른 서버로 보낼 수 있는 구조(`js/request-forgery`, 지금 호출은 모두 고정 `/api/`라 실제 경로는 없었으나 `/api/`로 시작하지 않으면 거부)
+      - 수정 2건 (요청 위조는 구조 보강 후 경고는 오탐 처리): 헤더 이름이 `__proto__`·`constructor`·`toString`이면 케이스 저장이 예외로 실패(`js/remote-property-injection`, 프로토타입 없는 객체로), web의 Spring 요청이 경로 대신 전체 주소를 받으면 세션 토큰을 다른 서버로 보낼 수 있는 구조(`js/request-forgery`, 지금 호출은 모두 고정 `/api/`라 실제 경로는 없었으나 `/api/`로 시작하지 않으면 거부하고 설정된 서버 주소 뒤에 붙임). CodeQL은 이 확인을 안전 처리로 보지 않아 같은 경고가 남아, 사용자 값이 경로·쿼리에만 들어감을 확인하고 오탐으로 닫음 (Copilot Autofix 제안은 공백·`://`가 든 경로에서 예외를 던져 화면 오류가 될 수 있어 대신 사용하지 않음)
       - 오탐 4건: 접두어로 토큰 종류만 고르는 인증 분기(`java/user-controlled-bypass`, 두 경로 모두 인증), 암호문 배열 길이 덧셈(`java/uncontrolled-arithmetic`), 화면에 텍스트로만 그리는 API 문서 설명의 태그 제거(`js/incomplete-multi-character-sanitization`), E2E 테스트의 스크립트 태그 찾기(`js/bad-tag-filter`)
   - 의존성 검토 (`.github/workflows/dependencies.yml`의 review): PR에서 새로 들어오거나 바뀐 운영 의존성의 높음 이상 취약점이면 실패. 이미지 전체를 보는 Security 점검과 달리 PR의 변경분만 봄
   - Gradle 의존성 그래프 제출 (같은 파일의 submit): GitHub 의존성 그래프에 Java 패키지가 하나도 없었음(npm 867·Actions 7만). Gradle은 저장소 파일만으로 그래프가 만들어지지 않아 Dependabot 취약점 경고가 api 의존성을 보지 못하던 상태. main에서 해석한 의존성(전이 포함)을 제출. PR에서는 제출하지 않으므로(Dependabot PR은 쓰기 권한 없음) Gradle 변경의 PR 검토는 Security 점검(OSV)이 담당
