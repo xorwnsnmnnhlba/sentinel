@@ -86,13 +86,13 @@ public class AuthService {
 		}
 		Instant now = clock.instant();
 		if (session.isExpired(now)) {
-			sessions.delete(session);
+			sessions.deleteSession(session.getId());
 			return Optional.empty();
 		}
 		Optional<User> user = users.findByIdAndArchivedAtIsNull(session.getUserId());
 		if (user.isEmpty()) {
 			// 삭제된 사용자의 세션은 더 이상 사용 불가
-			sessions.delete(session);
+			sessions.deleteSession(session.getId());
 			return Optional.empty();
 		}
 		session.markUsed(now);

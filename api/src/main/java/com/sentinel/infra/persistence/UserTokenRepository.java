@@ -19,6 +19,15 @@ public interface UserTokenRepository extends JpaRepository<UserToken, Long> {
 
 	void deleteByUserId(Long userId);
 
+	/**
+	 * 링크 사용 처리. 아직 쓰지 않았고 만료 전일 때만 기록 (조건부 갱신). 같은 링크를 동시에 쓰거나 그사이 취소·삭제되면
+	 * 나중 요청은 0건 (PostgreSQL은 먼저 갱신한 트랜잭션이 끝난 뒤 조건을 다시 확인)
+	 * @return 1이면 이 요청이 사용, 0이면 사용할 수 없음
+	 */
+	@Modifying
+	@Query("update UserToken t set t.usedAt = :now where t.id = :id and t.usedAt is null and t.expiresAt > :now")
+	int markUsed(@Param("id") long id, @Param("now") Instant now);
+
 	/** 아직 쓰지 않은 같은 종류·이메일의 링크 (예: 남은 초대) */
 	long deleteByTypeAndEmailAndUsedAtIsNull(UserToken.Type type, String email);
 

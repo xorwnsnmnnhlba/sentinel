@@ -254,7 +254,7 @@ describe("acceptInvite", () => {
         undefined,
         form({ name: "a", password: "member-password", passwordConfirmation: "member-password" }),
       ),
-    ).resolves.toEqual({ error: "링크가 만료되었거나 이미 사용되었습니다. 새 링크를 요청해 주세요" });
+    ).resolves.toEqual({ error: "링크가 만료되었거나 이미 사용·취소되었습니다. 새 링크를 요청해 주세요" });
     expect(testCookies.has("sentinel_session")).toBe(false);
   });
 });
@@ -293,7 +293,7 @@ describe("resetPassword", () => {
         undefined,
         form({ password: "brand-new-password", passwordConfirmation: "brand-new-password" }),
       ),
-    ).resolves.toEqual({ error: "링크가 만료되었거나 이미 사용되었습니다. 새 링크를 요청해 주세요" });
+    ).resolves.toEqual({ error: "링크가 만료되었거나 이미 사용·취소되었습니다. 새 링크를 요청해 주세요" });
   });
 
   it("checks the confirmation", async () => {

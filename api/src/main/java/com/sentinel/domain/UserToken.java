@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
  * 초대·비밀번호 재설정 링크의 1회용 토큰. 원문은 발급 시에만 전달하고 해시로만 보관.
  * <p>
  * 사용하면 {@code usedAt}을 기록하여 재사용을 막고, 만료 시각이 지나면 사용 불가.
+ * 사용 기록은 조건부 갱신({@code UserTokenRepository.markUsed})으로 하여 같은 링크를 동시에 써도 한 번만 성공
  */
 @Entity
 @Table(name = "user_token", indexes = @Index(name = "idx_user_token_user", columnList = "user_id"),
@@ -77,16 +78,6 @@ public class UserToken extends BaseEntity {
 
 	public boolean isUsable(Instant now) {
 		return usedAt == null && now.isBefore(expiresAt);
-	}
-
-	/**
-	 * @throws IllegalStateException 이미 사용했거나 만료된 토큰
-	 */
-	public void use(Instant now) {
-		if (!isUsable(now)) {
-			throw new IllegalStateException("token " + getId() + " is no longer usable");
-		}
-		this.usedAt = now;
 	}
 
 	public enum Type {
