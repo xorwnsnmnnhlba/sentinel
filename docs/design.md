@@ -454,6 +454,7 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 - 방식 (사용자 결정): Dependabot과 CI 점검을 함께. 비공개 저장소라 의존성 검토(dependency-review)·CodeQL은 유료 기능(GitHub Advanced Security)이 필요해 제외
   - 공개 저장소로 바꾼 뒤 추가 (2026-10-15): 둘 다 무료
   - CodeQL (`.github/workflows/codeql.yml`): api(Java, 빌드 없이 소스 분석)·web(TypeScript)·워크플로(Actions)를 PR·main·매주 분석. 보안 확장 규칙(`security-extended`). 결과는 Security → Code scanning
+    - 정기 분석 결과 알림 (2026-10-17): 경고는 Security 탭에만 남아 첫 분석의 6건을 이틀 동안 몰랐음. 매주 정기 분석(수동 실행 포함) 뒤 main에 열린 경고가 있거나 분석이 실패하면 "Code scanning needs attention" 이슈를 열고(열려 있으면 댓글), 0건·성공이면 닫음. 공개 저장소라 이슈에는 경고 수만 적고 규칙·위치는 적지 않음(경고는 쓰기 권한자만 조회). PR·main 푸시는 PR 검사가 새 경고를 보여 주므로 제외
     - 첫 main 분석 결과 (2026-10-15, 6건) 검토 (2026-10-16)
       - 수정 2건 (요청 위조는 구조 보강 후 경고는 오탐 처리): 헤더 이름이 `__proto__`·`constructor`·`toString`이면 케이스 저장이 예외로 실패(`js/remote-property-injection`. 처음 고친 프로토타입 없는 객체는 동작은 맞았으나 CodeQL이 인정하지 않아 main에서 경고가 남음 → `Map`에 모은 뒤 `Object.fromEntries`로 변환), web의 Spring 요청이 경로 대신 전체 주소를 받으면 세션 토큰을 다른 서버로 보낼 수 있는 구조(`js/request-forgery`, 지금 호출은 모두 고정 `/api/`라 실제 경로는 없었으나 `/api/`로 시작하지 않으면 거부하고 설정된 서버 주소 뒤에 붙임). CodeQL은 이 확인을 안전 처리로 보지 않아 같은 경고가 남아, 사용자 값이 경로·쿼리에만 들어감을 확인하고 오탐으로 닫음 (Copilot Autofix 제안은 공백·`://`가 든 경로에서 예외를 던져 화면 오류가 될 수 있어 대신 사용하지 않음)
       - 오탐 4건: 접두어로 토큰 종류만 고르는 인증 분기(`java/user-controlled-bypass`, 두 경로 모두 인증), 암호문 배열 길이 덧셈(`java/uncontrolled-arithmetic`), 화면에 텍스트로만 그리는 API 문서 설명의 태그 제거(`js/incomplete-multi-character-sanitization`), E2E 테스트의 스크립트 태그 찾기(`js/bad-tag-filter`)

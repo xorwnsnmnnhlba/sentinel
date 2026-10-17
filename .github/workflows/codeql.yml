@@ -44,3 +44,58 @@ jobs:
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           category: /language:${{ matrix.language }}
+
+  # 정기 분석(수동 실행 포함) 뒤 main에 열린 경고가 있거나 분석이 실패하면 저장소 이슈로 알림. 경고는 Security 탭에만
+  # 남아 알림이 없음 (2026-10-15 첫 분석의 6건을 이틀 동안 아무도 몰랐음). 0건이 되고 분석이 성공하면 이슈를 닫음
+  # 공개 저장소라 이슈에는 경고 수만 적음. 규칙·파일 위치는 Security 탭(쓰기 권한자만 조회)에서 확인
+  # PR·main 푸시는 PR 검사가 새 경고를 바로 보여 주므로 제외
+  report:
+    name: report (scheduled)
+    needs: analyze
+    if: always() && github.event_name != 'pull_request' && github.event_name != 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      # 열린 경고 수 조회
+      security-events: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: Code scanning needs attention
+      RESULT: ${{ needs.analyze.result }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ALERTS_URL: ${{ github.server_url }}/${{ github.repository }}/security/code-scanning?query=is%3Aopen+branch%3Amain
+    steps:
+      - name: 이슈 열기·닫기
+        run: |
+          # 취소된 분석은 판단하지 않음 (다음 실행에서 다시 확인)
+          if [ "$RESULT" = cancelled ]; then
+            exit 0
+          fi
+          open=$(gh api --paginate "repos/$GH_REPO/code-scanning/alerts?state=open&ref=refs/heads/main&per_page=100" \
+            --jq '.[].number' | wc -l | tr -d ' ')
+          number=$(gh issue list --state open --limit 200 --json number,title \
+            --jq '[.[] | select(.title == env.TITLE) | .number] | first // empty')
+          if [ "$RESULT" = success ] && [ "$open" = 0 ]; then
+            if [ -n "$number" ]; then
+              gh issue close "$number" --comment "열린 경고 0건, 분석 성공: $RUN_URL"
+            fi
+            exit 0
+          fi
+          if [ "$RESULT" = success ]; then
+            status="main에 열린 CodeQL 경고 ${open}건"
+          else
+            status="CodeQL 분석 실패 (열린 경고 ${open}건)"
+          fi
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$status: $RUN_URL"
+          else
+            gh issue create --title "$TITLE" --body "$(printf '%s\n\n%s\n%s\n%s' \
+              "$status: $RUN_URL" \
+              "- 경고 목록: $ALERTS_URL (규칙·위치는 이슈에 적지 않음. 공개 저장소의 경고는 쓰기 권한자만 조회)" \
+              "- 실제 문제면 코드 수정 (다음 분석에서 자동으로 닫힘), 오탐이면 Security 탭에서 사유와 함께 닫음 (docs/design.md \"의존성 취약점 점검\"의 CodeQL 검토 기록 참고)" \
+              "- 매주 월요일 정기 분석에서 다시 확인. 열린 경고 0건이고 분석이 성공하면 이 이슈는 자동으로 닫힘")"
+          fi
