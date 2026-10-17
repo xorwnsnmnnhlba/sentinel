@@ -91,7 +91,7 @@ Docker 이미지(`Dockerfile`)는 의존성 단계(`downloadDependencies`: jar�
 
 | 컨테이너 | 이미지 | 용도 |
 |----------|--------|------|
-| PostgreSQL | `postgres:18-alpine` | 스프링 컨텍스트·JPA 테스트 (`TestcontainersConfiguration`) |
+| PostgreSQL | `postgres:18-alpine` | 스프링 컨텍스트·JPA 테스트 (`TestcontainersConfiguration`). 테스트 실행 전체에서 컨테이너 1개, 컨텍스트마다 새 데이터베이스(격리). 연결 한도 300 |
 | WireMock | `wiremock/wiremock:3.13.2` | `RequestExecutor` 통합 테스트. 스텁은 `src/test/resources/wiremock/mappings` |
 
 ### RDS 없이 로컬 실행
