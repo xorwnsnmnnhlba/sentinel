@@ -66,6 +66,8 @@ public class TestResult extends BaseEntity {
 
 	public enum ErrorReason {
 		UNRESOLVED_VARIABLE, INVALID_REQUEST, TIMEOUT, CONNECTION_FAILED, IO_ERROR,
+		/** 인증서·TLS 연결 수립 실패 */
+		TLS_ERROR,
 		/** 링크 로컬·클라우드 메타데이터 주소로의 전송 거부 */
 		BLOCKED_DESTINATION, UNEXPECTED
 	}

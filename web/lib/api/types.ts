@@ -449,6 +449,7 @@ export type FailureCause =
   | "TIMEOUT"
   | "CONNECTION_FAILED"
   | "CONNECTION_LOST"
+  | "TLS"
   | "SERVER_ERROR"
   | "CLIENT_ERROR"
   | "ASSERTION_MISMATCH"

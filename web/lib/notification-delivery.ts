@@ -51,6 +51,8 @@ export function resultHint(
         return "채널 응답이 늦음";
       case "CONNECTION_FAILED":
         return "내부망·프록시에서 채널 주소로 나갈 수 있는지 확인";
+      case "TLS_ERROR":
+        return "채널 주소의 인증서 확인 (만료·신뢰할 수 없는 발급자·이름 불일치, 내부망 프록시가 인증서를 바꾸는지)";
       default:
         return null;
     }

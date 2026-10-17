@@ -34,6 +34,7 @@ describe("deliveryMessage", () => {
   it.each([
     ["CONNECTION_FAILED", "연결하지 못했습니다"],
     ["BLOCKED_DESTINATION", "내부·메타데이터 주소라 보내지 않았습니다"],
+    ["TLS_ERROR", "채널 주소의 인증서를 확인하지 못했습니다 (만료·신뢰할 수 없는 발급자·이름 불일치)"],
     ["SOMETHING_NEW", "SOMETHING_NEW"],
   ])("explains why nothing was received: %s", (error, reason) => {
     expect(deliveryMessage({ delivered: false, statusCode: null, error })).toBe(

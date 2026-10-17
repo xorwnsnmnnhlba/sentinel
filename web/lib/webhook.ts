@@ -35,6 +35,7 @@ const ERROR_LABELS: Record<string, string> = {
   CONNECTION_FAILED: "연결하지 못했습니다",
   TIMEOUT: "응답 대기 시간이 지났습니다",
   IO_ERROR: "전송 중 연결이 끊겼습니다",
+  TLS_ERROR: "채널 주소의 인증서를 확인하지 못했습니다 (만료·신뢰할 수 없는 발급자·이름 불일치)",
   BLOCKED_DESTINATION: "내부·메타데이터 주소라 보내지 않았습니다",
   INVALID_URL: "주소 형식이 올바르지 않습니다",
 };

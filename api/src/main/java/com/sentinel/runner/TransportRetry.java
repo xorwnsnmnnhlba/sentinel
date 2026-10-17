@@ -48,7 +48,8 @@ public final class TransportRetry {
 		return switch (reason) {
 			case CONNECTION_FAILED -> true;
 			case TIMEOUT, IO_ERROR -> SAFE_METHODS.contains(method);
-			case BLOCKED_DESTINATION -> false;
+			// 인증서·TLS 설정 문제는 다시 보내도 같은 결과
+			case BLOCKED_DESTINATION, TLS_ERROR -> false;
 		};
 	}
 

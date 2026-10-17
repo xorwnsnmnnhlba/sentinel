@@ -13,6 +13,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLPeerUnverifiedException;
+
 import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.RequestExecutionException;
 import com.sentinel.runner.RequestExecutionException.Reason;
@@ -96,6 +99,8 @@ public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable
 				.setMaxConnTotal(MAX_CONNECTIONS)
 				.setMaxConnPerRoute(MAX_CONNECTIONS)
 				.build())
+			// 케이스에 User-Agent가 없을 때만 붙음 (적은 값이 있으면 그 값)
+			.setUserAgent(UserAgent.VALUE)
 			.disableRedirectHandling()
 			// 기본 재시도는 429·503 응답과 일부 전송 오류를 다시 보내므로 검증 대상 응답이 가려짐
 			.disableAutomaticRetries()
@@ -148,6 +153,10 @@ public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable
 
 	private static Reason classify(Throwable ex) {
 		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+			// 인증서 검증·이름 확인 실패와 TLS 협상 실패. 일반 전송 오류와 나눠 "인증서 만료" 같은 흔한 장애를 바로 알아보도록
+			if (cause instanceof SSLHandshakeException || cause instanceof SSLPeerUnverifiedException) {
+				return Reason.TLS_ERROR;
+			}
 			if (cause instanceof ConnectTimeoutException || cause instanceof ConnectException
 					|| cause instanceof UnknownHostException) {
 				return Reason.CONNECTION_FAILED;

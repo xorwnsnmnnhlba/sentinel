@@ -153,7 +153,7 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long>, T
 	 * 응답이 없으면 오류 사유로, 응답을 받았으면 상태 코드로 나눔. 판정 결과(JSON)는 읽지 않음.
 	 * 결과 테이블 전체를 읽지 않도록 실행 행의 판정 수(V10)로 실패가 있던 실행만 골라 그 실행의 결과만 {@code LATERAL}로 읽음
 	 * ({@code OFFSET 0 ROWS}는 하위 쿼리가 풀리지 않도록 막는 경계, 불안정 케이스 집계와 같은 방식)
-	 * @return [원인, 케이스 ID, 환경 ID, 결과 수]. 원인은 TIMEOUT·CONNECTION_FAILED·CONNECTION_LOST·SERVER_ERROR·CLIENT_ERROR·
+	 * @return [원인, 케이스 ID, 환경 ID, 결과 수]. 원인은 TIMEOUT·CONNECTION_FAILED·CONNECTION_LOST·TLS·SERVER_ERROR·CLIENT_ERROR·
 	 *     ASSERTION_MISMATCH·CONFIGURATION·OTHER
 	 */
 	@Query(nativeQuery = true, value = """
@@ -163,6 +163,7 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long>, T
 			               WHEN r.verdict = 'ERROR' AND r.error_reason = 'TIMEOUT' THEN 'TIMEOUT'
 			               WHEN r.verdict = 'ERROR' AND r.error_reason = 'CONNECTION_FAILED' THEN 'CONNECTION_FAILED'
 			               WHEN r.verdict = 'ERROR' AND r.error_reason = 'IO_ERROR' THEN 'CONNECTION_LOST'
+			               WHEN r.verdict = 'ERROR' AND r.error_reason = 'TLS_ERROR' THEN 'TLS'
 			               WHEN r.verdict = 'ERROR'
 			                    AND r.error_reason IN ('UNRESOLVED_VARIABLE', 'INVALID_REQUEST', 'BLOCKED_DESTINATION')
 			                   THEN 'CONFIGURATION'

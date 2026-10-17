@@ -82,6 +82,7 @@ class FailureCauseServiceTest {
 			case "/timeout" -> throw failure(RequestExecutionException.Reason.TIMEOUT, request);
 			case "/refused" -> throw failure(RequestExecutionException.Reason.CONNECTION_FAILED, request);
 			case "/reset" -> throw failure(RequestExecutionException.Reason.IO_ERROR, request);
+			case "/expired-cert" -> throw failure(RequestExecutionException.Reason.TLS_ERROR, request);
 			// 경계값: 500부터 서버 오류, 400부터 요청 거부, 399는 응답 내용 불일치
 			case "/down" -> new HttpExchange(request, 500, Map.of(), "", Duration.ofMillis(5));
 			case "/forbidden" -> new HttpExchange(request, 400, Map.of(), "", Duration.ofMillis(5));
@@ -102,6 +103,7 @@ class FailureCauseServiceTest {
 		fixtures.testCase(suite, HttpMethod.GET, "/timeout", null, null);
 		fixtures.testCase(suite, HttpMethod.GET, "/refused", null, null);
 		fixtures.testCase(suite, HttpMethod.GET, "/reset", null, null);
+		fixtures.testCase(suite, HttpMethod.GET, "/expired-cert", null, null);
 		fixtures.testCase(suite, HttpMethod.GET, "/down", null, null);
 		fixtures.testCase(suite, HttpMethod.GET, "/forbidden", null, null);
 		TestCase mismatch = fixtures.testCase(suite, HttpMethod.GET, "/mismatch", null, null,
@@ -118,12 +120,12 @@ class FailureCauseServiceTest {
 
 		assertThat(result.from()).isEqualTo(FROM);
 		assertThat(result.to()).isEqualTo(TO);
-		assertThat(result.results()).isEqualTo(16);
+		assertThat(result.results()).isEqualTo(18);
 		// 결과가 많은 순, 같으면 원인 순서대로
 		assertThat(result.causes()).extracting(FailureCauseService.CauseSummary::cause)
 			.containsExactly(FailureCauseService.Cause.ASSERTION_MISMATCH, FailureCauseService.Cause.TIMEOUT,
 					FailureCauseService.Cause.CONNECTION_FAILED, FailureCauseService.Cause.CONNECTION_LOST,
-					FailureCauseService.Cause.SERVER_ERROR, FailureCauseService.Cause.CLIENT_ERROR,
+					FailureCauseService.Cause.TLS, FailureCauseService.Cause.SERVER_ERROR, FailureCauseService.Cause.CLIENT_ERROR,
 					FailureCauseService.Cause.CONFIGURATION);
 		assertThat(result.causes()).filteredOn(cause -> cause.cause() != FailureCauseService.Cause.ASSERTION_MISMATCH)
 			.allSatisfy(cause -> {
@@ -132,7 +134,8 @@ class FailureCauseServiceTest {
 			});
 		assertThat(result.causes()).extracting(FailureCauseService.CauseSummary::group)
 			.containsExactly(FailureCauseService.Group.API, FailureCauseService.Group.NETWORK,
-					FailureCauseService.Group.NETWORK, FailureCauseService.Group.NETWORK, FailureCauseService.Group.API,
+					FailureCauseService.Group.NETWORK, FailureCauseService.Group.NETWORK, FailureCauseService.Group.NETWORK,
+					FailureCauseService.Group.API,
 					FailureCauseService.Group.API, FailureCauseService.Group.SETUP);
 		// 판정 규칙 불일치(200)와 399 응답
 		FailureCauseService.CauseSummary assertion = result.causes().getFirst();

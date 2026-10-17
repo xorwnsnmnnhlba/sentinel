@@ -5,6 +5,7 @@ import java.time.Duration;
 
 import com.sentinel.domain.NotificationDelivery;
 import com.sentinel.infra.http.HttpFailures;
+import com.sentinel.infra.http.UserAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -44,7 +45,10 @@ class WebhookNotifier implements Notifier {
 			.build();
 		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
 		requestFactory.setReadTimeout(readTimeout);
-		this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+		this.restClient = RestClient.builder()
+			.requestFactory(requestFactory)
+			.defaultHeader("User-Agent", UserAgent.VALUE)
+			.build();
 	}
 
 	@Override
