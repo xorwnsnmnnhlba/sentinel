@@ -26,6 +26,7 @@ import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.DefaultClientTlsStrategy;
 import org.apache.hc.core5.http.io.EofSensorInputStream;
 import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
@@ -65,6 +66,10 @@ public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable
 
 	private final int maxResponseBytes;
 
+	/** 이번 요청의 인증서·TLS 실패 기록. 다음 주소의 연결 실패에 가려진 TLS 실패를 바로잡는 데 사용 */
+	private final TlsFailureRecorder tlsFailures = new TlsFailureRecorder(
+			DefaultClientTlsStrategy.createDefault());
+
 	public RestClientRequestExecutor(Duration connectTimeout, Duration readTimeout) {
 		this(connectTimeout, readTimeout, DEFAULT_TOTAL_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES);
 	}
@@ -90,6 +95,7 @@ public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable
 			.setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
 				// 연결 직전 주소 해석을 확인 단계와 하나로 묶음. 리다이렉트는 따라가지 않으므로 요청 주소만 확인하면 됨
 				.setDnsResolver(destinationGuard)
+				.setTlsSocketStrategy(tlsFailures)
 				.setDefaultConnectionConfig(ConnectionConfig.custom()
 					.setConnectTimeout(Timeout.of(connectTimeout))
 					.setSocketTimeout(Timeout.of(readTimeout))
@@ -142,9 +148,19 @@ public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable
 					throw new RequestExecutionException(Reason.BLOCKED_DESTINATION, request, blocked.getMessage());
 				}
 			}
+			IOException tls = tlsFailures.lastFailure();
+			if (tls != null && classify(ex) != Reason.TLS_ERROR) {
+				// 앞 주소의 인증서·TLS 실패가 마지막 주소의 연결 실패에 가려진 경우. 원인은 TLS 실패, 마지막 실패는 함께 남김
+				tls.addSuppressed(ex);
+				throw new RequestExecutionException(Reason.TLS_ERROR, request, elapsedSince(startedAt), tls);
+			}
 			throw new RequestExecutionException(classify(ex), request, elapsedSince(startedAt), ex);
 		}
+		finally {
+			tlsFailures.clear();
+		}
 	}
+
 
 	@Override
 	public void close() throws IOException {
