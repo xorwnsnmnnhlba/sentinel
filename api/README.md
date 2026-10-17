@@ -319,7 +319,7 @@ curl -i -X POST localhost:8080/api/runs \
   - 압축 요청(`Accept-Encoding`) 없음, 쿠키 저장·자동 전송 없음 (케이스에 적은 헤더만 전송)
   - 기본 `User-Agent`는 `Sentinel/<빌드 버전>` (라이브러리 기본값 `Apache-HttpClient/… (Java/…)`은 보안 장비가 자동화 도구로 막고 Java 버전을 알려 줌). 케이스에 적은 값이 있으면 그 값. 알림 Webhook·생존 신호도 같은 값
   - `Accept`는 케이스에 적은 경우만 (없으면 HTTP 규칙상 "아무 형식")
-  - 인증서·TLS 연결 수립 실패는 `TLS_ERROR`로 따로 기록 (일반 전송 오류 `IO_ERROR`와 구분, 재시도 안 함). 단 IPv4·IPv6 주소가 모두 있는 이름은 첫 주소의 TLS가 실패하면 HTTP 클라이언트가 다음 주소로 다시 연결하므로, 다음 주소가 닿지 않으면 마지막 실패(`CONNECTION_FAILED`)로 기록될 수 있음 (결과의 오류 메시지 확인)
+  - 인증서·TLS 연결 수립 실패는 `TLS_ERROR`로 따로 기록 (일반 전송 오류 `IO_ERROR`와 구분, 재시도 안 함). IPv4·IPv6 주소가 모두 있는 이름은 HTTP 클라이언트가 TLS 실패 뒤 다음 주소로 다시 연결하는데, 다음 주소도 실패하면 앞 주소의 TLS 실패로 기록 (다음 주소의 TLS가 성공하면 그 뒤 결과대로)
   - 본문은 실제 길이의 `Content-Length`로 전송 (조각 전송 `chunked` 아님). 케이스에 직접 적은 `Content-Length`는 실제 길이로 바꿈 (다르면 서버가 나머지를 기다리다 시간 초과)
 - 연결 재사용. 1초 이상 쉰 연결은 사용 전 확인, 30초 이상 쉰 연결은 정리. 동시 연결 한도 200 (Tomcat 기본 요청 스레드 수)
 - 제한 시간: 연결 `sentinel.runner.http.connect-timeout`(기본 5초) 초과 시 `CONNECTION_FAILED`, 응답 대기 `read-timeout`(기본 30초) 초과 시 `TIMEOUT`

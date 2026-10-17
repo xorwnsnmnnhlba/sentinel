@@ -206,6 +206,52 @@ class RestClientRequestExecutorTest {
 		}
 	}
 
+	@Test
+	void keepsTheTlsErrorWhenAnotherAddressOfTheNameFailsToConnectAfterIt(@TempDir Path dir) throws Exception {
+		// localhost는 127.0.0.1 → ::1 순으로 해석. 127.0.0.1의 TLS가 실패하면 HTTP 클라이언트가 ::1로 다시 연결하고(여기는 닫힘)
+		// 마지막 실패(연결 거부)만 남겨 인증서 오류가 가려졌음. IPv4·IPv6 주소가 모두 있는 실제 이름에서도 같음
+		HttpsServer server = selfSignedHttpsServer(dir);
+		server.start();
+		try {
+			ResolvedRequest request = new ResolvedRequest(HttpMethod.GET,
+					URI.create("https://localhost:" + server.getAddress().getPort() + "/health"), Map.of(), null);
+
+			assertThatThrownBy(() -> executor.execute(request)).isInstanceOfSatisfying(RequestExecutionException.class,
+					ex -> {
+						assertThat(ex.reason()).isEqualTo(Reason.TLS_ERROR);
+						// 결과에 남는 원인은 TLS 실패
+						assertThat(ex).hasCauseInstanceOf(javax.net.ssl.SSLHandshakeException.class);
+					});
+		}
+		finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void forgetsATlsFailureOnceTheRequestIsOver(@TempDir Path dir) throws Exception {
+		// 같은 스레드의 다음 요청이 앞 요청의 TLS 실패로 분류되지 않음
+		HttpsServer server = selfSignedHttpsServer(dir);
+		server.start();
+		int closedPort;
+		try (ServerSocket socket = new ServerSocket(0)) {
+			closedPort = socket.getLocalPort();
+		}
+		try {
+			assertThatThrownBy(() -> executor.execute(new ResolvedRequest(HttpMethod.GET,
+					URI.create("https://127.0.0.1:" + server.getAddress().getPort() + "/"), Map.of(), null)))
+				.isInstanceOfSatisfying(RequestExecutionException.class,
+						ex -> assertThat(ex.reason()).isEqualTo(Reason.TLS_ERROR));
+			assertThatThrownBy(() -> executor.execute(new ResolvedRequest(HttpMethod.GET,
+					URI.create("https://127.0.0.1:" + closedPort + "/"), Map.of(), null)))
+				.isInstanceOfSatisfying(RequestExecutionException.class,
+						ex -> assertThat(ex.reason()).isEqualTo(Reason.CONNECTION_FAILED));
+		}
+		finally {
+			server.stop(0);
+		}
+	}
+
 	/** JDK keytool로 만든 일회용 자체 서명 인증서(신뢰할 수 없는 발급자)의 HTTPS 서버 */
 	private static HttpsServer selfSignedHttpsServer(Path dir) throws Exception {
 		Path keystore = dir.resolve("server.p12");

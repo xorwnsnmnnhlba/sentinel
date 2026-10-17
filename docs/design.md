@@ -463,7 +463,7 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
 - 러너 요청과 보통 클라이언트 비교 (2026-10-17, 리허설 후속): 받은 요청 원문을 `curl`과 나란히 비교. 본문 길이·`Host`·`Connection`·케이스에 적은 헤더 유지·SNI·TLS 1.3은 정상
   - 기본 `User-Agent`가 `Apache-HttpClient/5.6.4 (Java/25.0.4.1)` (알림·생존 신호는 `Java-http-client/…`): 보안 장비가 자동화 도구로 막고 Java 버전을 알려 줌 → `Sentinel/<빌드 버전>`, 케이스에 적은 값 우선
   - 인증서 오류가 일반 `IO_ERROR`(대시보드 "연결 끊김")로 섞이고 GET은 소용없는 재시도 → `TLS_ERROR`, 재시도 안 함, 실패 원인 `TLS`("인증서·TLS 오류")
-  - 남은 차이: IPv4·IPv6 주소가 모두 있는 이름에서 첫 주소의 TLS가 실패하면 HTTP 클라이언트(Apache HttpClient)가 다음 주소로 다시 연결해, 다음 주소가 닿지 않으면 마지막 실패(연결 실패)만 남음. curl은 TLS 실패를 그대로 보고. 바꾸려면 연결 단계를 감싸야 해 보류 (문서화)
+  - IPv4·IPv6 주소가 모두 있는 이름에서 첫 주소의 TLS가 실패하면 HTTP 클라이언트(Apache HttpClient)가 다음 주소로 다시 연결해, 다음 주소가 닿지 않으면 마지막 실패(연결 실패)만 남았음 (`localhost`로 재현). curl은 TLS 실패를 그대로 보고 → TLS 단계를 감싸 실패를 기록(`TlsFailureRecorder`)하고, 요청이 최종 실패하면 앞 주소의 TLS 실패로 보고. 다음 주소로 넘어가는 동작과 다음 주소의 TLS가 성공한 경우는 그대로
   - `Accept` 기본값 없음은 HTTP 규칙상 "아무 형식"이라 유지
 
 ### 의존성 취약점 점검 (2026-10-10)
