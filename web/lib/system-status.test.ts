@@ -4,7 +4,7 @@ import type { SystemStatus } from "@/lib/api/types";
 import { secretStateText, settingRows, undecryptableLocation } from "@/lib/system-status";
 
 const status: SystemStatus = {
-  build: { version: "0.0.1-SNAPSHOT", builtAt: "2026-10-10T07:43:38Z" },
+  build: { version: "1.0.0", builtAt: "2026-10-10T07:43:38Z" },
   startedAt: "2026-10-10T07:43:47Z",
   databaseMigration: "29",
   secrets: { state: "ENABLED", undecryptable: [] },

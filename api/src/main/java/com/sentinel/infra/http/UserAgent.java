@@ -12,7 +12,7 @@ import java.util.Properties;
  */
 public final class UserAgent {
 
-	/** 예: {@code Sentinel/0.0.1-SNAPSHOT}. 빌드 정보가 없으면(개발 실행) {@code Sentinel/dev} */
+	/** 예: {@code Sentinel/1.0.0}. 빌드 정보가 없으면(개발 실행) {@code Sentinel/dev} */
 	public static final String VALUE = "Sentinel/" + version();
 
 	private UserAgent() {

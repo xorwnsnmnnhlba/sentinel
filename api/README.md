@@ -720,7 +720,7 @@ deploy-check:
 
 ```json
 {
-  "build": {"version": "0.0.1-SNAPSHOT", "builtAt": "2026-10-10T07:36:42Z"},
+  "build": {"version": "1.0.0", "builtAt": "2026-10-10T07:36:42Z"},
   "startedAt": "2026-10-10T07:40:03Z",
   "databaseMigration": "29",
   "secrets": {

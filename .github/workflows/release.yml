@@ -1,0 +1,18 @@
+# 릴리스 태그(v1.0.0 등)를 올리면 태그와 파일(api/build.gradle, web/package.json)의 버전이 같은지 확인
+# 서버는 태그를 받아 배포하므로(docs/deploy.md), 어긋나면 이 실행이 실패로 표시됨. 절차는 docs/branch-convention.md "릴리스"
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: release (version)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: bash scripts/release-version.sh --tag "$GITHUB_REF_NAME"

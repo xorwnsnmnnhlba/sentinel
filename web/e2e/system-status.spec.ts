@@ -23,7 +23,8 @@ test("사이드바에서 버전·암호화 키·알림 설정·보관 기간 확
   await expect(page.getByRole("heading", { name: "시스템 상태", level: 1 })).toBeVisible();
 
   const version = panel(page, "버전");
-  await expect(version).toContainText("0.0.1-SNAPSHOT");
+  // 릴리스 버전 (MAJOR.MINOR.PATCH, docs/branch-convention.md "6. 릴리스")
+  await expect(version.getByText(/^\d+\.\d+\.\d+$/)).toBeVisible();
   await expect(version.getByText(/^V\d+$/)).toBeVisible();
 
   const key = panel(page, "암호화 키");
