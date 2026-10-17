@@ -12,6 +12,8 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 수신 Webhook으로 알림 발송. 본문은 {@code {"text": "..."}} 한 필드로, Slack·Teams 수신 Webhook에 그대로 사용 가능.
@@ -22,6 +24,8 @@ import org.springframework.web.client.RestClientResponseException;
 class WebhookNotifier implements Notifier {
 
 	private static final Logger log = LoggerFactory.getLogger(WebhookNotifier.class);
+
+	private static final ObjectMapper JSON = JsonMapper.builder().build();
 
 	private final RestClient restClient;
 
@@ -55,10 +59,11 @@ class WebhookNotifier implements Notifier {
 	Long deliver(Notification notification) {
 		WebhookSender.Delivery delivery;
 		try {
+			// 바이트로 만들어 길이와 함께 전송. 객체를 그대로 넘기면 길이 없는 조각 전송(chunked)이 되어 일부 수신 서버·프록시가 거부
 			int status = restClient.post()
 				.uri(url)
 				.contentType(MediaType.APPLICATION_JSON)
-				.body(WebhookPayload.of(url, notification))
+				.body(JSON.writeValueAsBytes(WebhookPayload.of(url, notification)))
 				.retrieve()
 				.toBodilessEntity()
 				.getStatusCode()

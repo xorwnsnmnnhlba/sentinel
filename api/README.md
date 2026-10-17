@@ -317,6 +317,7 @@ curl -i -X POST localhost:8080/api/runs \
   - 리다이렉트 미추적 (3xx 그대로 기록)
   - 클라이언트 재시도 끔. 기본 설정은 429·503(`Retry-After`)과 일부 전송 오류를 다시 보내 첫 응답이 가려짐. 응답을 받지 못한 경우만 앱이 따로 재시도하고 기록 (아래 "전송 오류 재시도")
   - 압축 요청(`Accept-Encoding`) 없음, 쿠키 저장·자동 전송 없음 (케이스에 적은 헤더만 전송)
+  - 본문은 실제 길이의 `Content-Length`로 전송 (조각 전송 `chunked` 아님). 케이스에 직접 적은 `Content-Length`는 실제 길이로 바꿈 (다르면 서버가 나머지를 기다리다 시간 초과)
 - 연결 재사용. 1초 이상 쉰 연결은 사용 전 확인, 30초 이상 쉰 연결은 정리. 동시 연결 한도 200 (Tomcat 기본 요청 스레드 수)
 - 제한 시간: 연결 `sentinel.runner.http.connect-timeout`(기본 5초) 초과 시 `CONNECTION_FAILED`, 응답 대기 `read-timeout`(기본 30초) 초과 시 `TIMEOUT`
   - `read-timeout`은 읽을 때마다 다시 재므로, 본문을 조금씩 늦게 보내는 응답은 끝나지 않을 수 있음. 본문을 다 받을 때까지의 전체 제한 `total-timeout`(기본 2분)을 넘으면 연결을 끊고 `TIMEOUT`

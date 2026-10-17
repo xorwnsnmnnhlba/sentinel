@@ -33,6 +33,9 @@ class WebhookNotifierTest {
 
 	private final List<String> contentTypes = new CopyOnWriteArrayList<>();
 
+	/** 받은 요청의 본문 길이·전송 방식 헤더. "Content-Length 값 / Transfer-Encoding 값" */
+	private final List<String> framings = new CopyOnWriteArrayList<>();
+
 	private volatile int responseStatus = 200;
 
 	private volatile long responseDelayMillis = 0;
@@ -56,6 +59,8 @@ class WebhookNotifierTest {
 				bodies.add(new String(body.readAllBytes(), StandardCharsets.UTF_8));
 			}
 			contentTypes.add(String.valueOf(exchange.getRequestHeaders().getFirst("Content-Type")));
+			framings.add(exchange.getRequestHeaders().getFirst("Content-Length") + " / "
+					+ exchange.getRequestHeaders().getFirst("Transfer-Encoding"));
 			sleep(responseDelayMillis);
 			exchange.sendResponseHeaders(responseStatus, -1);
 			exchange.close();
@@ -79,6 +84,14 @@ class WebhookNotifierTest {
 		assertThat(deliveries).containsExactly(new WebhookSender.Delivery(true, 200, null));
 		assertThat(targets).containsExactly(
 				new DeliveryLog.Target(NotificationDelivery.Channel.DEFAULT, null, NotificationDelivery.Format.TEXT));
+	}
+
+	@Test
+	void sendsTheBodyWithItsLengthInsteadOfChunks() {
+		// 길이 없는 조각 전송(chunked)은 일부 수신 서버·프록시가 거부 (2026-10-17 새 서버 리허설에서 발견)
+		notifier().send(new Notification("알림", List.of("본문")));
+
+		assertThat(framings).containsExactly(bodies.getFirst().getBytes(StandardCharsets.UTF_8).length + " / null");
 	}
 
 	@Test
