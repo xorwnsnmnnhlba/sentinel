@@ -235,8 +235,9 @@ export function validateDraft(draft: CaseDraft): CaseValidation {
     errors.push(`경로는 ${MAX_PATH}자 이하로 입력해 주세요`);
   }
 
-  // 프로토타입 없는 객체: 헤더 이름이 "__proto__"·"constructor"면 일반 객체에서는 상속 값이 잡혀 push가 예외 (저장 실패)
-  const headers: Headers = Object.create(null);
+  // 객체에 이름으로 바로 쓰지 않고 Map에 모음. 헤더 이름이 "__proto__"·"constructor"면 일반 객체는 상속 값이 잡혀
+  // push가 예외 (저장 실패, CodeQL js/remote-property-injection). Object.fromEntries는 그런 이름도 자기 속성으로 만듦
+  const headerValues = new Map<string, string[]>();
   draft.headers.forEach((row, index) => {
     const headerName = row.name.trim();
     if (headerName === "" && row.value.trim() === "") {
@@ -247,7 +248,7 @@ export function validateDraft(draft: CaseDraft): CaseValidation {
     } else if (headerName.length > MAX_HEADER_NAME) {
       errors.push(`요청 헤더 ${index + 1}: 이름은 ${MAX_HEADER_NAME}자 이하로 입력해 주세요`);
     } else {
-      (headers[headerName] ??= []).push(row.value);
+      headerValues.set(headerName, [...(headerValues.get(headerName) ?? []), row.value]);
     }
   });
 
@@ -274,7 +275,12 @@ export function validateDraft(draft: CaseDraft): CaseValidation {
     ok: true,
     payload: {
       name,
-      request: { method: draft.method, path, headers, body: draft.body === "" ? null : draft.body },
+      request: {
+        method: draft.method,
+        path,
+        headers: Object.fromEntries(headerValues),
+        body: draft.body === "" ? null : draft.body,
+      },
       assertions,
       extractors,
     },
