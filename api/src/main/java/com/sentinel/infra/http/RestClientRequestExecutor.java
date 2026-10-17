@@ -119,7 +119,9 @@ public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable
 					.headers(headers -> request.headers().forEach(headers::addAll));
 			if (request.body() != null) {
 				byte[] body = request.body().getBytes(StandardCharsets.UTF_8);
-				spec.body(outputStream -> outputStream.write(body));
+				// 길이를 알려 보통 클라이언트처럼 고정 길이로 전송. 모르면 조각 전송(chunked)이 되어 일부 서버·게이트웨이가
+				// 거부하거나 다르게 처리함. 케이스에 직접 넣은 Content-Length도 실제 길이로 바꿈 (다르면 서버가 기다리다 시간 초과)
+				spec.contentLength(body.length).body(outputStream -> outputStream.write(body));
 			}
 			return spec.exchange((clientRequest, response) -> new HttpExchange(
 					request,

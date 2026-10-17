@@ -2,6 +2,7 @@ package com.sentinel.infra.http;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sentinel.runner.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.RequestExecutionException;
 import com.sentinel.runner.RequestExecutionException.Reason;
@@ -121,6 +123,35 @@ class RestClientRequestExecutorTest {
 
 		assertThat(exchange.statusCode()).isEqualTo(201);
 		assertThat(exchange.body()).isEqualTo("created");
+	}
+
+	@Test
+	void sendsTheBodyWithItsLengthLikeAnOrdinaryClient() throws IOException {
+		// 길이 없는 조각 전송(chunked)은 일부 서버·게이트웨이가 거부하거나 다르게 처리하여, 정상인 API가 실패로 보일 수 있음
+		// (2026-10-17 새 서버 리허설에서 발견). 요청에 직접 넣은 잘못된 Content-Length도 실제 길이로 보냄
+		List<String> framings = new ArrayList<>();
+		HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/", exchange -> {
+			byte[] received = exchange.getRequestBody().readAllBytes();
+			framings.add(exchange.getRequestHeaders().getFirst("Content-Length") + " / "
+					+ exchange.getRequestHeaders().getFirst("Transfer-Encoding") + " / " + received.length);
+			exchange.sendResponseHeaders(204, -1);
+			exchange.close();
+		});
+		server.start();
+		try {
+			String base = "http://127.0.0.1:" + server.getAddress().getPort();
+			executor.execute(new ResolvedRequest(HttpMethod.POST, URI.create(base + "/users"),
+					Map.of("Content-Type", List.of("application/json")), "{\"name\":\"이순신\"}"));
+			executor.execute(new ResolvedRequest(HttpMethod.PUT, URI.create(base + "/users/1"),
+					Map.of("Content-Length", List.of("999")), "abc"));
+			executor.execute(new ResolvedRequest(HttpMethod.GET, URI.create(base + "/users/1"), Map.of(), null));
+		}
+		finally {
+			server.stop(0);
+		}
+
+		assertThat(framings).containsExactly("20 / null / 20", "3 / null / 3", "null / null / 0");
 	}
 
 	@Test
