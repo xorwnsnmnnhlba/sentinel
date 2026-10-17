@@ -155,3 +155,45 @@ docs: add branch convention
    Merge commit 방식이므로 `git pull` 후 `-d`로 삭제 가능. 거부 시 PR 머지 여부 재확인
 
 3. api 변경 시 노트북 상시 실행 컨테이너 새 버전으로 교체
+
+---
+
+## 6. 릴리스
+
+운영 서버는 main이 아니라 릴리스 태그를 받아 배포 (`docs/deploy.md` "업데이트"). main에 머지된 변경은 다음 릴리스 전까지 운영에 가지 않음
+
+### 버전 규칙
+`MAJOR.MINOR.PATCH` (Semantic Versioning). 첫 릴리스 1.0.0 (2026-10-17)
+
+| 올리는 자리 | 변경 |
+|------|------|
+| PATCH | 버그·보안 수정, 의존성 업데이트 |
+| MINOR | 기능 추가, 하위 호환인 설정·API 추가 |
+| MAJOR | 호환이 깨지는 변경: 설정 이름 변경·삭제, API 응답 변경(CI 연동 스크립트 영향), 이전 버전으로 되돌릴 수 없는 DB 마이그레이션(열 삭제·이름 변경) |
+
+- 버전은 파일에 직접: `api/build.gradle`의 `version`과 `web/package.json`의 `version` (항상 같은 값). 화면 "시스템 상태"와 요청의 `User-Agent`(`Sentinel/1.0.0`)에 표시
+- 두 파일이 다르면 CI의 scripts 작업이 실패 (`scripts/release-version.sh --check`)
+- 다음 릴리스 전까지 main의 빌드도 지난 버전 번호로 표시 (`-SNAPSHOT` 미사용). 운영 서버의 버전은 태그로 받은 것이므로 정확함
+
+### 절차
+1. 릴리스 PR: `chore/infra-release-1.0.1` 브랜치에서 두 파일의 버전 변경
+
+   ```bash
+   sed -i '' "s/^version = '.*'$/version = '1.0.1'/" api/build.gradle   # 리눅스는 sed -i
+   (cd web && npm version 1.0.1 --no-git-tag-version)
+   scripts/release-version.sh --check
+   ```
+
+   커밋 `chore: release 1.0.1`. PR 본문에 지난 태그 이후 변경 요약 (`git log --first-parent --oneline v1.0.0..main`)
+2. 머지 후 그 머지 커밋에 태그
+
+   ```bash
+   git switch main && git pull --ff-only
+   git tag -a v1.0.1 -m "Sentinel 1.0.1"
+   git push origin v1.0.1
+   ```
+
+3. **Release** 워크플로(`.github/workflows/release.yml`)가 태그와 파일의 버전이 같은지 확인. 다르면 실패로 표시. 서버가 받기 전이면 태그를 지우고(`git tag -d v1.0.1 && git push origin :refs/tags/v1.0.1`) 1부터 다시
+4. 서버 업데이트는 그 태그로 (`docs/deploy.md` "업데이트")
+
+- 서버가 받은 태그는 고치지 않음. 잘못 만든 릴리스는 새 PATCH 버전으로 바로잡음

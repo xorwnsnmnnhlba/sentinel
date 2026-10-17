@@ -1,9 +1,14 @@
 package com.sentinel.api;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
@@ -80,7 +85,8 @@ class SystemStatusApiTest {
 		MvcTestResult result = mvc.get().uri("/api/system-status").exchange();
 
 		var json = assertThat(result).hasStatusOk().bodyJson();
-		json.extractingPath("$.build.version").isEqualTo("0.0.1-SNAPSHOT");
+		// 빌드 정보의 버전 = build.gradle의 릴리스 버전 (릴리스마다 바뀌므로 파일에서 읽어 비교)
+		json.extractingPath("$.build.version").isEqualTo(releaseVersion());
 		json.extractingPath("$.build.builtAt").isNotNull();
 		json.extractingPath("$.startedAt").asString().satisfies(at -> Instant.parse(at));
 		json.extractingPath("$.databaseMigration").isEqualTo(latestMigration());
@@ -150,6 +156,13 @@ class SystemStatusApiTest {
 			.mapToInt(file -> Integer.parseInt(file.getFilename().substring(1, file.getFilename().indexOf("__"))))
 			.max()
 			.orElseThrow());
+	}
+
+	/** api/build.gradle의 version (테스트는 api 폴더에서 실행) */
+	private static String releaseVersion() throws IOException {
+		Matcher version = Pattern.compile("(?m)^version = '([^']+)'").matcher(Files.readString(Path.of("build.gradle")));
+		assertThat(version.find()).isTrue();
+		return version.group(1);
 	}
 
 }

@@ -106,6 +106,9 @@ jobs:
       - run: bash scripts/sentinel-run.test.sh
       # 의존성 취약점 판정 (.github/workflows/security.yml에서 사용)
       - run: bash scripts/vulnerabilities.test.sh
+      # 릴리스 버전: api·web 파일의 버전이 같은지 (태그 확인은 .github/workflows/release.yml)
+      - run: bash scripts/release-version.test.sh
+      - run: bash scripts/release-version.sh --check
 
   api:
     name: api (test)

@@ -12,7 +12,7 @@
 | DB | AWS RDS의 `sentinel` 스키마 | `sslmode=require`, 백업은 RDS 자동 백업·스냅샷 |
 | 접속 주소·인증서 | 내부 DNS 이름 + 보유 인증서(기관 발급) | 사용자 PC가 이미 신뢰하므로 루트 인증서 배포 불필요 |
 | HSTS | 사용 (보유 인증서 전제) | 처음에는 짧게(300초) 확인 후 1년으로 늘림 |
-| 업데이트 | 서버에서 `git pull` 후 빌드 | 이미지 레지스트리 미사용 |
+| 업데이트 | 서버에서 릴리스 태그(`v1.0.0` 등)를 받아 빌드 (2026-10-17) | 이미지 레지스트리 미사용. main에 머지된 변경은 다음 릴리스 태그 전까지 운영에 가지 않음 (`docs/branch-convention.md` "6. 릴리스") |
 
 ## 서버 준비
 
@@ -28,7 +28,11 @@
 
 ```bash
 git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
+git tag --sort=-v:refname | head -n 3   # 최신 릴리스 확인
+git checkout v1.0.0                      # 최신 릴리스 태그로
 ```
+
+- 서버는 브랜치가 아니라 태그를 받으므로 git이 "detached HEAD"라고 안내하는 것이 정상
 
 1. 보유 인증서 배치 (`proxy/certs/`, git 제외). 새로 받은 저장소에는 폴더가 없으므로 `mkdir -p proxy/certs`
    - `cert.pem`: 서버 인증서 뒤에 중간 인증서를 이어 붙인 파일 (서버 → 중간 순). 중간 인증서가 빠지면 일부 PC에서 신뢰 오류
@@ -91,10 +95,12 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 - 공개 저장소는 60일 동안 활동(커밋 등)이 없으면 GitHub이 정기 실행을 멈춤. **Actions → Security**에 중지 안내가 보이면 **Enable workflow**
 
 ```bash
-git fetch
+git fetch --tags
+git describe --tags                      # 지금 버전
+git tag --sort=-v:refname | head -n 3   # 새 릴리스 확인
 # 새 DB 마이그레이션이 있으면 먼저 RDS 스냅샷
-git diff --stat HEAD origin/main -- api/src/main/resources/db/migration
-git pull --ff-only
+git diff --stat HEAD v1.0.1 -- api/src/main/resources/db/migration
+git checkout v1.0.1                      # 올릴 릴리스 태그
 scripts/preflight.sh
 docker compose pull --ignore-buildable
 docker compose build --pull
@@ -106,12 +112,12 @@ docker image prune -f
 - 중단 시간: 컨테이너 교체 동안(수십 초) 접속 불가. 그 사이 놓친 스케줄 실행은 기동 후 1회만 실행
 - 바뀐 코드가 없어도 api 컨테이너는 매번 다시 시작 (jar에 빌드 시각이 들어가 이미지가 새로 만들어짐). web·앞단은 바뀐 것이 없으면 그대로
 - 마이그레이션은 api 기동 시 Flyway가 적용. 실패하면 api가 기동하지 않고 `--wait`가 오류로 종료
-- 확인: `docker compose ps`(모두 healthy), 화면 "시스템 상태"의 빌드 시각·DB 마이그레이션이 새 버전, `docker compose logs --since 10m sentinel-api`
+- 확인: `docker compose ps`(모두 healthy), 화면 "시스템 상태"의 버전이 올린 릴리스(예: 1.0.1)이고 빌드 시각·DB 마이그레이션이 새 값, `docker compose logs --since 10m sentinel-api`
 
 ## 되돌리기
 
 ```bash
-git checkout <이전 커밋>
+git checkout v1.0.0                      # 이전 릴리스 태그
 docker compose up -d --build --wait
 ```
 
@@ -120,7 +126,7 @@ docker compose up -d --build --wait
   - 컬럼·테이블 추가만 있으면 대부분 이전 버전으로 기동 가능 (Flyway가 모르는 이후 버전 이력은 무시, 엔티티 검증은 남는 컬럼 허용)
   - 컬럼 삭제·이름 변경이 있으면 이전 버전의 엔티티 검증(`ddl-auto: validate`) 실패로 기동 불가. 수정 버전을 새로 배포하거나 업데이트 전 스냅샷으로 복원
   - RDS 스냅샷 복원은 새 인스턴스 생성 방식. 다른 서비스와 함께 쓰는 RDS라면 그 RDS 관리자와 협의
-- 되돌린 뒤 main으로 복귀는 수정 반영 후 다음 업데이트 때 (`git checkout main && git pull --ff-only`)
+- 되돌린 뒤에는 수정이 담긴 다음 릴리스 태그로 업데이트
 
 ## 인증서 교체
 
