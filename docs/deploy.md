@@ -87,6 +87,7 @@ git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 보안 업데이트도 같은 절차. 매주 월요일 GitHub **Security** 점검(`.github/workflows/security.yml`)이 실패하면 새로 공개된 취약점이므로 의존성 업데이트 PR(Dependabot 또는 직접)을 머지한 뒤 반영
 
 - 정기 점검이 실패하면 저장소에 "Weekly security check failed" 이슈가 열림 (저장소를 지켜보는(Watch) 사람에게 알림). 다시 통과하면 자동으로 닫힘
+- 매주 CodeQL 정기 분석에서 main에 열린 코드 경고가 있으면 "Code scanning needs attention" 이슈가 열림. 경고 내용은 **Security → Code scanning**에서 확인하고, 고치거나 오탐이면 사유를 남겨 닫음. 0건이 되면 이슈도 자동으로 닫힘
 - 공개 저장소는 60일 동안 활동(커밋 등)이 없으면 GitHub이 정기 실행을 멈춤. **Actions → Security**에 중지 안내가 보이면 **Enable workflow**
 
 ```bash
