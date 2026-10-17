@@ -57,6 +57,10 @@ describe("resultHint", () => {
       { ...sent, delivered: false, statusCode: null, error: "CONNECTION_FAILED" },
       "내부망·프록시에서 채널 주소로 나갈 수 있는지 확인",
     ],
+    [
+      { ...sent, delivered: false, statusCode: null, error: "TLS_ERROR" },
+      "채널 주소의 인증서 확인 (만료·신뢰할 수 없는 발급자·이름 불일치, 내부망 프록시가 인증서를 바꾸는지)",
+    ],
     [{ ...sent, delivered: false, statusCode: null, error: "BLOCKED_DESTINATION" }, null],
   ])("%j → %s", (item, hint) => {
     expect(resultHint(item)).toBe(hint);

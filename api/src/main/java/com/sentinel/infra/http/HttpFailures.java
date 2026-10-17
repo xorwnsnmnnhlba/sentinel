@@ -3,6 +3,9 @@ package com.sentinel.infra.http;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
 
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLPeerUnverifiedException;
+
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
@@ -16,12 +19,15 @@ public final class HttpFailures {
 	private HttpFailures() {
 	}
 
-	/** 예: HTTP 404, timeout, connection failed */
+	/** 예: HTTP 404, timeout, connection failed, TLS error */
 	public static String describe(RestClientException ex) {
 		if (ex instanceof RestClientResponseException response) {
 			return "HTTP " + response.getStatusCode().value();
 		}
 		if (ex instanceof ResourceAccessException) {
+			if (isTls(ex)) {
+				return "TLS error";
+			}
 			Throwable cause = ex.getCause();
 			return cause instanceof HttpTimeoutException || cause instanceof SocketTimeoutException ? "timeout"
 					: "connection failed";
@@ -31,15 +37,28 @@ public final class HttpFailures {
 
 	/**
 	 * 응답을 받지 못한 사유. 실행기({@code RequestExecutionException.Reason})와 같은 이름
-	 * @return TIMEOUT, CONNECTION_FAILED, IO_ERROR
+	 * @return TIMEOUT, CONNECTION_FAILED, TLS_ERROR, IO_ERROR
 	 */
 	public static String reason(RestClientException ex) {
 		if (ex instanceof ResourceAccessException) {
+			if (isTls(ex)) {
+				return "TLS_ERROR";
+			}
 			Throwable cause = ex.getCause();
 			return cause instanceof HttpTimeoutException || cause instanceof SocketTimeoutException ? "TIMEOUT"
 					: "CONNECTION_FAILED";
 		}
 		return "IO_ERROR";
+	}
+
+	/** 인증서 검증·이름 확인 실패와 TLS 협상 실패 (실행기와 같은 기준) */
+	private static boolean isTls(Throwable ex) {
+		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+			if (cause instanceof SSLHandshakeException || cause instanceof SSLPeerUnverifiedException) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 }

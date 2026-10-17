@@ -6,7 +6,9 @@ import { CAUSE_LABELS, failingRunsHref, formatShare, GROUP_LABELS, moreCases } f
 
 describe("failure cause", () => {
   it("labels every cause and group", () => {
-    expect(Object.keys(CAUSE_LABELS)).toHaveLength(8);
+    expect(Object.keys(CAUSE_LABELS)).toHaveLength(9);
+    // 인증서 만료 같은 흔한 장애를 일반 전송 오류와 나눠 보여 줌
+    expect(CAUSE_LABELS.TLS).toBe("인증서·TLS 오류");
     expect(CAUSE_LABELS.ASSERTION_MISMATCH).toBe("응답 내용 불일치");
     expect(GROUP_LABELS.NETWORK).toBe("GW·네트워크");
   });

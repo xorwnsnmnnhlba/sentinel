@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.sentinel.domain.NotificationDelivery;
+import com.sentinel.infra.http.UserAgent;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,8 @@ class WebhookNotifierTest {
 	/** 받은 요청의 본문 길이·전송 방식 헤더. "Content-Length 값 / Transfer-Encoding 값" */
 	private final List<String> framings = new CopyOnWriteArrayList<>();
 
+	private final List<String> userAgents = new CopyOnWriteArrayList<>();
+
 	private volatile int responseStatus = 200;
 
 	private volatile long responseDelayMillis = 0;
@@ -61,6 +64,7 @@ class WebhookNotifierTest {
 			contentTypes.add(String.valueOf(exchange.getRequestHeaders().getFirst("Content-Type")));
 			framings.add(exchange.getRequestHeaders().getFirst("Content-Length") + " / "
 					+ exchange.getRequestHeaders().getFirst("Transfer-Encoding"));
+			userAgents.add(String.valueOf(exchange.getRequestHeaders().getFirst("User-Agent")));
 			sleep(responseDelayMillis);
 			exchange.sendResponseHeaders(responseStatus, -1);
 			exchange.close();
@@ -92,6 +96,13 @@ class WebhookNotifierTest {
 		notifier().send(new Notification("알림", List.of("본문")));
 
 		assertThat(framings).containsExactly(bodies.getFirst().getBytes(StandardCharsets.UTF_8).length + " / null");
+	}
+
+	@Test
+	void identifiesItselfAsSentinel() {
+		notifier().send(new Notification("알림", List.of()));
+
+		assertThat(userAgents).containsExactly(UserAgent.VALUE);
 	}
 
 	@Test

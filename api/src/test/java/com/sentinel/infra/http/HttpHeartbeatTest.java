@@ -34,7 +34,8 @@ class HttpHeartbeatTest {
 	void startServer() throws IOException {
 		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.createContext("/ping", exchange -> {
-			requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI());
+			requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI() + " "
+					+ exchange.getRequestHeaders().getFirst("User-Agent"));
 			exchange.sendResponseHeaders(responseStatus, -1);
 			exchange.close();
 		});
@@ -50,7 +51,8 @@ class HttpHeartbeatTest {
 	void sendsAGetRequestToTheUrl() {
 		heartbeat(url("/ping/check-token")).beat();
 
-		assertThat(requests).containsExactly("GET /ping/check-token");
+		// 라이브러리 기본값(Java-http-client/…) 대신 Sentinel 이름
+		assertThat(requests).containsExactly("GET /ping/check-token " + UserAgent.VALUE);
 	}
 
 	@Test

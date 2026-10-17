@@ -35,7 +35,10 @@ public class HttpHeartbeat implements Heartbeat {
 			.build();
 		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
 		requestFactory.setReadTimeout(timeout);
-		this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+		this.restClient = RestClient.builder()
+			.requestFactory(requestFactory)
+			.defaultHeader("User-Agent", UserAgent.VALUE)
+			.build();
 	}
 
 	@Override

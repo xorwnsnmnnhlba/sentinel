@@ -29,7 +29,9 @@ class TransportRetryTest {
 	@ParameterizedTest
 	@CsvSource({ "CONNECTION_FAILED, POST, true", "CONNECTION_FAILED, GET, true", "TIMEOUT, GET, true",
 			"TIMEOUT, HEAD, true", "IO_ERROR, OPTIONS, true", "TIMEOUT, POST, false", "TIMEOUT, PUT, false",
-			"IO_ERROR, PATCH, false", "IO_ERROR, DELETE, false", "BLOCKED_DESTINATION, GET, false" })
+			"IO_ERROR, PATCH, false", "IO_ERROR, DELETE, false", "BLOCKED_DESTINATION, GET, false",
+			// 인증서·TLS 설정 문제는 안전한 메서드여도 다시 보내지 않음
+			"TLS_ERROR, GET, false" })
 	void retriesWhenTheRequestSurelyDidNotReachOrIsSafeToRepeat(Reason reason, HttpMethod method,
 			boolean retryable) {
 		assertThat(TransportRetry.retryable(reason, method)).isEqualTo(retryable);

@@ -1,10 +1,14 @@
 package com.sentinel.infra.http;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyStore;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -12,8 +16,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+
 import com.sentinel.runner.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsServer;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.RequestExecutionException;
 import com.sentinel.runner.RequestExecutionException.Reason;
@@ -21,6 +30,7 @@ import com.sentinel.runner.RequestExecutor;
 import com.sentinel.runner.ResolvedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
@@ -152,6 +162,75 @@ class RestClientRequestExecutorTest {
 		}
 
 		assertThat(framings).containsExactly("20 / null / 20", "3 / null / 3", "null / null / 0");
+	}
+
+	@Test
+	void identifiesItselfAsSentinelUnlessTheCaseSetsAUserAgent() throws IOException {
+		// 라이브러리 기본값(Apache-HttpClient/… (Java/…))은 보안 장비가 자동화 도구로 막고 Java 버전을 알려 줌
+		List<String> userAgents = new ArrayList<>();
+		HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/", exchange -> {
+			userAgents.add(exchange.getRequestHeaders().getFirst("User-Agent"));
+			exchange.sendResponseHeaders(204, -1);
+			exchange.close();
+		});
+		server.start();
+		try {
+			String base = "http://127.0.0.1:" + server.getAddress().getPort();
+			executor.execute(new ResolvedRequest(HttpMethod.GET, URI.create(base + "/a"), Map.of(), null));
+			executor.execute(new ResolvedRequest(HttpMethod.GET, URI.create(base + "/b"),
+					Map.of("User-Agent", List.of("partner-app/2.1")), null));
+		}
+		finally {
+			server.stop(0);
+		}
+
+		assertThat(userAgents).containsExactly(UserAgent.VALUE, "partner-app/2.1");
+		assertThat(UserAgent.VALUE).startsWith("Sentinel/").doesNotContain("Java");
+	}
+
+	@Test
+	void reportsAnUntrustedCertificateAsATlsError(@TempDir Path dir) throws Exception {
+		// 인증서 만료·신뢰할 수 없는 발급자·이름 불일치는 일반 전송 오류(IO_ERROR)와 나눠 바로 알아보도록
+		HttpsServer server = selfSignedHttpsServer(dir);
+		server.start();
+		try {
+			ResolvedRequest request = new ResolvedRequest(HttpMethod.GET,
+					URI.create("https://127.0.0.1:" + server.getAddress().getPort() + "/health"), Map.of(), null);
+
+			assertThatThrownBy(() -> executor.execute(request)).isInstanceOfSatisfying(RequestExecutionException.class,
+					ex -> assertThat(ex.reason()).isEqualTo(Reason.TLS_ERROR));
+		}
+		finally {
+			server.stop(0);
+		}
+	}
+
+	/** JDK keytool로 만든 일회용 자체 서명 인증서(신뢰할 수 없는 발급자)의 HTTPS 서버 */
+	private static HttpsServer selfSignedHttpsServer(Path dir) throws Exception {
+		Path keystore = dir.resolve("server.p12");
+		Process keytool = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "keytool").toString(),
+				"-genkeypair", "-alias", "server", "-keyalg", "RSA", "-keysize", "2048", "-dname", "CN=localhost",
+				"-ext", "SAN=dns:localhost", "-validity", "1", "-storetype", "PKCS12", "-keystore", keystore.toString(),
+				"-storepass", "rehearsal")
+			.redirectErrorStream(true)
+			.start();
+		assertThat(keytool.waitFor()).isZero();
+		KeyStore keys = KeyStore.getInstance("PKCS12");
+		try (InputStream in = Files.newInputStream(keystore)) {
+			keys.load(in, "rehearsal".toCharArray());
+		}
+		KeyManagerFactory keyManagers = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+		keyManagers.init(keys, "rehearsal".toCharArray());
+		SSLContext ssl = SSLContext.getInstance("TLS");
+		ssl.init(keyManagers.getKeyManagers(), null, null);
+		HttpsServer server = HttpsServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.setHttpsConfigurator(new HttpsConfigurator(ssl));
+		server.createContext("/", exchange -> {
+			exchange.sendResponseHeaders(200, -1);
+			exchange.close();
+		});
+		return server;
 	}
 
 	@Test

@@ -6,6 +6,7 @@ export const CAUSE_LABELS: Record<FailureCause, string> = {
   TIMEOUT: "타임아웃",
   CONNECTION_FAILED: "연결 실패",
   CONNECTION_LOST: "연결 끊김",
+  TLS: "인증서·TLS 오류",
   SERVER_ERROR: "서버 오류 5xx",
   CLIENT_ERROR: "요청 거부 4xx",
   ASSERTION_MISMATCH: "응답 내용 불일치",
