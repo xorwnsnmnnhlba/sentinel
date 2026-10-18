@@ -1,6 +1,7 @@
 package com.sentinel.infra.http;
 
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
@@ -45,7 +46,7 @@ import org.springframework.web.client.RestClientException;
  * HTTP 클라이언트는 Apache HttpClient 5. 연결할 주소를 {@link DestinationGuard}가 직접 해석·확인하도록 지정할 수 있어서 사용
  * (JDK HttpClient는 주소 해석기 지정 불가)
  */
-public class RestClientRequestExecutor implements RequestExecutor, AutoCloseable {
+public class RestClientRequestExecutor implements RequestExecutor, Closeable {
 
 	/**
 	 * 동시 연결 한도. Tomcat 기본 요청 스레드 수(200)와 같게 두어, 여러 실행이 겹쳐도 연결을 기다리지 않음 (실행 1건은 연결 1개만 사용)

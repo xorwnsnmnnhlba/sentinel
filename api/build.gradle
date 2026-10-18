@@ -13,6 +13,12 @@ java {
 	}
 }
 
+// 컴파일러 경고를 모두 켜고 경고가 있으면 실패 (새 경고가 쌓이지 않도록, 2026-10-18)
+// 제외: classfile(QueryDSL jar 자체의 경고), serial(예외를 직렬화하지 않음), processing(Lombok·QueryDSL이 처리하지 않는 애너테이션 안내)
+tasks.withType(JavaCompile).configureEach {
+	options.compilerArgs += ['-Xlint:all,-classfile,-serial,-processing', '-Werror']
+}
+
 // Spring Boot 4.1.1이 관리하는 Jackson(3.1.5·2.21.5)에 높음 취약점이 있어 같은 minor의 수정판으로 올림 (2026-10-11)
 // Spring Boot가 수정판을 관리하게 되면 제거 (.github/workflows/security.yml로 확인)
 ext['jackson-bom.version'] = '3.1.7'

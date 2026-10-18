@@ -143,11 +143,9 @@ public class CatalogCommandService {
 	}
 
 	/**
+	 * @param expectedVersion 수정 화면을 열 때 읽은 version. 다르면 거부 ({@link StaleVersionException}), null이면 확인하지 않음
 	 * @param variables 지정 시 전체 교체
 	 * @param secrets 이름별 반영. 값이 있으면 등록·교체, null이면 삭제, 목록에 없는 이름은 유지
-	 */
-	/**
-	 * @param expectedVersion 수정 화면을 열 때 읽은 version. 다르면 거부 ({@link StaleVersionException}), null이면 확인하지 않음
 	 */
 	public EnvironmentItem updateEnvironment(long environmentId, Long expectedVersion, String name, String baseUrl,
 			Map<String, String> variables, Map<String, String> secrets, long actorId) {
@@ -284,12 +282,10 @@ public class CatalogCommandService {
 	}
 
 	/**
+	 * @param expectedVersion 수정 화면을 열 때 읽은 version. 다르면 거부 ({@link StaleVersionException}), null이면 확인하지 않음
 	 * @param request 지정 시 요청 정의 전체 교체
 	 * @param assertions 지정 시 전체 교체. 빈 목록이면 기본 판정으로 복귀
 	 * @param extractors 지정 시 전체 교체
-	 */
-	/**
-	 * @param expectedVersion 수정 화면을 열 때 읽은 version. 다르면 거부 ({@link StaleVersionException}), null이면 확인하지 않음
 	 */
 	public CaseItem updateCase(long caseId, Long expectedVersion, String name, Request request, List<Assertion> assertions,
 			List<Extractor> extractors, long actorId) {

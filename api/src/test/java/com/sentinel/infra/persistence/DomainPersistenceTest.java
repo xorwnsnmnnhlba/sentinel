@@ -65,10 +65,10 @@ class DomainPersistenceTest {
 
 	@Test
 	void createsTablesInSentinelSchema() {
-		List<Object> schemas = entityManager.createNativeQuery("""
+		List<Object> schemas = nativeList("""
 				SELECT DISTINCT table_schema FROM information_schema.tables
 				WHERE table_name IN ('project', 'environment', 'test_suite', 'test_case')
-				""").getResultList();
+				""");
 
 		assertThat(schemas).containsExactly("sentinel");
 	}
@@ -76,10 +76,10 @@ class DomainPersistenceTest {
 	@Test
 	void appliesFlywayMigrationsToSentinelSchema() {
 		// Flyway가 스키마를 직접 생성하면 version NULL인 스키마 생성 기록이 함께 남으므로 제외
-		List<Object> versions = entityManager.createNativeQuery("""
+		List<Object> versions = nativeList("""
 				SELECT version FROM sentinel.flyway_schema_history
 				WHERE success AND version IS NOT NULL ORDER BY installed_rank
-				""").getResultList();
+				""");
 
 		assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30");
 	}
@@ -96,11 +96,11 @@ class DomainPersistenceTest {
 
 	@Test
 	void mapsJsonColumnsToStandardJsonType() {
-		List<Object> types = entityManager.createNativeQuery("""
+		List<Object> types = nativeList("""
 				SELECT data_type FROM information_schema.columns
 				WHERE table_schema = 'sentinel'
 				  AND (table_name, column_name) IN (('environment', 'variables'), ('test_case', 'headers'))
-				""").getResultList();
+				""");
 
 		assertThat(types).containsExactly("json", "json");
 	}
@@ -238,6 +238,12 @@ class DomainPersistenceTest {
 	private void flushAndClear() {
 		entityManager.flush();
 		entityManager.clear();
+	}
+
+	/** 네이티브 조회 결과. JPA는 타입 없는 목록(raw List)을 돌려주므로 Object 목록으로 */
+	private List<Object> nativeList(String sql) {
+		List<?> rows = entityManager.createNativeQuery(sql).getResultList();
+		return List.copyOf(rows);
 	}
 
 }

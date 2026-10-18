@@ -82,19 +82,28 @@ public class TestCase extends ArchivableEntity {
 		this.suite = Objects.requireNonNull(suite, "suite");
 		this.name = Preconditions.requireText(name, "name", 200);
 		this.request = Objects.requireNonNull(request, "request");
-		changeAssertions(assertions);
-		changeExtractors(extractors);
+		// 생성자에서는 덮어쓸 수 있는 change* 대신 정적 검사 (JPA 프록시가 하위 클래스라 생성 중 재정의 메서드 호출 방지)
+		this.assertions = validAssertions(assertions);
+		this.extractors = validExtractors(extractors);
 	}
 
 	public void changeAssertions(List<Assertion> assertions) {
-		if (assertions != null && assertions.stream().anyMatch(Objects::isNull)) {
-			throw new IllegalArgumentException("assertions must not contain null");
-		}
-		this.assertions = new ArrayList<>(assertions == null ? List.of() : assertions);
+		this.assertions = validAssertions(assertions);
 	}
 
 	/** 전체 교체. null은 빈 목록. 변수 이름은 케이스 안에서 중복 불가 */
 	public void changeExtractors(List<Extractor> extractors) {
+		this.extractors = validExtractors(extractors);
+	}
+
+	private static List<Assertion> validAssertions(List<Assertion> assertions) {
+		if (assertions != null && assertions.stream().anyMatch(Objects::isNull)) {
+			throw new IllegalArgumentException("assertions must not contain null");
+		}
+		return new ArrayList<>(assertions == null ? List.of() : assertions);
+	}
+
+	private static List<Extractor> validExtractors(List<Extractor> extractors) {
 		List<Extractor> valid = extractors == null ? List.of() : extractors;
 		if (valid.stream().anyMatch(Objects::isNull)) {
 			throw new IllegalArgumentException("extractors must not contain null");
@@ -108,7 +117,7 @@ public class TestCase extends ArchivableEntity {
 				throw new IllegalArgumentException("extractor name '" + extractor.name() + "' is duplicated");
 			}
 		}
-		this.extractors = new ArrayList<>(valid);
+		return new ArrayList<>(valid);
 	}
 
 	/** 실행 순서 지정. 0 이상 */

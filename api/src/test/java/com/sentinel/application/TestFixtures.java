@@ -114,12 +114,12 @@ public class TestFixtures {
 				new RequestSpec(method, path, headers, body), assertions, extractors));
 	}
 
-	/** 사용자는 삭제하지 않음. 기본 로그인 계정(TestAuthConfiguration)이 함께 지워지면 이후 요청이 401 */
 	/** 스위트 전체 실행 (실행 끝까지 대기). 다른 패키지 테스트의 데이터 준비용 */
 	public long runSuite(long suiteId, long environmentId, TestRun.Trigger trigger, Long triggeredBy) {
 		return testRunService.runSuite(suiteId, environmentId, trigger, triggeredBy);
 	}
 
+	/** 사용자는 삭제하지 않음. 기본 로그인 계정(TestAuthConfiguration)이 함께 지워지면 이후 요청이 401 */
 	public void deleteAll() {
 		changeLogs.deleteAllInBatch();
 		maintenanceWindows.deleteAllInBatch();
