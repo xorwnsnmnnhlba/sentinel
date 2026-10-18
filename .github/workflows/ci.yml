@@ -109,6 +109,8 @@ jobs:
       # 릴리스 버전: api·web 파일의 버전이 같은지 (태그 확인은 .github/workflows/release.yml)
       - run: bash scripts/release-version.test.sh
       - run: bash scripts/release-version.sh --check
+      # README 스택 버전 표 확인 스크립트 (릴리스 때 실행, PR마다 표를 확인하지는 않음)
+      - run: bash scripts/stack-versions.test.sh
 
   api:
     name: api (test)

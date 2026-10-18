@@ -184,6 +184,16 @@ docs: add branch convention
    scripts/release-version.sh --check
    ```
 
+   README 스택 버전 표도 실제 버전으로 (`web/package-lock.json`, Gradle 해석 결과, Gradle Wrapper 기준. Java 25 필요)
+
+   ```bash
+   scripts/stack-versions.sh         # 다른 버전 목록, 모두 같으면 종료 코드 0
+   scripts/stack-versions.sh --fix   # 다른 버전을 README에 반영
+   ```
+
+   - 확인할 행은 `scripts/stack-versions.list`. README 표에 행을 더하거나 이름을 바꾸면 목록도 함께 (CI의 scripts 작업이 없는 행을 찾음)
+   - PR마다 확인하지 않는 이유: 의존성 업데이트 PR(Dependabot)은 README를 고치지 않으므로 매번 실패함
+
    커밋 `chore: release 1.0.1`. PR 본문에 지난 태그 이후 변경 요약 (`git log --first-parent --oneline v1.0.0..main`)
 2. 머지 후 그 머지 커밋에 태그
 
