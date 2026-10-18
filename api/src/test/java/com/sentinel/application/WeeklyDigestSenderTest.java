@@ -20,9 +20,18 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.scheduling.support.CronExpression;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 /**
  * 주간 요약 발송 시점과 중복 방지. 자동 확인을 끄고 {@link WeeklyDigestSender#sendIfDue()}를 직접 호출하여 시각 제어.
@@ -146,6 +155,40 @@ class WeeklyDigestSenderTest {
 		// 재시작(새 인스턴스)해도 DB 기록으로 판단
 		assertThat(sender.sendIfDue()).isFalse();
 		assertThat(notifier.sent()).isEmpty();
+	}
+
+	@Test
+	void doesNotSendWhenAnotherSenderRecordedTheSameDigestFirst() {
+		clock.set(MONDAY_NINE.plusSeconds(30));
+		// 이 인스턴스가 확인한 뒤 기록하기 전에 다른 쪽(같은 DB를 쓰는 다른 기동)이 먼저 기록
+		deliveries.save(new DigestDelivery(MONDAY_NINE, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 16)));
+		DigestDeliveryRepository racing = mock(DigestDeliveryRepository.class, delegatesTo(deliveries));
+		doReturn(false).when(racing).existsByScheduledAt(MONDAY_NINE);
+		WeeklyDigestSender late = new WeeklyDigestSender(properties, scheduleProperties, digests, racing, notifier,
+				installation, transactions, clock);
+
+		// 기록이 유일 제약에 걸려 보내지 않고, 처리한 것으로 기억해 다시 확인하지 않음
+		assertThat(late.sendIfDue()).isFalse();
+		assertThat(late.sendIfDue()).isFalse();
+		assertThat(notifier.sent()).isEmpty();
+		verify(racing, times(1)).existsByScheduledAt(MONDAY_NINE);
+	}
+
+	@Test
+	void skipsWhileTheDatabaseIsUnavailableAndSendsOnceItRecovers() {
+		clock.set(MONDAY_NINE.plusSeconds(30));
+		DigestDeliveryRepository unreliable = mock(DigestDeliveryRepository.class, delegatesTo(deliveries));
+		doThrow(new DataAccessResourceFailureException("connection refused")).when(unreliable).existsByScheduledAt(any());
+		WeeklyDigestSender recovering = new WeeklyDigestSender(properties, scheduleProperties, digests, unreliable, notifier,
+				installation, transactions, clock);
+
+		assertThat(recovering.sendIfDue()).isFalse();
+		assertThat(notifier.sent()).isEmpty();
+
+		// 처리한 것으로 기억하지 않으므로 DB가 돌아오면 같은 예정분을 보냄
+		doAnswer(delegatesTo(deliveries)).when(unreliable).existsByScheduledAt(any());
+		assertThat(recovering.sendIfDue()).isTrue();
+		assertThat(notifier.sent()).extracting(Notification::title).containsExactly("[Sentinel] 주간 요약 08-10 ~ 08-16");
 	}
 
 	@Test
