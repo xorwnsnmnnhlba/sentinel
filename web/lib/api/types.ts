@@ -2,6 +2,16 @@
 
 export type Verdict = "PASSED" | "FAILED" | "ERROR";
 export type Outcome = "RESPONDED" | "ERROR";
+/** 응답을 받지 못했거나 보내기 전에 실패한 이유 (api/README.md "결과 해석") */
+export type ErrorReason =
+  | "UNRESOLVED_VARIABLE"
+  | "INVALID_REQUEST"
+  | "TIMEOUT"
+  | "CONNECTION_FAILED"
+  | "IO_ERROR"
+  | "TLS_ERROR"
+  | "BLOCKED_DESTINATION"
+  | "UNEXPECTED";
 export type Trigger = "MANUAL" | "SCHEDULED";
 /** ABORTED: 실행 중 앱 종료, CANCELED: 사용자가 중지 */
 export type RunStatus = "RUNNING" | "COMPLETED" | "ABORTED" | "CANCELED";
@@ -63,7 +73,7 @@ export interface RunResult {
   verdict: Verdict | null;
   outcome: Outcome;
   assertionResults: AssertionResult[];
-  errorReason: string | null;
+  errorReason: ErrorReason | null;
   errorMessage: string | null;
   elapsedMs: number | null;
   request: { method: string; url: string | null; headers: Headers | null; body: string | null };

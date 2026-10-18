@@ -4,11 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Headers, ResponseSchema, RunResult } from "@/lib/api/types";
+import { describeErrorReason } from "@/lib/error-reason";
 import { type ExtractionResult, splitExtractions } from "@/lib/extraction";
 import { prettyBody } from "@/lib/format";
 
 /**
- * 케이스 1건의 결과. 오류 사유, 응답을 받지 못해 다시 보낸 경우 그 횟수, 판정 규칙별 결과, 응답 값 추출 결과, 요청·응답 원문, 응답 구조
+ * 케이스 1건의 결과. 오류 사유(이름·확인할 점), 응답을 받지 못해 다시 보낸 경우 그 횟수, 판정 규칙별 결과, 응답 값 추출 결과, 요청·응답 원문, 응답 구조
  * 다른 케이스가 추출하는 변수가 비어 전송하지 못했으면 해결 방법 안내 (단건 실행은 "여기까지 실행", 그 외는 실행 순서 확인)
  * 보관기간이 지나 원문을 삭제한 실행(rawPurged)은 원문 대신 안내 문구 표시. 응답 구조는 원문과 달리 계속 표시
  */
@@ -35,20 +36,7 @@ export function ResultDetail({
         </p>
       )}
 
-      {result.errorReason && (
-        <div className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
-          <span className="font-semibold">{result.errorReason}</span>
-          {result.errorMessage && <span className="ml-2 break-all">{result.errorMessage}</span>}
-          {result.retries > 0 && <p className="mt-2">{result.retries}회 다시 보냈지만 응답을 받지 못했습니다</p>}
-          {missesExtractedValue(result) && (
-            <p className="mt-2">
-              {singleCase
-                ? '앞 케이스가 응답에서 추출하는 값입니다. 스위트 화면의 케이스 "⋯" 메뉴에서 "여기까지 실행"으로 앞 케이스와 함께 실행해 주세요'
-                : "값을 추출하는 케이스가 이 케이스보다 뒤에 있거나 추출에 실패했습니다. 실행 순서와 앞 케이스의 값 추출 결과를 확인해 주세요"}
-            </p>
-          )}
-        </div>
-      )}
+      {result.errorReason && <ErrorNotice reason={result.errorReason} result={result} singleCase={singleCase} />}
 
       {assertions.length > 0 && (
         <div className="rounded-md border">
@@ -117,6 +105,33 @@ export function ResultDetail({
             <Body body={result.request.body} />
           </TabsContent>
         </Tabs>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 오류 사유의 이름과 확인할 점. 원래 코드와 서버 메시지는 그대로 함께 표시 (문의·검색용)
+ * 앞 케이스가 추출하는 값이 비었으면 일반 안내 대신 해결 방법 안내
+ */
+function ErrorNotice({ reason, result, singleCase }: { reason: string; result: RunResult; singleCase: boolean }) {
+  const { label, hint } = describeErrorReason(reason);
+  return (
+    <div className="space-y-2 rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+      <p>
+        <span className="font-semibold">{label}</span>
+        {label !== reason && <span className="ml-2 font-mono text-xs">{reason}</span>}
+      </p>
+      {result.errorMessage && <p className="font-mono text-xs break-all">{result.errorMessage}</p>}
+      {result.retries > 0 && <p>{result.retries}회 다시 보냈지만 응답을 받지 못했습니다</p>}
+      {missesExtractedValue(result) ? (
+        <p>
+          {singleCase
+            ? '앞 케이스가 응답에서 추출하는 값입니다. 스위트 화면의 케이스 "⋯" 메뉴에서 "여기까지 실행"으로 앞 케이스와 함께 실행해 주세요'
+            : "값을 추출하는 케이스가 이 케이스보다 뒤에 있거나 추출에 실패했습니다. 실행 순서와 앞 케이스의 값 추출 결과를 확인해 주세요"}
+        </p>
+      ) : (
+        hint && <p>{hint}</p>
       )}
     </div>
   );

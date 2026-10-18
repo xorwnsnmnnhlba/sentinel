@@ -114,6 +114,45 @@ describe("ResultDetail", () => {
     expect(screen.queryByText(/다시 보낸 뒤 받은 응답/)).not.toBeInTheDocument();
   });
 
+  it("names the error and says what to check, keeping the code and message", () => {
+    render(
+      <ResultDetail
+        result={{
+          ...responded,
+          verdict: "ERROR",
+          outcome: "ERROR",
+          assertionResults: [],
+          errorReason: "TLS_ERROR",
+          errorMessage: "TLS_ERROR: GET https://gw.dev.internal/orders: PKIX path building failed",
+          response: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("인증서·TLS 오류")).toBeInTheDocument();
+    expect(screen.getByText("TLS_ERROR")).toBeInTheDocument();
+    expect(screen.getByText(/PKIX path building failed/)).toBeInTheDocument();
+    expect(screen.getByText(/대상 서버 인증서의 만료·발급자·이름을 확인해 주세요/)).toBeInTheDocument();
+  });
+
+  it("shows an unknown reason as it came", () => {
+    render(
+      <ResultDetail
+        result={{
+          ...responded,
+          verdict: "ERROR",
+          outcome: "ERROR",
+          errorReason: "NEW_REASON" as RunResult["errorReason"],
+          errorMessage: null,
+          response: null,
+        }}
+      />,
+    );
+
+    // 이름 자리에 코드 한 번만
+    expect(screen.getAllByText("NEW_REASON")).toHaveLength(1);
+  });
+
   it("mentions nothing about sending again when the first attempt responded", () => {
     render(<ResultDetail result={responded} />);
 
@@ -136,7 +175,10 @@ describe("ResultDetail", () => {
     render(<ResultDetail result={unsent} rawPurged />);
 
     expect(screen.getByText("GET (전송 전 실패)")).toBeInTheDocument();
+    expect(screen.getByText("변수 값 없음")).toBeInTheDocument();
     expect(screen.getByText("UNRESOLVED_VARIABLE")).toBeInTheDocument();
+    expect(screen.getByText("missing variable: token")).toBeInTheDocument();
+    expect(screen.getByText(/환경의 변수·시크릿 이름과 앞 케이스의 값 추출을 확인해 주세요/)).toBeInTheDocument();
     // 원문이 원래 없던 결과에는 삭제 안내를 붙이지 않음
     expect(screen.queryByText(/헤더와 본문을 삭제했습니다/)).not.toBeInTheDocument();
   });
@@ -189,6 +231,8 @@ describe("ResultDetail", () => {
 
     const { unmount } = render(<ResultDetail result={missing} singleCase />);
     expect(screen.getByText(/"여기까지 실행"으로 앞 케이스와 함께 실행해 주세요/)).toBeInTheDocument();
+    // 해결 방법을 알면 일반 안내는 생략
+    expect(screen.queryByText(/환경의 변수·시크릿 이름/)).not.toBeInTheDocument();
     unmount();
 
     render(<ResultDetail result={missing} />);
