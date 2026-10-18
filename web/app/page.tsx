@@ -6,6 +6,7 @@ import { PassRateMeter } from "@/components/dashboard/pass-rate-meter";
 import { Panel, PanelEmpty } from "@/components/catalog/section";
 import { FailingChannelList } from "@/components/dashboard/failing-channel-list";
 import { FailureCauseList } from "@/components/dashboard/failure-cause-list";
+import { GettingStarted } from "@/components/dashboard/getting-started";
 import { MonitoringGapList } from "@/components/dashboard/monitoring-gap-list";
 import { SlowdownTable } from "@/components/dashboard/slowdown-table";
 import { StatTile } from "@/components/dashboard/stat-tile";
@@ -15,14 +16,18 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiGet } from "@/lib/api/server";
 import type {
+  EnvironmentItem,
   FailureCauses,
   MaintenanceWindow,
   MonitoringGaps,
   NotificationChannel,
   Page,
+  ProjectItem,
   ResponseTimeChanges,
   RunSummary,
+  ScheduleDetail,
   Slowdown,
+  SuiteItem,
   SuiteSummaries,
   UnstableCases,
 } from "@/lib/api/types";
@@ -39,6 +44,7 @@ import {
   totals,
 } from "@/lib/dashboard";
 import { formatDateTime, formatProgress } from "@/lib/format";
+import { showGettingStarted, startSteps, type StartState } from "@/lib/getting-started";
 import { formatEnd } from "@/lib/maintenance";
 import { formatGapDuration, totalGapDuration } from "@/lib/monitoring-gap";
 import { defaultChannelConfigured, failingChannels, notificationsHref } from "@/lib/notification-delivery";
@@ -62,6 +68,7 @@ const RUNNING_REFRESH_MS = 3000;
 
 /**
  * 홈 대시보드. 기간(최근 7·30일, KST) 동안의 실행 현황과 이전 같은 길이 기간 대비 변화
+ * 스케줄이 하나도 없으면 맨 위에 처음 시작하기 (lib/getting-started.ts)
  */
 export default async function Dashboard(props: PageProps<"/">) {
   const searchParams = await props.searchParams;
@@ -82,6 +89,10 @@ export default async function Dashboard(props: PageProps<"/">) {
     slowdowns,
     failureCauses,
     channels,
+    projects,
+    environments,
+    suites,
+    schedules,
   ] = await Promise.all([
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(current)}`),
     apiGet<SuiteSummaries>(`/api/suite-summaries?${range(previous)}`),
@@ -94,7 +105,18 @@ export default async function Dashboard(props: PageProps<"/">) {
     apiGet<Slowdown[]>("/api/slowdowns"),
     apiGet<FailureCauses>(`/api/failure-causes?${range(current)}`),
     apiGet<NotificationChannel[]>("/api/notification-channels"),
+    apiGet<ProjectItem[]>("/api/projects"),
+    apiGet<EnvironmentItem[]>("/api/environments"),
+    apiGet<SuiteItem[]>("/api/suites"),
+    apiGet<ScheduleDetail[]>("/api/schedules"),
   ]);
+  const start: StartState = {
+    projects,
+    environments,
+    suites,
+    schedules,
+    defaultChannel: defaultChannelConfigured(channels),
+  };
   const gaps = monitoringGaps.gaps;
   const failing = failingChannels(channels);
   const maintenance = windows.filter((window) => window.active);
@@ -117,6 +139,9 @@ export default async function Dashboard(props: PageProps<"/">) {
         }
         actions={<PeriodLinks days={days} />}
       />
+
+      {/* 스케줄이 없으면 아직 자동 점검이 시작되지 않은 상태. 남은 단계를 맨 위에 */}
+      {showGettingStarted(start) && <GettingStarted steps={startSteps(start)} />}
 
       {/* 채널이 고장 나면 실패 알림도, 그 사실을 알릴 알림도 가지 않으므로 맨 위에. 없으면 표시하지 않음 */}
       {failing.length > 0 && (
