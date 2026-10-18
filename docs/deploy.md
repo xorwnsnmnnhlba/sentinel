@@ -29,7 +29,7 @@
 ```bash
 git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 git tag --sort=-v:refname | head -n 3   # 최신 릴리스 확인
-git checkout v1.0.0                      # 최신 릴리스 태그로
+git checkout v1.0.1                      # 최신 릴리스 태그로
 ```
 
 - 서버는 브랜치가 아니라 태그를 받으므로 git이 "detached HEAD"라고 안내하는 것이 정상
