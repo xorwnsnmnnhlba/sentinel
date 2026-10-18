@@ -10,6 +10,14 @@ export default defineConfig({
   resolve: { tsconfigPaths: true },
   test: {
     restoreMocks: true,
+    // npm run test:coverage. 수치 기준으로 실패시키지 않음 (보고서로 테스트가 닿지 않는 곳을 찾는 용도)
+    // 제외: 테스트 자체, shadcn/ui 생성 컴포넌트, async Server Component 화면(page·layout, Vitest 미지원이라 E2E가 확인)
+    coverage: {
+      provider: "v8",
+      include: ["app/**/*.{ts,tsx}", "components/**/*.tsx", "lib/**/*.ts", "proxy.ts"],
+      exclude: ["**/*.test.{ts,tsx}", "components/ui/**", "app/**/page.tsx", "app/**/layout.tsx"],
+      reporter: ["text-summary", "html", "json-summary"],
+    },
     projects: [
       {
         extends: true,

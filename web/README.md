@@ -263,6 +263,7 @@ npm run dev
 | `npm run format:check` | 서식 검사 (변경 없음) |
 | `npm test` | 테스트 1회 실행 |
 | `npm run test:watch` | 테스트 감시 모드 |
+| `npm run test:coverage` | 테스트 + 커버리지 보고서 (`coverage/index.html`). 수치 기준으로 실패시키지 않음, CI는 실행 요약·산출물 `web-coverage` |
 | `npm run e2e:up` | E2E 스택 기동 (PostgreSQL·api·web, 최초 실행 시 이미지 빌드) |
 | `npm run e2e` | E2E 테스트 실행 |
 | `npm run e2e:down` | E2E 스택 정리 (DB 데이터 삭제) |

@@ -31,7 +31,19 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
-      - run: npm test
+      # 커버리지는 보고만 (수치 기준으로 실패시키지 않음). 합계는 실행 요약, 자세한 내용은 산출물 web-coverage
+      - run: npm run test:coverage
+      - name: 커버리지 요약
+        run: |
+          {
+            echo '### web 커버리지'
+            jq -r '.total | "- 줄 \(.lines.pct)% (\(.lines.covered)/\(.lines.total))", "- 분기 \(.branches.pct)% (\(.branches.covered)/\(.branches.total))"' coverage/coverage-summary.json
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-coverage
+          path: web/coverage
+          retention-days: 14
       - run: npm run build
 
   e2e:
@@ -127,7 +139,23 @@ jobs:
       # Gradle 캐시, wrapper 체크섬 검증
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       # Testcontainers(PostgreSQL, WireMock)는 러너의 Docker 사용
-      - run: ./gradlew test
+      - run: ./gradlew test jacocoTestReport
+      # 커버리지는 보고만 (수치 기준으로 실패시키지 않음). 합계는 실행 요약, 자세한 내용은 산출물 api-coverage
+      - name: 커버리지 요약
+        run: |
+          python3 - build/reports/jacoco/test/jacocoTestReport.xml >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          counters = {c.get('type'): c for c in ET.parse(sys.argv[1]).getroot().findall('counter')}
+          print('### api 커버리지')
+          for kind, label in (('LINE', '줄'), ('BRANCH', '분기')):
+              missed, covered = int(counters[kind].get('missed')), int(counters[kind].get('covered'))
+              print(f'- {label} {100 * covered / (missed + covered):.1f}% ({covered}/{missed + covered})')
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: api-coverage
+          path: api/build/reports/jacoco/test/html
+          retention-days: 14
       - name: 실패 시 테스트 리포트 보관
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
