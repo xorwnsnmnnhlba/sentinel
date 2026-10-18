@@ -18,11 +18,8 @@ public class FakeRequestExecutor implements RequestExecutor {
 
 	private final List<ResolvedRequest> requests = new CopyOnWriteArrayList<>();
 
-	private volatile Function<ResolvedRequest, HttpExchange> behavior;
-
-	public FakeRequestExecutor() {
-		reset();
-	}
+	// 기본 응답 200. 생성 중에는 덮어쓸 수 있는 reset()을 부르지 않음
+	private volatile Function<ResolvedRequest, HttpExchange> behavior = responding(200, Map.of(), "");
 
 	@Override
 	public HttpExchange execute(ResolvedRequest request) {
@@ -31,7 +28,12 @@ public class FakeRequestExecutor implements RequestExecutor {
 	}
 
 	public void respond(int statusCode, Map<String, List<String>> headers, String body) {
-		behavior = request -> new HttpExchange(request, statusCode, headers, body, Duration.ofMillis(12));
+		behavior = responding(statusCode, headers, body);
+	}
+
+	private static Function<ResolvedRequest, HttpExchange> responding(int statusCode, Map<String, List<String>> headers,
+			String body) {
+		return request -> new HttpExchange(request, statusCode, headers, body, Duration.ofMillis(12));
 	}
 
 	/** 요청별 상태 코드로 응답. 판정 실패·통과를 경로마다 바꾸는 검증용 */

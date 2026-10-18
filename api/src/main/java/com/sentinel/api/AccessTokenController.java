@@ -47,7 +47,6 @@ class AccessTokenController {
 		return accessTokens.list(currentUser.get().id());
 	}
 
-	/** 폐기. 다른 사용자의 토큰은 404 */
 	/** 내 토큰 단건. 다른 사용자의 토큰은 404 */
 	@GetMapping("/{tokenId}")
 	AccessTokenService.AccessTokenItem get(@PathVariable long tokenId) {

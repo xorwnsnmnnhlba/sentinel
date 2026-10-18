@@ -1,5 +1,7 @@
 package com.sentinel.application.notification;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +20,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 로그인한 사용자 누구나 지정하는 주소이므로 실행기와 같은 목적지 확인(링크 로컬·클라우드 메타데이터 주소 차단)을 거치고
  * 리다이렉트를 따라가지 않음. 주소와 주소가 담긴 예외 메시지는 로그·응답에 남기지 않음 (자격증명)
  */
-public class WebhookSender implements AutoCloseable {
+public class WebhookSender implements Closeable {
 
 	private static final ObjectMapper JSON = JsonMapper.builder().build();
 
@@ -50,8 +52,8 @@ public class WebhookSender implements AutoCloseable {
 	}
 
 	@Override
-	public void close() throws Exception {
-		if (executor instanceof AutoCloseable closeable) {
+	public void close() throws IOException {
+		if (executor instanceof Closeable closeable) {
 			closeable.close();
 		}
 	}
