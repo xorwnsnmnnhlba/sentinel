@@ -500,6 +500,7 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
   - api 이미지 점검은 OS 패키지 확인용으로 유지(`--expect Ubuntu`). 같은 취약점이 두 결과에 모두 나오면 한 번만 셈
   - Gradle 의존성 그래프 제출에서 빌드 도구 클래스패스(`classpath`) 제외. 앱·이미지에 없는 의존성의 Dependabot 경고 방지
   - `shadcn`은 개발 의존성으로: 빌드 때 CSS(`shadcn/tailwind.css`)만 쓰는 CLI. 올려서 고칠 버전이 없는 취약점(2.0.0 이상 전부)이 딸린 패키지와 함께 운영 점검 대상에서 빠짐
+- jar의 jarmode 도구 제외 (2026-10-18): Spring Boot 플러그인이 `spring-boot-jarmode-tools`(jar 풀기·계층 이미지용)를 jar에 직접 넣어 앱 실행 클래스패스에 없음 → Gradle 해석 결과 점검·의존성 그래프 제출 모두 대상 밖. 이미지는 `java -jar`로 바로 실행해 쓰지 않으므로 `bootJar`의 `includeTools = false`로 제외 (배포물과 점검 범위 일치)
   - api·web 이미지를 한 점검에서 함께 판정하므로 둘을 한 PR로 (한쪽만 고친 PR은 다른 쪽 때문에 통과할 수 없음)
 
 ## 6. 실행 환경

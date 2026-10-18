@@ -27,6 +27,12 @@ springBoot {
 	buildInfo()
 }
 
+// jar 풀기·계층 이미지용 도구(spring-boot-jarmode-tools)는 넣지 않음. 이미지는 java -jar로 바로 실행 (api/Dockerfile)
+// 이 도구는 Spring Boot 플러그인이 직접 넣어 앱 의존성(runtimeClasspath)에 없으므로 주간 의존성 점검(OSV)이 보지 못함 (2026-10-18)
+tasks.named('bootJar') {
+	includeTools = false
+}
+
 repositories {
 	mavenCentral()
 }
