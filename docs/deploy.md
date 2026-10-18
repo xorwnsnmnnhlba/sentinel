@@ -21,6 +21,16 @@
 - 내부 DNS: 접속 이름(예: `sentinel.<내부 도메인>`)을 서버 IP로 등록
 - 방화벽: 443 허용 (HTTP로 들어와도 HTTPS로 이동시키려면 80도). web 3000·api 8080은 `127.0.0.1`에만 열려 있어 추가 조치 불필요
 - RDS 보안 그룹: 서버 IP에서 5432 인바운드 허용
+- RDS 타임아웃: Sentinel DB 계정으로 접속해 확인 (계정·DB별 설정이 파라미터 그룹보다 우선). 조건과 이유는 `docs/design.md` "연결 실패 처리"
+
+  ```sql
+  SHOW statement_timeout;                    -- 0 또는 30초 이상
+  SHOW idle_session_timeout;                 -- 0 또는 5분 초과 (PostgreSQL 14 이상)
+  SHOW idle_in_transaction_session_timeout;  -- 0 또는 30초 이상
+  ```
+
+  - 서버에 psql이 없으면 `docker run --rm -it postgres:18-alpine psql "host=<RDS 엔드포인트> dbname=<DB> user=<계정> sslmode=require"`
+  - 조건에 맞지 않으면 그 값을 바꾸거나 계정에만 따로 지정 (`ALTER ROLE <계정> SET idle_session_timeout = 0`)
 - 시계 동기화(NTP): 인증서 유효기간 판정·스케줄 시각의 기준
 - 디스크: 이미지 빌드 여유 공간. 컨테이너 로그는 서비스당 최대 50MB(10MB × 5)로 순환
 
