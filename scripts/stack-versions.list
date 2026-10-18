@@ -1,0 +1,61 @@
+# scripts/stack-versions.sh가 확인할 문서의 버전. 한 줄에 하나: 문서|표의 행 이름|셀 안에서 버전 앞에 오는 글자|실제 버전 출처
+# - 표의 행 이름 셀 바로 다음 셀에서 버전을 찾음. 버전 앞 글자를 비우면 그 셀의 첫 버전
+# - 출처: npm:<패키지> (web/package-lock.json), maven:<그룹:아티팩트> (Gradle 해석 결과), gradle (Wrapper)
+# - 대상 아님: Java·Node.js(로컬 설치), DB·Docker 이미지 태그 (의존성 파일에 없음)
+# - README 표에 행을 더하거나 이름을 바꾸면 여기도 함께 (scripts/stack-versions.test.sh가 없는 행을 찾음)
+README.md|Spring Boot||maven:org.springframework.boot:spring-boot
+README.md|Spring Boot|Spring Framework |maven:org.springframework:spring-core
+README.md|Hibernate ORM||maven:org.hibernate.orm:hibernate-core
+README.md|Lombok||maven:org.projectlombok:lombok
+README.md|PostgreSQL JDBC||maven:org.postgresql:postgresql
+README.md|Gradle||gradle
+README.md|Next.js||npm:next
+README.md|React||npm:react
+README.md|TypeScript||npm:typescript
+README.md|Tailwind CSS||npm:tailwindcss
+README.md|shadcn/ui|CLI |npm:shadcn
+README.md|TanStack Query||npm:@tanstack/react-query
+api/README.md|Gradle||gradle
+api/README.md|Spring Boot||maven:org.springframework.boot:spring-boot
+api/README.md|Spring Framework||maven:org.springframework:spring-core
+api/README.md|Spring Data JPA||maven:org.springframework.data:spring-data-jpa
+api/README.md|Hibernate ORM||maven:org.hibernate.orm:hibernate-core
+api/README.md|Jakarta Persistence||maven:jakarta.persistence:jakarta.persistence-api
+api/README.md|Hibernate Validator||maven:org.hibernate.validator:hibernate-validator
+api/README.md|Jackson||maven:tools.jackson.core:jackson-databind
+api/README.md|Tomcat (내장)||maven:org.apache.tomcat.embed:tomcat-embed-core
+api/README.md|HikariCP||maven:com.zaxxer:HikariCP
+api/README.md|PostgreSQL JDBC||maven:org.postgresql:postgresql
+api/README.md|Flyway||maven:org.flywaydb:flyway-core
+api/README.md|QueryDSL||maven:io.github.openfeign.querydsl:querydsl-jpa
+api/README.md|SnakeYAML Engine||maven:org.snakeyaml:snakeyaml-engine
+api/README.md|Testcontainers||maven:org.testcontainers:testcontainers
+api/README.md|Lombok||maven:org.projectlombok:lombok
+web/README.md|Next.js||npm:next
+web/README.md|React / React DOM||npm:react
+web/README.md|TypeScript||npm:typescript
+web/README.md|Tailwind CSS||npm:tailwindcss
+web/README.md|Tailwind CSS|`@tailwindcss/postcss` |npm:@tailwindcss/postcss
+web/README.md|Tailwind CSS|`tw-animate-css` |npm:tw-animate-css
+web/README.md|shadcn/ui|CLI |npm:shadcn
+web/README.md|shadcn/ui|`radix-ui` |npm:radix-ui
+web/README.md|아이콘|lucide-react |npm:lucide-react
+web/README.md|글꼴|Pretendard |npm:pretendard
+web/README.md|클래스 유틸|`cn` |npm:cn
+web/README.md|클래스 유틸|class-variance-authority |npm:class-variance-authority
+web/README.md|TanStack Query||npm:@tanstack/react-query
+web/README.md|ESLint||npm:eslint
+web/README.md|ESLint|`eslint-config-next` |npm:eslint-config-next
+web/README.md|ESLint|`eslint-config-prettier` |npm:eslint-config-prettier
+web/README.md|Prettier||npm:prettier
+web/README.md|Prettier|`prettier-plugin-tailwindcss` |npm:prettier-plugin-tailwindcss
+web/README.md|Vitest||npm:vitest
+web/README.md|Vitest|Vite |npm:vite
+web/README.md|Vitest|jsdom |npm:jsdom
+web/README.md|MSW||npm:msw
+web/README.md|Playwright||npm:@playwright/test
+web/README.md|Playwright|`@axe-core/playwright` |npm:@axe-core/playwright
+web/README.md|Testing Library|React |npm:@testing-library/react
+web/README.md|Testing Library|DOM |npm:@testing-library/dom
+web/README.md|Testing Library|user-event |npm:@testing-library/user-event
+web/README.md|Testing Library|jest-dom |npm:@testing-library/jest-dom
