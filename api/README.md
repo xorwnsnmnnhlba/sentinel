@@ -77,7 +77,11 @@ Lombok은 IntelliJ 번들 플러그인으로 인식. **Settings → Build, Execu
 ```bash
 ./gradlew build     # 컴파일 + 테스트 + jar 생성
 ./gradlew test      # 테스트만 실행
+./gradlew test jacocoTestReport   # 테스트 + 커버리지 보고서 (build/reports/jacoco/test/html)
 ```
+
+- 컴파일러 경고는 모두 켜고 경고가 있으면 실패 (`-Xlint:all` + `-Werror`, `build.gradle`). 제외: `classfile`(QueryDSL jar), `serial`, `processing`
+- 커버리지(JaCoCo)는 보고만 하고 수치 기준으로 실패시키지 않음. 테스트가 닿지 않는 곳을 찾는 용도. QueryDSL Q 클래스 제외. CI는 실행 요약에 줄·분기 비율, 산출물 `api-coverage`에 HTML 보고서
 
 테스트는 Testcontainers 기반이므로 Docker 실행 필요. DB 환경변수·RDS 접속 불필요
 

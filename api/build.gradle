@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	id 'jacoco'
 	id 'org.springframework.boot' version '4.1.1'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -93,4 +94,18 @@ tasks.register('downloadDependencies') {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// 테스트 커버리지 보고서 (./gradlew test jacocoTestReport → build/reports/jacoco). 수치 기준으로 실패시키지 않음
+// JaCoCo는 Gradle 기본 버전. 테스트 단계에서만 쓰여 이미지(bootJar)에는 영향 없음
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+	reports {
+		xml.required = true
+		html.required = true
+	}
+	// QueryDSL이 만든 Q 클래스(엔티티별 조회용)는 제외
+	classDirectories.setFrom(files(classDirectories.files.collect { dir ->
+		fileTree(dir) { exclude 'com/sentinel/domain/Q*.class' }
+	}))
 }
