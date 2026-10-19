@@ -11,21 +11,21 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 
 | 구분 | 버전 |
 |------|------|
-| Next.js | 16.3.5 (App Router, Turbopack) |
-| React / React DOM | 19.2.8 |
+| Next.js | 16.4.2 (App Router, Turbopack) |
+| React / React DOM | 19.3.1 |
 | TypeScript | 5.9.3 |
 | Tailwind CSS | 4.3.3 (`@tailwindcss/postcss` 4.3.3, `tw-animate-css` 1.4.0) |
-| shadcn/ui | CLI 4.21.0, 스타일 `radix-nova` (Radix UI 기반, `radix-ui` 1.6.7) |
-| 아이콘 | lucide-react 1.47.0 |
+| shadcn/ui | CLI 4.21.5, 스타일 `radix-nova` (Radix UI 기반, `radix-ui` 1.8.1) |
+| 아이콘 | lucide-react 1.57.0 |
 | 글꼴 | Pretendard 1.3.9 (동적 서브셋 자체 배포), Geist Mono (`next/font`) |
-| 클래스 유틸 | `cn` 0.3.0 (shadcn 공식, clsx + tailwind-merge 대체), class-variance-authority 0.7.1 |
-| TanStack Query | 5.103.1 |
-| ESLint | 9.39.5 (`eslint-config-next` 16.3.5, `eslint-config-prettier` 10.1.8) |
-| Prettier | 3.9.8 (`prettier-plugin-tailwindcss` 0.8.1) |
-| Vitest | 5.0.1 (Vite 8.3.0, jsdom 30.1.0) |
-| MSW | 2.15.0 |
-| Playwright | 1.63.0 (chromium), 접근성 검사 `@axe-core/playwright` 4.13.0 |
-| Testing Library | React 16.3.3, DOM 10.4.2, user-event 14.6.7, jest-dom 7.0.1 |
+| 클래스 유틸 | `cn` 0.4.0 (shadcn 공식, clsx + tailwind-merge 대체), class-variance-authority 0.7.1 |
+| TanStack Query | 5.104.3 |
+| ESLint | 9.39.5 (`eslint-config-next` 16.4.2, `eslint-config-prettier` 10.1.8) |
+| Prettier | 3.9.10 (`prettier-plugin-tailwindcss` 0.8.1) |
+| Vitest | 5.0.5 (Vite 8.3.3, jsdom 30.1.3) |
+| MSW | 3.0.3 |
+| Playwright | 1.64.1 (chromium), 접근성 검사 `@axe-core/playwright` 4.14.0 |
+| Testing Library | React 16.3.3, DOM 10.4.2, user-event 14.6.8, jest-dom 7.0.1 |
 | Node.js | 로컬 24.21.0, Docker `node:24-alpine` (Next.js 요구사항 20.9.0 이상) |
 
 `package-lock.json` 설치 버전 기준
