@@ -1,6 +1,6 @@
 # Sentinel 사용 설명서
 
-Ver: 1.1.0  
+Ver: 1.1.1  
 설치는 2장, 되돌리기·인증서 교체·백업 등 운영 세부는 [deploy.md](deploy.md), API 형식은 [api/README.md](../api/README.md)
 
 ## 목차
@@ -114,7 +114,7 @@ Ver: 1.1.0
 ```bash
 git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 git tag --sort=-v:refname | head -n 3
-git checkout v1.1.0
+git checkout v1.1.1
 ```
 
 - 둘째 줄로 최신 릴리스 태그 확인, 셋째 줄은 그 태그로
@@ -277,7 +277,7 @@ docker compose up -d --build --wait
 
 1. `https://<접속 이름>` 접속 시 인증서 경고 없음 (내부 인증 기관은 루트 인증서를 등록한 PC에서), `http://`는 `https://`로 이동
 2. 최초 관리자로 로그인
-3. 사이드바 "시스템 상태": 버전 1.1.0, 암호화 키 "사용 중", 알림·감시 설정이 "설정됨" (없는 항목은 `sentinel.env` 확인)
+3. 사이드바 "시스템 상태": 버전 1.1.1, 암호화 키 "사용 중", 알림·감시 설정이 "설정됨" (없는 항목은 `sentinel.env` 확인)
 4. "알림 이력" → "기본 채널 테스트 알림"으로 기본 채널에 메시지가 오는지 확인
 5. 생존 신호를 설정했다면 외부 감시 서비스에 첫 신호 도착 (1분 안)
 
@@ -309,7 +309,7 @@ docker compose up -d --build --wait
 ```bash
 git fetch --tags
 git describe --tags
-git checkout v1.1.0
+git checkout v1.1.1
 scripts/preflight.sh
 docker compose pull --ignore-buildable
 docker compose build --pull
@@ -982,6 +982,7 @@ staging 환경의 기본 URL, Sentinel 서버에서 그 주소로 가는 네트�
 
 | 버전 | 날짜 | 내용 |
 |------|------|------|
+| 1.1.1 | 2026-10-19 | 배포 jar에서 쓰지 않는 도구 라이브러리(jarmode) 제외. 의존성 업데이트 (Next.js 16.4.2, React 19.3.1 등). 사용 방법 변화 없음 |
 | 1.1.0 | 2026-10-18 | 결과 화면의 오류 사유를 코드 대신 이름과 확인할 점으로 표시 (11.1). 스케줄이 없는 동안 홈 맨 위에 처음 시작하기 (4장). 사용 설명서 추가 |
 | 1.0.1 | 2026-10-17 | IPv4·IPv6 주소가 모두 있는 대상에서 인증서·TLS 오류가 연결 실패(`CONNECTION_FAILED`)로 보이던 문제 수정. 이제 `TLS_ERROR`(인증서·TLS 오류)로 기록 |
 | 1.0.0 | 2026-10-17 | 첫 릴리스 |
