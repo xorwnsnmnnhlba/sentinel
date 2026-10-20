@@ -1,6 +1,7 @@
 package com.sentinel.runner.assertion;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -12,6 +13,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static com.sentinel.runner.assertion.AssertionTestSupport.response;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class SimpleAssertionsTest {
 
@@ -74,12 +78,26 @@ class SimpleAssertionsTest {
 	}
 
 	@Test
+	void comparesEveryValueOfARepeatedHeader() {
+		var exchange = response(200, Map.of("Set-Cookie", List.of("a=1", "b=2")), "", Duration.ZERO);
+
+		AssertionResult equals = new HeaderAssertion("Set-Cookie", Operator.EQUALS, "b=2").evaluate(exchange);
+		assertThat(equals.passed()).isTrue();
+		assertThat(equals.message()).isEqualTo("was [a=1, b=2]");
+		assertThat(new HeaderAssertion("Set-Cookie", Operator.NOT_EQUALS, "b=2").evaluate(exchange).passed()).isFalse();
+		assertThat(new HeaderAssertion("Set-Cookie", Operator.NOT_EQUALS, "c=3").evaluate(exchange).passed()).isTrue();
+		assertThat(new HeaderAssertion("X-Missing", Operator.EXISTS, null).evaluate(exchange).passed()).isFalse();
+	}
+
+	@Test
 	void validatesHeaderAssertion() {
 		assertThatThrownBy(() -> new HeaderAssertion("X", Operator.GREATER_THAN, "1"))
 			.isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> new HeaderAssertion("X", Operator.EQUALS, null))
 			.isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> new HeaderAssertion("X", Operator.MATCHES, "(")).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> new HeaderAssertion(" ", Operator.EXISTS, null)).hasMessage("header.name must not be blank");
+		assertThatThrownBy(() -> new HeaderAssertion("X", null, null)).isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
@@ -96,6 +114,25 @@ class SimpleAssertionsTest {
 			assertThat(result.passed()).isFalse();
 		});
 		assertThat(AssertionEvaluator.evaluate(null, response(200, "")).getFirst().passed()).isTrue();
+	}
+
+	@Test
+	void recordsARuleThatThrowsAsAFailureAndKeepsEvaluating() {
+		BodyContainsAssertion broken = mock(BodyContainsAssertion.class);
+		when(broken.evaluate(any())).thenThrow(new IllegalStateException("boom"));
+		when(broken.describe()).thenReturn("body contains \"x\"");
+
+		List<AssertionResult> results = AssertionEvaluator.evaluate(
+				List.of(broken, new StatusCodeAssertion(List.of("200"))), response(200, ""));
+
+		assertThat(results).extracting(AssertionResult::passed).containsExactly(false, true);
+		assertThat(results.getFirst().message()).isEqualTo("evaluation error: boom");
+	}
+
+	@Test
+	void rejectsAMissingStatusCode() {
+		assertThatThrownBy(() -> new StatusCodeAssertion(Arrays.asList("200", null)))
+			.hasMessageContaining("invalid status code pattern: ''");
 	}
 
 	@Test
