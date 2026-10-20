@@ -3,11 +3,14 @@ package com.sentinel.api;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import com.sentinel.TestAuthConfiguration;
 import com.sentinel.TestcontainersConfiguration;
 import com.sentinel.application.FakeRequestExecutorConfiguration;
 import com.sentinel.application.TestFixtures;
+import com.sentinel.application.importing.CaseImportService;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestSuite;
@@ -212,6 +215,26 @@ class CaseImportTest {
 		assertThat(post("/api/case-imports", """
 				{"suiteId": 999999, "cases": [{"name": "x", "request": {"method": "GET", "path": "/x"}}]}"""))
 			.hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void importsAtMost500CasesAtOnceAndPointsAtAnEmptyEntry() {
+		String tooMany = IntStream.rangeClosed(1, CaseImportService.MAX_CASES + 1)
+			.mapToObj(i -> "{\"name\": \"c%d\", \"request\": {\"method\": \"GET\", \"path\": \"/c%d\"}}".formatted(i, i))
+			.collect(Collectors.joining(","));
+
+		assertThat(post("/api/case-imports", "{\"suiteId\": %d, \"cases\": [%s]}".formatted(suite.getId(), tooMany)))
+			.hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("at most 500 cases can be imported at once");
+		assertThat(post("/api/case-imports", """
+				{"suiteId": %d, "cases": [{"name": "Fine", "request": {"method": "GET", "path": "/fine"}}, null]}"""
+			.formatted(suite.getId()))).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.detail")
+			.isEqualTo("cases[1] must not be null");
+		assertThat(testCases.findActiveInRunOrder(suite.getId())).isEmpty();
 	}
 
 	private MvcTestResult preview(long suiteId, String document) {

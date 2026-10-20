@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.sentinel.application.InvalidRequestException;
+import com.sentinel.domain.RequestSpec;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
 import org.junit.jupiter.api.Test;
@@ -160,6 +161,92 @@ class PostmanConverterTest {
 	}
 
 	@Test
+	void sendsOAuth2AndQueryApiKeysAsVariables() {
+		ConvertedDocument document = collection("""
+				{"name": "OAuth", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/me", "host": ["{{baseUrl}}"], "path": ["me"]},
+				  "auth": {"type": "oauth2", "oauth2": [{"key": "accessToken", "value": "{{accessToken}}"}]}}},
+				{"name": "Key in query", "request": {"method": "GET",
+				  "url": {"raw": "{{baseUrl}}/items?page=1", "host": ["{{baseUrl}}"], "path": ["items"], "query": [{"key": "page", "value": "1"}]},
+				  "auth": {"type": "apikey", "apikey": [{"key": "key", "value": "tenant"}, {"key": "value", "value": "{{tenant}}"}, {"key": "in", "value": "query"}]}}},
+				{"name": "Key without name", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/x", "host": ["{{baseUrl}}"], "path": ["x"]},
+				  "auth": {"type": "apikey", "apikey": [{"key": "value", "value": "{{k}}"}]}}}""");
+
+		assertThat(document.cases().get(0).request().headers())
+			.containsExactly(Map.entry("Authorization", List.of("Bearer {{accessToken}}")));
+		assertThat(document.cases().get(1).request().path()).isEqualTo("/items?page=1&tenant={{tenant}}");
+		assertThat(document.cases().get(1).request().headers()).isEmpty();
+		assertThat(document.cases().get(2).request().headers()).isEmpty();
+		assertThat(document.cases().get(2).warnings()).containsExactly("API key auth has no key name and was left out");
+	}
+
+	@Test
+	void setsTheContentTypeOfRawBodiesByLanguage() {
+		ConvertedDocument document = collection("""
+				{"name": "Xml", "request": {"method": "POST", "url": "https://api.example.com/xml",
+				  "body": {"mode": "raw", "raw": "<order/>", "options": {"raw": {"language": "xml"}}}}},
+				{"name": "Text", "request": {"method": "POST", "url": "https://api.example.com/text",
+				  "body": {"mode": "raw", "raw": "ping", "options": {"raw": {"language": "text"}}}}},
+				{"name": "Html", "request": {"method": "POST", "url": "https://api.example.com/html",
+				  "body": {"mode": "raw", "raw": "<p/>", "options": {"raw": {"language": "html"}}}}},
+				{"name": "Empty", "request": {"method": "POST", "url": "https://api.example.com/empty",
+				  "body": {"mode": "raw", "raw": ""}}},
+				{"name": "Form off", "request": {"method": "POST", "url": "https://api.example.com/form",
+				  "body": {"mode": "urlencoded", "urlencoded": [{"key": "a", "value": "1", "disabled": true}]}}}""");
+
+		assertThat(document.cases()).extracting(draft -> draft.request().body())
+			.containsExactly("<order/>", "ping", "<p/>", null, null);
+		assertThat(document.cases()).extracting(draft -> draft.request().headers().get("Content-Type"))
+			.containsExactly(List.of("application/xml"), List.of("text/plain"), null, null, null);
+	}
+
+	@Test
+	void warnsAboutBodiesItCannotKeep() {
+		ConvertedDocument document = collection("""
+				{"name": "Bad variables", "request": {"method": "POST", "url": "https://api.example.com/graphql",
+				  "body": {"mode": "graphql", "graphql": {"query": "{ me { id } }", "variables": "{not json"}}}},
+				{"name": "Huge", "request": {"method": "POST", "url": "https://api.example.com/huge",
+				  "body": {"mode": "raw", "raw": "%s"}}}""".formatted("x".repeat(RequestSpec.MAX_BODY_LENGTH + 1)));
+
+		CaseDraft graphql = document.cases().get(0);
+		assertThat(graphql.request().body()).contains("\"query\"").doesNotContain("variables");
+		assertThat(graphql.warnings()).containsExactly("GraphQL variables are not valid JSON and were left out");
+		assertThat(document.cases().get(1).request().body()).isNull();
+		assertThat(document.cases().get(1).warnings())
+			.containsExactly("request body exceeds " + RequestSpec.MAX_BODY_LENGTH + " characters; body left empty");
+	}
+
+	@Test
+	void readsUrlsWrittenInOtherShapes() {
+		ConvertedDocument document = collection("""
+				{"name": "Port", "request": {"method": "GET",
+				  "url": {"protocol": "https", "host": "api.example.com", "port": "8443", "path": "v1/health"}}},
+				{"name": "Segments", "request": {"method": "GET",
+				  "url": {"host": ["api", "example", "com"], "path": ["orders", {"type": "string", "value": "recent"}]}}},
+				{"name": "No url", "request": {"method": "GET"}},
+				{"name": "Host only", "request": {"method": "GET", "url": {"raw": "/status", "path": ["status"]}}}""");
+
+		assertThat(document.cases()).extracting(draft -> draft.request().path())
+			.containsExactly("/v1/health", "/orders/recent", "/", "/status");
+		// 프로토콜·포트가 있으면 함께, 호스트가 없으면 서버 목록에 넣지 않음
+		assertThat(document.servers()).containsExactly("https://api.example.com:8443", "api.example.com");
+	}
+
+	@Test
+	void fillsInMissingNamesAndMethodsAndWarnsAboutEveryScript() {
+		ConvertedDocument document = collection("""
+				{"item": [{"name": "Health", "request": {"url": "https://api.example.com/health"},
+				  "event": [{"listen": "test", "script": {"exec": "pm.test('ok')"}},
+				            {"listen": "prerequest", "script": {"exec": ["   "]}}]}]},
+				{"request": {"method": "DELETE", "url": "https://api.example.com/cache"}}""");
+
+		assertThat(document.cases()).extracting(CaseDraft::name)
+			.containsExactly("(folder) / Health", "DELETE https://api.example.com/cache");
+		assertThat(document.cases().get(0).request().method()).isEqualTo(HttpMethod.GET);
+		// 내용이 있는 스크립트만 경고
+		assertThat(document.cases().get(0).warnings()).containsExactly("test script is not supported; add assertions instead");
+	}
+
+	@Test
 	void rejectsDocumentsThatAreNotCollectionV2() {
 		assertThatThrownBy(() -> converter.convert("""
 				{"id": "e1", "name": "dev", "values": [{"key": "token", "value": "x"}], "_postman_variable_scope": "environment"}"""))
@@ -181,6 +268,12 @@ class PostmanConverterTest {
 				 "item": [{"name": "empty folder", "item": []}]}"""))
 			.isInstanceOf(InvalidRequestException.class)
 			.hasMessage("collection defines no supported requests");
+	}
+
+	private ConvertedDocument collection(String items) {
+		return converter.convert("""
+				{"info": {"name": "Inline", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+				 "item": [%s]}""".formatted(items));
 	}
 
 	private CaseDraft draft(String name) {

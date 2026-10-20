@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.sentinel.application.InvalidRequestException;
+import com.sentinel.domain.RequestSpec;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
 import org.junit.jupiter.api.Test;
@@ -269,6 +270,108 @@ class OpenApiConverterTest {
 		assertThat(document.cases().getFirst().warnings()).singleElement()
 			.asString()
 			.startsWith("request body: reference '#/components/requestBodies/");
+	}
+
+	@Test
+	void joinsSeveralRequiredQueryParametersAndSkipsWhatItCannotSend() {
+		ConvertedDocument document = converter.convert("""
+				openapi: 3.0.3
+				info: { title: Search, version: "1" }
+				paths:
+				  /search:
+				    get:
+				      parameters:
+				        - { name: q, in: query, required: true }
+				        - { name: page, in: query, required: true }
+				        - { name: session, in: cookie, required: true }
+				        - { in: query, required: true }
+				      responses: { "200": { description: ok } }
+				""");
+
+		CaseDraft search = document.cases().getFirst();
+		assertThat(search.request().path()).isEqualTo("/search?q={{q}}&page={{page}}");
+		// 이름·위치가 없는 파라미터는 조용히 건너뜀
+		assertThat(search.warnings()).containsExactly("required cookie parameter 'session' is not supported");
+	}
+
+	@Test
+	void appendsAQueryApiKeyAfterOtherQueryParameters() {
+		ConvertedDocument document = converter.convert("""
+				openapi: 3.0.3
+				info: { title: Tenant, version: "1" }
+				components:
+				  securitySchemes:
+				    tenantKey: { type: apiKey, in: query, name: tenant }
+				security: [ { tenantKey: [] } ]
+				paths:
+				  /items:
+				    get:
+				      parameters: [ { name: page, in: query, required: true } ]
+				      responses: { "200": { description: ok } }
+				""");
+
+		assertThat(document.cases().getFirst().request().path()).isEqualTo("/items?page={{page}}&tenant={{tenantKey}}");
+	}
+
+	@Test
+	void warnsAboutBodiesItCannotBuildAndExamplesItCannotFetch() {
+		String huge = "x".repeat(RequestSpec.MAX_BODY_LENGTH);
+		ConvertedDocument document = converter.convert("""
+				openapi: 3.0.3
+				info: { title: Bodies, version: "1" }
+				paths:
+				  /empty:
+				    post:
+				      requestBody: { required: true, content: { application/json: {} } }
+				      responses: { "201": { description: ok } }
+				  /optional:
+				    post:
+				      requestBody: { content: { application/json: {} } }
+				      responses: { "201": { description: ok } }
+				  /external:
+				    post:
+				      requestBody:
+				        content:
+				          application/json:
+				            examples: { remote: { externalValue: "https://example.com/order.json" } }
+				            schema: { type: object, properties: { id: { type: integer } } }
+				      responses: { "201": { description: ok } }
+				  /huge:
+				    post:
+				      requestBody: { content: { application/json: { example: { text: "%s" } } } }
+				      responses: { "201": { description: ok } }
+				""".formatted(huge));
+
+		assertThat(document.cases()).extracting(draft -> draft.request().body()).containsExactly(null, null,
+				"{\n  \"id\": 0\n}", null);
+		assertThat(document.cases()).extracting(CaseDraft::warnings)
+			.containsExactly(List.of("request body has no JSON example or schema; body left empty"), List.of(),
+					List.of("external example 'https://example.com/order.json' is not supported",
+							"request body was generated from the schema; replace the placeholder values"),
+					List.of("request body example exceeds " + RequestSpec.MAX_BODY_LENGTH + " characters; body left empty"));
+	}
+
+	@Test
+	void warnsAboutReferencesThatPointNowhereAndSkipsBrokenPaths() {
+		ConvertedDocument document = converter.convert("""
+				openapi: 3.0.3
+				info: { title: Refs, version: "1" }
+				paths:
+				  /missing: { $ref: "#/components/pathItems/gone" }
+				  /scalar: "not an operation"
+				  /broken: { get: "not an operation" }
+				  /ok:
+				    get: { responses: { "200": { description: ok } } }
+				""");
+
+		assertThat(document.cases()).extracting(CaseDraft::source).containsExactly("GET /ok");
+		assertThat(document.warnings()).contains("/missing: reference '#/components/pathItems/gone' was not found");
+	}
+
+	@Test
+	void namesTheVersionItFound() {
+		assertThatThrownBy(() -> converter.convert("openapi: 2.0\npaths: {}"))
+			.hasMessage("only OpenAPI 3 documents are supported (found openapi 2.0)");
 	}
 
 	@Test
