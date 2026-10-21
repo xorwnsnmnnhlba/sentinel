@@ -313,7 +313,8 @@ class PostmanConverterTest {
 			.containsExactly(Map.entry("Authorization", List.of("Bearer {{bearerToken}}")));
 		// 적힌 토큰이 없으므로 "평문을 바꿨다"는 경고 없이 등록 안내만
 		assertThat(document.cases().getFirst().warnings()).isEmpty();
-		assertThat(document.warnings()).contains("add {{bearerToken}} as a secret of the environment (bearer token)");
+		assertThat(document.warnings()).contains("add {{bearerToken}} as a secret of the environment (bearer token)"
+				+ ", or if a login request issues it, extract it into {{bearerToken}} in an earlier case");
 	}
 
 	@Test

@@ -285,7 +285,11 @@ test("Postman 컬렉션에서 케이스 가져오기", async ({ page }) => {
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("후보 2건")).toBeVisible();
   // 평문 토큰은 변수로 바뀌었다는 안내만 표시되고 값은 화면에 없음
-  await expect(dialog.getByText("add {{bearerToken}} as a secret of the environment (bearer token)")).toBeVisible();
+  await expect(
+    dialog.getByText(
+      "add {{bearerToken}} as a secret of the environment (bearer token), or if a login request issues it, extract it into {{bearerToken}} in an earlier case",
+    ),
+  ).toBeVisible();
   expect(await page.content()).not.toContain("literal-e2e-token");
   await dialog.getByRole("button", { name: "2건 가져오기" }).click();
 

@@ -103,6 +103,14 @@ final class ImportDocuments {
 		return "{{" + sanitized + "}}";
 	}
 
+	/**
+	 * 로그인 API가 발급하는 토큰(만료됨)은 고정 시크릿 대신 앞 케이스의 값 추출로 받는 방법도 안내.
+	 * 시크릿에 넣은 토큰은 만료되면 그때부터 점검이 실패함
+	 */
+	static String loginTokenHint(String variable) {
+		return ", or if a login request issues it, extract it into " + variable + " in an earlier case";
+	}
+
 	static String truncateName(String name) {
 		return name.length() <= MAX_NAME_LENGTH ? name : name.substring(0, MAX_NAME_LENGTH);
 	}

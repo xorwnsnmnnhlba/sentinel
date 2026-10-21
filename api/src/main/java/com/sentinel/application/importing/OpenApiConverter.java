@@ -228,8 +228,11 @@ final class OpenApiConverter {
 				warnings.add("security scheme '" + schemeName + "' (" + describe(scheme) + ") is not supported");
 				continue;
 			}
+			boolean token = "oauth2".equals(type) || "openIdConnect".equals(type)
+					|| ("http".equals(type) && "bearer".equalsIgnoreCase(text(scheme.get("scheme"))));
 			securityNotes.putIfAbsent(schemeName, "security scheme '" + schemeName + "' is sent as " + applied
-					+ "; add " + variable + " as a secret of the environment");
+					+ "; add " + variable + " as a secret of the environment"
+					+ (token ? ImportDocuments.loginTokenHint(variable) : ""));
 		}
 	}
 
