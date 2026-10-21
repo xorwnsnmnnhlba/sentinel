@@ -1,0 +1,30 @@
+{
+  "mappings": [
+    {
+      "scenarioName": "outage",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "Outage",
+      "request": { "method": "POST", "urlPath": "/demo/outage/start" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "outage": true } }
+    },
+    {
+      "scenarioName": "outage",
+      "requiredScenarioState": "Outage",
+      "request": { "method": "POST", "urlPath": "/demo/outage/start" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "outage": true } }
+    },
+    {
+      "scenarioName": "outage",
+      "requiredScenarioState": "Outage",
+      "newScenarioState": "Started",
+      "request": { "method": "POST", "urlPath": "/demo/outage/stop" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "outage": false } }
+    },
+    {
+      "scenarioName": "outage",
+      "requiredScenarioState": "Started",
+      "request": { "method": "POST", "urlPath": "/demo/outage/stop" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "outage": false } }
+    }
+  ]
+}

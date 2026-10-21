@@ -372,6 +372,56 @@ dev 환경의 API 1개를 평일 오전마다 점검하고 실패하면 알림 �
 
 케이스가 많으면 4번 대신 OpenAPI·Postman 문서에서 가져오기 (8.3 참고)
 
+### 데모로 체험하기 (실제 API 없이)
+
+점검할 API가 아직 없을 때, 함께 들어 있는 데모 API로 점검 등록 → 스케줄 → 실패·복구 알림까지 해 보는 방법. 설치한 서버(또는 로컬)에서 실행
+
+데모 API (`demo/`, WireMock)
+
+| 요청 | 응답 |
+|------|------|
+| `GET /health` | 200 `{"status": "UP"}` |
+| `POST /auth/login` (`{"username": "demo", "password": "demo-password"}`) | 200 `{"token": ...}`, 그 외 401 |
+| `GET /orders` (`Authorization: Bearer` 토큰) | 200 주문 목록. 장애 스위치를 켜면 503, 토큰 없으면 401 |
+| `GET /orders/101` | 200 주문 1건, 다른 번호는 404 |
+| `GET /reports/daily` | 200, 0.2~2.5초 사이로 응답 시간이 들쭉날쭉 |
+
+1. 데모 API 기동
+
+   ```bash
+   docker compose --profile demo up -d sentinel-demo-api
+   ```
+
+2. 프로젝트 `데모`, 환경 `demo` (기본 URL `http://sentinel-demo-api:8080`, 변수 `orderId` = `101`), 스위트 `데모 쇼핑몰` 등록
+3. 스위트 화면 "문서 가져오기" → "OpenAPI 3 (JSON·YAML)" → 저장소의 `demo/openapi.yaml` 내용 → 5건 모두 가져오기
+   - "add {{token}} as a secret" 경고는 무시. 데모는 시크릿 대신 로그인 응답에서 토큰을 받음 (다음 단계)
+4. `Login` 케이스 수정 → 값 추출: 변수 이름 `token`, 위치 본문 JSON 값 `$.token`, 값 가리기 → 저장
+   - 뒤 케이스들의 `Authorization: Bearer {{token}}`이 이 값으로 채워짐. 결과에는 `****`로 가려 저장
+5. `Daily report` 케이스에 응답 시간 판정 `2000`ms 추가 → 가끔 실패해 "불안정" 배지·실패 원인을 볼 수 있음
+6. 스위트 "실행" → 모두 통과 확인 (응답 시간이 길면 `Daily report`만 실패할 수 있음)
+7. 스케줄 추가: 환경 `demo`, cron `* * * * *` (1분마다)
+8. 장애 켜기 → 1~2분 안에 `List orders`가 503으로 실패, "알림 이력"에 `새로 실패` 알림
+
+   ```bash
+   curl -X POST http://127.0.0.1:18089/demo/outage/start
+   ```
+
+9. 장애 끄기 → 다음 실행에서 복구 알림
+
+   ```bash
+   curl -X POST http://127.0.0.1:18089/demo/outage/stop
+   ```
+
+10. 정리: 스케줄 끄기 또는 삭제, 데모 프로젝트 삭제, 데모 API 중지
+
+    ```bash
+    docker compose --profile demo stop sentinel-demo-api
+    ```
+
+- 알림 채널(Webhook)을 지정해 두면 같은 알림이 Slack·Teams로도 감
+- 장애 스위치는 같은 PC(`127.0.0.1:18089`)에서만 열림. 데모 API를 다시 시작하면 장애가 꺼진 상태로 돌아감
+- 데모 API는 `--profile demo`를 줄 때만 뜸. 평소 `docker compose up`에는 포함되지 않음
+
 ## 5. 점검 만들기
 
 ### 5.1 프로젝트

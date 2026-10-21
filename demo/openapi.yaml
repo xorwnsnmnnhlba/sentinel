@@ -1,0 +1,50 @@
+# 체험용 점검 대상(데모 API) 문서. 화면의 "문서 가져오기"에 붙여 넣어 케이스 생성 (docs/manual.md "데모로 체험하기")
+# 응답은 demo/wiremock/mappings. 인증 스킴 이름(token)이 로그인 케이스의 값 추출 변수 이름과 같아 {{token}}으로 이어짐
+openapi: 3.0.3
+info:
+  title: Sentinel Demo Shop
+  version: "1.0"
+servers:
+  - url: http://sentinel-demo-api:8080
+components:
+  securitySchemes:
+    token:
+      type: http
+      scheme: bearer
+security:
+  - token: []
+paths:
+  /health:
+    get:
+      summary: Health
+      security: []
+      responses:
+        "200": { description: up }
+  /auth/login:
+    post:
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { username: demo, password: demo-password }
+      responses:
+        "200": { description: session token }
+  /orders:
+    get:
+      summary: List orders
+      responses:
+        "200": { description: orders }
+  /orders/{orderId}:
+    get:
+      summary: Get order
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: order }
+  /reports/daily:
+    get:
+      summary: Daily report
+      responses:
+        "200": { description: report, sometimes slow }
