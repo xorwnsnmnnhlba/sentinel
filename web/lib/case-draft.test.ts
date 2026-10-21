@@ -12,6 +12,7 @@ import {
   newAssertion,
   newExtractor,
   parseExpected,
+  ruleSummary,
   toDraft,
   validateDraft,
 } from "./case-draft";
@@ -363,4 +364,23 @@ describe("expected value round trip", () => {
       expect(validateDraft(form)).toMatchObject({ ok: true, payload: { assertions: [{ expected }] } });
     },
   );
+});
+
+describe("ruleSummary", () => {
+  it("names the rules as the editor does and falls back to the default rule", () => {
+    expect(
+      ruleSummary([
+        { type: "statusCode", anyOf: ["200"] },
+        { type: "responseTime", maxMillis: 2000 },
+      ]),
+    ).toBe("상태 코드, 응답 시간");
+    expect(ruleSummary([{ type: "jsonPath" }, { type: "header" }, { type: "bodyContains" }])).toBe(
+      "JSON 값 (JsonPath), 응답 헤더, 본문 포함",
+    );
+    expect(ruleSummary([])).toBe("기본 (2xx)");
+  });
+
+  it("shows an unknown rule by its code", () => {
+    expect(ruleSummary([{ type: "schema" }, { type: "toString" }])).toBe("schema, toString");
+  });
 });

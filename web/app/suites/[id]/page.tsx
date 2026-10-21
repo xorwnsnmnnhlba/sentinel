@@ -43,6 +43,7 @@ import type {
   SuiteItem,
   UnstableCases,
 } from "@/lib/api/types";
+import { ruleSummary } from "@/lib/case-draft";
 import { historyHref, suiteHistoryHref } from "@/lib/change-log";
 import { formatDateTime } from "@/lib/format";
 import { slowdownDetail, slowdownsByCase } from "@/lib/slowdown";
@@ -196,11 +197,7 @@ export default async function SuitePage(props: PageProps<"/suites/[id]">) {
                       </p>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {testCase.assertions.length > 0
-                      ? testCase.assertions.map((assertion) => assertion.type).join(", ")
-                      : "기본 (2xx)"}
-                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{ruleSummary(testCase.assertions)}</TableCell>
                   <TableCell className="text-right">
                     <ActionMenu
                       label={`케이스 ${testCase.name} 작업`}
