@@ -1,0 +1,53 @@
+# 변이 검사. 코드를 조금씩 바꿔(변이) 테스트가 그 변화를 잡아내는지 확인. 커버리지와 달리 "실행만 되고 확인하지 않는" 테스트를 찾음
+# - api: PIT. 외부 연결 없이 도는 판정·값 추출·구조 지문(runner)과 문서 변환(importing) (api/build.gradle의 pitest)
+# - web: 아직 없음. Stryker 10.0.0의 Vitest 연결 도구가 Vitest 5 이전 공개라 변이마다 테스트를 하나도 돌리지 않음 (2026-10-20 확인)
+#   Stryker가 Vitest 5를 지원하면 추가
+# 오래 걸려 PR마다 돌리지 않고 주 1회. 보고만 하고 점수 기준으로 실패시키지 않음 (살아남은 변이는 보고서를 보고 테스트 보강)
+name: Mutation
+
+on:
+  schedule:
+    # 화요일 09:00 KST (월요일 의존성 업데이트를 반영한 뒤)
+    - cron: "0 0 * * 2"
+  workflow_dispatch:
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: api (pitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: zulu
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - run: ./gradlew pitest
+      - name: 변이 점수 요약
+        run: |
+          python3 - build/reports/pitest/mutations.xml >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import sys, collections, xml.etree.ElementTree as ET
+          statuses = collections.Counter(m.get('status') for m in ET.parse(sys.argv[1]).getroot().findall('mutation'))
+          total = sum(statuses.values())
+          detected = statuses['KILLED'] + statuses['TIMED_OUT'] + statuses['MEMORY_ERROR']
+          print('### api 변이 검사')
+          print(f'- 점수 {100 * detected / total:.1f}% ({detected}/{total})')
+          print(f"- 살아남음 {statuses['SURVIVED']}, 테스트가 닿지 않음 {statuses['NO_COVERAGE']}")
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: api-mutation
+          path: api/build/reports/pitest
+          retention-days: 14
