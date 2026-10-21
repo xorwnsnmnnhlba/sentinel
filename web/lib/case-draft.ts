@@ -50,6 +50,18 @@ export const ASSERTION_LABELS: Record<AssertionType, string> = {
   bodyContains: "본문 포함",
 };
 
+/**
+ * 목록에 보일 판정 규칙 요약. 편집 화면과 같은 이름, 규칙이 없으면 기본 판정. 모르는 종류는 코드 그대로
+ */
+export function ruleSummary(assertions: Assertion[]): string {
+  if (assertions.length === 0) {
+    return "기본 (2xx)";
+  }
+  return assertions
+    .map(({ type }) => (Object.hasOwn(ASSERTION_LABELS, type) ? ASSERTION_LABELS[type as AssertionType] : type))
+    .join(", ");
+}
+
 /** 입력 중 상태. 숫자·목록도 문자열로 보관하고 저장 시 변환 */
 export type AssertionDraft =
   | { type: "statusCode"; anyOf: string }
