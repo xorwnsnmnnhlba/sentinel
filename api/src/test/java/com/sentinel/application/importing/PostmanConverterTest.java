@@ -247,10 +247,84 @@ class PostmanConverterTest {
 	}
 
 	@Test
+	void keepsAContentTypeTheRequestAlreadySets() {
+		ConvertedDocument document = collection("""
+				{"name": "Vendor json", "request": {"method": "POST", "url": "https://api.example.com/orders",
+				  "header": [{"key": "content-type", "value": "application/vnd.api+json"}],
+				  "body": {"mode": "raw", "raw": "{}", "options": {"raw": {"language": "json"}}}}}""");
+
+		assertThat(document.cases().getFirst().request().headers())
+			.containsExactly(Map.entry("content-type", List.of("application/vnd.api+json")));
+	}
+
+	@Test
+	void leavesOutADisabledBodyAndKeepsOneUpToTheLengthLimit() {
+		String exact = "x".repeat(RequestSpec.MAX_BODY_LENGTH);
+		ConvertedDocument document = collection("""
+				{"name": "Off", "request": {"method": "POST", "url": "https://api.example.com/a",
+				  "body": {"mode": "raw", "raw": "ping", "disabled": true}}},
+				{"name": "Fits", "request": {"method": "POST", "url": "https://api.example.com/b",
+				  "body": {"mode": "raw", "raw": "%s"}}}""".formatted(exact));
+
+		assertThat(document.cases()).extracting(draft -> draft.request().body()).containsExactly(null, exact);
+	}
+
+	@Test
+	void readsAQueryRightAfterTheHostAndIgnoresHeaderLinesWithoutAName() {
+		ConvertedDocument document = converter.convert("""
+				{
+				  "info": {"name": "Old", "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"},
+				  "item": [{"name": "Search", "request": {"method": "GET", "header": ": no name\\nAccept: text/plain",
+				            "url": "https://api.example.com?q=1"}}]
+				}""");
+
+		CaseDraft search = document.cases().getFirst();
+		assertThat(search.request().path()).isEqualTo("/?q=1");
+		assertThat(search.request().headers()).containsExactly(Map.entry("Accept", List.of("text/plain")));
+	}
+
+	@Test
+	void showsAVariableHostWithoutAValueThatIsNotAnAddress() {
+		ConvertedDocument document = converter.convert("""
+				{"info": {"name": "Hosts", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+				 "variable": [{"key": "baseUrl", "value": "localhost:8080"}],
+				 "item": [{"name": "Ping", "request": {"method": "GET",
+				   "url": {"raw": "{{baseUrl}}/ping", "host": ["{{baseUrl}}"], "path": ["ping"]}}}]}""");
+
+		assertThat(document.servers()).containsExactly("{{baseUrl}}");
+	}
+
+	@Test
+	void judgesOnlyBySavedResponsesInThe2xxRange() {
+		ConvertedDocument document = collection("""
+				{"name": "Redirect", "request": {"method": "GET", "url": "https://api.example.com/old"},
+				 "response": [{"name": "moved", "code": 300}]}""");
+
+		assertThat(document.cases().getFirst().assertions()).containsExactly(new StatusCodeAssertion(List.of("2xx")));
+	}
+
+	@Test
+	void sendsABearerTokenVariableWhenTheTokenIsMissing() {
+		ConvertedDocument document = collection("""
+				{"name": "No token", "request": {"method": "GET", "url": "https://api.example.com/me",
+				  "auth": {"type": "bearer"}}}""");
+
+		assertThat(document.cases().getFirst().request().headers())
+			.containsExactly(Map.entry("Authorization", List.of("Bearer {{bearerToken}}")));
+		// 적힌 토큰이 없으므로 "평문을 바꿨다"는 경고 없이 등록 안내만
+		assertThat(document.cases().getFirst().warnings()).isEmpty();
+		assertThat(document.warnings()).contains("add {{bearerToken}} as a secret of the environment (bearer token)");
+	}
+
+	@Test
 	void rejectsDocumentsThatAreNotCollectionV2() {
 		assertThatThrownBy(() -> converter.convert("""
 				{"id": "e1", "name": "dev", "values": [{"key": "token", "value": "x"}], "_postman_variable_scope": "environment"}"""))
 			.isInstanceOf(InvalidRequestException.class)
+			.hasMessage("this is a Postman environment, not a collection");
+		// 예전 내보내기에는 _postman_variable_scope가 없음
+		assertThatThrownBy(() -> converter.convert("""
+				{"id": "e2", "name": "staging", "values": [{"key": "baseUrl", "value": "https://staging.example.com"}]}"""))
 			.hasMessage("this is a Postman environment, not a collection");
 		assertThatThrownBy(() -> converter.convert("""
 				{"id": "c1", "name": "v1", "order": [], "requests": []}"""))

@@ -2,6 +2,7 @@ package com.sentinel.runner.assertion;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,23 @@ class ValuesTest {
 
 		assertThat(Values.jsonEquals(actual, expected)).isFalse();
 		assertThat(Values.jsonEquals(actual, new HashMap<>(actual))).isTrue();
+	}
+
+	@Test
+	void neverEqualsAnArrayOrObjectWithADifferentKindOfValue() {
+		assertThat(Values.jsonEquals(List.of("a"), "a")).isFalse();
+		assertThat(Values.jsonEquals("a", List.of("a"))).isFalse();
+		assertThat(Values.jsonEquals(Map.of("a", 1), List.of(1))).isFalse();
+		assertThat(Values.jsonEquals(List.of(1), Map.of("a", 1))).isFalse();
+	}
+
+	@Test
+	void keepsValuesUpToTheLengthLimitWhole() {
+		String exact = "x".repeat(198);
+
+		// 따옴표를 더해 200자는 그대로, 201자부터 줄임
+		assertThat(Values.format(exact)).isEqualTo("\"" + exact + "\"");
+		assertThat(Values.format(exact + "y")).endsWith("...");
 	}
 
 	@Test

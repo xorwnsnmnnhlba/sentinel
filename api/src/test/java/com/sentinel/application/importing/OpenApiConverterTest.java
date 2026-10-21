@@ -252,6 +252,44 @@ class OpenApiConverterTest {
 	}
 
 	@Test
+	void keepsNamesWithinTheLimitWhenNumberingThem() {
+		String limit = "N".repeat(ImportDocuments.MAX_NAME_LENGTH);
+		ConvertedDocument document = converter.convert("""
+				openapi: 3.0.0
+				info: { title: Long, version: "1" }
+				paths:
+				  /a: { get: { summary: "%1$s", responses: { "200": { description: ok } } } }
+				  /b: { get: { summary: "%1$s", responses: { "200": { description: ok } } } }
+				  /c: { get: { summary: "%1$s", responses: { "200": { description: ok } } } }
+				""".formatted(limit + "TAIL"));
+
+		// 한도(200자)에서 자르고, 번호를 붙일 때도 한도 안에서 이름 끝을 줄임
+		assertThat(document.cases()).extracting(CaseDraft::name)
+			.containsExactly(limit, "N".repeat(ImportDocuments.MAX_NAME_LENGTH - 4) + " (2)",
+					"N".repeat(ImportDocuments.MAX_NAME_LENGTH - 4) + " (3)");
+	}
+
+	@Test
+	void keepsAStringExampleBodyUpToTheLengthLimit() {
+		String exact = "x".repeat(RequestSpec.MAX_BODY_LENGTH);
+		ConvertedDocument document = converter.convert("""
+				openapi: 3.0.3
+				info: { title: Text, version: "1" }
+				paths:
+				  /fits:
+				    post:
+				      requestBody: { content: { application/json: { example: "%1$s" } } }
+				      responses: { "201": { description: ok } }
+				  /over:
+				    post:
+				      requestBody: { content: { application/json: { example: "%1$sx" } } }
+				      responses: { "201": { description: ok } }
+				""".formatted(exact));
+
+		assertThat(document.cases()).extracting(draft -> draft.request().body()).containsExactly(exact, null);
+	}
+
+	@Test
 	void stopsFollowingCircularReferences() {
 		ConvertedDocument document = converter.convert("""
 				openapi: 3.0.0
@@ -406,6 +444,10 @@ class OpenApiConverterTest {
 			.hasMessage("document must not be empty");
 		assertThatThrownBy(() -> converter.convert("openapi: [3.0.0")).isInstanceOf(InvalidRequestException.class)
 			.hasMessageStartingWith("document is not valid JSON or YAML: ");
+		// 한도와 같은 길이는 크기 때문에 거부하지 않음 (내용이 OpenAPI가 아니라서 거부)
+		assertThatThrownBy(() -> converter.convert("x".repeat(ImportDocuments.MAX_CONTENT_LENGTH)))
+			.isInstanceOf(InvalidRequestException.class)
+			.hasMessageNotContaining("characters");
 		assertThatThrownBy(() -> converter.convert("x".repeat(ImportDocuments.MAX_CONTENT_LENGTH + 1)))
 			.isInstanceOf(InvalidRequestException.class)
 			.hasMessage("document must be at most " + ImportDocuments.MAX_CONTENT_LENGTH + " characters");
