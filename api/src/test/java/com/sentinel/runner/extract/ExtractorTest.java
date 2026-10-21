@@ -87,6 +87,32 @@ class ExtractorTest {
 	}
 
 	@Test
+	void failsOnJsonThatIsCutOff() {
+		Extraction extraction = new Extractor("token", Source.BODY, "$.token", false)
+			.extract(exchange(Map.of(), "{\"token\": \"abc"));
+
+		assertThat(extraction.message()).isEqualTo("response body is not JSON");
+	}
+
+	@Test
+	void keepsValuesUpToTheLengthLimitWholeInTheMessage() {
+		String exact = "x".repeat(198);
+		Extraction extraction = new Extractor("value", Source.BODY, "$.value", false)
+			.extract(exchange(Map.of(), "{\"value\": \"" + exact + "\"}"));
+
+		assertThat(extraction.message()).isEqualTo("was \"" + exact + "\"");
+	}
+
+	@Test
+	void acceptsAnExpressionUpToTheLengthLimit() {
+		String header = "X-" + "a".repeat(498);
+
+		assertThat(new Extractor("value", Source.HEADER, header, false).expression()).hasSize(500);
+		assertThatThrownBy(() -> new Extractor("value", Source.HEADER, header + "a", false))
+			.isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
 	void shortensLongValuesInTheMessage() {
 		String longValue = "x".repeat(300);
 		Extraction extraction = new Extractor("value", Source.BODY, "$.value", false)

@@ -90,6 +90,24 @@ class SimpleAssertionsTest {
 	}
 
 	@Test
+	void failsHeaderContainsAndMatchesWhenNoValueFits() {
+		var exchange = response(200, Map.of("Content-Type", List.of("text/html")), "", Duration.ZERO);
+
+		assertThat(new HeaderAssertion("Content-Type", Operator.CONTAINS, "json").evaluate(exchange).passed()).isFalse();
+		assertThat(new HeaderAssertion("Content-Type", Operator.MATCHES, "^application/").evaluate(exchange).passed())
+			.isFalse();
+	}
+
+	@Test
+	void describesRulesForResultsAndAlerts() {
+		assertThat(new BodyContainsAssertion("OK").describe()).isEqualTo("body contains \"OK\"");
+		assertThat(new ResponseTimeAssertion(2000).describe()).isEqualTo("response time <= 2000ms");
+		assertThat(new HeaderAssertion("Content-Type", Operator.CONTAINS, "json").describe())
+			.isEqualTo("header Content-Type contains \"json\"");
+		assertThat(new HeaderAssertion("X-Trace", Operator.EXISTS, null).describe()).isEqualTo("header X-Trace exists");
+	}
+
+	@Test
 	void validatesHeaderAssertion() {
 		assertThatThrownBy(() -> new HeaderAssertion("X", Operator.GREATER_THAN, "1"))
 			.isInstanceOf(IllegalArgumentException.class);

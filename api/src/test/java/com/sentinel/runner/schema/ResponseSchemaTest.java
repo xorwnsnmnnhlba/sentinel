@@ -97,6 +97,21 @@ class ResponseSchemaTest {
 	}
 
 	@Test
+	void stopsNestedArraysAtTheDepthLimitToo() {
+		String deep = "[".repeat(ResponseSchema.MAX_DEPTH + 5) + "1" + "]".repeat(ResponseSchema.MAX_DEPTH + 5);
+
+		assertThat(ResponseSchema.of(JSON, deep).orElseThrow().complete()).isFalse();
+	}
+
+	@Test
+	void staysCompleteWhenOnlyEmptyContainersSitAtTheDepthLimit() {
+		String deep = "{\"a\":".repeat(ResponseSchema.MAX_DEPTH) + "{}" + "}".repeat(ResponseSchema.MAX_DEPTH);
+
+		// 빈 객체는 더 기록할 것이 없으므로 일부만 기록한 것이 아님
+		assertThat(ResponseSchema.of(JSON, deep).orElseThrow().complete()).isTrue();
+	}
+
+	@Test
 	void stopsAtTheFieldLimit() {
 		ResponseSchema schema = ResponseSchema.of(JSON, manyFields()).orElseThrow();
 
