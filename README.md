@@ -17,6 +17,7 @@ sentinel/
  ├─ api/                  Spring Boot 백엔드 (러너, 스케줄러, API)
  ├─ web/                  Next.js 프론트엔드 (BFF, 화면)
  ├─ docs/                 설계 문서
+ ├─ demo/                 체험용 점검 대상(데모 API, WireMock)과 가져오기용 OpenAPI 문서
  ├─ scripts/              배포 전 점검(preflight.sh), 성능 점검(perf/)
  ├─ .github/workflows/    CI (PR·main 푸시마다 web lint·서식·테스트·빌드, api 테스트, E2E)
  ├─ docker-compose.e2e.yml E2E 테스트용 독립 스택 (PostgreSQL·api·web·HTTPS 앞단, 포트 13443·18080)
@@ -131,6 +132,8 @@ curl -s -X POST localhost:8080/api/runs -H 'Content-Type: application/json' -d '
 - 빈 DB 기준 스위트·환경 ID는 1. 그 외에는 파일 안의 ID 조회 쿼리 사용
 - 결과 `summary`: 통과 2, 실패 1, 오류 1 (실패 알림 확인용 의도적 실패 2건 포함)
 - 스케줄 등록, GW 케이스 템플릿: 파일 안 주석 참고
+
+화면으로 처음부터 체험하려면 데모 API(`docker compose --profile demo up -d sentinel-demo-api`)와 사용 설명서 "데모로 체험하기" ([docs/manual.md](docs/manual.md)): 문서 가져오기 → 값 추출 → 스케줄 → 장애 스위치로 실패·복구 알림
 
 ### 4. 로컬 개발 실행
 

@@ -1,0 +1,9 @@
+{
+  "request": { "method": "GET", "urlPath": "/reports/daily" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "date": "today", "orders": 42, "revenue": 504000 },
+    "delayDistribution": { "type": "uniform", "lower": 200, "upper": 2500 }
+  }
+}

@@ -86,6 +86,20 @@ services:
       timeout: 3s
       retries: 20
 
+  # 체험용 점검 대상(데모 API). 실제 API 없이 점검 등록 → 스케줄 → 실패·복구 알림을 해 보는 용도 (docs/manual.md "데모로 체험하기")
+  # demo 프로필로만 기동: docker compose --profile demo up -d sentinel-demo-api. 기본 up에는 포함되지 않음
+  # Sentinel은 같은 Docker 네트워크의 http://sentinel-demo-api:8080으로 호출. 장애 스위치는 같은 PC의 127.0.0.1:18089
+  sentinel-demo-api:
+    image: wiremock/wiremock:3.13.2
+    container_name: sentinel-demo-api
+    profiles: [demo]
+    logging: *logging
+    command: ["--disable-banner"]
+    ports:
+      - "127.0.0.1:18089:8080"
+    volumes:
+      - ./demo/wiremock:/home/wiremock:ro
+
 volumes:
   caddy_data:
   caddy_config:
