@@ -394,7 +394,7 @@ dev 환경의 API 1개를 평일 오전마다 점검하고 실패하면 알림 �
 
 2. 프로젝트 `데모`, 환경 `demo` (기본 URL `http://sentinel-demo-api:8080`, 변수 `orderId` = `101`), 스위트 `데모 쇼핑몰` 등록
 3. 스위트 화면 "문서 가져오기" → "OpenAPI 3 (JSON·YAML)" → 저장소의 `demo/openapi.yaml` 내용 → 5건 모두 가져오기
-   - "add {{token}} as a secret" 경고는 무시. 데모는 시크릿 대신 로그인 응답에서 토큰을 받음 (다음 단계)
+   - 인증 안내 "add {{token}} as a secret of the environment, or if a login request issues it, extract it into {{token}} in an earlier case": 데모는 뒤쪽 방법(로그인 응답에서 값 추출, 다음 단계)
 4. `Login` 케이스 수정 → 값 추출: 변수 이름 `token`, 위치 본문 JSON 값 `$.token`, 값 가리기 → 저장
    - 뒤 케이스들의 `Authorization: Bearer {{token}}`이 이 값으로 채워짐. 결과에는 `****`로 가려 저장
 5. `Daily report` 케이스에 응답 시간 판정 `2000`ms 추가 → 가끔 실패해 "불안정" 배지·실패 원인을 볼 수 있음
@@ -675,7 +675,7 @@ cron 예
   - 경로 파라미터 `{petId}` → `{{petId}}`, 필수 query·header 파라미터도 변수로
   - 판정 규칙은 문서의 2xx 응답 코드, 없으면 `2xx`
   - JSON 요청 본문은 예시 값, 없으면 스키마로 만든 자리 표시 값 (경고 확인 후 수정)
-  - 인증은 `Authorization: Bearer {{스킴 이름}}` 등 변수로. 어떤 변수를 시크릿으로 등록할지 경고에 안내
+  - 인증은 `Authorization: Bearer {{스킴 이름}}` 등 변수로. 어떤 변수를 시크릿으로 등록할지 경고에 안내. 로그인 API가 발급하는 토큰은 시크릿 대신 앞 케이스의 값 추출로 같은 이름의 변수에 받음 (8.2, 데모 4장)
   - Postman의 평문 자격증명은 변수로 바꾸고 값은 남기지 않음. 스크립트(pre-request·test)는 미지원
 - 지원하지 않는 문서: Swagger 2.0, Postman v1 컬렉션·환경 파일
 - 세부 변환 규칙은 [api/README.md](../api/README.md) "케이스 가져오기"

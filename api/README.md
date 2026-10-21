@@ -667,12 +667,12 @@ deploy-check:
 
 | 보안 스킴 | 요청 |
 |-----------|------|
-| `http` `bearer`, `oauth2`, `openIdConnect` | `Authorization: Bearer {{스킴 이름}}`. 토큰 발급은 미지원이라 발급받은 토큰을 시크릿으로 등록 |
+| `http` `bearer`, `oauth2`, `openIdConnect` | `Authorization: Bearer {{스킴 이름}}`. 고정 토큰은 시크릿으로, 로그인 API가 발급하는 토큰(만료됨)은 앞 케이스의 값 추출로 같은 이름의 변수에 받음 |
 | `http` `basic` | `Authorization: Basic {{스킴 이름}}`. 값은 `아이디:비밀번호`를 Base64로 인코딩한 문자열 |
 | `apiKey` header·query | `X-API-Key: {{스킴 이름}}`, `?tenant={{스킴 이름}}`처럼 지정한 이름·위치에 추가 |
 | `apiKey` cookie, 그 밖의 `http` 스킴(digest 등) | 미지원 경고 |
 
-- 사용한 스킴마다 "어떤 변수를 시크릿으로 등록해야 하는지" 문서 단위 안내 1건 (`warnings`)
+- 사용한 스킴마다 "어떤 변수를 시크릿으로 등록해야 하는지" 문서 단위 안내 1건 (`warnings`). 토큰 스킴(bearer·oauth2·openIdConnect)은 로그인 케이스에서 값 추출로 받는 방법도 함께. Postman의 bearer·oauth2 토큰도 같음
 
 스키마 기반 본문 뼈대 (값은 자리 표시용)
 - 스키마의 `example` → `default` → `const` → `enum` 첫 값이 있으면 그대로 사용

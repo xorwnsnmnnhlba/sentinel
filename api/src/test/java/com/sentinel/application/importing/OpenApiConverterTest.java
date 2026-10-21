@@ -147,11 +147,11 @@ class OpenApiConverterTest {
 			.containsExactly(Map.entry("Authorization", List.of("Bearer {{oauth}}")));
 		// 어떤 변수를 시크릿으로 등록해야 하는지 스킴마다 한 번 안내
 		assertThat(document.warnings()).containsExactly(
-				"security scheme 'bearerAuth' is sent as 'Authorization: Bearer {{bearerAuth}}'; add {{bearerAuth}} as a secret of the environment",
+				"security scheme 'bearerAuth' is sent as 'Authorization: Bearer {{bearerAuth}}'; add {{bearerAuth}} as a secret of the environment, or if a login request issues it, extract it into {{bearerAuth}} in an earlier case",
 				"security scheme 'apiKeyHeader' is sent as 'X-API-Key: {{apiKeyHeader}}'; add {{apiKeyHeader}} as a secret of the environment",
 				"security scheme 'tenantKey' is sent as query tenant={{tenantKey}}; add {{tenantKey}} as a secret of the environment",
 				"security scheme 'basicAuth' is sent as 'Authorization: Basic {{basicAuth}}'; add {{basicAuth}} as a secret of the environment",
-				"security scheme 'oauth' is sent as 'Authorization: Bearer {{oauth}}'; add {{oauth}} as a secret of the environment");
+				"security scheme 'oauth' is sent as 'Authorization: Bearer {{oauth}}'; add {{oauth}} as a secret of the environment, or if a login request issues it, extract it into {{oauth}} in an earlier case");
 	}
 
 	@Test

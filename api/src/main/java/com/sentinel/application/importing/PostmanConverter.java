@@ -408,10 +408,10 @@ final class PostmanConverter {
 				}
 				case "bearer" -> headers.put("Authorization",
 						List.of("Bearer " + credential(authParameter(auth, "bearer", "token"), "bearerToken",
-								"bearer token", caseWarnings)));
+								"bearer token", true, caseWarnings)));
 				case "oauth2" -> headers.put("Authorization",
 						List.of("Bearer " + credential(authParameter(auth, "oauth2", "accessToken"), "accessToken",
-								"OAuth 2.0 access token", caseWarnings)));
+								"OAuth 2.0 access token", true, caseWarnings)));
 				case "basic" -> {
 					headers.put("Authorization", List.of("Basic {{basicAuth}}"));
 					notes.putIfAbsent("basicAuth", "basic auth is sent as 'Authorization: Basic {{basicAuth}}'; add "
@@ -423,7 +423,7 @@ final class PostmanConverter {
 						caseWarnings.add("API key auth has no key name and was left out");
 						return;
 					}
-					String value = credential(authParameter(auth, "apikey", "value"), "apiKey", "API key",
+					String value = credential(authParameter(auth, "apikey", "value"), "apiKey", "API key", false,
 							caseWarnings);
 					if ("query".equals(authParameter(auth, "apikey", "in"))) {
 						appendQuery(query, key, value);
@@ -438,15 +438,18 @@ final class PostmanConverter {
 
 		/**
 		 * 인증 값. 변수가 포함된 값은 그대로, 평문이면 변수로 바꾸고 안내 (값 자체는 어디에도 남기지 않음)
+		 * @param token 로그인으로 발급받는 토큰. 시크릿 외에 앞 케이스의 값 추출로 받는 방법도 안내
 		 */
-		private String credential(String value, String variable, String what, List<String> caseWarnings) {
+		private String credential(String value, String variable, String what, boolean token,
+				List<String> caseWarnings) {
 			if (value != null && VARIABLE.matcher(value).find()) {
 				return value;
 			}
 			if (value != null) {
 				caseWarnings.add("literal " + what + " was replaced with {{" + variable + "}}");
 			}
-			notes.putIfAbsent(variable, "add {{" + variable + "}} as a secret of the environment (" + what + ")");
+			notes.putIfAbsent(variable, "add {{" + variable + "}} as a secret of the environment (" + what + ")"
+					+ (token ? ImportDocuments.loginTokenHint("{{" + variable + "}}") : ""));
 			return "{{" + variable + "}}";
 		}
 
@@ -464,7 +467,7 @@ final class PostmanConverter {
 					Matcher scheme = AUTHORIZATION_VALUE.matcher(value);
 					String prefix = name.toLowerCase(Locale.ROOT).endsWith("authorization") && scheme.matches()
 							? scheme.group(1) + " " : "";
-					return prefix + credential(value, variable, "'" + name + "' header value", caseWarnings);
+					return prefix + credential(value, variable, "'" + name + "' header value", false, caseWarnings);
 				}).toList();
 			});
 		}
