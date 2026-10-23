@@ -6,7 +6,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
-import com.sentinel.application.InvalidRequestException;
 import com.sentinel.domain.RequestSpec;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
@@ -321,7 +320,7 @@ class PostmanConverterTest {
 	void rejectsDocumentsThatAreNotCollectionV2() {
 		assertThatThrownBy(() -> converter.convert("""
 				{"id": "e1", "name": "dev", "values": [{"key": "token", "value": "x"}], "_postman_variable_scope": "environment"}"""))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessage("this is a Postman environment, not a collection");
 		// 예전 내보내기에는 _postman_variable_scope가 없음
 		assertThatThrownBy(() -> converter.convert("""
@@ -329,19 +328,19 @@ class PostmanConverterTest {
 			.hasMessage("this is a Postman environment, not a collection");
 		assertThatThrownBy(() -> converter.convert("""
 				{"id": "c1", "name": "v1", "order": [], "requests": []}"""))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessage("only Postman Collection v2.0 and v2.1 are supported (found v1); export the collection again");
 		assertThatThrownBy(() -> converter.convert("openapi: 3.0.0\npaths: {}"))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessage("document is not a Postman collection (info.schema is missing)");
 		assertThatThrownBy(() -> converter.convert("""
 				{"info": {"name": "x", "schema": "https://schema.getpostman.com/json/collection/v3.0.0/collection.json"}, "item": []}"""))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessageStartingWith("only Postman Collection v2.0 and v2.1 are supported (found schema ");
 		assertThatThrownBy(() -> converter.convert("""
 				{"info": {"name": "x", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
 				 "item": [{"name": "empty folder", "item": []}]}"""))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessage("collection defines no supported requests");
 	}
 

@@ -11,7 +11,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.sentinel.application.CatalogQueryService.Request;
-import com.sentinel.application.InvalidRequestException;
 import com.sentinel.domain.RequestSpec;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
@@ -55,14 +54,14 @@ final class OpenApiConverter {
 	private static final Pattern RESPONSE_CODE = Pattern.compile("[1-5][0-9xX]{2}");
 
 	/**
-	 * @throws InvalidRequestException 해석할 수 없는 문서, OpenAPI 3이 아닌 문서, 작업이 없는 문서
+	 * @throws ImportDocumentException 해석할 수 없는 문서, OpenAPI 3이 아닌 문서, 작업이 없는 문서
 	 */
 	public ConvertedDocument convert(String content) {
 		JsonNode root = parse(content);
 		requireOpenApi3(root);
 		JsonNode paths = root.path("paths");
 		if (!paths.isObject() || paths.isEmpty()) {
-			throw new InvalidRequestException("document defines no paths");
+			throw ImportDocumentException.noPaths();
 		}
 
 		List<ImportWarning> warnings = new ArrayList<>();
@@ -92,7 +91,7 @@ final class OpenApiConverter {
 			}
 		}
 		if (drafts.isEmpty()) {
-			throw new InvalidRequestException("document defines no supported operations");
+			throw ImportDocumentException.noOperations();
 		}
 		warnings.addAll(securityNotes.values());
 
@@ -109,17 +108,18 @@ final class OpenApiConverter {
 
 	private static void requireOpenApi3(JsonNode root) {
 		if (root == null || !root.isObject()) {
-			throw new InvalidRequestException("document must be a JSON or YAML object");
+			throw ImportDocumentException.notAnObject();
 		}
 		String swagger = text(root.get("swagger"));
 		if (swagger != null) {
-			throw new InvalidRequestException(
-					"only OpenAPI 3 documents are supported (found swagger " + swagger + ")");
+			throw ImportDocumentException.swagger2(swagger);
 		}
 		String version = text(root.get("openapi"));
-		if (version == null || !version.startsWith("3.")) {
-			throw new InvalidRequestException("only OpenAPI 3 documents are supported (found openapi "
-					+ (version == null ? "none" : version) + ")");
+		if (version == null) {
+			throw ImportDocumentException.notOpenApi();
+		}
+		if (!version.startsWith("3.")) {
+			throw ImportDocumentException.openApiVersion(version);
 		}
 	}
 

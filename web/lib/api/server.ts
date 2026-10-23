@@ -16,11 +16,27 @@ const apiOrigin = apiBaseUrl.replace(/\/+$/, "");
 /**
  * Spring ProblemDetail 응답 오류. throw 대상이므로 Error 객체에 status·detail을 더한 형태 (클래스 미사용).
  * 판별은 instanceof 대신 isApiError 사용
+ * code·params는 화면이 한국어 문장을 만들도록 서버가 붙인 오류 종류와 값 (예: 가져올 수 없는 문서). 없으면 detail만
  */
-export type ApiError = Error & { name: "ApiError"; status: number; detail: string };
+export type ApiError = Error & {
+  name: "ApiError";
+  status: number;
+  detail: string;
+  code?: string;
+  params?: Record<string, string>;
+};
 
-export function apiError(status: number, detail: string): ApiError {
-  return Object.assign(new Error(`API ${status}: ${detail}`), { name: "ApiError" as const, status, detail });
+export function apiError(
+  status: number,
+  detail: string,
+  problem: { code?: string; params?: Record<string, string> } = {},
+): ApiError {
+  return Object.assign(new Error(`API ${status}: ${detail}`), {
+    name: "ApiError" as const,
+    status,
+    detail,
+    ...problem,
+  });
 }
 
 export function isApiError(error: unknown): error is ApiError {
@@ -107,9 +123,21 @@ export async function apiSend<T>(
 
 async function toApiError(response: Response): Promise<ApiError> {
   try {
-    const problem = (await response.json()) as { detail?: string; title?: string };
-    return apiError(response.status, problem.detail ?? problem.title ?? response.statusText);
+    const problem = (await response.json()) as { detail?: string; title?: string; code?: unknown; params?: unknown };
+    return apiError(response.status, problem.detail ?? problem.title ?? response.statusText, {
+      ...(typeof problem.code === "string" && { code: problem.code }),
+      ...(isStringRecord(problem.params) && { params: problem.params }),
+    });
   } catch {
     return apiError(response.status, response.statusText);
   }
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((entry) => typeof entry === "string")
+  );
 }

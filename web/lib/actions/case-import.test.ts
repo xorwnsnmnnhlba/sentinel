@@ -66,15 +66,31 @@ describe("previewCaseImport", () => {
     expect(bodies).toEqual([{ suiteId: 3, format: "POSTMAN", content: '{"info": {}}' }]);
   });
 
-  it("shows why Spring could not read the document", async () => {
+  it("shows why Spring could not read the document in Korean", async () => {
     server.use(
       http.post(springUrl("/api/case-import-previews"), () =>
-        problem(400, "only OpenAPI 3 documents are supported (found swagger 2.0)"),
+        HttpResponse.json(
+          {
+            status: 400,
+            detail: "only OpenAPI 3 documents are supported (found swagger 2.0)",
+            code: "SWAGGER_2",
+            params: { version: "2.0" },
+          },
+          { status: 400 },
+        ),
       ),
     );
 
     await expect(previewCaseImport(3, { content: "swagger: '2.0'", format: "OPENAPI_3" })).resolves.toEqual({
-      error: "문서를 읽지 못했습니다: only OpenAPI 3 documents are supported (found swagger 2.0)",
+      error: "문서를 읽지 못했습니다: Swagger 2.0 문서입니다. OpenAPI 3으로 변환한 문서를 넣어 주세요",
+    });
+  });
+
+  it("shows Spring's message for a bad request without a code", async () => {
+    server.use(http.post(springUrl("/api/case-import-previews"), () => problem(400, "suiteId must not be null")));
+
+    await expect(previewCaseImport(3, { content: "openapi: 3.0.3", format: "OPENAPI_3" })).resolves.toEqual({
+      error: "문서를 읽지 못했습니다: suiteId must not be null",
     });
   });
 

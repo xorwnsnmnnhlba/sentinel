@@ -32,7 +32,7 @@ import {
   toImportCases,
   toRows,
 } from "@/lib/case-import";
-import { describeImportWarning } from "@/lib/import-warning";
+import { describeImportWarning } from "@/lib/import-message";
 
 /**
  * 문서(OpenAPI 3, Postman 컬렉션)에서 케이스 가져오기. 문서 입력 → 미리보기(후보 선택·이름 수정) → 가져오기.

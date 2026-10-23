@@ -16,7 +16,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.sentinel.application.CatalogQueryService.Request;
-import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.importing.ImportWarning.Credential;
 import com.sentinel.domain.RequestSpec;
 import com.sentinel.runner.HttpMethod;
@@ -69,7 +68,7 @@ final class PostmanConverter {
 	private final JsonNodeFactory nodes = JsonNodeFactory.instance;
 
 	/**
-	 * @throws InvalidRequestException 해석할 수 없는 문서, Postman Collection v2가 아닌 문서, 요청이 없는 컬렉션
+	 * @throws ImportDocumentException 해석할 수 없는 문서, Postman Collection v2가 아닌 문서, 요청이 없는 컬렉션
 	 */
 	public ConvertedDocument convert(String content) {
 		JsonNode root = parse(content);
@@ -78,7 +77,7 @@ final class PostmanConverter {
 		Conversion conversion = new Conversion(root);
 		conversion.walk(root.path("item"), List.of(), root.get("auth"));
 		if (conversion.drafts.isEmpty()) {
-			throw new InvalidRequestException("collection defines no supported requests");
+			throw ImportDocumentException.noRequests();
 		}
 
 		List<ImportWarning> warnings = new ArrayList<>(conversion.warnings);
@@ -101,22 +100,20 @@ final class PostmanConverter {
 
 	private static void requireCollectionV2(JsonNode root) {
 		if (root == null || !root.isObject()) {
-			throw new InvalidRequestException("document must be a JSON or YAML object");
+			throw ImportDocumentException.notAnObject();
 		}
 		if (root.has("_postman_variable_scope") || (root.has("values") && !root.has("item"))) {
-			throw new InvalidRequestException("this is a Postman environment, not a collection");
+			throw ImportDocumentException.postmanEnvironment();
 		}
 		String schema = text(root.path("info").get("schema"));
 		if (schema == null) {
 			if (root.has("requests")) {
-				throw new InvalidRequestException(
-						"only Postman Collection v2.0 and v2.1 are supported (found v1); export the collection again");
+				throw ImportDocumentException.postmanV1();
 			}
-			throw new InvalidRequestException("document is not a Postman collection (info.schema is missing)");
+			throw ImportDocumentException.notPostman();
 		}
 		if (!SUPPORTED_SCHEMA.matcher(schema).find()) {
-			throw new InvalidRequestException(
-					"only Postman Collection v2.0 and v2.1 are supported (found schema " + schema + ")");
+			throw ImportDocumentException.postmanSchema(schema);
 		}
 	}
 
@@ -373,7 +370,7 @@ final class PostmanConverter {
 						try {
 							graphql.set("variables", parse(variables));
 						}
-						catch (InvalidRequestException ex) {
+						catch (ImportDocumentException ex) {
 							caseWarnings.add(ImportWarning.graphqlVariablesInvalid());
 						}
 					}

@@ -5,7 +5,7 @@ import java.util.Map;
 
 /**
  * 가져오기 경고·안내. 화면은 {@code code}·{@code params}로 한국어 문장을 만들고, 모르는 {@code code}는 {@code message} 그대로 표시
- * (web/lib/import-warning.ts)
+ * (web/lib/import-message.ts)
  *
  * @param params 문장에 넣을 값. 이름은 code마다 고정 ({@link Code} 설명)
  * @param message 영어 문장. API 직접 사용·이전 화면용

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { describeImportWarning, IMPORT_WARNING_TEXTS } from "./import-warning";
+import { describeImportError, describeImportWarning, IMPORT_ERROR_TEXTS, IMPORT_WARNING_TEXTS } from "./import-message";
 
 describe("import warning", () => {
   it("covers every warning the converters send", () => {
@@ -90,5 +90,51 @@ describe("import warning", () => {
         message: "no header name",
       }),
     ).toBe("no header name");
+  });
+});
+
+describe("import error", () => {
+  it("covers every document the converters reject", () => {
+    // Spring ImportDocumentException.Code와 같은 목록
+    expect(Object.keys(IMPORT_ERROR_TEXTS)).toEqual([
+      "EMPTY",
+      "TOO_LONG",
+      "INVALID_SYNTAX",
+      "UNREADABLE",
+      "NOT_AN_OBJECT",
+      "SWAGGER_2",
+      "NOT_OPENAPI",
+      "OPENAPI_VERSION",
+      "NO_PATHS",
+      "NO_OPERATIONS",
+      "POSTMAN_ENVIRONMENT",
+      "POSTMAN_V1",
+      "NOT_POSTMAN",
+      "POSTMAN_SCHEMA",
+      "NO_REQUESTS",
+    ]);
+  });
+
+  it("says what to do with the document in Korean", () => {
+    expect(describeImportError("NOT_OPENAPI", {}, "found openapi none")).toBe(
+      "openapi 항목이 없어 OpenAPI 문서가 아닙니다. Postman 컬렉션이면 형식을 Postman으로 골라 주세요",
+    );
+    expect(describeImportError("TOO_LONG", { limit: "5242880" }, "too long")).toBe(
+      "문서는 5,242,880자까지 가져올 수 있습니다",
+    );
+    expect(describeImportError("INVALID_SYNTAX", { detail: "line 3" }, "not valid")).toBe(
+      "JSON·YAML 문법이 올바르지 않습니다 (line 3)",
+    );
+  });
+
+  it("shows the server's message without a code, with an unknown code or a missing value", () => {
+    expect(describeImportError(undefined, {}, "suiteId must not be null")).toBe("suiteId must not be null");
+    expect(describeImportError("NEW_ERROR", {}, "something new")).toBe("something new");
+    expect(describeImportError("SWAGGER_2", {}, "found swagger")).toBe("found swagger");
+  });
+
+  it("keeps warning and error codes apart", () => {
+    expect(describeImportError("DEPRECATED", {}, "server message")).toBe("server message");
+    expect(describeImportWarning({ code: "EMPTY", params: {}, message: "server message" })).toBe("server message");
   });
 });

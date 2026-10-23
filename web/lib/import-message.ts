@@ -1,10 +1,12 @@
 import type { ImportWarning } from "@/lib/api/types";
 
 /**
- * 가져오기 경고·안내 문장. 서버가 보낸 code·params로 만들고, 모르는 code(서버가 먼저 업데이트된 경우 등)나
- * 빠진 값이 있으면 서버의 영어 문장 그대로 (Spring ImportWarning.Code와 같은 목록)
+ * 가져오기 경고·오류 문장. 서버가 보낸 code·params로 만들고, 모르는 code(서버가 먼저 업데이트된 경우 등)나
+ * 빠진 값이 있으면 서버의 영어 문장 그대로
  * 문장의 {이름}은 params 값. 조사가 값에 따라 달라지지 않도록 "대상: 설명" 형태
  */
+
+/** 미리보기의 경고·안내 (Spring ImportWarning.Code와 같은 목록) */
 export const IMPORT_WARNING_TEXTS = {
   VARIABLE_RENAMED: "파라미터 '{name}': 변수 이름에 쓸 수 없는 문자를 _로 바꿔 변수 {variable} 사용",
   METHOD_SKIPPED: "{source}: {method} 메서드는 지원하지 않아 제외했습니다",
@@ -36,6 +38,26 @@ export const IMPORT_WARNING_TEXTS = {
     "환경에 시크릿 {variable} 등록이 필요합니다 ({credential}). 로그인 요청이 발급하는 토큰이면 앞 케이스의 값 추출로 {variable}에 받아도 됩니다",
   SCRIPT_UNSUPPORTED: "{script} 스크립트: 지원하지 않습니다. 판정 규칙으로 대신해 주세요",
   COLLECTION_VARIABLES: "컬렉션 변수는 가져오지 않습니다. 환경에 정의해 주세요: {names}",
+} as const;
+
+/** 가져올 수 없는 문서 (Spring ImportDocumentException.Code와 같은 목록) */
+export const IMPORT_ERROR_TEXTS = {
+  EMPTY: "문서가 비어 있습니다",
+  TOO_LONG: "문서는 {limit}자까지 가져올 수 있습니다",
+  INVALID_SYNTAX: "JSON·YAML 문법이 올바르지 않습니다 ({detail})",
+  UNREADABLE: "문서를 해석하지 못했습니다 ({detail})",
+  NOT_AN_OBJECT: "문서의 최상위가 객체가 아닙니다. 문서 전체를 넣었는지 확인해 주세요",
+  SWAGGER_2: "Swagger {version} 문서입니다. OpenAPI 3으로 변환한 문서를 넣어 주세요",
+  NOT_OPENAPI: "openapi 항목이 없어 OpenAPI 문서가 아닙니다. Postman 컬렉션이면 형식을 Postman으로 골라 주세요",
+  OPENAPI_VERSION: "OpenAPI 3 문서만 가져올 수 있습니다 (문서의 버전: {version})",
+  NO_PATHS: "문서에 경로(paths)가 없습니다",
+  NO_OPERATIONS: "문서에 가져올 수 있는 작업이 없습니다 (TRACE만 있는 경우 등)",
+  POSTMAN_ENVIRONMENT:
+    "Postman 환경 파일입니다. 컬렉션을 내보낸 파일을 넣어 주세요 (환경의 변수는 Sentinel 환경에 직접 등록)",
+  POSTMAN_V1: "Postman Collection v1입니다. Postman에서 v2.1로 다시 내보내 주세요",
+  NOT_POSTMAN: "info.schema 항목이 없어 Postman 컬렉션이 아닙니다. OpenAPI 문서면 형식을 OpenAPI 3으로 골라 주세요",
+  POSTMAN_SCHEMA: "Postman Collection v2.0·v2.1만 가져올 수 있습니다 (문서의 스키마: {schema})",
+  NO_REQUESTS: "컬렉션에 가져올 수 있는 요청이 없습니다",
 } as const;
 
 /** 참조 위치 중 경로가 아닌 것 */
@@ -70,11 +92,27 @@ const PARAM_FORMATS: Record<string, ParamFormat> = {
 };
 
 export function describeImportWarning({ code, params, message }: ImportWarning): string {
-  if (!Object.hasOwn(IMPORT_WARNING_TEXTS, code)) {
+  return describe(IMPORT_WARNING_TEXTS, code, params, message);
+}
+
+/**
+ * @param detail 서버의 영어 메시지. code가 없거나(다른 종류의 400) 모르는 code면 그대로
+ */
+export function describeImportError(code: string | undefined, params: Record<string, string>, detail: string): string {
+  return code === undefined ? detail : describe(IMPORT_ERROR_TEXTS, code, params, detail);
+}
+
+function describe(
+  texts: Record<string, string>,
+  code: string,
+  params: Record<string, string>,
+  message: string,
+): string {
+  if (!Object.hasOwn(texts, code)) {
     return message;
   }
   let complete = true;
-  const text = IMPORT_WARNING_TEXTS[code as keyof typeof IMPORT_WARNING_TEXTS].replace(/\{(\w+)\}/g, (_, name) => {
+  const text = texts[code].replace(/\{(\w+)\}/g, (_, name: string) => {
     // 문장의 값 이름은 기본 속성(toString 등)과 겹치지 않아 own 여부는 보지 않음
     const value: string | undefined = params[name];
     const format: ParamFormat | undefined = PARAM_FORMATS[name];

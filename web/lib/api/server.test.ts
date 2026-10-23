@@ -50,6 +50,41 @@ describe("apiGet", () => {
     expect(error).toMatchObject({ status: 404, detail: "project 9 not found" });
   });
 
+  it("keeps the error code and string params the server attached", async () => {
+    server.use(
+      http.post(springUrl("/api/case-import-previews"), () =>
+        HttpResponse.json(
+          {
+            status: 400,
+            detail: "only OpenAPI 3 documents are supported",
+            code: "SWAGGER_2",
+            params: { version: "2.0" },
+          },
+          { status: 400 },
+        ),
+      ),
+      http.post(springUrl("/api/case-imports"), () =>
+        HttpResponse.json({ status: 400, detail: "bad", code: 7, params: { version: 2 } }, { status: 400 }),
+      ),
+      http.post(springUrl("/api/suites"), () =>
+        HttpResponse.json({ status: 400, detail: "list", params: ["2.0"] }, { status: 400 }),
+      ),
+    );
+
+    await expect(apiSend("POST", "/api/case-import-previews", {})).rejects.toMatchObject({
+      status: 400,
+      code: "SWAGGER_2",
+      params: { version: "2.0" },
+    });
+    const malformed = await apiSend("POST", "/api/case-imports", {}).catch((caught: unknown) => caught);
+    expect(malformed).toMatchObject({ status: 400, detail: "bad" });
+    expect(malformed).not.toHaveProperty("code");
+    expect(malformed).not.toHaveProperty("params");
+    await expect(apiSend("POST", "/api/suites", {}).catch((caught: unknown) => caught)).resolves.not.toHaveProperty(
+      "params",
+    );
+  });
+
   it("falls back to status text when body is not JSON", async () => {
     server.use(
       http.get(

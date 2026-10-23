@@ -207,12 +207,19 @@ class CaseImportTest {
 
 	@Test
 	void rejectsUnsupportedDocumentsAndUnknownSuites() {
-		assertThat(preview(suite.getId(), """
+		MvcTestResult swagger = preview(suite.getId(), """
 				swagger: "2.0"
-				paths: {}""")).hasStatus(HttpStatus.BAD_REQUEST)
-			.bodyJson()
-			.extractingPath("$.detail")
-			.isEqualTo("only OpenAPI 3 documents are supported (found swagger 2.0)");
+				paths: {}""");
+		assertThat(swagger).hasStatus(HttpStatus.BAD_REQUEST);
+		// 화면이 한국어 문장을 만들 code·params와 영어 메시지
+		var problem = assertThat(swagger).bodyJson();
+		problem.extractingPath("$.detail").isEqualTo("only OpenAPI 3 documents are supported (found swagger 2.0)");
+		problem.extractingPath("$.code").isEqualTo("SWAGGER_2");
+		problem.extractingPath("$.params").isEqualTo(Map.of("version", "2.0"));
+		// 그 밖의 잘못된 요청에는 code 없음
+		assertThat(post("/api/case-imports", """
+				{"suiteId": %d, "cases": []}""".formatted(suite.getId()))).bodyJson()
+			.doesNotHavePath("$.code");
 		assertThat(preview(999_999L, DOCUMENT)).hasStatus(HttpStatus.NOT_FOUND);
 		assertThat(post("/api/case-import-previews", """
 				{"suiteId": %d, "format": "RAML", "content": "{}"}""".formatted(suite.getId())))
