@@ -9,5 +9,5 @@ import java.util.List;
  * @param warnings 문서 단위 경고·안내 (지원하지 않아 제외한 작업, 등록할 시크릿 등)
  */
 record ConvertedDocument(String title, String version, List<String> servers, List<CaseDraft> cases,
-		List<String> warnings) {
+		List<ImportWarning> warnings) {
 }

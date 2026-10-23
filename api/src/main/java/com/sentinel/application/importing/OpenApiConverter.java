@@ -65,11 +65,11 @@ final class OpenApiConverter {
 			throw new InvalidRequestException("document defines no paths");
 		}
 
-		List<String> warnings = new ArrayList<>();
+		List<ImportWarning> warnings = new ArrayList<>();
 		List<CaseDraft> drafts = new ArrayList<>();
 		Set<String> usedNames = new HashSet<>();
 		// 보안 스킴별 안내. 작업마다 반복하지 않도록 문서 단위로 한 번씩
-		Map<String, String> securityNotes = new LinkedHashMap<>();
+		Map<String, ImportWarning> securityNotes = new LinkedHashMap<>();
 		for (Map.Entry<String, JsonNode> pathEntry : paths.properties()) {
 			String path = pathEntry.getKey();
 			JsonNode pathItem = resolve(root, pathEntry.getValue(), path, warnings);
@@ -83,7 +83,7 @@ final class OpenApiConverter {
 				}
 				String source = method.toUpperCase(Locale.ROOT) + " " + path;
 				if (method.equals("trace")) {
-					warnings.add(source + ": TRACE is not supported and was skipped");
+					warnings.add(ImportWarning.methodSkipped(source, "TRACE"));
 					continue;
 				}
 				CaseDraft draft = convertOperation(root, path, HttpMethod.valueOf(method.toUpperCase(Locale.ROOT)),
@@ -124,10 +124,10 @@ final class OpenApiConverter {
 	}
 
 	private CaseDraft convertOperation(JsonNode root, String path, HttpMethod method, JsonNode pathItem,
-			JsonNode operation, String source, Map<String, String> securityNotes) {
-		List<String> warnings = new ArrayList<>();
+			JsonNode operation, String source, Map<String, ImportWarning> securityNotes) {
+		List<ImportWarning> warnings = new ArrayList<>();
 		if (operation.path("deprecated").asBoolean(false)) {
-			warnings.add("operation is deprecated");
+			warnings.add(ImportWarning.deprecated());
 		}
 
 		Map<String, JsonNode> parameters = parameters(root, pathItem, operation, warnings);
@@ -152,7 +152,7 @@ final class OpenApiConverter {
 						headers.put(name, List.of(variable(name, warnings)));
 					}
 				}
-				case "cookie" -> warnings.add("required cookie parameter '" + name + "' is not supported");
+				case "cookie" -> warnings.add(ImportWarning.cookieParameter(name));
 				default -> {
 					// path 파라미터는 경로 치환에서 처리
 				}
@@ -170,7 +170,7 @@ final class OpenApiConverter {
 	 * 경로 공통 파라미터와 작업 파라미터 병합. 같은 이름·위치는 작업 쪽 우선 (OpenAPI 규칙)
 	 */
 	private Map<String, JsonNode> parameters(JsonNode root, JsonNode pathItem, JsonNode operation,
-			List<String> warnings) {
+			List<ImportWarning> warnings) {
 		Map<String, JsonNode> merged = new LinkedHashMap<>();
 		for (JsonNode source : List.of(pathItem.path("parameters"), operation.path("parameters"))) {
 			for (JsonNode node : source) {
@@ -188,7 +188,7 @@ final class OpenApiConverter {
 	 * 빈 목록({@code security: []})은 인증 없음. 값은 스킴 이름의 변수로 채워 환경 시크릿으로 지정하도록 함
 	 */
 	private void applySecurity(JsonNode root, JsonNode operation, Map<String, List<String>> headers,
-			StringBuilder query, List<String> warnings, Map<String, String> securityNotes) {
+			StringBuilder query, List<ImportWarning> warnings, Map<String, ImportWarning> securityNotes) {
 		JsonNode security = operation.has("security") ? operation.get("security") : root.get("security");
 		if (security == null || !security.isArray() || security.isEmpty()) {
 			return;
@@ -197,7 +197,7 @@ final class OpenApiConverter {
 			JsonNode scheme = resolve(root, root.path("components").path("securitySchemes").get(schemeName),
 					"security scheme", warnings);
 			if (scheme == null || !scheme.isObject()) {
-				warnings.add("security scheme '" + schemeName + "' is not defined");
+				warnings.add(ImportWarning.securitySchemeUndefined(schemeName));
 				continue;
 			}
 			String variable = variable(schemeName, warnings);
@@ -225,14 +225,12 @@ final class OpenApiConverter {
 				default -> null;
 			};
 			if (applied == null) {
-				warnings.add("security scheme '" + schemeName + "' (" + describe(scheme) + ") is not supported");
+				warnings.add(ImportWarning.securitySchemeUnsupported(schemeName, describe(scheme)));
 				continue;
 			}
 			boolean token = "oauth2".equals(type) || "openIdConnect".equals(type)
 					|| ("http".equals(type) && "bearer".equalsIgnoreCase(text(scheme.get("scheme"))));
-			securityNotes.putIfAbsent(schemeName, "security scheme '" + schemeName + "' is sent as " + applied
-					+ "; add " + variable + " as a secret of the environment"
-					+ (token ? ImportDocuments.loginTokenHint(variable) : ""));
+			securityNotes.putIfAbsent(schemeName, ImportWarning.securityScheme(schemeName, applied, variable, token));
 		}
 	}
 
@@ -248,7 +246,7 @@ final class OpenApiConverter {
 	}
 
 	private String requestBody(JsonNode root, JsonNode operation, Map<String, List<String>> headers,
-			List<String> warnings) {
+			List<ImportWarning> warnings) {
 		JsonNode requestBody = resolve(root, operation.get("requestBody"), "request body", warnings);
 		if (requestBody == null || !requestBody.isObject()) {
 			return null;
@@ -264,7 +262,7 @@ final class OpenApiConverter {
 		boolean required = requestBody.path("required").asBoolean(false);
 		if (mediaType == null) {
 			if (!content.isEmpty()) {
-				warnings.add("request body media type " + content.propertyNames() + " is not supported; body left empty");
+				warnings.add(ImportWarning.bodyMediaTypeUnsupported(String.join(", ", content.propertyNames())));
 			}
 			return null;
 		}
@@ -273,15 +271,15 @@ final class OpenApiConverter {
 			example = new SchemaSkeleton(root).build(content.path(mediaType).get("schema"));
 			if (example == null) {
 				if (required) {
-					warnings.add("request body has no JSON example or schema; body left empty");
+					warnings.add(ImportWarning.bodyMissing());
 				}
 				return null;
 			}
-			warnings.add("request body was generated from the schema; replace the placeholder values");
+			warnings.add(ImportWarning.bodyFromSchema());
 		}
 		String body = format(example);
 		if (body.length() > RequestSpec.MAX_BODY_LENGTH) {
-			warnings.add("request body example exceeds " + RequestSpec.MAX_BODY_LENGTH + " characters; body left empty");
+			warnings.add(ImportWarning.bodyTooLong(RequestSpec.MAX_BODY_LENGTH, true));
 			return null;
 		}
 		headers.putIfAbsent("Content-Type", List.of(mediaType));
@@ -291,7 +289,7 @@ final class OpenApiConverter {
 	/**
 	 * 예시 우선순위: 미디어 타입의 {@code example} → {@code examples}의 첫 값 → 스키마의 {@code example}
 	 */
-	private JsonNode example(JsonNode root, JsonNode media, List<String> warnings) {
+	private JsonNode example(JsonNode root, JsonNode media, List<ImportWarning> warnings) {
 		if (media == null || !media.isObject()) {
 			return null;
 		}
@@ -304,14 +302,14 @@ final class OpenApiConverter {
 				return example.get("value");
 			}
 			if (example != null && example.has("externalValue")) {
-				warnings.add("external example '" + text(example.get("externalValue")) + "' is not supported");
+				warnings.add(ImportWarning.externalExample(text(example.get("externalValue"))));
 			}
 		}
 		JsonNode schema = resolve(root, media.get("schema"), "schema", warnings);
 		return schema != null && schema.has("example") ? schema.get("example") : null;
 	}
 
-	private static List<String> successCodes(JsonNode operation, List<String> warnings) {
+	private static List<String> successCodes(JsonNode operation, List<ImportWarning> warnings) {
 		List<String> codes = new ArrayList<>();
 		for (String code : operation.path("responses").propertyNames()) {
 			if (RESPONSE_CODE.matcher(code).matches() && code.startsWith("2")) {
@@ -319,13 +317,13 @@ final class OpenApiConverter {
 			}
 		}
 		if (codes.isEmpty()) {
-			warnings.add("no 2xx response is declared; expecting any 2xx");
+			warnings.add(ImportWarning.noSuccessResponse());
 			return List.of("2xx");
 		}
 		return codes;
 	}
 
-	private static String pathWithVariables(String path, List<String> warnings) {
+	private static String pathWithVariables(String path, List<ImportWarning> warnings) {
 		Matcher matcher = PATH_PARAMETER.matcher(path);
 		StringBuilder converted = new StringBuilder();
 		while (matcher.find()) {
@@ -349,21 +347,21 @@ final class OpenApiConverter {
 	/**
 	 * {@code $ref} 해석. 내부 참조({@code #/...})만 지원하며 해석 실패 시 경고 후 null
 	 */
-	private static JsonNode resolve(JsonNode root, JsonNode node, String what, List<String> warnings) {
+	private static JsonNode resolve(JsonNode root, JsonNode node, String what, List<ImportWarning> warnings) {
 		JsonNode current = node;
 		for (int depth = 0; current != null && current.has("$ref"); depth++) {
 			String ref = text(current.get("$ref"));
 			if (depth >= MAX_REF_DEPTH || ref == null) {
-				warnings.add(what + ": reference '" + ref + "' could not be resolved");
+				warnings.add(ImportWarning.referenceUnresolved(what, ref));
 				return null;
 			}
 			if (!ref.startsWith("#/")) {
-				warnings.add(what + ": external reference '" + ref + "' is not supported");
+				warnings.add(ImportWarning.referenceExternal(what, ref));
 				return null;
 			}
 			JsonNode target = root.at(ref.substring(1));
 			if (target.isMissingNode()) {
-				warnings.add(what + ": reference '" + ref + "' was not found");
+				warnings.add(ImportWarning.referenceNotFound(what, ref));
 				return null;
 			}
 			current = target;

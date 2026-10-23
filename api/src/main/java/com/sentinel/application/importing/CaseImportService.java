@@ -105,7 +105,7 @@ public class CaseImportService {
 	 * @param warnings 문서 단위 경고
 	 */
 	public record Preview(String title, String version, List<String> servers, List<Candidate> cases,
-			List<String> warnings) {
+			List<ImportWarning> warnings) {
 	}
 
 	/**
@@ -113,7 +113,7 @@ public class CaseImportService {
 	 * @param conflict 스위트에 같은 이름의 케이스가 있음. 이름을 바꾸거나 제외해야 가져오기 가능
 	 */
 	public record Candidate(String source, String name, Request request, List<Assertion> assertions,
-			List<String> warnings, boolean conflict) {
+			List<ImportWarning> warnings, boolean conflict) {
 
 		static Candidate of(CaseDraft draft, boolean conflict) {
 			return new Candidate(draft.source(), draft.name(), draft.request(), draft.assertions(), draft.warnings(),

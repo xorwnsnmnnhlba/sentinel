@@ -394,7 +394,7 @@ dev 환경의 API 1개를 평일 오전마다 점검하고 실패하면 알림 �
 
 2. 프로젝트 `데모`, 환경 `demo` (기본 URL `http://sentinel-demo-api:8080`, 변수 `orderId` = `101`), 스위트 `데모 쇼핑몰` 등록
 3. 스위트 화면 "문서 가져오기" → "OpenAPI 3 (JSON·YAML)" → 저장소의 `demo/openapi.yaml` 내용 → 5건 모두 가져오기
-   - 인증 안내 "add {{token}} as a secret of the environment, or if a login request issues it, extract it into {{token}} in an earlier case": 데모는 뒤쪽 방법(로그인 응답에서 값 추출, 다음 단계)
+   - 인증 안내 "환경에 시크릿 {{token}} 등록이 필요합니다. 로그인 요청이 발급하는 토큰이면 앞 케이스의 값 추출로 {{token}}에 받아도 됩니다": 데모는 뒤쪽 방법(로그인 응답에서 값 추출, 다음 단계)
 4. `Login` 케이스 수정 → 값 추출: 변수 이름 `token`, 위치 본문 JSON 값 `$.token`, 값 가리기 → 저장
    - 뒤 케이스들의 `Authorization: Bearer {{token}}`이 이 값으로 채워짐. 결과에는 `****`로 가려 저장
 5. `Daily report` 케이스에 응답 시간 판정 `2000`ms 추가 → 가끔 실패해 "불안정" 배지·실패 원인을 볼 수 있음

@@ -287,7 +287,7 @@ test("Postman 컬렉션에서 케이스 가져오기", async ({ page }) => {
   // 평문 토큰은 변수로 바뀌었다는 안내만 표시되고 값은 화면에 없음
   await expect(
     dialog.getByText(
-      "add {{bearerToken}} as a secret of the environment (bearer token), or if a login request issues it, extract it into {{bearerToken}} in an earlier case",
+      "환경에 시크릿 {{bearerToken}} 등록이 필요합니다 (Bearer 토큰). 로그인 요청이 발급하는 토큰이면 앞 케이스의 값 추출로 {{bearerToken}}에 받아도 됩니다",
     ),
   ).toBeVisible();
   expect(await page.content()).not.toContain("literal-e2e-token");

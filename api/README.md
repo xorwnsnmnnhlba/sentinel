@@ -644,6 +644,7 @@ deploy-check:
 
 - 미리보기 응답: `title`, `version`, `servers`(환경 기본 URL 설정 참고용), `cases`, `warnings`(문서 단위)
   - 후보: `source`(원본 위치. 예: `GET /pets/{petId}`, `GET {{baseUrl}}/orders`), `name`, `request`, `assertions`, `warnings`(생략·대체한 내용), `conflict`(스위트에 같은 이름 있음)
+  - 경고: `{"code": "COOKIE_PARAMETER", "params": {"name": "session"}, "message": "required cookie parameter 'session' is not supported"}`. 화면은 `code`·`params`로 한국어 문장을 만들고(`web/lib/import-warning.ts`) 모르는 `code`는 영어 `message` 그대로. 종류와 `params` 이름은 `ImportWarning.Code`
   - 후보를 그대로(또는 이름·요청을 고쳐) `cases`로 보내면 가져오기. `source`·`warnings`·`conflict`는 무시
 - 가져오기는 한 건이라도 실패하면 전부 미등록. 이름 중복(스위트 기존 케이스, 목록 안 중복)은 409, 잘못된 케이스는 400 (`cases[1] 'Broken': ...`처럼 위치 표시)
 - 문서는 5MB(문자 수)까지, 한 번에 가져오기는 500건까지

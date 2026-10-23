@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
 
 import com.sentinel.application.CatalogQueryService.Request;
 import com.sentinel.application.InvalidRequestException;
+import com.sentinel.application.importing.ImportWarning.Credential;
 import com.sentinel.domain.RequestSpec;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
@@ -80,7 +81,7 @@ final class PostmanConverter {
 			throw new InvalidRequestException("collection defines no supported requests");
 		}
 
-		List<String> warnings = new ArrayList<>(conversion.warnings);
+		List<ImportWarning> warnings = new ArrayList<>(conversion.warnings);
 		warnings.addAll(conversion.notes.values());
 		Set<String> variables = new TreeSet<>();
 		root.path("variable").forEach(variable -> {
@@ -91,8 +92,7 @@ final class PostmanConverter {
 		});
 		if (!variables.isEmpty()) {
 			// 값은 자격증명일 수 있어 이름만 안내
-			warnings.add("collection variables are not imported; define them in the environment: "
-					+ String.join(", ", variables));
+			warnings.add(ImportWarning.collectionVariables(String.join(", ", variables)));
 		}
 		JsonNode info = root.path("info");
 		return new ConvertedDocument(text(info.get("name")), version(info.get("version")),
@@ -136,10 +136,10 @@ final class PostmanConverter {
 
 		private final List<CaseDraft> drafts = new ArrayList<>();
 
-		private final List<String> warnings = new ArrayList<>();
+		private final List<ImportWarning> warnings = new ArrayList<>();
 
 		/** 등록할 시크릿·변수 안내. 요청마다 반복하지 않도록 변수 이름별 한 번 */
-		private final Map<String, String> notes = new LinkedHashMap<>();
+		private final Map<String, ImportWarning> notes = new LinkedHashMap<>();
 
 		private final Set<String> servers = new LinkedHashSet<>();
 
@@ -181,11 +181,11 @@ final class PostmanConverter {
 				method = HttpMethod.valueOf(methodName);
 			}
 			catch (IllegalArgumentException ex) {
-				warnings.add(source + ": method " + methodName + " is not supported and was skipped");
+				warnings.add(ImportWarning.methodSkipped(source, methodName));
 				return;
 			}
 
-			List<String> caseWarnings = new ArrayList<>();
+			List<ImportWarning> caseWarnings = new ArrayList<>();
 			scriptWarnings(item, caseWarnings);
 			Map<String, List<String>> headers = new LinkedHashMap<>();
 			StringBuilder query = new StringBuilder();
@@ -332,7 +332,7 @@ final class PostmanConverter {
 			});
 		}
 
-		private String body(JsonNode body, Map<String, List<String>> headers, List<String> caseWarnings) {
+		private String body(JsonNode body, Map<String, List<String>> headers, List<ImportWarning> caseWarnings) {
 			if (body == null || !body.isObject() || body.path("disabled").asBoolean(false)) {
 				return null;
 			}
@@ -374,7 +374,7 @@ final class PostmanConverter {
 							graphql.set("variables", parse(variables));
 						}
 						catch (InvalidRequestException ex) {
-							caseWarnings.add("GraphQL variables are not valid JSON and were left out");
+							caseWarnings.add(ImportWarning.graphqlVariablesInvalid());
 						}
 					}
 					if (!hasHeader(headers, "Content-Type")) {
@@ -383,12 +383,12 @@ final class PostmanConverter {
 					yield format(graphql);
 				}
 				default -> {
-					caseWarnings.add("request body mode '" + mode + "' is not supported; body left empty");
+					caseWarnings.add(ImportWarning.bodyModeUnsupported(mode));
 					yield null;
 				}
 			};
 			if (converted != null && converted.length() > RequestSpec.MAX_BODY_LENGTH) {
-				caseWarnings.add("request body exceeds " + RequestSpec.MAX_BODY_LENGTH + " characters; body left empty");
+				caseWarnings.add(ImportWarning.bodyTooLong(RequestSpec.MAX_BODY_LENGTH, false));
 				return null;
 			}
 			return converted;
@@ -398,7 +398,7 @@ final class PostmanConverter {
 		 * 인증을 헤더·query로. 평문 자격증명은 변수로 바꿈 (Basic은 아이디·비밀번호 인코딩이 필요해 항상 변수)
 		 */
 		private void applyAuth(JsonNode auth, Map<String, List<String>> headers, StringBuilder query,
-				List<String> caseWarnings) {
+				List<ImportWarning> caseWarnings) {
 			if (auth == null || !auth.isObject()) {
 				return;
 			}
@@ -408,22 +408,21 @@ final class PostmanConverter {
 				}
 				case "bearer" -> headers.put("Authorization",
 						List.of("Bearer " + credential(authParameter(auth, "bearer", "token"), "bearerToken",
-								"bearer token", true, caseWarnings)));
+								Credential.BEARER_TOKEN, null, caseWarnings)));
 				case "oauth2" -> headers.put("Authorization",
 						List.of("Bearer " + credential(authParameter(auth, "oauth2", "accessToken"), "accessToken",
-								"OAuth 2.0 access token", true, caseWarnings)));
+								Credential.ACCESS_TOKEN, null, caseWarnings)));
 				case "basic" -> {
 					headers.put("Authorization", List.of("Basic {{basicAuth}}"));
-					notes.putIfAbsent("basicAuth", "basic auth is sent as 'Authorization: Basic {{basicAuth}}'; add "
-							+ "{{basicAuth}} as a secret holding base64 of 'username:password'");
+					notes.putIfAbsent("basicAuth", ImportWarning.basicAuthSecret("{{basicAuth}}"));
 				}
 				case "apikey" -> {
 					String key = authParameter(auth, "apikey", "key");
 					if (key == null) {
-						caseWarnings.add("API key auth has no key name and was left out");
+						caseWarnings.add(ImportWarning.apiKeyNameMissing());
 						return;
 					}
-					String value = credential(authParameter(auth, "apikey", "value"), "apiKey", "API key", false,
+					String value = credential(authParameter(auth, "apikey", "value"), "apiKey", Credential.API_KEY, null,
 							caseWarnings);
 					if ("query".equals(authParameter(auth, "apikey", "in"))) {
 						appendQuery(query, key, value);
@@ -432,29 +431,29 @@ final class PostmanConverter {
 						headers.put(key, List.of(value));
 					}
 				}
-				default -> caseWarnings.add("auth type '" + type + "' is not supported");
+				default -> caseWarnings.add(ImportWarning.authUnsupported(type));
 			}
 		}
 
 		/**
 		 * 인증 값. 변수가 포함된 값은 그대로, 평문이면 변수로 바꾸고 안내 (값 자체는 어디에도 남기지 않음)
-		 * @param token 로그인으로 발급받는 토큰. 시크릿 외에 앞 케이스의 값 추출로 받는 방법도 안내
+		 * @param header credential이 {@link Credential#HEADER}일 때 헤더 이름, 아니면 null
 		 */
-		private String credential(String value, String variable, String what, boolean token,
-				List<String> caseWarnings) {
+		private String credential(String value, String variable, Credential credential, String header,
+				List<ImportWarning> caseWarnings) {
 			if (value != null && VARIABLE.matcher(value).find()) {
 				return value;
 			}
+			String placeholder = "{{" + variable + "}}";
 			if (value != null) {
-				caseWarnings.add("literal " + what + " was replaced with {{" + variable + "}}");
+				caseWarnings.add(ImportWarning.credentialReplaced(credential, header, placeholder));
 			}
-			notes.putIfAbsent(variable, "add {{" + variable + "}} as a secret of the environment (" + what + ")"
-					+ (token ? ImportDocuments.loginTokenHint("{{" + variable + "}}") : ""));
-			return "{{" + variable + "}}";
+			notes.putIfAbsent(variable, ImportWarning.credentialSecret(credential, header, placeholder));
+			return placeholder;
 		}
 
 		/** 직접 적은 Authorization·Cookie 등 헤더도 평문이면 변수로 */
-		private void protectCredentialHeaders(Map<String, List<String>> headers, List<String> caseWarnings) {
+		private void protectCredentialHeaders(Map<String, List<String>> headers, List<ImportWarning> caseWarnings) {
 			headers.replaceAll((name, values) -> {
 				String variable = CREDENTIAL_HEADERS.get(name);
 				if (variable == null) {
@@ -467,20 +466,18 @@ final class PostmanConverter {
 					Matcher scheme = AUTHORIZATION_VALUE.matcher(value);
 					String prefix = name.toLowerCase(Locale.ROOT).endsWith("authorization") && scheme.matches()
 							? scheme.group(1) + " " : "";
-					return prefix + credential(value, variable, "'" + name + "' header value", false, caseWarnings);
+					return prefix + credential(value, variable, Credential.HEADER, name, caseWarnings);
 				}).toList();
 			});
 		}
 
-		private void scriptWarnings(JsonNode item, List<String> caseWarnings) {
+		private void scriptWarnings(JsonNode item, List<ImportWarning> caseWarnings) {
 			for (JsonNode event : item.path("event")) {
 				JsonNode exec = event.path("script").path("exec");
 				boolean hasCode = exec.isString() ? !exec.asString().isBlank()
 						: exec.valueStream().anyMatch(line -> !line.asString("").isBlank());
 				if (hasCode) {
-					String listen = String.valueOf(text(event.get("listen")));
-					caseWarnings.add((listen.equals("prerequest") ? "pre-request" : listen)
-							+ " script is not supported; add assertions instead");
+					caseWarnings.add(ImportWarning.scriptUnsupported(String.valueOf(text(event.get("listen")))));
 				}
 			}
 		}

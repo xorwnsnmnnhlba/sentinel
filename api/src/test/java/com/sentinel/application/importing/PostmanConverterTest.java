@@ -32,7 +32,7 @@ class PostmanConverterTest {
 		// 호스트는 참고용. 컬렉션 변수 값이 주소면 함께 표시
 		assertThat(document.servers()).containsExactly("{{baseUrl}} (https://shop.example.com/api)",
 				"https://admin.example.com");
-		assertThat(document.warnings()).containsExactly(
+		assertThat(messages(document.warnings())).containsExactly(
 				"COPY {{baseUrl}}/legacy: method COPY is not supported and was skipped",
 				"add {{apiKey}} as a secret of the environment (API key)",
 				"add {{cookie}} as a secret of the environment ('Cookie' header value)",
@@ -54,7 +54,7 @@ class PostmanConverterTest {
 				Map.entry("Authorization", List.of("Bearer {{token}}")));
 		// 저장된 예시 응답의 2xx 코드
 		assertThat(list.assertions()).containsExactly(new StatusCodeAssertion(List.of("200")));
-		assertThat(list.warnings()).isEmpty();
+		assertThat(messages(list.warnings())).isEmpty();
 
 		// URL만 적은 요청은 GET
 		assertThat(draft("List orders").request().path()).isEqualTo("/orders");
@@ -68,7 +68,7 @@ class PostmanConverterTest {
 		assertThat(get.request().path()).isEqualTo("/orders/42/items/{{itemId}}");
 		assertThat(get.assertions()).containsExactly(new StatusCodeAssertion(List.of("2xx")));
 		// 내용 없는 스크립트는 경고하지 않음
-		assertThat(get.warnings()).containsExactly("test script is not supported; add assertions instead");
+		assertThat(messages(get.warnings())).containsExactly("test script is not supported; add assertions instead");
 	}
 
 	@Test
@@ -106,7 +106,7 @@ class PostmanConverterTest {
 		CaseDraft reindex = draft("Admin / Reindex");
 		assertThat(reindex.request().headers()).containsEntry("X-Admin-Key", List.of("{{apiKey}}"))
 			.containsEntry("Cookie", List.of("{{cookie}}"));
-		assertThat(reindex.warnings()).containsExactly("literal API key was replaced with {{apiKey}}",
+		assertThat(messages(reindex.warnings())).containsExactly("literal API key was replaced with {{apiKey}}",
 				"literal 'Cookie' header value was replaced with {{cookie}}");
 
 		// noauth는 상속을 끊음
@@ -115,12 +115,12 @@ class PostmanConverterTest {
 		// Basic은 인코딩이 필요해 항상 변수. 직접 적은 Authorization 헤더보다 인증 설정 우선
 		CaseDraft search = draft("Search");
 		assertThat(search.request().headers()).containsEntry("Authorization", List.of("Basic {{basicAuth}}"));
-		assertThat(search.warnings()).isEmpty();
+		assertThat(messages(search.warnings())).isEmpty();
 
 		// 지원하지 않는 인증은 경고, 직접 적은 평문 Authorization은 스킴을 남기고 값만 변수로
 		CaseDraft upload = draft("Upload");
 		assertThat(upload.request().headers()).containsExactly(Map.entry("Authorization", List.of("Token {{authorization}}")));
-		assertThat(upload.warnings()).containsExactly("request body mode 'formdata' is not supported; body left empty",
+		assertThat(messages(upload.warnings())).containsExactly("request body mode 'formdata' is not supported; body left empty",
 				"auth type 'digest' is not supported",
 				"literal 'Authorization' header value was replaced with {{authorization}}");
 
@@ -157,7 +157,7 @@ class PostmanConverterTest {
 			assertThat(ping.request().headers()).containsExactly(Map.entry("Accept", List.of("text/plain")),
 					Map.entry("X-Trace", List.of("{{trace}}")), Map.entry("Authorization", List.of("Bearer {{jwt}}")));
 		});
-		assertThat(document.warnings()).isEmpty();
+		assertThat(messages(document.warnings())).isEmpty();
 	}
 
 	@Test
@@ -176,7 +176,7 @@ class PostmanConverterTest {
 		assertThat(document.cases().get(1).request().path()).isEqualTo("/items?page=1&tenant={{tenant}}");
 		assertThat(document.cases().get(1).request().headers()).isEmpty();
 		assertThat(document.cases().get(2).request().headers()).isEmpty();
-		assertThat(document.cases().get(2).warnings()).containsExactly("API key auth has no key name and was left out");
+		assertThat(messages(document.cases().get(2).warnings())).containsExactly("API key auth has no key name and was left out");
 	}
 
 	@Test
@@ -209,9 +209,9 @@ class PostmanConverterTest {
 
 		CaseDraft graphql = document.cases().get(0);
 		assertThat(graphql.request().body()).contains("\"query\"").doesNotContain("variables");
-		assertThat(graphql.warnings()).containsExactly("GraphQL variables are not valid JSON and were left out");
+		assertThat(messages(graphql.warnings())).containsExactly("GraphQL variables are not valid JSON and were left out");
 		assertThat(document.cases().get(1).request().body()).isNull();
-		assertThat(document.cases().get(1).warnings())
+		assertThat(messages(document.cases().get(1).warnings()))
 			.containsExactly("request body exceeds " + RequestSpec.MAX_BODY_LENGTH + " characters; body left empty");
 	}
 
@@ -243,7 +243,7 @@ class PostmanConverterTest {
 			.containsExactly("(folder) / Health", "DELETE https://api.example.com/cache");
 		assertThat(document.cases().get(0).request().method()).isEqualTo(HttpMethod.GET);
 		// 내용이 있는 스크립트만 경고
-		assertThat(document.cases().get(0).warnings()).containsExactly("test script is not supported; add assertions instead");
+		assertThat(messages(document.cases().get(0).warnings())).containsExactly("test script is not supported; add assertions instead");
 	}
 
 	@Test
@@ -312,8 +312,8 @@ class PostmanConverterTest {
 		assertThat(document.cases().getFirst().request().headers())
 			.containsExactly(Map.entry("Authorization", List.of("Bearer {{bearerToken}}")));
 		// 적힌 토큰이 없으므로 "평문을 바꿨다"는 경고 없이 등록 안내만
-		assertThat(document.cases().getFirst().warnings()).isEmpty();
-		assertThat(document.warnings()).contains("add {{bearerToken}} as a secret of the environment (bearer token)"
+		assertThat(messages(document.cases().getFirst().warnings())).isEmpty();
+		assertThat(messages(document.warnings())).contains("add {{bearerToken}} as a secret of the environment (bearer token)"
 				+ ", or if a login request issues it, extract it into {{bearerToken}} in an earlier case");
 	}
 
@@ -367,6 +367,10 @@ class PostmanConverterTest {
 		catch (IOException ex) {
 			throw new IllegalStateException(ex);
 		}
+	}
+
+	private static List<String> messages(List<ImportWarning> warnings) {
+		return warnings.stream().map(ImportWarning::message).toList();
 	}
 
 }

@@ -32,7 +32,7 @@ class OpenApiConverterTest {
 			.containsExactly("GET /pets", "POST /pets", "GET /pets/{petId}", "PUT /pets/{petId}",
 					"DELETE /pets/{petId}", "POST /pets/{petId}/photo", "PATCH /stores/{store[id]}", "POST /orders",
 					"GET /external");
-		assertThat(document.warnings()).containsExactly("TRACE /pets: TRACE is not supported and was skipped");
+		assertThat(messages(document.warnings())).containsExactly("TRACE /pets: TRACE is not supported and was skipped");
 	}
 
 	@Test
@@ -45,7 +45,7 @@ class OpenApiConverterTest {
 		assertThat(list.request().headers()).isEmpty();
 		assertThat(list.request().body()).isNull();
 		assertThat(list.assertions()).containsExactly(new StatusCodeAssertion(List.of("200")));
-		assertThat(list.warnings()).isEmpty();
+		assertThat(messages(list.warnings())).isEmpty();
 	}
 
 	@Test
@@ -101,27 +101,27 @@ class OpenApiConverterTest {
 			// 이름 없는 작업은 메서드와 경로
 			assertThat(delete.name()).isEqualTo("DELETE /pets/{petId}");
 			assertThat(delete.assertions()).containsExactly(new StatusCodeAssertion(List.of("2xx")));
-			assertThat(delete.warnings()).containsExactly("operation is deprecated",
+			assertThat(messages(delete.warnings())).containsExactly("operation is deprecated",
 					"no 2xx response is declared; expecting any 2xx");
 		});
 		assertThat(draft("POST /pets/{petId}/photo")).satisfies(upload -> {
 			assertThat(upload.request().body()).isNull();
 			assertThat(upload.request().headers()).isEmpty();
-			assertThat(upload.warnings())
+			assertThat(messages(upload.warnings()))
 				.containsExactly("request body media type [multipart/form-data] is not supported; body left empty");
 		});
 		// 예시가 없으면 스키마로 뼈대 생성 (속성 없는 객체는 빈 객체)
 		assertThat(draft("POST /orders")).satisfies(order -> {
 			assertThat(order.request().body()).isEqualTo("{}");
 			assertThat(order.request().headers()).containsEntry("Content-Type", List.of("application/json"));
-			assertThat(order.warnings())
+			assertThat(messages(order.warnings()))
 				.containsExactly("request body was generated from the schema; replace the placeholder values");
 		});
-		assertThat(draft("GET /external").warnings())
+		assertThat(messages(draft("GET /external").warnings()))
 			.containsExactly("parameter: external reference 'common.yaml#/components/parameters/Tenant' is not supported");
 		assertThat(draft("PATCH /stores/{store[id]}")).satisfies(store -> {
 			assertThat(store.request().path()).isEqualTo("/stores/{{store_id_}}");
-			assertThat(store.warnings()).containsExactly("parameter 'store[id]' is used as variable {{store_id_}}");
+			assertThat(messages(store.warnings())).containsExactly("parameter 'store[id]' is used as variable {{store_id_}}");
 		});
 	}
 
@@ -139,14 +139,14 @@ class OpenApiConverterTest {
 			assertThat(reports.request().path()).isEqualTo("/reports?from={{from}}&tenant={{tenantKey}}");
 			assertThat(reports.request().headers())
 				.containsExactly(Map.entry("X-API-Key", List.of("{{apiKeyHeader}}")));
-			assertThat(reports.warnings()).isEmpty();
+			assertThat(messages(reports.warnings())).isEmpty();
 		});
 		assertThat(secured("GET /legacy").request().headers())
 			.containsExactly(Map.entry("Authorization", List.of("Basic {{basicAuth}}")));
 		assertThat(secured("GET /oauth").request().headers())
 			.containsExactly(Map.entry("Authorization", List.of("Bearer {{oauth}}")));
 		// 어떤 변수를 시크릿으로 등록해야 하는지 스킴마다 한 번 안내
-		assertThat(document.warnings()).containsExactly(
+		assertThat(messages(document.warnings())).containsExactly(
 				"security scheme 'bearerAuth' is sent as 'Authorization: Bearer {{bearerAuth}}'; add {{bearerAuth}} as a secret of the environment, or if a login request issues it, extract it into {{bearerAuth}} in an earlier case",
 				"security scheme 'apiKeyHeader' is sent as 'X-API-Key: {{apiKeyHeader}}'; add {{apiKeyHeader}} as a secret of the environment",
 				"security scheme 'tenantKey' is sent as query tenant={{tenantKey}}; add {{tenantKey}} as a secret of the environment",
@@ -159,7 +159,7 @@ class OpenApiConverterTest {
 		CaseDraft unsupported = secured("GET /unsupported");
 
 		assertThat(unsupported.request().headers()).isEmpty();
-		assertThat(unsupported.warnings()).containsExactly(
+		assertThat(messages(unsupported.warnings())).containsExactly(
 				"security scheme 'sessionCookie' (apiKey cookie) is not supported",
 				"security scheme 'digestAuth' (http digest) is not supported",
 				"security scheme 'ghost' is not defined");
@@ -189,7 +189,7 @@ class OpenApiConverterTest {
 				  "kind": "person"
 				}""");
 		assertThat(user.request().headers()).containsExactly(Map.entry("Content-Type", List.of("application/json")));
-		assertThat(user.warnings())
+		assertThat(messages(user.warnings()))
 			.containsExactly("request body was generated from the schema; replace the placeholder values");
 
 		// 자기 참조 스키마는 되풀이하지 않음
@@ -230,7 +230,7 @@ class OpenApiConverterTest {
 
 		assertThat(document.cases()).allSatisfy(draft -> {
 			assertThat(draft.assertions()).containsExactly(new StatusCodeAssertion(List.of("201")));
-			assertThat(draft.warnings()).isEmpty();
+			assertThat(messages(draft.warnings())).isEmpty();
 		});
 	}
 
@@ -305,7 +305,7 @@ class OpenApiConverterTest {
 				    B: { $ref: "#/components/requestBodies/A" }
 				""");
 
-		assertThat(document.cases().getFirst().warnings()).singleElement()
+		assertThat(messages(document.cases().getFirst().warnings())).singleElement()
 			.asString()
 			.startsWith("request body: reference '#/components/requestBodies/");
 	}
@@ -329,7 +329,7 @@ class OpenApiConverterTest {
 		CaseDraft search = document.cases().getFirst();
 		assertThat(search.request().path()).isEqualTo("/search?q={{q}}&page={{page}}");
 		// 이름·위치가 없는 파라미터는 조용히 건너뜀
-		assertThat(search.warnings()).containsExactly("required cookie parameter 'session' is not supported");
+		assertThat(messages(search.warnings())).containsExactly("required cookie parameter 'session' is not supported");
 	}
 
 	@Test
@@ -382,7 +382,7 @@ class OpenApiConverterTest {
 
 		assertThat(document.cases()).extracting(draft -> draft.request().body()).containsExactly(null, null,
 				"{\n  \"id\": 0\n}", null);
-		assertThat(document.cases()).extracting(CaseDraft::warnings)
+		assertThat(document.cases()).extracting(draft -> messages(draft.warnings()))
 			.containsExactly(List.of("request body has no JSON example or schema; body left empty"), List.of(),
 					List.of("external example 'https://example.com/order.json' is not supported",
 							"request body was generated from the schema; replace the placeholder values"),
@@ -403,7 +403,7 @@ class OpenApiConverterTest {
 				""");
 
 		assertThat(document.cases()).extracting(CaseDraft::source).containsExactly("GET /ok");
-		assertThat(document.warnings()).contains("/missing: reference '#/components/pathItems/gone' was not found");
+		assertThat(messages(document.warnings())).contains("/missing: reference '#/components/pathItems/gone' was not found");
 	}
 
 	@Test
@@ -496,6 +496,10 @@ class OpenApiConverterTest {
 		catch (IOException ex) {
 			throw new IllegalStateException(ex);
 		}
+	}
+
+	private static List<String> messages(List<ImportWarning> warnings) {
+		return warnings.stream().map(ImportWarning::message).toList();
 	}
 
 }
