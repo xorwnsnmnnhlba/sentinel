@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { importCases, previewCaseImport } from "@/lib/actions/case-import";
-import type { CaseImportPreview } from "@/lib/api/types";
+import type { CaseImportPreview, ImportWarning } from "@/lib/api/types";
 import {
   type CandidateRow,
   IMPORT_FORMATS,
@@ -32,6 +32,7 @@ import {
   toImportCases,
   toRows,
 } from "@/lib/case-import";
+import { describeImportWarning } from "@/lib/import-warning";
 
 /**
  * 문서(OpenAPI 3, Postman 컬렉션)에서 케이스 가져오기. 문서 입력 → 미리보기(후보 선택·이름 수정) → 가져오기.
@@ -319,14 +320,14 @@ async function send<T extends { error?: string } | undefined>(call: () => Promis
   }
 }
 
-function Warnings({ items }: { items: string[] }) {
+function Warnings({ items }: { items: ImportWarning[] }) {
   if (items.length === 0) {
     return null;
   }
   return (
     <ul className="mt-1 space-y-0.5 text-xs text-amber-800 dark:text-amber-400">
       {items.map((item, index) => (
-        <li key={index}>{item}</li>
+        <li key={index}>{describeImportWarning(item)}</li>
       ))}
     </ul>
   );

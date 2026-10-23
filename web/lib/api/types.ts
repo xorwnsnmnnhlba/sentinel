@@ -270,6 +270,14 @@ export interface PasswordResetLinkInfo {
   expiresAt: string;
 }
 
+/** 가져오기 경고·안내. 화면은 code·params로 한국어 문장을 만들고, 모르는 code는 message(영어) 그대로 (lib/import-warning.ts) */
+export interface ImportWarning {
+  code: string;
+  /** 문장에 넣을 값. 이름은 code마다 고정 */
+  params: Record<string, string>;
+  message: string;
+}
+
 /** 가져오기 후보 케이스. name·request·assertions를 그대로(또는 고쳐) 가져오기에 사용 */
 export interface CaseImportCandidate {
   /** 원본 작업. 예: GET /pets/{petId} */
@@ -278,7 +286,7 @@ export interface CaseImportCandidate {
   request: CaseItem["request"];
   assertions: Assertion[];
   /** 변환하면서 생략·대체한 내용 */
-  warnings: string[];
+  warnings: ImportWarning[];
   /** 스위트에 같은 이름의 케이스가 있음 */
   conflict: boolean;
 }
@@ -291,7 +299,7 @@ export interface CaseImportPreview {
   servers: string[];
   cases: CaseImportCandidate[];
   /** 문서 단위 경고 (지원하지 않아 제외한 작업 등) */
-  warnings: string[];
+  warnings: ImportWarning[];
 }
 
 /** 가져오기 요청의 케이스 */

@@ -29,10 +29,18 @@ const preview: CaseImportPreview = {
   servers: ["https://orders.example.com/api"],
   cases: [
     candidate("GET /orders", "List orders", { conflict: true }),
-    candidate("POST /orders", "Create order", { warnings: ["request body has no JSON example; body left empty"] }),
+    candidate("POST /orders", "Create order", {
+      warnings: [{ code: "BODY_MISSING", params: {}, message: "request body has no JSON example; body left empty" }],
+    }),
     candidate("GET /orders/{orderId}", "Get order"),
   ],
-  warnings: ["TRACE /orders: TRACE is not supported and was skipped"],
+  warnings: [
+    {
+      code: "METHOD_SKIPPED",
+      params: { source: "TRACE /orders", method: "TRACE" },
+      message: "TRACE /orders: TRACE is not supported and was skipped",
+    },
+  ],
 };
 
 afterEach(() => {
@@ -60,8 +68,9 @@ describe("CaseImportDialog", () => {
     expect(previewCaseImport).toHaveBeenCalledWith(3, { content: "openapi: 3.0.3", format: "OPENAPI_3" });
     expect(screen.getByText("Orders · 2.0")).toBeInTheDocument();
     expect(screen.getByText("https://orders.example.com/api")).toBeInTheDocument();
-    expect(screen.getByText("TRACE /orders: TRACE is not supported and was skipped")).toBeInTheDocument();
-    expect(screen.getByText("request body has no JSON example; body left empty")).toBeInTheDocument();
+    // 경고는 한국어 문장으로
+    expect(screen.getByText("TRACE /orders: TRACE 메서드는 지원하지 않아 제외했습니다")).toBeInTheDocument();
+    expect(screen.getByText("필수 요청 본문인데 JSON 예시·스키마가 없어 본문을 비워 두었습니다")).toBeInTheDocument();
     // 스위트에 이미 있는 이름은 선택 해제 상태로 시작
     expect(screen.getByRole("checkbox", { name: "GET /orders 가져오기" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "POST /orders 가져오기" })).toBeChecked();

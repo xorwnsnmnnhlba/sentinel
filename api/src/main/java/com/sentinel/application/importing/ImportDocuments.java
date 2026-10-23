@@ -95,20 +95,13 @@ final class ImportDocuments {
 	/**
 	 * 이름을 변수로. 변수 이름에 쓸 수 없는 문자는 {@code _}로 바꾸고 경고
 	 */
-	static String variable(String name, List<String> warnings) {
+	static String variable(String name, List<ImportWarning> warnings) {
 		String sanitized = INVALID_VARIABLE_CHARACTER.matcher(name.strip()).replaceAll("_");
+		String variable = "{{" + sanitized + "}}";
 		if (!sanitized.equals(name)) {
-			warnings.add("parameter '" + name + "' is used as variable {{" + sanitized + "}}");
+			warnings.add(ImportWarning.variableRenamed(name, variable));
 		}
-		return "{{" + sanitized + "}}";
-	}
-
-	/**
-	 * 로그인 API가 발급하는 토큰(만료됨)은 고정 시크릿 대신 앞 케이스의 값 추출로 받는 방법도 안내.
-	 * 시크릿에 넣은 토큰은 만료되면 그때부터 점검이 실패함
-	 */
-	static String loginTokenHint(String variable) {
-		return ", or if a login request issues it, extract it into " + variable + " in an earlier case";
+		return variable;
 	}
 
 	static String truncateName(String name) {

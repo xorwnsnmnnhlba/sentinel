@@ -12,7 +12,7 @@ import com.sentinel.runner.assertion.Assertion;
  * @param warnings 변환하면서 생략·대체한 내용
  */
 record CaseDraft(String source, String name, Request request, List<Assertion> assertions,
-		List<String> warnings) {
+		List<ImportWarning> warnings) {
 
 	CaseDraft withName(String name) {
 		return new CaseDraft(source, name, request, assertions, warnings);

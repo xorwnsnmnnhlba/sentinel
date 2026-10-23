@@ -148,6 +148,13 @@ class CaseImportTest {
 		// 평문 토큰은 변수로 바뀌고 응답 어디에도 없음
 		body.extractingPath("$.cases[0].request.headers.Authorization").isEqualTo(List.of("Bearer {{bearerToken}}"));
 		assertThat(preview.getResponse().getContentAsString()).doesNotContain("literal-token");
+		// 경고는 화면이 한국어 문장을 만들 code·params와 영어 문장
+		body.extractingPath("$.cases[0].warnings[0].code").isEqualTo("CREDENTIAL_REPLACED");
+		body.extractingPath("$.cases[0].warnings[0].params")
+			.isEqualTo(Map.of("credential", "bearerToken", "variable", "{{bearerToken}}"));
+		body.extractingPath("$.cases[0].warnings[0].message")
+			.isEqualTo("literal bearer token was replaced with {{bearerToken}}");
+		body.extractingPath("$.warnings[*].code").isEqualTo(List.of("CREDENTIAL_TOKEN"));
 
 		ArrayNode candidates = candidates(preview);
 		assertThat(post("/api/case-imports", """
