@@ -50,7 +50,7 @@ public class CaseImportService {
 
 	/**
 	 * @throws NotFoundException 스위트 미존재·보관
-	 * @throws InvalidRequestException 해석할 수 없거나 지원하지 않는 문서
+	 * @throws ImportDocumentException 해석할 수 없거나 지원하지 않는 문서
 	 */
 	@Transactional(readOnly = true)
 	public Preview preview(long suiteId, Format format, String content) {

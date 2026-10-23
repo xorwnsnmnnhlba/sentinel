@@ -11,6 +11,7 @@ import {
   MAX_DOCUMENT_LENGTH,
   MAX_IMPORT_CASES,
 } from "@/lib/case-import";
+import { describeImportError } from "@/lib/import-message";
 
 import type { ActionState } from "./catalog";
 
@@ -93,7 +94,8 @@ function failure(error: unknown, prefix: string): string {
   if (isApiError(error)) {
     switch (error.status) {
       case 400:
-        return `${prefix}: ${error.detail}`;
+        // 가져올 수 없는 문서는 서버가 붙인 code로 한국어 문장. 그 밖의 400(잘못된 케이스 등)은 서버 메시지
+        return `${prefix}: ${describeImportError(error.code, error.params ?? {}, error.detail)}`;
       case 404:
         return "스위트를 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다";
       case 409:

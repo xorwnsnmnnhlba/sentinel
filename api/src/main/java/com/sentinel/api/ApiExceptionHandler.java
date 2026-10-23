@@ -9,6 +9,7 @@ import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.NotFoundException;
 import com.sentinel.application.StaleVersionException;
 import com.sentinel.application.TooManyRunsException;
+import com.sentinel.application.importing.ImportDocumentException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -81,6 +82,15 @@ class ApiExceptionHandler {
 	@ExceptionHandler(InvalidRequestException.class)
 	ProblemDetail handleInvalidRequest(InvalidRequestException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+	}
+
+	/** 가져올 수 없는 문서. 화면이 한국어 문장을 만들 code·params를 함께 (web/lib/import-message.ts) */
+	@ExceptionHandler(ImportDocumentException.class)
+	ProblemDetail handleImportDocument(ImportDocumentException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+		problem.setProperty("code", ex.code());
+		problem.setProperty("params", ex.params());
+		return problem;
 	}
 
 }

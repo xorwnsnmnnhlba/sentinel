@@ -226,6 +226,15 @@ test("OpenAPI 문서에서 케이스 가져오기", async ({ page }) => {
   await page.getByRole("link", { name: suite }).click();
 
   await page.getByRole("button", { name: "문서 가져오기" }).click();
+  // 가져올 수 없는 문서는 이유와 할 일을 한국어로
+  await page.getByLabel("문서", { exact: true }).fill(`swagger: "2.0"\npaths: {}`);
+  await page.getByRole("button", { name: "미리보기" }).click();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByText("문서를 읽지 못했습니다: Swagger 2.0 문서입니다. OpenAPI 3으로 변환한 문서를 넣어 주세요"),
+  ).toBeVisible();
+
   await page.getByLabel("문서", { exact: true }).fill(`openapi: 3.0.3
 info: { title: Sentinel, version: "1" }
 servers: [ { url: "http://e2e-api:8080" } ]

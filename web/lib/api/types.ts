@@ -270,7 +270,7 @@ export interface PasswordResetLinkInfo {
   expiresAt: string;
 }
 
-/** 가져오기 경고·안내. 화면은 code·params로 한국어 문장을 만들고, 모르는 code는 message(영어) 그대로 (lib/import-warning.ts) */
+/** 가져오기 경고·안내. 화면은 code·params로 한국어 문장을 만들고, 모르는 code는 message(영어) 그대로 (lib/import-message.ts) */
 export interface ImportWarning {
   code: string;
   /** 문장에 넣을 값. 이름은 code마다 고정 */

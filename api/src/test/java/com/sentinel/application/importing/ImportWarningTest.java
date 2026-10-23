@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 화면이 한국어 문장을 만드는 code·params (web/lib/import-warning.ts). 영어 문장은 변환기 테스트에서 확인
+ * 화면이 한국어 문장을 만드는 code·params (web/lib/import-message.ts). 영어 문장은 변환기 테스트에서 확인
  */
 class ImportWarningTest {
 

@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import com.sentinel.application.InvalidRequestException;
 import org.snakeyaml.engine.v2.api.Load;
 import org.snakeyaml.engine.v2.api.LoadSettings;
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException;
@@ -54,27 +53,27 @@ final class ImportDocuments {
 
 	/**
 	 * JSON·YAML 문서 해석. YAML 1.2는 JSON을 포함하므로 두 형식 모두 YAML 파서로 읽고, 별칭(*ref)은 펼침
-	 * @throws InvalidRequestException 빈 문서, 길이 초과, 해석 실패
+	 * @throws ImportDocumentException 빈 문서, 길이 초과, 해석 실패
 	 */
 	static JsonNode parse(String content) {
 		if (content == null || content.isBlank()) {
-			throw new InvalidRequestException("document must not be empty");
+			throw ImportDocumentException.empty();
 		}
 		if (content.length() > MAX_CONTENT_LENGTH) {
-			throw new InvalidRequestException("document must be at most " + MAX_CONTENT_LENGTH + " characters");
+			throw ImportDocumentException.tooLong(MAX_CONTENT_LENGTH);
 		}
 		Object loaded;
 		try {
 			loaded = new Load(YAML_SETTINGS).loadFromString(content);
 		}
 		catch (YamlEngineException ex) {
-			throw new InvalidRequestException("document is not valid JSON or YAML: " + abbreviate(ex.getMessage()));
+			throw ImportDocumentException.invalidSyntax(abbreviate(ex.getMessage()));
 		}
 		try {
 			return JSON.valueToTree(loaded);
 		}
 		catch (JacksonException ex) {
-			throw new InvalidRequestException("document could not be read: " + abbreviate(ex.getOriginalMessage()));
+			throw ImportDocumentException.unreadable(abbreviate(ex.getOriginalMessage()));
 		}
 	}
 

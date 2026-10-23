@@ -6,7 +6,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
-import com.sentinel.application.InvalidRequestException;
 import com.sentinel.domain.RequestSpec;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.StatusCodeAssertion;
@@ -418,38 +417,38 @@ class OpenApiConverterTest {
 				swagger: "2.0"
 				info: { title: Old, version: "1" }
 				paths: {}
-				""")).isInstanceOf(InvalidRequestException.class)
+				""")).isInstanceOf(ImportDocumentException.class)
 			.hasMessage("only OpenAPI 3 documents are supported (found swagger 2.0)");
 		assertThatThrownBy(() -> converter.convert("info: { title: None }"))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessage("only OpenAPI 3 documents are supported (found openapi none)");
 		assertThatThrownBy(() -> converter.convert("- just\n- a list"))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessage("document must be a JSON or YAML object");
 		assertThatThrownBy(() -> converter.convert("openapi: 3.0.0\npaths: {}"))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessage("document defines no paths");
 		assertThatThrownBy(() -> converter.convert("""
 				openapi: 3.0.0
 				paths:
 				  /only-trace:
 				    trace: { responses: { "200": { description: ok } } }
-				""")).isInstanceOf(InvalidRequestException.class)
+				""")).isInstanceOf(ImportDocumentException.class)
 			.hasMessage("document defines no supported operations");
 	}
 
 	@Test
 	void rejectsUnreadableOrOversizedDocuments() {
-		assertThatThrownBy(() -> converter.convert("   ")).isInstanceOf(InvalidRequestException.class)
+		assertThatThrownBy(() -> converter.convert("   ")).isInstanceOf(ImportDocumentException.class)
 			.hasMessage("document must not be empty");
-		assertThatThrownBy(() -> converter.convert("openapi: [3.0.0")).isInstanceOf(InvalidRequestException.class)
+		assertThatThrownBy(() -> converter.convert("openapi: [3.0.0")).isInstanceOf(ImportDocumentException.class)
 			.hasMessageStartingWith("document is not valid JSON or YAML: ");
 		// 한도와 같은 길이는 크기 때문에 거부하지 않음 (내용이 OpenAPI가 아니라서 거부)
 		assertThatThrownBy(() -> converter.convert("x".repeat(ImportDocuments.MAX_CONTENT_LENGTH)))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessageNotContaining("characters");
 		assertThatThrownBy(() -> converter.convert("x".repeat(ImportDocuments.MAX_CONTENT_LENGTH + 1)))
-			.isInstanceOf(InvalidRequestException.class)
+			.isInstanceOf(ImportDocumentException.class)
 			.hasMessage("document must be at most " + ImportDocuments.MAX_CONTENT_LENGTH + " characters");
 	}
 
@@ -467,7 +466,7 @@ class OpenApiConverterTest {
 			previous = name;
 		}
 
-		assertThatThrownBy(() -> converter.convert(bomb.toString())).isInstanceOf(InvalidRequestException.class)
+		assertThatThrownBy(() -> converter.convert(bomb.toString())).isInstanceOf(ImportDocumentException.class)
 			.hasMessageStartingWith("document is not valid JSON or YAML: ");
 	}
 
