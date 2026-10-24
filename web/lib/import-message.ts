@@ -1,9 +1,8 @@
 import type { ImportWarning } from "@/lib/api/types";
+import { codedText, lookup, type ParamFormat } from "@/lib/coded-text";
 
 /**
- * 가져오기 경고·오류 문장. 서버가 보낸 code·params로 만들고, 모르는 code(서버가 먼저 업데이트된 경우 등)나
- * 빠진 값이 있으면 서버의 영어 문장 그대로
- * 문장의 {이름}은 params 값. 조사가 값에 따라 달라지지 않도록 "대상: 설명" 형태
+ * 가져오기 경고·오류 문장. 서버가 보낸 code·params로 만들고(lib/coded-text.ts), 모르는 code나 빠진 값이 있으면 서버의 영어 문장 그대로
  */
 
 /** 미리보기의 경고·안내 (Spring ImportWarning.Code와 같은 목록) */
@@ -81,8 +80,6 @@ const SCRIPTS: Record<string, string> = {
 };
 
 /** 값을 문장에 넣기 전 한국어로. 목록에 없는 값은 그대로 */
-type ParamFormat = (value: string, params: Record<string, string>) => string | undefined;
-
 const PARAM_FORMATS: Record<string, ParamFormat> = {
   location: (value) => lookup(LOCATIONS, value),
   credential: (value, params) =>
@@ -92,40 +89,12 @@ const PARAM_FORMATS: Record<string, ParamFormat> = {
 };
 
 export function describeImportWarning({ code, params, message }: ImportWarning): string {
-  return describe(IMPORT_WARNING_TEXTS, code, params, message);
+  return codedText(IMPORT_WARNING_TEXTS, PARAM_FORMATS, code, params) ?? message;
 }
 
 /**
  * @param detail 서버의 영어 메시지. code가 없거나(다른 종류의 400) 모르는 code면 그대로
  */
 export function describeImportError(code: string | undefined, params: Record<string, string>, detail: string): string {
-  return code === undefined ? detail : describe(IMPORT_ERROR_TEXTS, code, params, detail);
-}
-
-function describe(
-  texts: Record<string, string>,
-  code: string,
-  params: Record<string, string>,
-  message: string,
-): string {
-  if (!Object.hasOwn(texts, code)) {
-    return message;
-  }
-  let complete = true;
-  const text = texts[code].replace(/\{(\w+)\}/g, (_, name: string) => {
-    // 문장의 값 이름은 기본 속성(toString 등)과 겹치지 않아 own 여부는 보지 않음
-    const value: string | undefined = params[name];
-    const format: ParamFormat | undefined = PARAM_FORMATS[name];
-    const formatted = value === undefined || format === undefined ? value : format(value, params);
-    if (formatted === undefined) {
-      complete = false;
-      return "";
-    }
-    return formatted;
-  });
-  return complete ? text : message;
-}
-
-function lookup(names: Record<string, string>, value: string): string {
-  return Object.hasOwn(names, value) ? names[value] : value;
+  return (code === undefined ? null : codedText(IMPORT_ERROR_TEXTS, PARAM_FORMATS, code, params)) ?? detail;
 }

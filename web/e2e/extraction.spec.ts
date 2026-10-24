@@ -59,6 +59,10 @@ test("로그인 응답의 토큰을 꺼내 뒤 케이스의 인증에 사용하�
   await page.getByLabel(/본문/).fill('{"email": "admin@sentinel.test", "password": "{{password}}"}');
   await page.getByRole("button", { name: "추출 추가" }).click();
   await page.getByLabel("값 추출 1 변수 이름").fill("token");
+  // 서버만 알아보는 JsonPath 문법 오류는 몇 번째 추출인지와 함께 한국어로
+  await page.getByLabel("값 추출 1 JsonPath").fill("$.[");
+  await page.getByRole("button", { name: "등록", exact: true }).click();
+  await expect(page.getByText("값 추출 1: JsonPath 문법이 올바르지 않습니다: $.[")).toBeVisible();
   await page.getByLabel("값 추출 1 JsonPath").fill("$.token");
   await page.getByRole("switch", { name: "값 추출 1 값 가리기" }).click();
   expect(await accessibilityViolations(page)).toEqual([]);

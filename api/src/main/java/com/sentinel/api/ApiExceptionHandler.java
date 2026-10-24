@@ -1,5 +1,9 @@
 package com.sentinel.api;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.sentinel.application.ConflictException;
 import com.sentinel.application.auth.ForbiddenException;
 import com.sentinel.application.auth.InvalidCredentialsException;
@@ -9,17 +13,27 @@ import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.NotFoundException;
 import com.sentinel.application.StaleVersionException;
 import com.sentinel.application.TooManyRunsException;
-import com.sentinel.application.importing.ImportDocumentException;
+import com.sentinel.runner.InvalidValueException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DatabindException;
 
+/**
+ * Spring Boot의 ProblemDetail 처리(spring.mvc.problemdetails, 순서 0)보다 먼저. 읽을 수 없는 요청 본문을 이쪽에서 처리하기 위함
+ * (그 밖의 Spring 오류는 여기서 다루지 않으므로 그대로 Spring 처리)
+ */
 @RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 class ApiExceptionHandler {
 
 	/** web이 이 문구로 동시 수정 충돌을 구분 (lib/actions) */
@@ -79,18 +93,49 @@ class ApiExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "conflicts with an existing item");
 	}
 
+	/** 종류가 붙은 오류는 화면이 한국어 문장을 만들 code·params를 함께 (web/lib/input-error.ts, web/lib/import-message.ts) */
 	@ExceptionHandler(InvalidRequestException.class)
 	ProblemDetail handleInvalidRequest(InvalidRequestException ex) {
-		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+		return badRequest(ex.getMessage(), ex.code(), ex.params());
 	}
 
-	/** 가져올 수 없는 문서. 화면이 한국어 문장을 만들 code·params를 함께 (web/lib/import-message.ts) */
-	@ExceptionHandler(ImportDocumentException.class)
-	ProblemDetail handleImportDocument(ImportDocumentException ex) {
-		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
-		problem.setProperty("code", ex.code());
-		problem.setProperty("params", ex.params());
+	/**
+	 * 읽을 수 없는 요청 본문. 판정 규칙·값 추출은 JSON을 읽으면서 검증하므로, 종류가 붙은 검증 오류({@link InvalidValueException})면
+	 * 그 메시지·code와 위치(예: assertions의 1번째 → list {@code assertions}, index {@code 0})를 알림.
+	 * 그 밖의 오류(JSON 문법 등)는 Spring 기본 응답과 같은 문구
+	 */
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	ProblemDetail handleNotReadable(HttpMessageNotReadableException ex) {
+		InvalidValueException invalid = cause(ex, InvalidValueException.class);
+		if (invalid == null) {
+			return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Failed to read request");
+		}
+		Map<String, String> params = new HashMap<>(invalid.params());
+		DatabindException databind = cause(ex, DatabindException.class);
+		List<JacksonException.Reference> path = databind == null ? List.of() : databind.getPath();
+		if (path.size() >= 2 && path.get(0).getPropertyName() != null && path.get(1).getIndex() >= 0) {
+			params.put("list", path.get(0).getPropertyName());
+			params.put("index", String.valueOf(path.get(1).getIndex()));
+		}
+		return badRequest(invalid.getMessage(), invalid.code().name(), params);
+	}
+
+	private static ProblemDetail badRequest(String detail, String code, Map<String, String> params) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+		if (code != null) {
+			problem.setProperty("code", code);
+			problem.setProperty("params", params);
+		}
 		return problem;
+	}
+
+	private static <T extends Throwable> T cause(Throwable error, Class<T> type) {
+		for (Throwable current = error; current != null; current = current.getCause()) {
+			if (type.isInstance(current)) {
+				return type.cast(current);
+			}
+		}
+		return null;
 	}
 
 }

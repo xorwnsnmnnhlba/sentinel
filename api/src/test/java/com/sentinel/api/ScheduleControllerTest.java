@@ -247,6 +247,24 @@ class ScheduleControllerTest {
 		assertThat(patch("/api/schedules/-1", "{\"enabled\": true}")).hasStatus(HttpStatus.NOT_FOUND);
 	}
 
+	@Test
+	void namesTheCronFieldThatIsWrong() {
+		Project project = fixtures.project();
+		TestSuite suite = fixtures.suite(project);
+		Environment environment = fixtures.environment(project, Map.of());
+
+		var body = assertThat(create(suite, environment, "0 9 * * MON-FRY")).hasStatus(HttpStatus.BAD_REQUEST).bodyJson();
+		body.extractingPath("$.detail").asString().startsWith("invalid cron: 0 9 * * MON-FRY (");
+		body.extractingPath("$.code").isEqualTo("CRON_INVALID_FIELD");
+		body.extractingPath("$.params").isEqualTo(Map.of("field", "weekday", "value", "MON-FRY"));
+
+		String location = create(suite, environment, "10 9 * * 1-5").getResponse().getHeader("Location");
+		assertThat(patch(location, "{\"cron\": \"0 0 30 2 *\"}")).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.code")
+			.isEqualTo("CRON_NEVER_FIRES");
+	}
+
 	private MvcTestResult create(TestSuite suite, Environment environment, String cron) {
 		return mvc.post()
 			.uri("/api/schedules")

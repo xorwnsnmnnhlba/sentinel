@@ -656,6 +656,26 @@ describe("cases", () => {
 
     await expect(createCase(4, draft)).resolves.toEqual({ errors: ["이미 사용 중인 이름입니다"] });
   });
+
+  it("names the rule whose JsonPath Spring could not read", async () => {
+    server.use(
+      http.post(springUrl("/api/cases"), () =>
+        HttpResponse.json(
+          {
+            status: 400,
+            detail: "invalid JSON path: $.[",
+            code: "INVALID_JSON_PATH",
+            params: { expression: "$.[", list: "assertions", index: "1" },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    await expect(createCase(4, draft)).resolves.toEqual({
+      errors: ["판정 규칙 2: JsonPath 문법이 올바르지 않습니다: $.["],
+    });
+  });
 });
 
 describe("updateSchedules", () => {
@@ -727,11 +747,31 @@ describe("schedules", () => {
     });
   });
 
-  it("shows the Spring message for an invalid cron", async () => {
-    server.use(http.post(springUrl("/api/schedules"), () => problem(400, "cron must have 5 fields")));
+  it("shows the Spring message for a bad request without a code", async () => {
+    server.use(http.post(springUrl("/api/schedules"), () => problem(400, "cron must not be blank")));
 
-    await expect(createSchedule(2, undefined, form({ environmentId: "3", cron: "0 10 9 * * *" }))).resolves.toEqual({
-      error: "입력값을 확인해 주세요: cron must have 5 fields",
+    await expect(createSchedule(2, undefined, form({ environmentId: "3", cron: " " }))).resolves.toEqual({
+      error: "입력값을 확인해 주세요: cron must not be blank",
+    });
+  });
+
+  it("says which cron field is wrong in Korean", async () => {
+    server.use(
+      http.post(springUrl("/api/schedules"), () =>
+        HttpResponse.json(
+          {
+            status: 400,
+            detail: "invalid cron: 61 9 * * * (...)",
+            code: "CRON_INVALID_FIELD",
+            params: { field: "minute", value: "61" },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    await expect(createSchedule(2, undefined, form({ environmentId: "3", cron: "61 9 * * *" }))).resolves.toEqual({
+      error: "cron의 분(0~59) 칸이 올바르지 않습니다: 61",
     });
   });
 

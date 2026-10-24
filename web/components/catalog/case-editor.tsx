@@ -292,11 +292,14 @@ export function CaseEditor({
       {/* 긴 양식에서도 저장·실행 버튼이 보이도록 화면 아래에 붙임 */}
       <div className="sticky bottom-0 z-10 space-y-3 border-t bg-background py-3">
         {errors.length > 0 && (
-          <ul role="alert" className="space-y-1 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {errors.map((error) => (
-              <li key={error}>{error}</li>
-            ))}
-          </ul>
+          // 목록(ul)에는 alert 역할을 줄 수 없어 감싸는 요소에 (접근성 검사 aria-allowed-role)
+          <div role="alert" className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <ul className="space-y-1">
+              {errors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </div>
         )}
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" name="intent" value="save" disabled={pending}>

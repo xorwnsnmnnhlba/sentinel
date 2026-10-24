@@ -3,8 +3,12 @@ package com.sentinel.domain;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
+import com.sentinel.runner.InvalidValueException;
+import com.sentinel.runner.InvalidValueException.Code;
 import jakarta.persistence.Column;
 import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
@@ -30,6 +34,9 @@ import org.springframework.scheduling.support.CronExpression;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TestSchedule extends BaseEntity {
+
+	/** cron 칸 이름 (InvalidValueException CRON_INVALID_FIELD의 field) */
+	private static final List<String> CRON_FIELDS = List.of("minute", "hour", "day", "month", "weekday");
 
 	/** 낙관적 잠금 (V30). 동시에 고친 나중 요청은 실패하여 앞 요청의 변경을 덮어쓰지 않음 */
 	@Version
@@ -171,7 +178,7 @@ public class TestSchedule extends BaseEntity {
 	private Instant nextAfter(Instant instant, ZoneId zone) {
 		ZonedDateTime next = toSpringCron(cron).next(instant.atZone(zone));
 		if (next == null) {
-			throw new IllegalArgumentException("cron never fires: " + cron);
+			throw new InvalidValueException(Code.CRON_NEVER_FIRES, Map.of("cron", cron), "cron never fires: " + cron, null);
 		}
 		return next.toInstant();
 	}
@@ -179,7 +186,8 @@ public class TestSchedule extends BaseEntity {
 	static String normalizeCron(String cron) {
 		String value = Preconditions.requireText(cron, "cron", 100).replaceAll("\\s+", " ");
 		if (value.split(" ").length != 5) {
-			throw new IllegalArgumentException("cron must have 5 fields (minute hour day month weekday): " + value);
+			throw new InvalidValueException(Code.CRON_FIELD_COUNT, Map.of("cron", value),
+					"cron must have 5 fields (minute hour day month weekday): " + value, null);
 		}
 		toSpringCron(value);
 		return value;
@@ -191,7 +199,28 @@ public class TestSchedule extends BaseEntity {
 			return CronExpression.parse("0 " + cron);
 		}
 		catch (IllegalArgumentException ex) {
-			throw new IllegalArgumentException("invalid cron: " + cron + " (" + ex.getMessage() + ")", ex);
+			String message = "invalid cron: " + cron + " (" + ex.getMessage() + ")";
+			String[] fields = cron.split(" ");
+			for (int index = 0; index < fields.length; index++) {
+				if (!parses(fields, index)) {
+					throw new InvalidValueException(Code.CRON_INVALID_FIELD,
+							Map.of("field", CRON_FIELDS.get(index), "value", fields[index]), message, ex);
+				}
+			}
+			throw new InvalidValueException(Code.CRON_INVALID, Map.of("cron", cron), message, ex);
+		}
+	}
+
+	/** 다른 칸을 모두 *로 두고 이 칸만 넣어 해석. 잘못된 칸을 찾아 화면에 알리기 위함 */
+	private static boolean parses(String[] fields, int index) {
+		String[] probe = { "*", "*", "*", "*", "*" };
+		probe[index] = fields[index];
+		try {
+			CronExpression.parse("0 " + String.join(" ", probe));
+			return true;
+		}
+		catch (IllegalArgumentException ex) {
+			return false;
 		}
 	}
 

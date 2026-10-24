@@ -520,6 +520,10 @@ deploy-check:
 
 - 케이스 검색 `q`: 이름·경로 부분 일치 (대소문자 무시, 앞뒤 공백 제거, `%`·`_`는 문자 그대로). 스위트별 실행 순서, 최대 100건. `suiteId`와 함께 쓰면 그 스위트 안에서만. 빈 검색어·200자 초과는 400
 - 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
+- 오류는 ProblemDetail(`detail`은 영어). 화면이 한국어 문장을 만드는 400에는 `code`·`params`도 함께 (없는 400은 `detail`만)
+  - 입력 값: `InvalidValueException.Code`. 예: cron `{"code": "CRON_INVALID_FIELD", "params": {"field": "minute", "value": "61"}}`, 판정 규칙·값 추출의 JsonPath·정규식 `{"code": "INVALID_JSON_PATH", "params": {"expression": "$.[", "list": "assertions", "index": "1"}}` (`list`·`index`는 요청 본문에서 몇 번째 항목인지, 0부터). 화면 문장은 `web/lib/input-error.ts`
+  - 문서 가져오기: 아래 "케이스 가져오기"
+  - 그 밖의 읽을 수 없는 요청 본문(JSON 문법 오류 등)은 `detail` "Failed to read request"
 - 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
 - 스위트는 `caseCount`, 케이스는 요청 정의(`request`)와 판정 규칙(`assertions`)·응답 값 추출(`extractors`), 환경은 `baseUrl`과 변수 포함
 - 실행 목록: 최신순, 페이지 응답 `{content, page, size, totalElements, totalPages}` (`page`는 0부터, `size`는 1~100으로 보정)

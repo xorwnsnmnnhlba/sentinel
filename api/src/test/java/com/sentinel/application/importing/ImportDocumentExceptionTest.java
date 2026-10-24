@@ -42,14 +42,14 @@ class ImportDocumentExceptionTest {
 
 		assertThatThrownBy(() -> converter.convert("info: { title: x }")).isInstanceOf(ImportDocumentException.class)
 			.extracting("code")
-			.isEqualTo(Code.NOT_OPENAPI);
+			.isEqualTo("NOT_OPENAPI");
 		assertThatThrownBy(() -> converter.convert("openapi: 2.0")).isInstanceOf(ImportDocumentException.class)
 			.extracting("code")
-			.isEqualTo(Code.OPENAPI_VERSION);
+			.isEqualTo("OPENAPI_VERSION");
 	}
 
 	private static Tuple rejected(Code code, Map<String, String> params) {
-		return Tuple.tuple(code, params);
+		return Tuple.tuple(code.name(), params);
 	}
 
 }
