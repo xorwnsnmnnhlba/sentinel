@@ -1,5 +1,9 @@
 package com.sentinel.domain;
 
+import java.util.Map;
+
+import com.sentinel.runner.InvalidValueException;
+import com.sentinel.runner.InvalidValueException.Code;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -57,7 +61,7 @@ public class User extends ArchivableEntity {
 	public static String normalizeEmail(String email) {
 		String value = Preconditions.requireText(email, "email", 255).toLowerCase();
 		if (!value.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
-			throw new IllegalArgumentException("email is not valid: " + value);
+			throw new InvalidValueException(Code.EMAIL_INVALID, Map.of("email", value), "email is not valid: " + value, null);
 		}
 		return value;
 	}

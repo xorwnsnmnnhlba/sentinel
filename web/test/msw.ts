@@ -12,3 +12,8 @@ export function springUrl(path: string): string {
 export function problem(status: number, detail: string) {
   return Response.json({ type: "about:blank", title: "Error", status, detail }, { status });
 }
+
+/** 화면이 한국어 문장을 만들 code·params가 붙은 오류 응답 */
+export function codedProblem(status: number, detail: string, code: string, params: Record<string, string> = {}) {
+  return Response.json({ type: "about:blank", title: "Error", status, detail, code, params }, { status });
+}

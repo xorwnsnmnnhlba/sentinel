@@ -58,7 +58,7 @@ public class MaintenanceWindowService {
 			window = windows.save(new MaintenanceWindow(environment, startsAt, endsAt, reason, actorId, now));
 		}
 		catch (IllegalArgumentException ex) {
-			throw new InvalidRequestException(ex.getMessage());
+			throw InvalidRequestException.of(ex);
 		}
 		changeLog.record(actorId, target(window), Action.CREATED);
 		return itemOf(window, now);
@@ -85,7 +85,7 @@ public class MaintenanceWindowService {
 			throw new ConflictException(ex.getMessage());
 		}
 		catch (IllegalArgumentException ex) {
-			throw new InvalidRequestException(ex.getMessage());
+			throw InvalidRequestException.of(ex);
 		}
 		changeLog.record(actorId, target(window), Action.UPDATED,
 				new Changes().compare("startsAt", beforeStart, window.getStartsAt())

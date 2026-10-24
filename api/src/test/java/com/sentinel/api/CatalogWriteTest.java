@@ -276,6 +276,44 @@ class CatalogWriteTest {
 	}
 
 	@Test
+	void namesWhatIsWrongWithAnEnvironmentOrAName() {
+		Project project = fixtures.project();
+
+		var scheme = assertThat(post("/api/environments", """
+				{"projectId": %d, "name": "dev", "baseUrl": "ftp://gw"}""".formatted(project.getId())))
+			.hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson();
+		scheme.extractingPath("$.detail").isEqualTo("baseUrl must use http or https: ftp://gw");
+		scheme.extractingPath("$.code").isEqualTo("BASE_URL_SCHEME");
+		scheme.extractingPath("$.params").isEqualTo(Map.of("value", "ftp://gw"));
+		// 이 테스트는 암호화 키 없이 실행. 시크릿은 저장할 수 없음
+		assertThat(post("/api/environments", """
+				{"projectId": %d, "name": "dev", "baseUrl": "https://gw", "secrets": {"token": "x"}}"""
+			.formatted(project.getId()))).bodyJson()
+			.extractingPath("$.code")
+			.isEqualTo("SECRETS_DISABLED");
+		assertThat(post("/api/projects", """
+				{"name": "   "}""")).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.params")
+			.isEqualTo(Map.of("target", "name"));
+	}
+
+	@Test
+	void saysTheSecretsCannotBeReadWithoutAKey() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environmentWithSecret(project, "token", "cipher");
+		long caseId = createCase(fixtures.suite(project), "a");
+
+		assertThat(post("/api/runs", """
+				{"caseId": %d, "environmentId": %d}""".formatted(caseId, environment.getId())))
+			.hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.code")
+			.isEqualTo("SECRETS_KEY_MISSING");
+	}
+
+	@Test
 	void rejectsInvalidExtractors() {
 		TestSuite suite = fixtures.suite(fixtures.project());
 		String request = """

@@ -17,6 +17,11 @@ public class InvalidRequestException extends RuntimeException {
 		this(message, null, Map.of());
 	}
 
+	/** 서비스가 직접 내는 종류 있는 오류 (예: 시크릿을 읽을 수 없음) */
+	public InvalidRequestException(InvalidValueException.Code code, Map<String, String> params, String message) {
+		this(message, code.name(), params);
+	}
+
 	protected InvalidRequestException(String message, String code, Map<String, String> params) {
 		super(message);
 		this.code = code;

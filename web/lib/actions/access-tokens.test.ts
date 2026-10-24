@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { refresh } from "next/cache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { problem, server, springUrl } from "@/test/msw";
+import { codedProblem, problem, server, springUrl } from "@/test/msw";
 
 import { issueAccessToken, revokeAccessToken } from "./access-tokens";
 
@@ -58,6 +58,16 @@ describe("issueAccessToken", () => {
 
     await expect(issueAccessToken(undefined, form(fields))).resolves.toEqual({ error: message });
     expect(bodies).toEqual([]);
+  });
+
+  it("names a coded error in Korean", async () => {
+    capture("post", "/api/access-tokens", () =>
+      codedProblem(400, "name must be at most 100 characters", "TOO_LONG", { target: "name", max: "100" }),
+    );
+
+    await expect(issueAccessToken(undefined, form({ name: "CI", validityDays: "30" }))).resolves.toEqual({
+      error: "이름: 100자 이하로 입력해 주세요",
+    });
   });
 
   it("shows what Spring rejected", async () => {

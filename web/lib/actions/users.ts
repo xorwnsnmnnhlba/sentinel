@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { apiGet, apiSend, isApiError } from "@/lib/api/server";
 import { setSessionCookie } from "@/lib/api/session";
 import type { AuthenticatedUser, IssuedLink, PasswordResetLinkInfo, UserSummary } from "@/lib/api/types";
+import { describeInputError } from "@/lib/input-error";
 
 /**
  * 사용자 초대·초대 취소·삭제, 비밀번호 변경·재설정.
@@ -147,9 +148,10 @@ function message(error: unknown): string {
   if (isApiError(error)) {
     switch (error.status) {
       case 400:
-        return error.detail.includes("at least")
-          ? "비밀번호는 10자 이상이어야 합니다"
-          : `입력값을 확인해 주세요: ${error.detail}`;
+        if (error.detail.includes("at least")) {
+          return "비밀번호는 10자 이상이어야 합니다";
+        }
+        return describeInputError(error.code, error.params ?? {}) ?? `입력값을 확인해 주세요: ${error.detail}`;
       case 403:
         return "권한이 없습니다. 관리자만 사용할 수 있습니다";
       case 404:

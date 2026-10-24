@@ -35,6 +35,7 @@ import com.sentinel.infra.persistence.TestScheduleRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
 import com.sentinel.application.notification.WebhookUrls;
 import com.sentinel.application.secret.SecretCipher;
+import com.sentinel.runner.InvalidValueException;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.extract.Extractor;
 import lombok.RequiredArgsConstructor;
@@ -373,7 +374,7 @@ public class CatalogCommandService {
 		}
 		String url = valid(() -> WebhookUrls.validate(webhookUrl));
 		if (!secretCipher.isEnabled()) {
-			throw new InvalidRequestException(
+			throw new InvalidRequestException(InvalidValueException.Code.SECRETS_DISABLED, Map.of(),
 					"secrets are disabled: set sentinel.secret.key (SENTINEL_SECRET_KEY) to use them");
 		}
 		project.changeWebhook(secretCipher.encrypt(url));
@@ -388,7 +389,7 @@ public class CatalogCommandService {
 			return;
 		}
 		if (!secretCipher.isEnabled()) {
-			throw new InvalidRequestException(
+			throw new InvalidRequestException(InvalidValueException.Code.SECRETS_DISABLED, Map.of(),
 					"secrets are disabled: set sentinel.secret.key (SENTINEL_SECRET_KEY) to use them");
 		}
 		change(() -> secrets.forEach((secretName, value) -> {
@@ -458,7 +459,7 @@ public class CatalogCommandService {
 			return action.get();
 		}
 		catch (IllegalArgumentException ex) {
-			throw new InvalidRequestException(ex.getMessage());
+			throw InvalidRequestException.of(ex);
 		}
 	}
 

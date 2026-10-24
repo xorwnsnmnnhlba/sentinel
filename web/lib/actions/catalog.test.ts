@@ -201,7 +201,15 @@ describe("environments", () => {
   it("explains that the server has no encryption key", async () => {
     server.use(
       http.post(springUrl("/api/environments"), () =>
-        problem(400, "secrets are disabled: set sentinel.secret.key (SENTINEL_SECRET_KEY) to use them"),
+        HttpResponse.json(
+          {
+            status: 400,
+            detail: "secrets are disabled: set sentinel.secret.key (SENTINEL_SECRET_KEY) to use them",
+            code: "SECRETS_DISABLED",
+            params: {},
+          },
+          { status: 400 },
+        ),
       ),
     );
 

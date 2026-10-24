@@ -12,6 +12,18 @@ describe("input error", () => {
       "CRON_INVALID_FIELD",
       "CRON_INVALID",
       "CRON_NEVER_FIRES",
+      "REQUIRED",
+      "TOO_LONG",
+      "BASE_URL_INVALID",
+      "BASE_URL_SCHEME",
+      "BASE_URL_HOST",
+      "BASE_URL_QUERY",
+      "USED_AS_SECRET",
+      "USED_AS_VARIABLE",
+      "EMAIL_INVALID",
+      "SECRETS_DISABLED",
+      "SECRETS_KEY_MISSING",
+      "SECRETS_UNREADABLE",
     ]);
   });
 
@@ -24,6 +36,26 @@ describe("input error", () => {
     );
     expect(describeInputError("CRON_NEVER_FIRES", { cron: "0 0 30 2 *" })).toBe(
       "실행 시각이 오지 않는 cron입니다 (예: 2월 30일): 0 0 30 2 *",
+    );
+  });
+
+  it("names the item with a blank or too long value", () => {
+    expect(describeInputError("REQUIRED", { target: "baseUrl" })).toBe("기본 URL: 값을 입력해 주세요");
+    expect(describeInputError("TOO_LONG", { target: "secret name", max: "100" })).toBe(
+      "시크릿 이름: 100자 이하로 입력해 주세요",
+    );
+    expect(describeInputError("REQUIRED", { target: "inviteToken" })).toBe("inviteToken: 값을 입력해 주세요");
+  });
+
+  it("says what is wrong with the environment", () => {
+    expect(describeInputError("BASE_URL_SCHEME", { value: "ftp://gw" })).toBe(
+      "기본 URL은 http:// 또는 https://로 시작해야 합니다: ftp://gw",
+    );
+    expect(describeInputError("USED_AS_VARIABLE", { name: "token" })).toBe(
+      "시크릿 token: 같은 이름의 변수가 있습니다. 이름을 바꾸거나 한쪽을 지워 주세요",
+    );
+    expect(describeInputError("SECRETS_UNREADABLE", {})).toBe(
+      "이 환경의 시크릿을 읽을 수 없습니다. 서버 암호화 키가 바뀌었다면 환경 수정에서 시크릿 값을 다시 입력해 주세요",
     );
   });
 

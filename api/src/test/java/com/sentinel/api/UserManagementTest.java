@@ -2,6 +2,7 @@ package com.sentinel.api;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import com.jayway.jsonpath.JsonPath;
@@ -143,6 +144,21 @@ class UserManagementTest {
 				{"email": "later-%s@sentinel.test"}""".formatted(UUID.randomUUID())), "$.token");
 		clock.advance(Duration.ofDays(8));
 		assertThat(mvc.get().uri("/api/invites/{token}", second)).hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void namesAnInvalidInviteEmail() {
+		var body = assertThat(post("/api/invites", adminToken, """
+				{"email": "member@sentinel", "role": "MEMBER"}""")).hasStatus(HttpStatus.BAD_REQUEST).bodyJson();
+		body.extractingPath("$.detail").isEqualTo("email is not valid: member@sentinel");
+		body.extractingPath("$.code").isEqualTo("EMAIL_INVALID");
+		body.extractingPath("$.params").isEqualTo(Map.of("email", "member@sentinel"));
+		// 요청 항목 검증(@Email)에 먼저 걸려도 같은 종류
+		var annotated = assertThat(post("/api/invites", adminToken, """
+				{"email": "not an email", "role": "MEMBER"}""")).hasStatus(HttpStatus.BAD_REQUEST).bodyJson();
+		annotated.extractingPath("$.detail").isEqualTo("Invalid request content.");
+		annotated.extractingPath("$.code").isEqualTo("EMAIL_INVALID");
+		annotated.extractingPath("$.params").isEqualTo(Map.of("email", "not an email"));
 	}
 
 	@Test

@@ -60,9 +60,13 @@ test("프로젝트·환경·스위트 등록", async ({ page }) => {
 
   await page.getByRole("button", { name: "환경 추가" }).click();
   await page.getByLabel("이름", { exact: true }).fill("self");
-  await page.getByLabel("기본 URL").fill("http://e2e-api:8080");
+  // 브라우저 주소 검사는 통과하지만 Sentinel이 받지 않는 주소는 이유를 한국어로
+  await page.getByLabel("기본 URL").fill("ftp://e2e-api:8080");
   await page.getByLabel("변수 1 이름").fill("apiPrefix");
   await page.getByLabel("변수 1 값").fill("/api");
+  await page.getByRole("button", { name: "등록" }).click();
+  await expect(alertIn(page)).toContainText("기본 URL은 http:// 또는 https://로 시작해야 합니다: ftp://e2e-api:8080");
+  await page.getByLabel("기본 URL").fill("http://e2e-api:8080");
   await page.getByRole("button", { name: "등록" }).click();
 
   const environments = page.getByRole("row", { name: /self/ });
@@ -72,8 +76,11 @@ test("프로젝트·환경·스위트 등록", async ({ page }) => {
   // 시크릿 추가: 이름만 목록에 표시되고 값은 어디에도 남지 않음
   await chooseAction(page, "환경 self 작업", "수정");
   await page.getByRole("button", { name: "시크릿 추가" }).click();
-  await page.getByLabel("새 시크릿 1 이름").fill("token");
+  await page.getByLabel("새 시크릿 1 이름").fill("apiPrefix");
   await page.getByLabel("새 시크릿 1 값").fill(secret);
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(alertIn(page)).toContainText("시크릿 apiPrefix: 같은 이름의 변수가 있습니다");
+  await page.getByLabel("새 시크릿 1 이름").fill("token");
   await page.getByRole("button", { name: "저장" }).click();
 
   await expect(page.getByRole("row", { name: /self/ })).toContainText("token");

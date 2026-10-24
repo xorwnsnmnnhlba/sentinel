@@ -23,13 +23,15 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DatabindException;
 
 /**
- * Spring Boot의 ProblemDetail 처리(spring.mvc.problemdetails, 순서 0)보다 먼저. 읽을 수 없는 요청 본문을 이쪽에서 처리하기 위함
+ * Spring Boot의 ProblemDetail 처리(spring.mvc.problemdetails, 순서 0)보다 먼저. 읽을 수 없는 요청 본문·요청 항목 검증 실패를 이쪽에서 처리하기 위함
  * (그 밖의 Spring 오류는 여기서 다루지 않으므로 그대로 Spring 처리)
  */
 @RestControllerAdvice
@@ -38,6 +40,9 @@ class ApiExceptionHandler {
 
 	/** web이 이 문구로 동시 수정 충돌을 구분 (lib/actions) */
 	static final String CONCURRENT_MODIFICATION = "modified by another request; reload and try again";
+
+	/** 요청 항목 검증 실패 시 Spring 기본 문구 */
+	private static final String INVALID_CONTENT = "Invalid request content.";
 
 
 	@ExceptionHandler(NotFoundException.class)
@@ -118,6 +123,23 @@ class ApiExceptionHandler {
 			params.put("index", String.valueOf(path.get(1).getIndex()));
 		}
 		return badRequest(invalid.getMessage(), invalid.code().name(), params);
+	}
+
+	/**
+	 * 요청 항목 검증(@NotBlank 등) 실패. 첫 항목의 빈 값·이메일 형식은 도메인 검증과 같은 code로 (화면 문장 공유).
+	 * 그 밖은 Spring 기본 응답과 같은 문구만
+	 */
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	ProblemDetail handleInvalidArgument(MethodArgumentNotValidException ex) {
+		FieldError error = ex.getBindingResult().getFieldError();
+		String code = error == null ? null : String.valueOf(error.getCode());
+		return switch (code) {
+			case "NotBlank", "NotNull", "NotEmpty" ->
+				badRequest(INVALID_CONTENT, InvalidValueException.Code.REQUIRED.name(), Map.of("target", error.getField()));
+			case "Email" -> badRequest(INVALID_CONTENT, InvalidValueException.Code.EMAIL_INVALID.name(),
+					Map.of("email", String.valueOf(error.getRejectedValue())));
+			case null, default -> ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, INVALID_CONTENT);
+		};
 	}
 
 	private static ProblemDetail badRequest(String detail, String code, Map<String, String> params) {

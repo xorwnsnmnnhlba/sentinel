@@ -217,8 +217,8 @@ class CaseImportTest {
 		problem.extractingPath("$.code").isEqualTo("SWAGGER_2");
 		problem.extractingPath("$.params").isEqualTo(Map.of("version", "2.0"));
 		// 그 밖의 잘못된 요청에는 code 없음
-		assertThat(post("/api/case-imports", """
-				{"suiteId": %d, "cases": []}""".formatted(suite.getId()))).bodyJson()
+		assertThat(post("/api/case-import-previews", """
+				{"suiteId": %d, "format": "RAML", "content": "{}"}""".formatted(suite.getId()))).bodyJson()
 			.doesNotHavePath("$.code");
 		assertThat(preview(999_999L, DOCUMENT)).hasStatus(HttpStatus.NOT_FOUND);
 		assertThat(post("/api/case-import-previews", """
