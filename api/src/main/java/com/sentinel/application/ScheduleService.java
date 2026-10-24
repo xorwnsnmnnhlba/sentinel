@@ -68,7 +68,7 @@ public class ScheduleService {
 			schedule = new TestSchedule(suite, environment, cron, clock.instant(), properties.zone());
 		}
 		catch (IllegalArgumentException ex) {
-			throw new InvalidRequestException(ex.getMessage());
+			throw InvalidRequestException.of(ex);
 		}
 		schedule.changeSkipHolidays(skipHolidays);
 		schedules.save(schedule);
@@ -105,7 +105,7 @@ public class ScheduleService {
 				schedule.changeEnvironment(environment);
 			}
 			catch (IllegalArgumentException ex) {
-				throw new InvalidRequestException(ex.getMessage());
+				throw InvalidRequestException.of(ex);
 			}
 		}
 		if (cron != null) {
@@ -113,7 +113,7 @@ public class ScheduleService {
 				schedule.changeCron(cron, clock.instant(), properties.zone());
 			}
 			catch (IllegalArgumentException ex) {
-				throw new InvalidRequestException(ex.getMessage());
+				throw InvalidRequestException.of(ex);
 			}
 		}
 		if (skipHolidays != null) {

@@ -9,6 +9,8 @@ import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import com.sentinel.runner.HttpExchange;
+import com.sentinel.runner.InvalidValueException;
+import com.sentinel.runner.InvalidValueException.Code;
 
 /**
  * 응답 본문 JSON 경로 판정. 예: {@code $.status == "UP"}, {@code $.items.length() >= 1}.
@@ -29,7 +31,8 @@ public record JsonPathAssertion(String path, Operator operator, Object expected)
 			JsonPath.compile(path);
 		}
 		catch (InvalidPathException ex) {
-			throw new IllegalArgumentException("invalid JSON path: " + path, ex);
+			throw new InvalidValueException(Code.INVALID_JSON_PATH, Map.of("expression", path), "invalid JSON path: " + path,
+					ex);
 		}
 		if (operator == null) {
 			throw new IllegalArgumentException("jsonPath.operator is required");

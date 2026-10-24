@@ -3,9 +3,14 @@ package com.sentinel.domain;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Map;
 
+import com.sentinel.runner.InvalidValueException;
+import com.sentinel.runner.InvalidValueException.Code;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -97,6 +102,28 @@ class TestScheduleTest {
 	@ValueSource(strings = { "0 10 9 * * *", "10 9 * *", "61 9 * * *", "not a cron", "0 0 30 2 *" })
 	void rejectsInvalidOrNeverFiringCron(String cron) {
 		assertThatThrownBy(() -> schedule(cron, SEOUL)).isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@ParameterizedTest
+	@CsvSource(delimiter = '|', textBlock = """
+			10 9 * *        | CRON_FIELD_COUNT   | cron=10 9 * *
+			61 9 * * *      | CRON_INVALID_FIELD | field=minute,value=61
+			0 24 * * *      | CRON_INVALID_FIELD | field=hour,value=24
+			0 9 32 * *      | CRON_INVALID_FIELD | field=day,value=32
+			0 9 * 13 *      | CRON_INVALID_FIELD | field=month,value=13
+			0 9 * * MON-FRY | CRON_INVALID_FIELD | field=weekday,value=MON-FRY
+			0 0 30 2 *      | CRON_NEVER_FIRES   | cron=0 0 30 2 *
+			""")
+	void namesWhatIsWrongWithACron(String cron, Code code, String params) {
+		Map<String, String> expected = new HashMap<>();
+		for (String pair : params.split(",")) {
+			expected.put(pair.substring(0, pair.indexOf('=')), pair.substring(pair.indexOf('=') + 1));
+		}
+
+		assertThatThrownBy(() -> schedule(cron, SEOUL)).isInstanceOfSatisfying(InvalidValueException.class, ex -> {
+			assertThat(ex.code()).isEqualTo(code);
+			assertThat(ex.params()).isEqualTo(expected);
+		});
 	}
 
 	@Test

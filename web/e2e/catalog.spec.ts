@@ -360,7 +360,13 @@ test("스케줄 등록·전환·수정·삭제", async ({ page }) => {
   await chooseAction(page, "스케줄 10 9 * * 1-5 작업", "수정");
   await page.getByLabel("cron").fill("0 0 30 2 *");
   await page.getByRole("button", { name: "저장" }).click();
-  await expect(alertIn(page)).toContainText("입력값을 확인해 주세요");
+  await expect(alertIn(page)).toContainText("실행 시각이 오지 않는 cron입니다 (예: 2월 30일): 0 0 30 2 *");
+  // 잘못된 칸은 이름과 쓸 수 있는 값으로
+  await page.getByLabel("cron").fill("0 9 * * MON-FRY");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(alertIn(page)).toContainText(
+    "cron의 요일(0~7, SUN~SAT. 0과 7은 일요일) 칸이 올바르지 않습니다: MON-FRY",
+  );
 
   await page.getByLabel("cron").fill("30 17 * * 1-5");
   await page.getByRole("button", { name: "저장" }).click();

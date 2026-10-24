@@ -5,14 +5,10 @@ import java.util.Map;
 import com.sentinel.application.InvalidRequestException;
 
 /**
- * 가져올 수 없는 문서. 400 응답에 {@code code}·{@code params}를 함께 담아, 화면이 한국어 문장을 만들고 모르는 code는 영어 메시지 그대로 표시
- * (web/lib/import-message.ts)
+ * 가져올 수 없는 문서. 400 응답에 {@code code}({@link Code}의 이름)·{@code params}를 함께 담아, 화면이 한국어 문장을 만들고
+ * 모르는 code는 영어 메시지 그대로 표시 (web/lib/import-message.ts)
  */
 public class ImportDocumentException extends InvalidRequestException {
-
-	private final Code code;
-
-	private final Map<String, String> params;
 
 	/** 오류 종류. 괄호 안은 params 이름 */
 	public enum Code {
@@ -49,17 +45,7 @@ public class ImportDocumentException extends InvalidRequestException {
 	}
 
 	private ImportDocumentException(Code code, Map<String, String> params, String message) {
-		super(message);
-		this.code = code;
-		this.params = Map.copyOf(params);
-	}
-
-	public Code code() {
-		return code;
-	}
-
-	public Map<String, String> params() {
-		return params;
+		super(message, code.name(), params);
 	}
 
 	static ImportDocumentException empty() {

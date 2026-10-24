@@ -3,6 +3,8 @@ package com.sentinel.runner.assertion;
 import java.util.List;
 import java.util.Map;
 
+import com.sentinel.runner.InvalidValueException;
+import com.sentinel.runner.InvalidValueException.Code;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -133,12 +135,19 @@ class JsonPathAssertionTest {
 
 	@Test
 	void validatesRule() {
+		// 화면이 한국어 문장을 만들 종류·값 (web/lib/input-error.ts)
 		assertThatThrownBy(() -> new JsonPathAssertion("$.[", Operator.EXISTS, null))
-			.isInstanceOf(IllegalArgumentException.class);
+			.isInstanceOfSatisfying(InvalidValueException.class, ex -> {
+				assertThat(ex.code()).isEqualTo(Code.INVALID_JSON_PATH);
+				assertThat(ex.params()).isEqualTo(Map.of("expression", "$.["));
+			});
 		assertThatThrownBy(() -> new JsonPathAssertion("$.a", Operator.GREATER_THAN, "1"))
 			.isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> new JsonPathAssertion("$.a", Operator.MATCHES, "("))
-			.isInstanceOf(IllegalArgumentException.class);
+			.isInstanceOfSatisfying(InvalidValueException.class, ex -> {
+				assertThat(ex.code()).isEqualTo(Code.INVALID_REGEX);
+				assertThat(ex.params()).isEqualTo(Map.of("expression", "("));
+			});
 		assertThatThrownBy(() -> new JsonPathAssertion("$.a", Operator.CONTAINS, null))
 			.isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> new JsonPathAssertion(" ", Operator.EXISTS, null))

@@ -8,6 +8,9 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import com.sentinel.runner.InvalidValueException;
+import com.sentinel.runner.InvalidValueException.Code;
+
 /**
  * 판정 값 비교·표시 유틸리티. JSON 값(문자열, 숫자, 불리언, null, 배열, 객체) 기준.
  */
@@ -23,7 +26,7 @@ final class Values {
 			return Pattern.compile(regex);
 		}
 		catch (PatternSyntaxException ex) {
-			throw new IllegalArgumentException("invalid regex: " + regex, ex);
+			throw new InvalidValueException(Code.INVALID_REGEX, Map.of("expression", regex), "invalid regex: " + regex, ex);
 		}
 	}
 

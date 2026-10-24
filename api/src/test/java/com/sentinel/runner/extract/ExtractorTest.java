@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.HttpMethod;
+import com.sentinel.runner.InvalidValueException;
 import com.sentinel.runner.ResolvedRequest;
 import com.sentinel.runner.extract.Extractor.Extraction;
 import com.sentinel.runner.extract.Extractor.Source;
@@ -144,7 +145,11 @@ class ExtractorTest {
 		assertThatThrownBy(() -> new Extractor("a", Source.HEADER, " ", false))
 			.hasMessageContaining("extractor.expression");
 		assertThatThrownBy(() -> new Extractor("a", Source.BODY, "$.[", false))
-			.hasMessageContaining("invalid JSON path");
+			.hasMessageContaining("invalid JSON path")
+			.isInstanceOfSatisfying(InvalidValueException.class, ex -> {
+				assertThat(ex.code()).isEqualTo(InvalidValueException.Code.INVALID_JSON_PATH);
+				assertThat(ex.params()).isEqualTo(Map.of("expression", "$.["));
+			});
 		// 헤더 이름은 JSON 경로로 검사하지 않음
 		assertThat(new Extractor("a", Source.HEADER, "X-Request-Id", false).expression()).isEqualTo("X-Request-Id");
 		assertThat(new Extractor("a.b-c_1", Source.BODY, "$.a", false).name()).isEqualTo("a.b-c_1");

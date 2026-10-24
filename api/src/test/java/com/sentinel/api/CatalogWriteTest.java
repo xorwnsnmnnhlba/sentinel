@@ -238,6 +238,44 @@ class CatalogWriteTest {
 	}
 
 	@Test
+	void namesTheRuleWhoseExpressionCannotBeRead() {
+		TestSuite suite = fixtures.suite(fixtures.project());
+		String request = """
+				{"method": "GET", "path": "/a"}""";
+
+		// 판정 규칙은 JSON을 읽으면서 검증. 몇 번째 규칙인지와 화면이 한국어 문장을 만들 code·params를 함께
+		var path = assertThat(post("/api/cases", """
+				{"suiteId": %d, "name": "a", "request": %s, "assertions": [
+				  {"type": "statusCode", "anyOf": ["200"]},
+				  {"type": "jsonPath", "path": "$.[", "operator": "EXISTS"}]}""".formatted(suite.getId(), request)))
+			.hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson();
+		path.extractingPath("$.detail").isEqualTo("invalid JSON path: $.[");
+		path.extractingPath("$.code").isEqualTo("INVALID_JSON_PATH");
+		path.extractingPath("$.params").isEqualTo(Map.of("expression", "$.[", "list", "assertions", "index", "1"));
+
+		assertThat(post("/api/cases", """
+				{"suiteId": %d, "name": "b", "request": %s, "assertions": [
+				  {"type": "header", "name": "X-Id", "operator": "MATCHES", "value": "("}]}"""
+			.formatted(suite.getId(), request))).bodyJson()
+			.extractingPath("$.params")
+			.isEqualTo(Map.of("expression", "(", "list", "assertions", "index", "0"));
+		assertThat(post("/api/cases", extractorCaseJson(suite.getId(), "c", request, """
+				[{"name": "id", "from": "BODY", "expression": "$.id"},
+				 {"name": "token", "from": "BODY", "expression": "$.["}]"""))).bodyJson()
+			.extractingPath("$.params")
+			.isEqualTo(Map.of("expression", "$.[", "list", "extractors", "index", "1"));
+
+		// 종류가 없는 오류(JSON 문법 등)는 Spring 기본 문구 그대로, code 없음
+		var malformed = assertThat(post("/api/cases", "{\"suiteId\": ")).hasStatus(HttpStatus.BAD_REQUEST).bodyJson();
+		malformed.extractingPath("$.detail").isEqualTo("Failed to read request");
+		malformed.doesNotHavePath("$.code");
+		assertThat(post("/api/cases", extractorCaseJson(suite.getId(), "d", request, """
+				[{"name": "user id", "from": "BODY", "expression": "$.id"}]"""))).bodyJson()
+			.doesNotHavePath("$.code");
+	}
+
+	@Test
 	void rejectsInvalidExtractors() {
 		TestSuite suite = fixtures.suite(fixtures.project());
 		String request = """

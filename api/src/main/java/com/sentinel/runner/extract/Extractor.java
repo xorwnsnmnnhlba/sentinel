@@ -10,6 +10,8 @@ import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import com.sentinel.runner.HttpExchange;
+import com.sentinel.runner.InvalidValueException;
+import com.sentinel.runner.InvalidValueException.Code;
 
 /**
  * 응답 값 추출 규칙. 추출한 값은 같은 스위트 실행에서 뒤에 실행하는 케이스가 {@code {{name}}}으로 사용
@@ -54,7 +56,8 @@ public record Extractor(String name, Source from, String expression, Boolean sec
 				JsonPath.compile(expression);
 			}
 			catch (InvalidPathException ex) {
-				throw new IllegalArgumentException("invalid JSON path: " + expression, ex);
+				throw new InvalidValueException(Code.INVALID_JSON_PATH, Map.of("expression", expression),
+						"invalid JSON path: " + expression, ex);
 			}
 		}
 	}

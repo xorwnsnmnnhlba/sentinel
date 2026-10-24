@@ -7,6 +7,7 @@ import { apiGet, apiSend, isApiError } from "@/lib/api/server";
 import type { CaseItem, EnvironmentItem, MaintenanceWindow, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
 import { copyName, MAX_CASE_NAME_LENGTH } from "@/lib/copy-name";
 import { type CaseDraft, isCaseDraft, validateDraft } from "@/lib/case-draft";
+import { describeInputError } from "@/lib/input-error";
 import { fromKstInput, periodError } from "@/lib/maintenance";
 import { MAX_BULK_UPDATE } from "@/lib/schedule-overview";
 import { type Delivery, webhookUrlError } from "@/lib/webhook";
@@ -620,7 +621,10 @@ function failure(error: unknown): ActionState {
         if (error.detail.includes("secrets are disabled")) {
           return { error: "시크릿 기능이 꺼져 있습니다. 서버에 암호화 키(SENTINEL_SECRET_KEY) 설정이 필요합니다" };
         }
-        return { error: `입력값을 확인해 주세요: ${error.detail}` };
+        // 서버가 종류(code)를 붙인 오류는 한국어 문장 (cron, JsonPath·정규식 등). 그 밖은 서버 메시지
+        return {
+          error: describeInputError(error.code, error.params ?? {}) ?? `입력값을 확인해 주세요: ${error.detail}`,
+        };
       case 404:
         return { error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다" };
       case 409:
