@@ -63,7 +63,7 @@ public class AccessTokenService {
 					now, Duration.ofDays(validityDays)));
 		}
 		catch (IllegalArgumentException ex) {
-			throw new InvalidRequestException(ex.getMessage());
+			throw InvalidRequestException.of(ex);
 		}
 		changeLog.record(userId, target(saved), Action.CREATED);
 		return new Issued(token, AccessTokenItem.of(saved, now));

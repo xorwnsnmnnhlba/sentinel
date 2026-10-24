@@ -1,5 +1,10 @@
 package com.sentinel.domain;
 
+import java.util.Map;
+
+import com.sentinel.runner.InvalidValueException;
+import com.sentinel.runner.InvalidValueException.Code;
+
 final class Preconditions {
 
 	private Preconditions() {
@@ -7,11 +12,12 @@ final class Preconditions {
 
 	static String requireText(String value, String name, int maxLength) {
 		if (value == null || value.isBlank()) {
-			throw new IllegalArgumentException(name + " must not be blank");
+			throw new InvalidValueException(Code.REQUIRED, Map.of("target", name), name + " must not be blank", null);
 		}
 		String trimmed = value.strip();
 		if (trimmed.length() > maxLength) {
-			throw new IllegalArgumentException(name + " must be at most " + maxLength + " characters");
+			throw new InvalidValueException(Code.TOO_LONG, Map.of("target", name, "max", String.valueOf(maxLength)),
+					name + " must be at most " + maxLength + " characters", null);
 		}
 		return trimmed;
 	}

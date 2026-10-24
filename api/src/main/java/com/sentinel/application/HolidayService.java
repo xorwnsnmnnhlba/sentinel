@@ -52,7 +52,7 @@ public class HolidayService {
 			holiday = holidays.save(new Holiday(date, name, actorId));
 		}
 		catch (IllegalArgumentException ex) {
-			throw new InvalidRequestException(ex.getMessage());
+			throw InvalidRequestException.of(ex);
 		}
 		changeLog.record(actorId, target(holiday), Action.CREATED);
 		return HolidayItem.of(holiday);

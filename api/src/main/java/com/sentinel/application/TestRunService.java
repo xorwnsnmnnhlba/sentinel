@@ -30,6 +30,7 @@ import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.infra.persistence.TestRunRepository;
 import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.infra.persistence.TestSuiteRepository;
+import com.sentinel.runner.InvalidValueException;
 import com.sentinel.runner.HttpExchange;
 import com.sentinel.runner.RequestExecutionException;
 import com.sentinel.runner.RequestExecutor;
@@ -370,7 +371,8 @@ public class TestRunService {
 		}
 		catch (SecretKeyMissingException | SecretDecryptionException ex) {
 			throw new InvalidRequestException(
-					"environment " + environment.getId() + " has secrets that cannot be read: " + ex.getMessage());
+					ex instanceof SecretKeyMissingException ? InvalidValueException.Code.SECRETS_KEY_MISSING : InvalidValueException.Code.SECRETS_UNREADABLE,
+					Map.of(), "environment " + environment.getId() + " has secrets that cannot be read: " + ex.getMessage());
 		}
 		return decrypted;
 	}

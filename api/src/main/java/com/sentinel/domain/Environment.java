@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.sentinel.runner.InvalidValueException;
+import com.sentinel.runner.InvalidValueException.Code;
 import jakarta.persistence.Column;
 import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
@@ -80,7 +82,8 @@ public class Environment extends ArchivableEntity {
 	void putVariable(String key, String value) {
 		String validKey = Preconditions.requireText(key, "variable key", 100);
 		if (secrets().containsKey(validKey)) {
-			throw new IllegalArgumentException("'" + validKey + "' is already used as a secret");
+			throw new InvalidValueException(Code.USED_AS_SECRET, Map.of("name", validKey),
+					"'" + validKey + "' is already used as a secret", null);
 		}
 		if (value == null) {
 			throw new IllegalArgumentException("variable '" + validKey + "' must not be null");
@@ -113,7 +116,8 @@ public class Environment extends ArchivableEntity {
 	public void putSecret(String name, String cipherValue) {
 		String validName = Preconditions.requireText(name, "secret name", 100);
 		if (variables.containsKey(validName)) {
-			throw new IllegalArgumentException("'" + validName + "' is already used as a variable");
+			throw new InvalidValueException(Code.USED_AS_VARIABLE, Map.of("name", validName),
+					"'" + validName + "' is already used as a variable", null);
 		}
 		if (cipherValue == null) {
 			throw new IllegalArgumentException("secret '" + validName + "' must not be null");
@@ -152,16 +156,20 @@ public class Environment extends ArchivableEntity {
 			uri = new URI(value);
 		}
 		catch (URISyntaxException ex) {
-			throw new IllegalArgumentException("baseUrl is not a valid URI: " + value, ex);
+			throw new InvalidValueException(Code.BASE_URL_INVALID, Map.of("value", value),
+					"baseUrl is not a valid URI: " + value, ex);
 		}
 		if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
-			throw new IllegalArgumentException("baseUrl must use http or https: " + value);
+			throw new InvalidValueException(Code.BASE_URL_SCHEME, Map.of("value", value),
+					"baseUrl must use http or https: " + value, null);
 		}
 		if (uri.getHost() == null) {
-			throw new IllegalArgumentException("baseUrl must have a host: " + value);
+			throw new InvalidValueException(Code.BASE_URL_HOST, Map.of("value", value), "baseUrl must have a host: " + value,
+					null);
 		}
 		if (uri.getQuery() != null || uri.getFragment() != null) {
-			throw new IllegalArgumentException("baseUrl must not have a query or fragment: " + value);
+			throw new InvalidValueException(Code.BASE_URL_QUERY, Map.of("value", value),
+					"baseUrl must not have a query or fragment: " + value, null);
 		}
 		return value.replaceAll("/+$", "");
 	}

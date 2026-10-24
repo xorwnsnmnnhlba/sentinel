@@ -268,7 +268,7 @@ public class UserService {
 			return User.normalizeEmail(email);
 		}
 		catch (IllegalArgumentException ex) {
-			throw new InvalidRequestException(ex.getMessage());
+			throw InvalidRequestException.of(ex);
 		}
 	}
 

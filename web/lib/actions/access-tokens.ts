@@ -5,6 +5,7 @@ import { refresh } from "next/cache";
 import { apiSend, isApiError } from "@/lib/api/server";
 import type { IssuedAccessToken } from "@/lib/api/types";
 import { VALIDITY_DAYS } from "@/lib/access-token";
+import { describeInputError } from "@/lib/input-error";
 
 /**
  * API 토큰 발급·폐기. 토큰 원문은 발급 응답에서만 확인할 수 있어 화면에 한 번만 표시
@@ -49,7 +50,7 @@ export async function revokeAccessToken(tokenId: number): Promise<ActionState> {
 
 function message(error: unknown): string {
   if (isApiError(error) && error.status === 400) {
-    return `입력값을 확인해 주세요: ${error.detail}`;
+    return describeInputError(error.code, error.params ?? {}) ?? `입력값을 확인해 주세요: ${error.detail}`;
   }
   console.error("access token action failed", error);
   return "요청을 처리하지 못했습니다. API 서버 상태를 확인해 주세요";

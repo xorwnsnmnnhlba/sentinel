@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { refresh } from "next/cache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { problem, server, springUrl } from "@/test/msw";
+import { codedProblem, problem, server, springUrl } from "@/test/msw";
 
 import { createHoliday, deleteHoliday, importHolidays } from "./holidays";
 
@@ -68,6 +68,16 @@ describe("createHoliday", () => {
       error: message,
     });
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("names a coded error in Korean", async () => {
+    capture("post", "/api/holidays", () =>
+      codedProblem(400, "name must be at most 100 characters", "TOO_LONG", { target: "name", max: "100" }),
+    );
+
+    await expect(createHoliday(undefined, form({ date: "2026-10-09", name: "한글날" }))).resolves.toEqual({
+      error: "이름: 100자 이하로 입력해 주세요",
+    });
   });
 
   it("hides unexpected failures", async () => {

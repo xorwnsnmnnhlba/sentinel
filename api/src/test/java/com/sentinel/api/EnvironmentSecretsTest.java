@@ -11,6 +11,7 @@ import com.sentinel.application.InlineBackgroundRunsConfiguration;
 import com.sentinel.application.TestFixtures;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
+import com.sentinel.domain.TestCase;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
 import com.sentinel.runner.HttpMethod;
@@ -117,6 +118,28 @@ class EnvironmentSecretsTest {
 			.extractingPath("$.detail")
 			.asString()
 			.contains("already used as a variable");
+		assertThat(post("""
+				{"projectId": %d, "name": "dev", "baseUrl": "https://gw", "variables": {"token": "plain"},
+				 "secrets": {"token": "%s"}}""".formatted(project.getId(), TOKEN))).bodyJson()
+			.extractingPath("$.code")
+			.isEqualTo("USED_AS_VARIABLE");
+	}
+
+	@Test
+	void saysTheSecretsCannotBeReadWhenTheKeyChanged() {
+		Project project = fixtures.project();
+		// 다른 키로 암호화된 값처럼 이 키로는 풀리지 않는 값
+		Environment environment = fixtures.environmentWithSecret(project, "token", "not-encrypted-with-this-key");
+		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/a", null, null);
+
+		var body = assertThat(mvc.post()
+			.uri("/api/runs")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"caseId\": %d, \"environmentId\": %d}".formatted(testCase.getId(), environment.getId())))
+			.hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson();
+		body.extractingPath("$.code").isEqualTo("SECRETS_UNREADABLE");
+		body.extractingPath("$.params").isEqualTo(Map.of());
 	}
 
 	@Test

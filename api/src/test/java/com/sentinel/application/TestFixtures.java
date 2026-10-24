@@ -89,6 +89,13 @@ public class TestFixtures {
 		return environments.save(environment);
 	}
 
+	/** 저장된 암호문을 그대로 둔 시크릿이 있는 환경 (암호화 키 없음·복호화 실패 확인용) */
+	public Environment environmentWithSecret(Project project, String secretName, String cipherValue) {
+		Environment environment = new Environment(project, "dev", "https://gw.dev.internal");
+		environment.putSecret(secretName, cipherValue);
+		return environments.save(environment);
+	}
+
 	public TestSuite suite(Project project) {
 		return suites.save(new TestSuite(project, "suite-" + UUID.randomUUID(), null));
 	}

@@ -3,7 +3,7 @@ import { refresh } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { testCookies } from "@/test/cookies";
-import { problem, server, springUrl } from "@/test/msw";
+import { codedProblem, problem, server, springUrl } from "@/test/msw";
 import { captureRedirect } from "@/test/next";
 
 import {
@@ -63,6 +63,18 @@ describe("invite", () => {
     });
     await invite("https://x", undefined, form({ email: "a@b.c" }));
     expect(received).toMatchObject({ role: "MEMBER" });
+  });
+
+  it("says the email is invalid in Korean", async () => {
+    server.use(
+      http.post(springUrl("/api/invites"), () =>
+        codedProblem(400, "email is not valid: a@b", "EMAIL_INVALID", { email: "a@b" }),
+      ),
+    );
+
+    await expect(invite("https://x", undefined, form({ email: "a@b" }))).resolves.toEqual({
+      error: "이메일 형식이 올바르지 않습니다: a@b",
+    });
   });
 
   it("explains that the email is taken", async () => {

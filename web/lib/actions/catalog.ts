@@ -617,11 +617,7 @@ function failure(error: unknown): ActionState {
   if (isApiError(error)) {
     switch (error.status) {
       case 400:
-        // 서버에 암호화 키가 없으면 시크릿 등록 자체가 거부됨. 사용자가 조치할 수 없는 설정 문제라 별도 안내
-        if (error.detail.includes("secrets are disabled")) {
-          return { error: "시크릿 기능이 꺼져 있습니다. 서버에 암호화 키(SENTINEL_SECRET_KEY) 설정이 필요합니다" };
-        }
-        // 서버가 종류(code)를 붙인 오류는 한국어 문장 (cron, JsonPath·정규식 등). 그 밖은 서버 메시지
+        // 서버가 종류(code)를 붙인 오류는 한국어 문장 (cron, JsonPath·정규식, 기본 URL, 암호화 키 없음 등). 그 밖은 서버 메시지
         return {
           error: describeInputError(error.code, error.params ?? {}) ?? `입력값을 확인해 주세요: ${error.detail}`,
         };

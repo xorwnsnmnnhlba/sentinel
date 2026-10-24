@@ -5,6 +5,7 @@ import { refresh } from "next/cache";
 import { apiSend, isApiError } from "@/lib/api/server";
 import type { Holiday } from "@/lib/api/types";
 import { holidayError, parseHolidayLines } from "@/lib/holiday";
+import { describeInputError } from "@/lib/input-error";
 
 /**
  * 휴일 등록·삭제. 모든 스케줄에 영향을 주므로 관리자만 (그 외는 Spring이 403)
@@ -77,7 +78,7 @@ function message(error: unknown): string {
   if (isApiError(error)) {
     switch (error.status) {
       case 400:
-        return `입력값을 확인해 주세요: ${error.detail}`;
+        return describeInputError(error.code, error.params ?? {}) ?? `입력값을 확인해 주세요: ${error.detail}`;
       case 403:
         return "휴일은 관리자만 등록·삭제할 수 있습니다";
     }

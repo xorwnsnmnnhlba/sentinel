@@ -522,6 +522,8 @@ deploy-check:
 - 필터 파라미터 생략 시 전체. 존재하지 않는 부모 ID로 필터링하면 빈 목록(200), 단건 조회만 미존재 시 404 ProblemDetail
 - 오류는 ProblemDetail(`detail`은 영어). 화면이 한국어 문장을 만드는 400에는 `code`·`params`도 함께 (없는 400은 `detail`만)
   - 입력 값: `InvalidValueException.Code`. 예: cron `{"code": "CRON_INVALID_FIELD", "params": {"field": "minute", "value": "61"}}`, 판정 규칙·값 추출의 JsonPath·정규식 `{"code": "INVALID_JSON_PATH", "params": {"expression": "$.[", "list": "assertions", "index": "1"}}` (`list`·`index`는 요청 본문에서 몇 번째 항목인지, 0부터). 화면 문장은 `web/lib/input-error.ts`
+  - 그 밖의 종류: 빈 값·길이 초과(`REQUIRED`·`TOO_LONG`, `target`은 항목 이름), 환경 기본 URL(`BASE_URL_*`), 변수·시크릿 이름 겹침(`USED_AS_*`), 이메일 형식(`EMAIL_INVALID`), 암호화 키 없음·시크릿을 읽을 수 없음(`SECRETS_*`)
+  - 요청 항목 검증(`@NotBlank`, `@Email` 등)에 걸린 경우도 첫 항목을 같은 종류로 (`detail`은 Spring 기본 "Invalid request content.")
   - 문서 가져오기: 아래 "케이스 가져오기"
   - 그 밖의 읽을 수 없는 요청 본문(JSON 문법 오류 등)은 `detail` "Failed to read request"
 - 응답 항목에 부모 ID 포함 (`environment.projectId`, `suite.projectId`, `case.suiteId`)
