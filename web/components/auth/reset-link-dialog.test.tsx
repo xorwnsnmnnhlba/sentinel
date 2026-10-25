@@ -75,6 +75,7 @@ describe("ResetLinkDialog", () => {
     await user.click(screen.getByRole("button", { name: "링크 발급" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("사용자를 찾을 수 없습니다");
-    expect(screen.getByRole("button", { name: "링크 발급" })).toBeEnabled();
+    // await 뒤의 상태 변경은 전환(transition)과 따로 반영되어, 오류가 먼저 보이고 버튼은 다음 렌더링에서 "링크 발급"으로 돌아올 수 있음
+    expect(await screen.findByRole("button", { name: "링크 발급" })).toBeEnabled();
   });
 });

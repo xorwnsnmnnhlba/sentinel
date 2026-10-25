@@ -28,10 +28,14 @@ describe("RerunFailedForm", () => {
 
   it("disables the button while starting", async () => {
     const user = userEvent.setup();
-    render(<RerunFailedForm action={() => new Promise<ActionState>(() => {})} />);
+    let finish: (state: ActionState) => void = () => {};
+    render(<RerunFailedForm action={() => new Promise<ActionState>((resolve) => (finish = resolve))} />);
 
     await user.click(screen.getByRole("button", { name: "실패만 다시 실행" }));
 
     expect(await screen.findByRole("button", { name: "다시 실행 중…" })).toBeDisabled();
+    // 끝나지 않은 액션을 남기면 React가 이후 테스트의 전환(transition)까지 함께 묶어 그 결과가 화면에 반영되지 않음
+    finish({});
+    expect(await screen.findByRole("button", { name: "실패만 다시 실행" })).toBeEnabled();
   });
 });
