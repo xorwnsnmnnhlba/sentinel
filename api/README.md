@@ -83,7 +83,7 @@ Lombok은 IntelliJ 번들 플러그인으로 인식. **Settings → Build, Execu
 
 - 컴파일러 경고는 모두 켜고 경고가 있으면 실패 (`-Xlint:all` + `-Werror`, `build.gradle`). 제외: `classfile`(QueryDSL jar), `serial`, `processing`
 - 커버리지(JaCoCo)는 보고만 하고 수치 기준으로 실패시키지 않음. 테스트가 닿지 않는 곳을 찾는 용도. QueryDSL Q 클래스 제외. CI는 실행 요약에 줄·분기 비율, 산출물 `api-coverage`에 HTML 보고서
-- 변이 검사(PIT)는 외부 연결 없이 도는 판정·값 추출·구조 지문(`runner`)과 문서 변환(`importing`)만 대상. 코드를 조금씩 바꿔 테스트가 잡아내는지 확인 (커버리지는 실행만 되고 확인하지 않는 테스트를 찾지 못함). 주 1회 CI(`.github/workflows/mutation.yml`)가 실행 요약에 점수, 산출물 `api-mutation`에 HTML 보고서. 점수 기준으로 실패시키지 않음
+- 변이 검사(PIT)는 외부 연결 없이 도는 판정·값 추출·구조 지문(`runner`), 문서 변환(`importing`), 엔티티 검증·상태 변경(`domain`)만 대상. 코드를 조금씩 바꿔 테스트가 잡아내는지 확인 (커버리지는 실행만 되고 확인하지 않는 테스트를 찾지 못함). 주 1회 CI(`.github/workflows/mutation.yml`)가 실행 요약에 점수, 산출물 `api-mutation`에 HTML 보고서. 점수 기준으로 실패시키지 않음
 
 테스트는 Testcontainers 기반이므로 Docker 실행 필요. DB 환경변수·RDS 접속 불필요
 

@@ -1,6 +1,7 @@
 package com.sentinel.domain;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,9 @@ class EnvironmentTest {
 		environment.replaceVariables(Map.of("token", "t"));
 		assertThat(environment.getVariables()).containsExactly(Map.entry("token", "t"));
 
-		Map<String, String> invalid = new HashMap<>();
+		// 앞 항목은 들어간 뒤 실패해도 바꾸기 전 변수만 남음
+		Map<String, String> invalid = new LinkedHashMap<>();
+		invalid.put("fresh", "1");
 		invalid.put("userId", null);
 		assertThatThrownBy(() -> environment.replaceVariables(invalid)).isInstanceOf(IllegalArgumentException.class);
 		assertThat(environment.getVariables()).containsExactly(Map.entry("token", "t"));

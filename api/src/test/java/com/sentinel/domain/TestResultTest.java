@@ -86,6 +86,50 @@ class TestResultTest {
 		assertThat(result.getElapsedMs()).isNull();
 	}
 
+	@Test
+	void readsTheSchemaOnlyFromJsonResponses() {
+		assertThat(TestResult.responded(run, testCase,
+				exchange("{\"id\": 1}", Map.of("Content-Type", List.of("application/json"))), List.of())
+			.getResponseSchema()).isNotNull();
+		// Content-Type이 JSON이 아니면 본문이 JSON처럼 보여도 지문 없음, 없으면 본문 모양으로 판단
+		assertThat(TestResult.responded(run, testCase,
+				exchange("{\"id\": 1}", Map.of("Content-Type", List.of("text/plain"))), List.of())
+			.getResponseSchema()).isNull();
+		assertThat(TestResult.responded(run, testCase, exchange("{\"id\": 1}", Map.of()), List.of())
+			.getResponseSchema()).isNotNull();
+	}
+
+	@Test
+	void masksSecretsInAssertionMessages() {
+		AssertionResult leaked = new AssertionResult("$.token exists", false, "was \"s3cret\"");
+
+		TestResult result = TestResult.responded(run, testCase, exchange("", Map.of()), List.of(leaked),
+				java.util.Set.of("s3cret"));
+
+		assertThat(result.getAssertionResults()).singleElement()
+			.satisfies(assertion -> assertThat(assertion.message()).isEqualTo("was \"" + SensitiveHeaders.MASK + "\""));
+	}
+
+	@Test
+	void keepsErrorMessagesAndSentRequestsUpToTheirLimits() {
+		ResolvedRequest sent = new ResolvedRequest(HttpMethod.POST, java.net.URI.create("https://gw/a"), Map.of(),
+				"{}");
+
+		TestResult exact = TestResult.failed(run, testCase, HttpMethod.POST, TestResult.ErrorReason.TIMEOUT,
+				"m".repeat(1000), sent, Duration.ofSeconds(5));
+		assertThat(exact.getErrorMessage()).hasSize(1000);
+		assertThat(exact.getRequestUrl()).isEqualTo("https://gw/a");
+		assertThat(exact.getRequestBody()).isEqualTo("{}");
+		assertThat(exact.getElapsedMs()).isEqualTo(5000);
+
+		TestResult over = TestResult.failed(run, testCase, HttpMethod.POST, TestResult.ErrorReason.TIMEOUT,
+				"m".repeat(1001), null, null);
+		assertThat(over.getErrorMessage()).isEqualTo("m".repeat(1000));
+
+		assertThat(TestResult.failed(run, testCase, HttpMethod.GET, TestResult.ErrorReason.TIMEOUT, null, null, null)
+			.getErrorMessage()).isNull();
+	}
+
 	private HttpExchange exchange(String body, Map<String, List<String>> headers) {
 		return new HttpExchange(ResolvedRequest.of(HttpMethod.GET, "https://gw/a"), 200, headers, body,
 				Duration.ofMillis(5));
@@ -99,6 +143,8 @@ class TestResultTest {
 		result.recordRetries(2);
 
 		assertThat(result.getRetryCount()).isEqualTo(2);
+		result.recordRetries(0);
+		assertThat(result.getRetryCount()).isZero();
 		assertThatThrownBy(() -> result.recordRetries(-1)).isInstanceOf(IllegalArgumentException.class);
 	}
 

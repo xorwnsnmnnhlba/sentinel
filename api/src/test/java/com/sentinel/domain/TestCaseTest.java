@@ -80,6 +80,8 @@ class TestCaseTest {
 		assertThat(testCase.getRunOrder()).isZero();
 		testCase.placeAt(3);
 		assertThat(testCase.getRunOrder()).isEqualTo(3);
+		testCase.placeAt(0);
+		assertThat(testCase.getRunOrder()).isZero();
 		assertThatThrownBy(() -> testCase.placeAt(-1)).isInstanceOf(IllegalArgumentException.class);
 	}
 
