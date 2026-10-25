@@ -100,13 +100,16 @@ export function CaseEditor({
           : next === "run"
             ? await action(draft, environmentId)
             : await action(draft, environmentId, true);
-      if (result?.errors?.length) {
-        setErrors(result.errors);
-      }
-      // 저장은 됐고 화면에 남는 경우(실행 실패). 이어서 저장할 때 방금 저장한 version 기준
-      if (result?.version !== undefined) {
-        update({ version: result.version });
-      }
+      // await 뒤의 상태 변경도 전환으로 묶어 결과와 진행 상태 해제를 한 번에 반영
+      startTransition(() => {
+        if (result?.errors?.length) {
+          setErrors(result.errors);
+        }
+        // 저장은 됐고 화면에 남는 경우(실행 실패). 이어서 저장할 때 방금 저장한 version 기준
+        if (result?.version !== undefined) {
+          update({ version: result.version });
+        }
+      });
     });
   }
 
