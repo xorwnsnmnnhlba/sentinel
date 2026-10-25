@@ -1,5 +1,5 @@
 # 변이 검사. 코드를 조금씩 바꿔(변이) 테스트가 그 변화를 잡아내는지 확인. 커버리지와 달리 "실행만 되고 확인하지 않는" 테스트를 찾음
-# - api: PIT. 외부 연결 없이 도는 판정·값 추출·구조 지문(runner)과 문서 변환(importing) (api/build.gradle의 pitest)
+# - api: PIT. 외부 연결 없이 도는 판정·값 추출·구조 지문(runner), 문서 변환(importing), 엔티티 검증·상태 변경(domain) (api/build.gradle의 pitest)
 # - web: 아직 없음. Stryker 10.0.0의 Vitest 연결 도구가 Vitest 5 이전 공개라 변이마다 테스트를 하나도 돌리지 않음 (2026-10-20 확인)
 #   Stryker가 Vitest 5를 지원하면 추가
 # 오래 걸려 PR마다 돌리지 않고 주 1회. 보고만 하고 점수 기준으로 실패시키지 않음 (살아남은 변이는 보고서를 보고 테스트 보강)
