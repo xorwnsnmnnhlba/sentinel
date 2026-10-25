@@ -1,6 +1,6 @@
 # Sentinel 사용 설명서
 
-Ver: 1.4.0  
+Ver: 1.5.0  
 설치는 2장, 되돌리기·인증서 교체·백업 등 운영 세부는 [deploy.md](deploy.md), API 형식은 [api/README.md](../api/README.md)
 
 ## 목차
@@ -114,7 +114,7 @@ Ver: 1.4.0
 ```bash
 git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 git tag --sort=-v:refname | head -n 3
-git checkout v1.4.0
+git checkout v1.5.0
 ```
 
 - 둘째 줄로 최신 릴리스 태그 확인, 셋째 줄은 그 태그로
@@ -277,7 +277,7 @@ docker compose up -d --build --wait
 
 1. `https://<접속 이름>` 접속 시 인증서 경고 없음 (내부 인증 기관은 루트 인증서를 등록한 PC에서), `http://`는 `https://`로 이동
 2. 최초 관리자로 로그인
-3. 사이드바 "시스템 상태": 버전 1.4.0, 암호화 키 "사용 중", 알림·감시 설정이 "설정됨" (없는 항목은 `sentinel.env` 확인)
+3. 사이드바 "시스템 상태": 버전 1.5.0, 암호화 키 "사용 중", 알림·감시 설정이 "설정됨" (없는 항목은 `sentinel.env` 확인)
 4. "알림 이력" → "기본 채널 테스트 알림"으로 기본 채널에 메시지가 오는지 확인
 5. 생존 신호를 설정했다면 외부 감시 서비스에 첫 신호 도착 (1분 안)
 
@@ -309,7 +309,7 @@ docker compose up -d --build --wait
 ```bash
 git fetch --tags
 git describe --tags
-git checkout v1.4.0
+git checkout v1.5.0
 scripts/preflight.sh
 docker compose pull --ignore-buildable
 docker compose build --pull
@@ -1032,6 +1032,7 @@ staging 환경의 기본 URL, Sentinel 서버에서 그 주소로 가는 네트�
 
 | 버전 | 날짜 | 내용 |
 |------|------|------|
+| 1.5.0 | 2026-10-25 | 문서 가져오기 중 이름이 겹치면 겹친 이름만 표시(서버 영어 문구 제거). 저장·실행 뒤 결과(오류 등)와 버튼의 진행 상태가 같은 순간에 바뀜. API의 409·400 응답에 화면이 구분할 `code` 추가(이름 겹침, 동시 수정, 다시 실행 불가, 비밀번호 길이. 기존 필드 유지) |
 | 1.4.0 | 2026-10-24 | 입력 오류를 한국어로, 무엇을 고칠지와 함께 표시: 문서 가져오기에서 읽을 수 없는 문서(Swagger 2.0, 형식을 잘못 고른 문서 등), 스케줄 cron(잘못된 칸과 쓸 수 있는 값), 케이스의 JsonPath·정규식(몇 번째 판정 규칙·값 추출인지), 환경 기본 URL, 변수·시크릿 이름 겹침, 초대 이메일, 빈 값·길이 초과. 실행 시 시크릿을 읽을 수 없으면 원인(암호화 키 없음·바뀜)을 안내. API의 400 응답에 `code`·`params` 추가 (기존 필드 유지) |
 | 1.3.0 | 2026-10-23 | 문서 가져오기의 경고·안내를 한국어로 표시. 스위트 화면 케이스 목록의 판정 규칙을 편집 화면과 같은 이름으로 표시. 가져오기 미리보기 API의 `warnings`가 문자열 대신 `code`·`params`·`message` 객체 (API를 직접 호출해 경고를 읽었다면 `message` 사용) |
 | 1.2.0 | 2026-10-21 | 실제 API 없이 체험하는 데모 API (4장 "데모로 체험하기"). 문서 가져오기에서 로그인으로 받는 토큰은 시크릿 대신 값 추출로 받는 방법도 안내 |
