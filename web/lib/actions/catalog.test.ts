@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { refresh } from "next/cache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { problem, server, springUrl } from "@/test/msw";
+import { codedProblem, problem, server, springUrl } from "@/test/msw";
 import { captureRedirect } from "@/test/next";
 
 import { type CaseDraft, emptyDraft } from "@/lib/case-draft";
@@ -160,7 +160,7 @@ describe("environments", () => {
   it("explains that someone else saved the environment first and reloads the page", async () => {
     server.use(
       http.patch(springUrl("/api/environments/4"), () =>
-        problem(409, "modified by another request; reload and try again"),
+        codedProblem(409, "modified by another request; reload and try again", "CONCURRENT_MODIFICATION"),
       ),
     );
 
@@ -463,13 +463,14 @@ describe("rerunFailed", () => {
   });
 
   it.each([
-    ["test run 43 is still running", "아직 진행 중인 실행입니다. 끝난 뒤 다시 실행해 주세요"],
+    ["RUN_STILL_RUNNING", "test run 43 is still running", "아직 진행 중인 실행입니다. 끝난 뒤 다시 실행해 주세요"],
     [
+      "NOTHING_TO_RERUN",
       "test run 43 has no failed cases to rerun",
       "다시 실행할 실패 케이스가 없습니다. 실패한 케이스가 모두 삭제되었을 수 있습니다",
     ],
-  ])("explains why the run cannot be rerun: %s", async (detail, message) => {
-    capture("post", "/api/runs", () => problem(409, detail));
+  ])("explains why the run cannot be rerun: %s", async (code, detail, message) => {
+    capture("post", "/api/runs", () => codedProblem(409, detail, code));
 
     await expect(rerunFailed(43)).resolves.toEqual({ error: message });
   });
@@ -817,7 +818,7 @@ describe("schedules", () => {
   it("asks to reload when someone else changed the schedule first", async () => {
     server.use(
       http.patch(springUrl("/api/schedules/5"), () =>
-        problem(409, "modified by another request; reload and try again"),
+        codedProblem(409, "modified by another request; reload and try again", "CONCURRENT_MODIFICATION"),
       ),
     );
 

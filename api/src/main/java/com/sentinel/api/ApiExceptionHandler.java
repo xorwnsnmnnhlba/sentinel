@@ -38,7 +38,7 @@ import tools.jackson.databind.DatabindException;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class ApiExceptionHandler {
 
-	/** web이 이 문구로 동시 수정 충돌을 구분 (lib/actions) */
+	/** 동시 수정 충돌 문구. 화면은 code CONCURRENT_MODIFICATION으로 구분 (lib/actions) */
 	static final String CONCURRENT_MODIFICATION = "modified by another request; reload and try again";
 
 	/** 요청 항목 검증 실패 시 Spring 기본 문구 */
@@ -78,7 +78,7 @@ class ApiExceptionHandler {
 
 	@ExceptionHandler(ConflictException.class)
 	ProblemDetail handleConflict(ConflictException ex) {
-		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+		return problem(HttpStatus.CONFLICT, ex.getMessage(), ex.code() == null ? null : ex.code().name(), ex.params());
 	}
 
 	/**
@@ -87,7 +87,7 @@ class ApiExceptionHandler {
 	 */
 	@ExceptionHandler({ ObjectOptimisticLockingFailureException.class, StaleVersionException.class })
 	ProblemDetail handleOptimisticLock(RuntimeException ex) {
-		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, CONCURRENT_MODIFICATION);
+		return problem(HttpStatus.CONFLICT, CONCURRENT_MODIFICATION, "CONCURRENT_MODIFICATION", Map.of());
 	}
 
 	/**
@@ -143,7 +143,12 @@ class ApiExceptionHandler {
 	}
 
 	private static ProblemDetail badRequest(String detail, String code, Map<String, String> params) {
-		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+		return problem(HttpStatus.BAD_REQUEST, detail, code, params);
+	}
+
+	/** 종류(code)가 있으면 화면이 문장·처리를 고를 수 있도록 code·params를 함께 */
+	private static ProblemDetail problem(HttpStatus status, String detail, String code, Map<String, String> params) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
 		if (code != null) {
 			problem.setProperty("code", code);
 			problem.setProperty("params", params);

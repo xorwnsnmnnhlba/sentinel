@@ -443,7 +443,8 @@ public class CatalogCommandService {
 		finder.apply(normalized)
 			.filter(found -> !found.getId().equals(selfId))
 			.ifPresent(found -> {
-				throw new ConflictException(resource + " name '" + normalized + "' is already in use");
+				throw new ConflictException(ConflictException.Code.NAME_IN_USE, Map.of("name", normalized),
+						resource + " name '" + normalized + "' is already in use");
 			});
 	}
 

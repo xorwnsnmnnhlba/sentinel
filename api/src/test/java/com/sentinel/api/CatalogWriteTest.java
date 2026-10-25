@@ -77,12 +77,11 @@ class CatalogWriteTest {
 		String second = post("/api/projects", """
 				{"name": "search"}""").getResponse().getHeader("Location");
 
-		assertThat(post("/api/projects", """
-				{"name": " billing "}""")).hasStatus(HttpStatus.CONFLICT)
-			.bodyJson()
-			.extractingPath("$.detail")
-			.asString()
-			.contains("already in use");
+		var conflict = assertThat(post("/api/projects", """
+				{"name": " billing "}""")).hasStatus(HttpStatus.CONFLICT).bodyJson();
+		conflict.extractingPath("$.detail").asString().contains("already in use");
+		conflict.extractingPath("$.code").isEqualTo("NAME_IN_USE");
+		conflict.extractingPath("$.params").isEqualTo(Map.of("name", "billing"));
 		assertThat(patch(second, """
 				{"name": "billing"}""")).hasStatus(HttpStatus.CONFLICT);
 		// 자기 이름으로 수정은 허용

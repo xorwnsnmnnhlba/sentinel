@@ -99,7 +99,10 @@ function failure(error: unknown, prefix: string): string {
       case 404:
         return "스위트를 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다";
       case 409:
-        return `이미 사용 중인 이름이 있습니다: ${error.detail}`;
+        // 동시에 같은 이름이 먼저 등록된 경우. 서버가 붙인 이름만 보여 주고 영어 메시지는 쓰지 않음
+        return error.params?.name === undefined
+          ? "이미 사용 중인 이름이 있습니다"
+          : `이미 사용 중인 이름이 있습니다: ${error.params.name}`;
     }
   }
   console.error("case import failed", error);

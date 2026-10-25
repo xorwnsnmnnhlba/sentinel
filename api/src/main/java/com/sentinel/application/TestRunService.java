@@ -207,7 +207,8 @@ public class TestRunService {
 		return transactions.write(status -> {
 			TestRun original = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
 			if (original.getStatus() == TestRun.Status.RUNNING) {
-				throw new ConflictException("test run " + runId + " is still running");
+				throw new ConflictException(ConflictException.Code.RUN_STILL_RUNNING, Map.of(),
+						"test run " + runId + " is still running");
 			}
 			// 원래 실행 뒤 삭제(보관)된 스위트·환경으로는 실행하지 않음
 			if (original.getSuite().isArchived()) {
@@ -219,7 +220,8 @@ public class TestRunService {
 			Set<Long> failed = failedCaseIds(runId);
 			List<TestCase> suiteCases = testCases.findActiveInRunOrder(original.getSuite().getId());
 			if (suiteCases.stream().noneMatch(testCase -> failed.contains(testCase.getId()))) {
-				throw new ConflictException("test run " + runId + " has no failed cases to rerun");
+				throw new ConflictException(ConflictException.Code.NOTHING_TO_RERUN, Map.of(),
+						"test run " + runId + " has no failed cases to rerun");
 			}
 			Set<Long> selected = RerunSelection.select(suiteCases.stream().map(TestRunService::stepOf).toList(), failed);
 			return start(suiteCases.stream().filter(testCase -> selected.contains(testCase.getId())).toList(),

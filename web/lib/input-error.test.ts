@@ -24,6 +24,7 @@ describe("input error", () => {
       "SECRETS_DISABLED",
       "SECRETS_KEY_MISSING",
       "SECRETS_UNREADABLE",
+      "PASSWORD_TOO_SHORT",
     ]);
   });
 

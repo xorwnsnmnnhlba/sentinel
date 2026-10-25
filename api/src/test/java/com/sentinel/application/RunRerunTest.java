@@ -195,7 +195,9 @@ class RunRerunTest {
 		assertThatThrownBy(() -> service.runRerun(failedThenDeleted, tester)).isInstanceOf(ConflictException.class)
 			.hasMessage("test run " + failedThenDeleted + " has no failed cases to rerun");
 		assertThatThrownBy(() -> service.runRerun(running.getId(), tester)).isInstanceOf(ConflictException.class)
-			.hasMessage("test run " + running.getId() + " is still running");
+			.hasMessage("test run " + running.getId() + " is still running")
+			.extracting("code")
+			.isEqualTo(ConflictException.Code.RUN_STILL_RUNNING);
 		assertThatThrownBy(() -> service.runRerun(-1, tester)).isInstanceOf(NotFoundException.class)
 			.hasMessage("test run -1 not found");
 		assertThat(runs.count()).isEqualTo(before);

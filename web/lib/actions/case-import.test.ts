@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CaseImportPreview } from "@/lib/api/types";
 import { MAX_DOCUMENT_LENGTH } from "@/lib/case-import";
-import { problem, server, springUrl } from "@/test/msw";
+import { codedProblem, problem, server, springUrl } from "@/test/msw";
 
 import { importCases, previewCaseImport } from "./case-import";
 
@@ -126,11 +126,6 @@ describe("importCases", () => {
 
   it.each([
     [
-      409,
-      "test case name 'List orders' is already in use",
-      "이미 사용 중인 이름이 있습니다: test case name 'List orders' is already in use",
-    ],
-    [
       400,
       "cases[0] 'List orders': path must start with '/'",
       "가져오지 못했습니다: cases[0] 'List orders': path must start with '/'",
@@ -142,6 +137,18 @@ describe("importCases", () => {
 
     await expect(importCases(3, chosen)).resolves.toEqual({ error });
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("names the case whose name was taken meanwhile without the server's English message", async () => {
+    server.use(
+      http.post(springUrl("/api/case-imports"), () =>
+        codedProblem(409, "test case name 'List orders' is already in use", "NAME_IN_USE", { name: "List orders" }),
+      ),
+    );
+    await expect(importCases(3, chosen)).resolves.toEqual({ error: "이미 사용 중인 이름이 있습니다: List orders" });
+
+    server.use(http.post(springUrl("/api/case-imports"), () => problem(409, "conflicts with an existing item")));
+    await expect(importCases(3, chosen)).resolves.toEqual({ error: "이미 사용 중인 이름이 있습니다" });
   });
 
   it.each([

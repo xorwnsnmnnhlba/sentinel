@@ -148,9 +148,6 @@ function message(error: unknown): string {
   if (isApiError(error)) {
     switch (error.status) {
       case 400:
-        if (error.detail.includes("at least")) {
-          return "비밀번호는 10자 이상이어야 합니다";
-        }
         return describeInputError(error.code, error.params ?? {}) ?? `입력값을 확인해 주세요: ${error.detail}`;
       case 403:
         return "권한이 없습니다. 관리자만 사용할 수 있습니다";
