@@ -148,10 +148,10 @@ class RunControllerTest {
 		listed.extractingPath("$.content[1].rerunOf").isNull();
 
 		// 실패가 없는 실행(방금 다시 실행은 모두 통과)은 409
-		assertThat(createRun("{\"rerunOf\": %d}".formatted(id(rerun)))).hasStatus(HttpStatus.CONFLICT)
-			.bodyJson()
-			.extractingPath("$.detail")
-			.isEqualTo("test run " + id(rerun) + " has no failed cases to rerun");
+		var nothing = assertThat(createRun("{\"rerunOf\": %d}".formatted(id(rerun)))).hasStatus(HttpStatus.CONFLICT)
+			.bodyJson();
+		nothing.extractingPath("$.detail").isEqualTo("test run " + id(rerun) + " has no failed cases to rerun");
+		nothing.extractingPath("$.code").isEqualTo("NOTHING_TO_RERUN");
 		assertThat(createRun("{\"rerunOf\": -1}")).hasStatus(HttpStatus.NOT_FOUND)
 			.bodyJson()
 			.extractingPath("$.detail")

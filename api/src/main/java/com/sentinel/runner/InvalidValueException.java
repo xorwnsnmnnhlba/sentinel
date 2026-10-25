@@ -50,7 +50,9 @@ public class InvalidValueException extends IllegalArgumentException {
 		/** 서버에 암호화 키가 없어 환경의 시크릿을 읽을 수 없음 (실행 시) */
 		SECRETS_KEY_MISSING,
 		/** 암호화 키가 바뀌어 환경의 시크릿을 읽을 수 없음 (실행 시) */
-		SECRETS_UNREADABLE
+		SECRETS_UNREADABLE,
+		/** 비밀번호가 최소 길이보다 짧음 (min) */
+		PASSWORD_TOO_SHORT
 	}
 
 	public InvalidValueException(Code code, Map<String, String> params, String message, Throwable cause) {

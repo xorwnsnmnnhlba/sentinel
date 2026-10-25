@@ -212,7 +212,9 @@ describe("changePassword", () => {
 
   it("reports a too short password", async () => {
     server.use(
-      http.put(springUrl("/api/users/me/password"), () => problem(400, "password must be at least 10 characters")),
+      http.put(springUrl("/api/users/me/password"), () =>
+        codedProblem(400, "password must be at least 10 characters", "PASSWORD_TOO_SHORT", { min: "10" }),
+      ),
     );
 
     await expect(

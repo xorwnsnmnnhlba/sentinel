@@ -174,9 +174,8 @@ class UserManagementTest {
 				{"inviteToken": "%s", "name": "구성원", "password": "short"}""".formatted(token)))
 			.hasStatus(HttpStatus.BAD_REQUEST)
 			.bodyJson()
-			.extractingPath("$.detail")
-			.asString()
-			.contains("at least 10 characters");
+			.extractingPath("$.code")
+			.isEqualTo("PASSWORD_TOO_SHORT");
 	}
 
 	@Test

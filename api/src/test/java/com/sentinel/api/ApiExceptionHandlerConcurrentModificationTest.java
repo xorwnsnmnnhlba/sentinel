@@ -16,8 +16,9 @@ class ApiExceptionHandlerConcurrentModificationTest {
 			.handleOptimisticLock(new ObjectOptimisticLockingFailureException(TestSchedule.class, 1L));
 
 		assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
-		// web(lib/actions)이 이 문구로 이름 중복(409)과 구분
 		assertThat(problem.getDetail()).isEqualTo("modified by another request; reload and try again");
+		// web(lib/actions)은 code로 이름 중복(409)과 구분
+		assertThat(problem.getProperties()).containsEntry("code", "CONCURRENT_MODIFICATION");
 	}
 
 }

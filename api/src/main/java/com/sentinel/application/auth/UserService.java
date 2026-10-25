@@ -18,6 +18,7 @@ import com.sentinel.domain.User;
 import com.sentinel.domain.UserToken;
 import com.sentinel.infra.persistence.UserRepository;
 import com.sentinel.infra.persistence.UserTokenRepository;
+import com.sentinel.runner.InvalidValueException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -274,7 +275,9 @@ public class UserService {
 
 	private static void requireStrongPassword(String password) {
 		if (password == null || password.length() < MIN_PASSWORD_LENGTH) {
-			throw new InvalidRequestException("password must be at least " + MIN_PASSWORD_LENGTH + " characters");
+			throw new InvalidRequestException(InvalidValueException.Code.PASSWORD_TOO_SHORT,
+					Map.of("min", String.valueOf(MIN_PASSWORD_LENGTH)),
+					"password must be at least " + MIN_PASSWORD_LENGTH + " characters");
 		}
 	}
 

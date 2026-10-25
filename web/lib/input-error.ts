@@ -25,6 +25,7 @@ export const INPUT_ERROR_TEXTS = {
     "서버에 암호화 키(SENTINEL_SECRET_KEY)가 설정되지 않아 이 환경의 시크릿을 읽을 수 없습니다. 관리자에게 알려 주세요",
   SECRETS_UNREADABLE:
     "이 환경의 시크릿을 읽을 수 없습니다. 서버 암호화 키가 바뀌었다면 환경 수정에서 시크릿 값을 다시 입력해 주세요",
+  PASSWORD_TOO_SHORT: "비밀번호는 {min}자 이상이어야 합니다",
 } as const;
 
 /** 빈 값·길이 초과 항목 이름 (서버의 항목 이름 → 화면 이름). 목록에 없으면 그대로 */

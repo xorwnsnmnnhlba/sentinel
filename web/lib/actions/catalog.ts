@@ -487,9 +487,10 @@ export async function rerunFailed(runId: number): Promise<ActionState> {
     // 이름 중복이 아닌, 다시 실행할 수 없는 상태
     if (isApiError(error) && error.status === 409) {
       return {
-        error: error.detail.includes("still running")
-          ? "아직 진행 중인 실행입니다. 끝난 뒤 다시 실행해 주세요"
-          : "다시 실행할 실패 케이스가 없습니다. 실패한 케이스가 모두 삭제되었을 수 있습니다",
+        error:
+          error.code === "RUN_STILL_RUNNING"
+            ? "아직 진행 중인 실행입니다. 끝난 뒤 다시 실행해 주세요"
+            : "다시 실행할 실패 케이스가 없습니다. 실패한 케이스가 모두 삭제되었을 수 있습니다",
       };
     }
     return failure(error);
@@ -610,9 +611,6 @@ function versionOf(form: FormData): number | undefined {
   return Number.isSafeInteger(value) ? value : undefined;
 }
 
-/** Spring이 동시 수정 충돌(409)에 붙이는 문구 (api ApiExceptionHandler.CONCURRENT_MODIFICATION) */
-const CONCURRENT_MODIFICATION = "modified by another request";
-
 function failure(error: unknown): ActionState {
   if (isApiError(error)) {
     switch (error.status) {
@@ -625,7 +623,7 @@ function failure(error: unknown): ActionState {
         return { error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다" };
       case 409:
         // 같은 항목을 다른 곳에서 먼저 고침 (Spring 낙관적 잠금). 이름 중복과 구분하고 최신 내용을 보이도록 화면 재조회
-        if (error.detail.includes(CONCURRENT_MODIFICATION)) {
+        if (error.code === "CONCURRENT_MODIFICATION") {
           refresh();
           return { error: "다른 곳에서 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요" };
         }
