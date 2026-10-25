@@ -28,7 +28,11 @@ export function ResetLinkDialog({
   const [pending, startTransition] = useTransition();
 
   function issue() {
-    startTransition(async () => setState(await createPasswordReset(baseUrl, userId)));
+    startTransition(async () => {
+      const result = await createPasswordReset(baseUrl, userId);
+      // await 뒤의 상태 변경도 전환으로 묶어 결과와 진행 상태 해제를 한 번에 반영 (React useTransition 문서의 알려진 제약)
+      startTransition(() => setState(result));
+    });
   }
 
   return (

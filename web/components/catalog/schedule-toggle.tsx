@@ -25,7 +25,8 @@ export function ScheduleToggle({
     startTransition(async () => {
       const result = await setScheduleEnabled(scheduleId, next);
       if (result?.error) {
-        setError(result.error);
+        // await 뒤의 상태 변경도 전환으로 묶어 결과와 진행 상태 해제를 한 번에 반영
+        startTransition(() => setError(result.error));
       }
     });
   }

@@ -24,11 +24,14 @@ export function TestNotificationButton({
     setResult(undefined);
     startTransition(async () => {
       const state = await action();
-      if (state?.delivery) {
-        setResult({ ok: state.delivery.delivered, message: deliveryMessage(state.delivery) });
-      } else {
-        setResult({ ok: false, message: state?.error ?? "요청을 처리하지 못했습니다" });
-      }
+      // await 뒤의 상태 변경도 전환으로 묶어 결과와 진행 상태 해제를 한 번에 반영
+      startTransition(() => {
+        if (state?.delivery) {
+          setResult({ ok: state.delivery.delivered, message: deliveryMessage(state.delivery) });
+        } else {
+          setResult({ ok: false, message: state?.error ?? "요청을 처리하지 못했습니다" });
+        }
+      });
     });
   }
 

@@ -133,11 +133,14 @@ function DocumentStep({
     }
     startTransition(async () => {
       const result = await send(() => previewCaseImport(suiteId, { content, format }));
-      if (result.preview) {
-        onPreview(result.preview);
-      } else {
-        setError(result.error);
-      }
+      // await 뒤의 상태 변경도 전환으로 묶어 결과와 진행 상태 해제를 한 번에 반영
+      startTransition(() => {
+        if (result.preview) {
+          onPreview(result.preview);
+        } else {
+          setError(result.error);
+        }
+      });
     });
   }
 
@@ -215,11 +218,13 @@ function CandidateStep({
   function submit() {
     startTransition(async () => {
       const result = await send(() => importCases(suiteId, toImportCases(rows)));
-      if (result?.error) {
-        setError(result.error);
-      } else {
-        onDone();
-      }
+      startTransition(() => {
+        if (result?.error) {
+          setError(result.error);
+        } else {
+          onDone();
+        }
+      });
     });
   }
 
