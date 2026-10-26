@@ -798,6 +798,8 @@ deploy-check:
 
 - cron은 5자리 표준 형식(`분 시 일 월 요일`), `Asia/Seoul` 기준. 예: `10 9 * * 1-5` = 평일 09:10
 - 60초 간격 폴링으로 실행 시각 도달 스케줄의 스위트 실행 (`trigger: SCHEDULED`)
+  - 폴링은 주기 경계 직후(60초면 매분 1초)에 실행하고 매번 벽시계로 다음 경계를 다시 계산. 폴링 안의 스위트 실행 시간만큼 주기가 밀리지 않으므로 매분 스케줄도 빠지는 분 없음
+  - 폴링이 주기보다 길어지면 끝난 뒤의 다음 경계에 실행. 그사이 실행 시각이 지난 스케줄은 그 폴링에서 1회 실행
 - 노트북 절전 등으로 놓친 실행은 1회만 실행 후 다음 시각으로 이동
 - 기동 시 `RUNNING`으로 남은 실행은 `ABORTED` 처리. 스케줄 폴링·웹 요청이 시작되기 전(모든 빈 생성 직후)에 하므로 재기동 직후의 따라잡기 실행은 건드리지 않음
 - 실행할 스케줄마다 그 차례의 시각으로 점검 시간·휴일·다음 실행 시각을 판단 (앞 스위트가 오래 걸려도 폴링 시작 시각으로 판단하지 않음)
@@ -821,7 +823,7 @@ docker compose logs sentinel-api | grep "completed:"
 |------|--------|------|
 | `sentinel.schedule.enabled` | `true` | 폴링 동작 여부 |
 | `sentinel.schedule.zone` | `Asia/Seoul` | cron 해석 시간대 |
-| `sentinel.schedule.poll-interval` | `60s` | 폴링 주기 |
+| `sentinel.schedule.poll-interval` | `60s` | 폴링 주기. 주기의 배수 시각 + 1초에 실행 |
 | `sentinel.schedule.gap-threshold` | `10m` | 모니터링 공백 기준. 폴링 주기와 평소 실행 시간보다 길게 |
 
 ### 모니터링 공백
