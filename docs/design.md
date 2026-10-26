@@ -503,6 +503,7 @@ GET  /billing/v1/history → 응답시간 3200ms (임계 2000ms)
   - 같은 제출에서 나온 Jackson 3.1.5·commons-lang3 3.16.0 경고는 Gradle 빌드 도구(Spring Boot 플러그인) 클래스패스. 앱에는 3.1.7·3.20.0이 들어가고 이미지에 없음
 - Java 의존성은 Gradle 해석 결과로 점검 (2026-10-15): Security 점검에서 init 스크립트(`api/gradle/ci/runtime-lockfile.init.gradle`)로 앱 실행 클래스패스만 잠근 임시 `gradle.lockfile`(정확한 좌표 110개)을 만들어 OSV로 점검. `build.gradle`은 그대로이고 잠금 파일은 커밋하지 않음(`.gitignore`)
   - 확인: 같은 방식으로 Tomcat 11.0.24를 점검하면 치명 3건으로 막히고 11.0.27은 통과 (이미지 점검은 같은 버전을 0건으로 통과시켰음)
+- 덮어쓰기 제거 (2026-10-26): Spring Boot 4.1.2가 Jackson 3.1.7·2.21.7과 Tomcat 11.0.27을 관리하므로 `build.gradle`의 `jackson-bom.version`·`jackson-2-bom.version`·`tomcat.version` 제거. 제거 전후 실행 클래스패스(`runtimeClasspath`) 동일
   - 누락 확인을 생태계(`--expect Maven`)에서 정확한 좌표(`--expect-package org.springframework:spring-core` 등)로 바꿈. 좌표를 잘못 읽으면 패키지 수는 맞아도 걸러지지 않던 문제
   - api 이미지 점검은 OS 패키지 확인용으로 유지(`--expect Ubuntu`). 같은 취약점이 두 결과에 모두 나오면 한 번만 셈
   - Gradle 의존성 그래프 제출에서 빌드 도구 클래스패스(`classpath`) 제외. 앱·이미지에 없는 의존성의 Dependabot 경고 방지

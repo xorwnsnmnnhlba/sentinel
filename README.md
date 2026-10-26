@@ -33,17 +33,17 @@ sentinel/
 | 모듈 | 구분 | 버전 | 문서 |
 |------|------|------|------|
 | `api` | Java | 25 (로컬 Azul Zulu 25.0.4.1) | [api/README.md](api/README.md) |
-| | Spring Boot | 4.1.1 (Spring Framework 7.0.9) | |
-| | Hibernate ORM | 7.4.5.Final | |
-| | Lombok | 1.18.46 (`@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor`만 사용) | |
-| | PostgreSQL JDBC | 42.7.13 | |
-| | Gradle | 9.8.1 | |
+| | Spring Boot | 4.1.2 (Spring Framework 7.0.10) | |
+| | Hibernate ORM | 7.4.13.Final | |
+| | Lombok | 1.18.48 (`@Getter`, `@RequiredArgsConstructor`, `@NoArgsConstructor`만 사용) | |
+| | PostgreSQL JDBC | 42.7.14 | |
+| | Gradle | 9.8.2 | |
 | `web` | Next.js | 16.4.2 | [web/README.md](web/README.md) |
 | | React | 19.3.1 | |
 | | TypeScript | 5.9.3 | |
 | | Tailwind CSS | 4.3.3 | |
-| | shadcn/ui | CLI 4.21.5 (Radix UI) | |
-| | TanStack Query | 5.104.3 | |
+| | shadcn/ui | CLI 4.22.1 (Radix UI) | |
+| | TanStack Query | 5.104.5 | |
 | | Node.js | 24.21.0 (요구사항 20.9.0 이상) | |
 
 모듈별 전체 의존성 버전은 각 README 참고
