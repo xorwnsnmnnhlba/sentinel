@@ -45,7 +45,8 @@ class SchedulingConfig implements SchedulingConfigurer {
 	@Override
 	public void configureTasks(ScheduledTaskRegistrar registrar) {
 		if (properties.enabled()) {
-			registrar.addFixedDelayTask(poller::poll, properties.pollInterval());
+			// 주기 경계에 맞춰 실행 (이전 폴링이 끝난 뒤 기다리면 실행 시간만큼 밀려 매분 스케줄이 가끔 한 회 빠짐)
+			registrar.addTriggerTask(poller::poll, new AlignedPollTrigger(properties.pollInterval()));
 			// cron 작업 대신 주기 확인: 예정 시각에 꺼져 있었으면 켜진 뒤 발송 (스케줄과 같은 방식)
 			if (digestProperties.enabled()) {
 				registrar.addFixedDelayTask(digestSender::sendIfDue, properties.pollInterval());
