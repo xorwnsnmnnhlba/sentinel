@@ -354,8 +354,8 @@ public class TestRunService {
 		Map<String, String> secrets = decrypt(environment);
 		Map<String, String> values = new LinkedHashMap<>(environment.getVariables());
 		values.putAll(secrets);
-		return new Prepared(run.getId(), suite.getId(), run.getTrigger(), preparedCases, Map.copyOf(values),
-				Set.copyOf(secrets.values()), extractedInSuite);
+		return new Prepared(run.getId(), suite.getId(), environment.getId(), run.getTrigger(), preparedCases,
+				Map.copyOf(values), Set.copyOf(secrets.values()), extractedInSuite);
 	}
 
 	/**
@@ -425,14 +425,15 @@ public class TestRunService {
 			}
 			Set<String> masked = Set.copyOf(secretValues);
 			TestResult.Verdict verdict = transactions.write(status -> {
-				TestResult.Verdict saved = results.save(resultOf(prepared.runId(), preparedCase, execution, masked))
-					.getVerdict();
-				// 실행의 판정 수·재시도 수도 같은 트랜잭션에서 올려 결과와 어긋나지 않음 (중단·중지된 실행도 저장된 결과 기준)
-				countVerdict(prepared.runId(), saved);
+				TestResult saved = results.save(resultOf(prepared.runId(), preparedCase, execution, masked));
+				// 구조 변화 판정(기준선 반영·승인 대기), 실행의 판정 수·재시도 수도 같은 트랜잭션에서 올려 결과와 어긋나지 않음
+				// (중단·중지된 실행도 저장된 결과 기준)
+				schemaDrift.review(prepared.environmentId(), saved);
+				countVerdict(prepared.runId(), saved.getVerdict());
 				if (execution.retries() > 0) {
 					runs.incrementRetried(prepared.runId());
 				}
-				return saved;
+				return saved.getVerdict();
 			});
 			counts.merge(verdict, 1, Integer::sum);
 		}
@@ -572,8 +573,9 @@ public class TestRunService {
 	 * @param secretValues 이력 저장 시 가릴 시크릿 값
 	 * @param extractedInSuite 스위트의 케이스들이 추출하는 변수 이름
 	 */
-	private record Prepared(long runId, long suiteId, TestRun.Trigger trigger, List<PreparedCase> cases,
-			Map<String, String> variables, Set<String> secretValues, Set<String> extractedInSuite) {
+	private record Prepared(long runId, long suiteId, long environmentId, TestRun.Trigger trigger,
+			List<PreparedCase> cases, Map<String, String> variables, Set<String> secretValues,
+			Set<String> extractedInSuite) {
 	}
 
 	private record PreparedCase(long testCaseId, RequestTemplate template, List<Assertion> assertions,

@@ -8,8 +8,10 @@ import com.sentinel.application.drift.ResultDrift;
 import com.sentinel.domain.Environment;
 import com.sentinel.domain.Project;
 import com.sentinel.domain.TestCase;
+import com.sentinel.domain.TestResult;
 import com.sentinel.domain.TestRun;
 import com.sentinel.domain.TestSuite;
+import com.sentinel.infra.persistence.TestResultRepository;
 import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.schema.SchemaDrift.Change;
 import com.sentinel.runner.schema.SchemaDrift.Kind;
@@ -45,6 +47,12 @@ class SchemaDriftServiceTest {
 
 	@Autowired
 	private EntityManagerFactory entityManagerFactory;
+
+	@Autowired
+	private TestResultRepository results;
+
+	@Autowired
+	private Transactions transactions;
 
 	private Project project;
 
@@ -129,6 +137,105 @@ class SchemaDriftServiceTest {
 		runWith(dev, "{\"id\": \"changed\"}");
 
 		assertThat(result(oldRun).drift().observations()).isEqualTo(1);
+	}
+
+	@Test
+	void keepsReportingABreakingChangeUntilItIsAccepted() {
+		runWith(dev, "{\"id\": 1}");
+		runWith(dev, "{\"id\": 2}");
+
+		TestRunDetail.Result first = runWith(dev, "{\"id\": \"3\"}");
+		TestRunDetail.Result again = runWith(dev, "{\"id\": \"4\"}");
+
+		// 승인 대기 지문은 기준선에 넣지 않으므로 같은 변화를 다음 실행에서도 보고
+		assertThat(first.drift().changes()).extracting(Change::kind).containsExactly(Kind.TYPE_CHANGED);
+		assertThat(again.drift().changes()).extracting(Change::kind).containsExactly(Kind.TYPE_CHANGED);
+		assertThat(again.drift().observations()).isEqualTo(2);
+		assertThat(results.findById(first.id()).orElseThrow().isSchemaPending()).isTrue();
+	}
+
+	@Test
+	void holdsNewNullsForApproval() {
+		runWith(dev, "{\"name\": \"a\"}");
+		runWith(dev, "{\"name\": \"b\"}");
+
+		TestRunDetail.Result nulled = runWith(dev, "{\"name\": null}");
+
+		assertThat(nulled.drift().changes()).extracting(Change::kind).containsExactly(Kind.NULLABLE);
+		assertThat(results.findById(nulled.id()).orElseThrow().isSchemaPending()).isTrue();
+		assertThat(runWith(dev, "{\"name\": null}").drift().changes()).extracting(Change::kind)
+			.containsExactly(Kind.NULLABLE);
+	}
+
+	@Test
+	void acceptsNewFieldsRightAway() {
+		runWith(dev, "{\"id\": 1}");
+		runWith(dev, "{\"id\": 2}");
+
+		TestRunDetail.Result added = runWith(dev, "{\"id\": 3, \"tags\": []}");
+		TestRunDetail.Result next = runWith(dev, "{\"id\": 4, \"tags\": []}");
+
+		assertThat(added.drift().changes()).extracting(Change::kind).containsExactly(Kind.ADDED);
+		assertThat(results.findById(added.id()).orElseThrow().isSchemaPending()).isFalse();
+		assertThat(next.drift()).isEqualTo(new ResultDrift(ResultDrift.Status.COMPARED, 3, List.of()));
+	}
+
+	@Test
+	void remembersNullsAfterTheyLeaveTheWindow() {
+		runWith(dev, "{\"name\": null}");
+		for (int i = 0; i < 4; i++) {
+			runWith(dev, "{\"name\": \"a\"}");
+		}
+
+		// 창(4)에는 null이 없지만 받아들인 지문에서 본 null은 영구 허용
+		assertThat(runWith(dev, "{\"name\": null}").drift().changes()).isEmpty();
+	}
+
+	@Test
+	void remembersFieldsThatWentMissingAfterTheyLeaveTheWindow() {
+		runWith(dev, "{\"id\": 1, \"note\": \"a\"}");
+		runWith(dev, "{\"id\": 2}");
+		for (int i = 0; i < 4; i++) {
+			runWith(dev, "{\"id\": 3, \"note\": \"b\"}");
+		}
+
+		assertThat(runWith(dev, "{\"id\": 4}").drift().changes()).isEmpty();
+	}
+
+	@Test
+	void stillRequiresFieldsThatAppearedLaterOnceTheWindowIsFull() {
+		runWith(dev, "{\"id\": 1}");
+		for (int i = 0; i < 4; i++) {
+			runWith(dev, "{\"id\": 2, \"note\": \"a\"}");
+		}
+
+		// 처음 나타나기 전의 없음은 영구 허용이 아님
+		assertThat(runWith(dev, "{\"id\": 3}").drift().changes()).extracting(Change::kind)
+			.containsExactly(Kind.REMOVED);
+	}
+
+	@Test
+	void judgesAnOldRunWithoutTolerancesRecordedAfterIt() {
+		runWith(dev, "{\"name\": \"a\"}");
+		runWith(dev, "{\"name\": \"b\"}");
+		long oldRun = runIdWith(dev, "{\"name\": null}");
+		long oldResult = result(oldRun).id();
+		// 이 결과 뒤에 기록된 허용 (이 결과를 승인한 경우와 같음)
+		transactions.writeWithoutResult(
+				status -> results.addSchemaTolerance(orders.getId(), dev.getId(), "$.name", "NULLABLE", oldResult));
+
+		assertThat(result(oldRun).drift().changes()).extracting(Change::kind).containsExactly(Kind.NULLABLE);
+		assertThat(runWith(dev, "{\"name\": null}").drift().changes()).isEmpty();
+	}
+
+	@Test
+	void keepsVeryLongPathsOnlyWithinTheWindow() {
+		// 영구 허용 표의 경로 길이(1000자)를 넘는 경로는 남기지 않음. 넘는 값을 넣으려다 결과 저장이 실패하면 안 됨
+		String key = "k".repeat(1000);
+		TestRunDetail.Result result = runWith(dev, "{\"" + key + "\": null}");
+
+		assertThat(result.verdict()).isEqualTo(TestResult.Verdict.PASSED);
+		assertThat(result.drift().status()).isEqualTo(ResultDrift.Status.COLLECTING);
 	}
 
 	@Test
