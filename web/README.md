@@ -15,11 +15,11 @@ Sentinel 프론트엔드. 화면 및 BFF(Backend for Frontend) 담당
 | React / React DOM | 19.3.1 |
 | TypeScript | 5.9.3 |
 | Tailwind CSS | 4.3.3 (`@tailwindcss/postcss` 4.3.3, `tw-animate-css` 1.4.0) |
-| shadcn/ui | CLI 4.21.5, 스타일 `radix-nova` (Radix UI 기반, `radix-ui` 1.8.1) |
-| 아이콘 | lucide-react 1.57.0 |
+| shadcn/ui | CLI 4.22.1, 스타일 `radix-nova` (Radix UI 기반, `radix-ui` 1.8.1) |
+| 아이콘 | lucide-react 1.61.0 |
 | 글꼴 | Pretendard 1.3.9 (동적 서브셋 자체 배포), Geist Mono (`next/font`) |
-| 클래스 유틸 | `cn` 0.4.0 (shadcn 공식, clsx + tailwind-merge 대체), class-variance-authority 0.7.1 |
-| TanStack Query | 5.104.3 |
+| 클래스 유틸 | `cn` 0.5.0 (shadcn 공식, clsx + tailwind-merge 대체), class-variance-authority 0.7.1 |
+| TanStack Query | 5.104.5 |
 | ESLint | 9.39.5 (`eslint-config-next` 16.4.2, `eslint-config-prettier` 10.1.8) |
 | Prettier | 3.9.10 (`prettier-plugin-tailwindcss` 0.8.1) |
 | Vitest | 5.0.5 (Vite 8.3.3, jsdom 30.1.3) |
