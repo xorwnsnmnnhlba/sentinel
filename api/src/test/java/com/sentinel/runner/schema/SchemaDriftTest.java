@@ -126,4 +126,21 @@ class SchemaDriftTest {
 					tuple(Level.INFO, "$.d"));
 	}
 
+	@Test
+	void toleratesNullAndAbsenceRememberedOutsideTheWindow() {
+		SchemaBaseline baseline = baseline("{\"id\": 1, \"name\": \"a\"}", "{\"id\": 2, \"name\": \"b\"}")
+			.tolerating(List.of(new SchemaTolerance("$.name", SchemaTolerance.Kind.NULLABLE),
+					new SchemaTolerance("$.id", SchemaTolerance.Kind.OPTIONAL),
+					new SchemaTolerance("$.gone", SchemaTolerance.Kind.OPTIONAL)));
+
+		assertThat(baseline.fields().get("$.name").types()).containsExactly("null", "string");
+		assertThat(baseline.fields().get("$.id").required()).isFalse();
+		// 기준선에 없는 경로의 허용은 무시
+		assertThat(baseline.fields()).doesNotContainKey("$.gone");
+		assertThat(drift(baseline, "{\"name\": null}")).isEmpty();
+		// null 외 타입 변화는 그대로 보고
+		assertThat(drift(baseline, "{\"id\": \"x\", \"name\": 1}")).extracting(Change::kind)
+			.containsExactly(Kind.TYPE_CHANGED, Kind.TYPE_CHANGED);
+	}
+
 }

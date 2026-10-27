@@ -137,6 +137,12 @@ public class TestResult extends BaseEntity {
 	@Column(columnDefinition = "json")
 	private ResponseSchema responseSchema;
 
+	/**
+	 * 구조 변화 승인 대기 (V31). 기록할 때 호환이 깨지는 변화·null 전환이 있어 지문을 기준선에 넣지 않음
+	 */
+	@Column(nullable = false)
+	private boolean schemaPending;
+
 	private Long elapsedMs;
 
 	/** 응답을 받지 못해 다시 보낸 횟수 (V20). 재시도 뒤의 응답·마지막 오류를 기록 */
@@ -253,6 +259,14 @@ public class TestResult extends BaseEntity {
 			throw new IllegalArgumentException("retries must not be negative: " + retries);
 		}
 		this.retryCount = retries;
+	}
+
+	/** 지문을 기준선에 넣지 않고 승인 대기로 둠 */
+	public void holdSchema() {
+		if (responseSchema == null) {
+			throw new IllegalStateException("result has no response schema");
+		}
+		this.schemaPending = true;
 	}
 
 }

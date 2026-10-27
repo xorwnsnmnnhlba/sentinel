@@ -136,6 +136,19 @@ class TestResultTest {
 	}
 
 	@Test
+	void holdsOnlyFingerprintedResultsForApproval() {
+		TestResult json = TestResult.responded(run, testCase,
+				exchange("{\"id\": 1}", Map.of("Content-Type", List.of("application/json"))), List.of());
+		TestResult text = TestResult.responded(run, testCase, exchange("OK", Map.of()), List.of());
+
+		json.holdSchema();
+
+		assertThat(json.isSchemaPending()).isTrue();
+		assertThatThrownBy(text::holdSchema).isInstanceOf(IllegalStateException.class);
+		assertThat(text.isSchemaPending()).isFalse();
+	}
+
+	@Test
 	void recordsHowManyTimesTheRequestWasSentAgain() {
 		TestResult result = TestResult.responded(run, testCase, exchange("{}", Map.of()), List.of());
 		assertThat(result.getRetryCount()).isZero();

@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.sentinel.domain.TestResult;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -192,7 +193,8 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long>, T
 	List<Object[]> failureCauses(@Param("from") Instant from, @Param("to") Instant to);
 
 	/**
-	 * 케이스별 이전 구조 지문 최근 {@code window}건 (같은 환경, {@code runId}보다 앞선 실행). 구조 변화 판정의 기준선
+	 * 케이스별 이전 구조 지문 최근 {@code window}건 (같은 환경, {@code runId}보다 앞선 실행). 구조 변화 판정의 기준선.
+	 * 승인 대기(V31 {@code schema_pending}) 지문은 제외
 	 * <p>
 	 * 케이스마다 SQL 표준 {@code LATERAL} + {@code FETCH FIRST}로 {@code idx_result_case_time}을 최근 결과부터 읽고
 	 * {@code window}건에서 멈춤. 이력 전체를 읽지 않도록 {@code beforeResultId}(이 실행의 첫 결과 ID)보다 앞선 결과부터 읽음.
@@ -212,6 +214,7 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long>, T
 			      AND t.id < :runId
 			      AND t.environment_id = :environmentId
 			      AND r.response_schema IS NOT NULL
+			      AND NOT r.schema_pending
 			    ORDER BY r.id DESC
 			    FETCH FIRST (:window) ROWS ONLY
 			) s
@@ -221,5 +224,32 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long>, T
 	List<Object[]> findRecentSchemas(@Param("environmentId") long environmentId,
 			@Param("caseIds") Collection<Long> caseIds, @Param("runId") long runId,
 			@Param("beforeResultId") long beforeResultId, @Param("window") int window);
+
+	/**
+	 * 케이스별 영구 허용 변동 (V31 {@code schema_tolerance}). {@code beforeResultId}보다 앞선 결과가 남긴 것만
+	 * @return [케이스 ID, 경로, 종류]
+	 */
+	@Query(nativeQuery = true, value = """
+			SELECT t.test_case_id, t.path, t.kind
+			FROM {h-schema}schema_tolerance t
+			WHERE t.environment_id = :environmentId
+			  AND t.test_case_id IN (:caseIds)
+			  AND t.first_result_id < :beforeResultId
+			""")
+	List<Object[]> findSchemaTolerances(@Param("environmentId") long environmentId,
+			@Param("caseIds") Collection<Long> caseIds, @Param("beforeResultId") long beforeResultId);
+
+	/**
+	 * 영구 허용 변동 기록. 이미 있으면 그대로 (먼저 남긴 결과 유지). 같은 케이스·환경을 동시에 실행해도 충돌로 결과 저장이 실패하지 않도록
+	 * PostgreSQL {@code ON CONFLICT DO NOTHING}
+	 */
+	@Modifying
+	@Query(nativeQuery = true, value = """
+			INSERT INTO {h-schema}schema_tolerance (test_case_id, environment_id, path, kind, first_result_id)
+			VALUES (:caseId, :environmentId, :path, :kind, :resultId)
+			ON CONFLICT DO NOTHING
+			""")
+	void addSchemaTolerance(@Param("caseId") long caseId, @Param("environmentId") long environmentId,
+			@Param("path") String path, @Param("kind") String kind, @Param("resultId") long resultId);
 
 }

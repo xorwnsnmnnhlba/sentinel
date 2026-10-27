@@ -29,6 +29,7 @@ import com.sentinel.runner.HttpMethod;
 import com.sentinel.runner.assertion.Assertion;
 import com.sentinel.runner.extract.Extractor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 /**
@@ -67,6 +68,9 @@ public class TestFixtures {
 	private final NotificationDeliveryRepository notificationDeliveries;
 
 	private final TestRunService testRunService;
+
+	/** 엔티티가 없는 표(구조 변화 영구 허용) 정리용 */
+	private final JdbcClient jdbc;
 
 	/** 수동 실행 주체 등 사용자 필요한 테스트용 계정 */
 	public User user() {
@@ -135,6 +139,7 @@ public class TestFixtures {
 		holidays.deleteAllInBatch();
 		notificationDeliveries.deleteAllInBatch();
 		schedules.deleteAllInBatch();
+		jdbc.sql("DELETE FROM sentinel.schema_tolerance").update();
 		results.deleteAllInBatch();
 		runs.deleteAllInBatch();
 		testCases.deleteAllInBatch();
