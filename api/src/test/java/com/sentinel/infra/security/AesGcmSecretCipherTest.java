@@ -54,7 +54,12 @@ class AesGcmSecretCipherTest {
 	@Test
 	void rejectsTamperedValues() {
 		String encrypted = cipher.encrypt("token");
-		String tampered = encrypted.substring(0, encrypted.length() - 2) + "AA";
+		// 끝 문자를 고정 값으로 바꾸면 원래 값과 같을 때 변조가 안 되므로 태그 마지막 바이트의 비트를 반전
+		byte[] combined = Base64.getDecoder().decode(encrypted.substring("v1:".length()));
+		combined[combined.length - 1] ^= 1;
+		String tampered = "v1:" + Base64.getEncoder().encodeToString(combined);
+
+		assertThat(tampered).isNotEqualTo(encrypted);
 
 		assertThatThrownBy(() -> cipher.decrypt(tampered)).isInstanceOf(SecretDecryptionException.class);
 	}
