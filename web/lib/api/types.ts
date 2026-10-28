@@ -110,6 +110,13 @@ export interface ResultDrift {
   status: "COMPARED" | "COLLECTING";
   observations: number;
   changes: DriftChange[];
+  /**
+   * 승인 대기. 호환이 깨지는 변화·null 전환이 있어 기준선에 넣지 않았고 지금 기준선으로 다시 비교해도 남음.
+   * 기준선에 반영하기 전까지 같은 변화를 매 실행 보고 (api/README.md "구조 변화")
+   */
+  pending: boolean;
+  /** 승인 대기였다가 기준선에 반영한 기록. 승인한 사용자를 찾을 수 없으면 approvedBy null */
+  approval: { approvedBy: IdName | null; approvedAt: string } | null;
 }
 
 /**

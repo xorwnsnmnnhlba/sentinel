@@ -4,6 +4,7 @@ import java.net.URI;
 import java.time.LocalDate;
 
 import com.sentinel.api.request.CreateRunRequest;
+import com.sentinel.api.request.UpdateResultRequest;
 import com.sentinel.api.request.UpdateRunRequest;
 import com.sentinel.application.InvalidRequestException;
 import com.sentinel.application.JUnitReport;
@@ -90,6 +91,26 @@ class RunController {
 		}
 		testRunService.cancel(runId, currentUser.get().id());
 		return testRunService.getRun(runId);
+	}
+
+	/** 결과 1건 (결과 상세의 케이스별 결과와 같은 형식). 다른 실행의 결과는 404 */
+	@GetMapping("/{runId}/results/{resultId}")
+	TestRunDetail.Result getResult(@PathVariable long runId, @PathVariable long resultId) {
+		return testRunService.getResult(runId, resultId);
+	}
+
+	/**
+	 * 승인 대기 응답 구조를 기준선에 반영 ({@code {"schemaPending": false}}). 다음 실행부터 같은 변화를 보고하지 않음.
+	 * 승인 대기가 아닌 결과(이미 반영, 기록할 때 받아들임, 구조 지문 없음)는 409, false 외 값은 400
+	 */
+	@PatchMapping("/{runId}/results/{resultId}")
+	TestRunDetail.Result updateResult(@PathVariable long runId, @PathVariable long resultId,
+			@Valid @RequestBody UpdateResultRequest request) {
+		if (request.schemaPending()) {
+			throw new InvalidRequestException("only schemaPending false is supported");
+		}
+		testRunService.approveSchema(runId, resultId, currentUser.get().id());
+		return testRunService.getResult(runId, resultId);
 	}
 
 	/**

@@ -22,7 +22,7 @@ import { RerunFailedForm } from "@/components/runs/rerun-failed-form";
 import { RunProgress } from "@/components/runs/run-progress";
 import { ResultDetail } from "@/components/runs/result-detail";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { cancelRun, rerunFailed } from "@/lib/actions/catalog";
+import { approveSchema, cancelRun, rerunFailed } from "@/lib/actions/catalog";
 import { apiGetOrNotFound } from "@/lib/api/server";
 import type { RunDetail } from "@/lib/api/types";
 import { formatDateTime, formatElapsed, formatProgress, formatRunDuration } from "@/lib/format";
@@ -46,9 +46,12 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
     notFound();
   }
   const run = await apiGetOrNotFound<RunDetail>(`/api/runs/${id}`);
-  // 실패·오류 케이스와 호환이 깨지는 구조 변화가 있는 케이스는 펼친 상태로 표시
+  // 실패·오류 케이스, 호환이 깨지는 구조 변화나 승인 대기가 있는 케이스는 펼친 상태로 표시
   const openByDefault = run.results
-    .filter((result) => result.verdict !== "PASSED" || highestLevel(result.drift) === "BREAKING")
+    .filter(
+      (result) =>
+        result.verdict !== "PASSED" || highestLevel(result.drift) === "BREAKING" || result.drift?.pending === true,
+    )
     .map((result) => String(result.id));
   const failing = run.summary.failed + run.summary.errors;
 
@@ -156,6 +159,7 @@ export default async function RunDetailPage(props: PageProps<"/runs/[id]">) {
                     result={result}
                     rawPurged={run.rawPurgedAt !== null}
                     singleCase={run.testCase !== null}
+                    approveSchema={result.drift?.pending ? approveSchema.bind(null, run.id, result.id) : undefined}
                   />
                 </AccordionContent>
               </AccordionItem>

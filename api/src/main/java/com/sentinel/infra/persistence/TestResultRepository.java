@@ -252,4 +252,17 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long>, T
 	void addSchemaTolerance(@Param("caseId") long caseId, @Param("environmentId") long environmentId,
 			@Param("path") String path, @Param("kind") String kind, @Param("resultId") long resultId);
 
+	/**
+	 * 승인 대기면 기준선에 반영하고 승인 기록. 두 사람이 동시에 승인해도 한쪽만 반영되도록 조건부 갱신
+	 * @return 갱신한 행 수. 승인 대기가 아니면(이미 반영) 0
+	 */
+	@Modifying
+	@Query("""
+			UPDATE TestResult r
+			SET r.schemaPending = false, r.schemaApprovedBy = :approvedBy, r.schemaApprovedAt = :approvedAt
+			WHERE r.id = :resultId AND r.schemaPending = true
+			""")
+	int approveSchemaIfPending(@Param("resultId") long resultId, @Param("approvedBy") long approvedBy,
+			@Param("approvedAt") Instant approvedAt);
+
 }

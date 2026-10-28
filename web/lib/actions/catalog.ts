@@ -4,7 +4,15 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { apiGet, apiSend, isApiError } from "@/lib/api/server";
-import type { CaseItem, EnvironmentItem, MaintenanceWindow, ProjectItem, RunDetail, SuiteItem } from "@/lib/api/types";
+import type {
+  CaseItem,
+  EnvironmentItem,
+  MaintenanceWindow,
+  ProjectItem,
+  RunDetail,
+  RunResult,
+  SuiteItem,
+} from "@/lib/api/types";
 import { copyName, MAX_CASE_NAME_LENGTH } from "@/lib/copy-name";
 import { type CaseDraft, isCaseDraft, validateDraft } from "@/lib/case-draft";
 import { describeInputError } from "@/lib/input-error";
@@ -468,6 +476,24 @@ export async function cancelRun(runId: number): Promise<ActionState> {
     if (isApiError(error) && error.status === 409) {
       refresh();
       return { error: "이미 끝난 실행입니다" };
+    }
+    return failure(error);
+  }
+  refresh();
+  return {};
+}
+
+/**
+ * 승인 대기 응답 구조를 기준선에 반영. 다음 실행부터 같은 변화를 보고하지 않음. 성공 시 결과 화면 재조회
+ */
+export async function approveSchema(runId: number, resultId: number): Promise<ActionState> {
+  try {
+    await apiSend<RunResult>("PATCH", `/api/runs/${id(runId)}/results/${id(resultId)}`, { schemaPending: false });
+  } catch (error) {
+    // 이름 중복이 아닌, 그사이 다른 사용자가 반영한 경우. 화면을 다시 받아 반영 기록을 표시
+    if (isApiError(error) && error.status === 409) {
+      refresh();
+      return { error: "이미 기준선에 반영된 결과입니다" };
     }
     return failure(error);
   }

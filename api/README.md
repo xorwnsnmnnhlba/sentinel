@@ -240,6 +240,10 @@ curl -i -X POST localhost:8080/api/runs \
   - 이미 끝난 실행(완료·중단·중지)은 409, `CANCELED` 외 상태는 400
   - 중지된 실행은 일부 케이스만 실행되므로 스위트 요약·최근 실행·직전 실행 비교 대상에서 제외하고 실패 알림도 보내지 않음
   - 스케줄 실행은 스케줄러 스레드에서 끝까지 진행 (한도와 무관)
+- 결과 1건: `GET /api/runs/{runId}/results/{resultId}`. 실행 상세의 `results[]`와 같은 형식, 다른 실행의 결과는 404
+- 구조 변화 승인: `PATCH /api/runs/{runId}/results/{resultId}` + `{"schemaPending": false}`. 승인 대기 응답 구조를 기준선에 반영 (아래 "결과 해석"의 `drift`)
+  - 응답은 반영한 결과 (`drift.pending: false`, `drift.approval` `{approvedBy: {id, name}, approvedAt}`)
+  - 승인 대기가 아닌 결과(이미 반영, 기록할 때 바로 반영, 구조 지문 없음)는 409, `false` 외 값은 400
 - 스위트 실행은 케이스 실행 순서대로 순차 실행, 실패 케이스가 있어도 나머지 계속 실행
   - 실행 순서: 케이스 목록(`GET /api/cases?suiteId=`) 순서와 같음. 새 케이스는 마지막. 스위트 `PATCH`의 `caseOrder`로 변경 ("REST API" 참고)
 - 케이스 단건 실행은 케이스가 속한 스위트의 실행으로 기록하고 대상 케이스를 `testCase`(`{id, name}`)로 표시. 스위트 전체 실행은 `null`
@@ -275,11 +279,13 @@ curl -i -X POST localhost:8080/api/runs \
   - 잘라서 저장하는 본문과 달리 전체 본문(최대 5MB)으로 계산. 깊이 20·경로 1,000개 한도를 넘으면 `complete: false`
   - Content-Type이 JSON(`application/json`, `+json`)이거나 없을 때 본문이 `{`·`[`로 시작하면 대상. 그 외·해석 실패·응답 없음은 `null`
   - 원문 보관기간(30일)이 지나도 삭제하지 않음
-- `drift`: 같은 케이스·환경의 이전 실행 대비 구조 변화 `{status, observations, changes}`. 지문이 없으면 `null`
+- `drift`: 같은 케이스·환경의 이전 실행 대비 구조 변화 `{status, observations, changes, pending, approval}`. 지문이 없으면 `null`
   - 기준선: 이 실행보다 앞선 실행 중 승인 대기가 아닌 지문 최근 20건(`sentinel.schema-drift.window`)과 영구 허용. 3건(`min-observations`) 미만이면 `status: COLLECTING`, 비교하지 않음
   - 필수 필드: 상위 경로가 있었던 모든 응답에 존재 (빈 배열·선택 필드인 상위 객체가 없던 응답은 관측에서 제외). null은 한 번이라도 관측되면 허용
   - 영구 허용: 기준선에 넣은 지문에서 본 null, 나타난 뒤 없던 적이 있는 필드는 창 밖으로 밀려나도 계속 허용 (드물게 null·없음인 필드를 반복 보고하지 않도록). null 외 타입은 창 안에서만 (바뀐 타입이 되돌아오면 다시 보고)
-  - 승인 대기: 결과를 기록할 때 판정하여 `BREAKING`·`WARNING`이 있으면 지문을 기준선에 넣지 않음. 같은 변화가 이어지면 매 실행 보고. `INFO`만 있거나 수집 중이면 바로 반영. 승인(기준선 반영)은 이후 단계
+  - 승인 대기: 결과를 기록할 때 판정하여 `BREAKING`·`WARNING`이 있으면 지문을 기준선에 넣지 않음. 같은 변화가 이어지면 매 실행 보고. `INFO`만 있거나 수집 중이면 바로 반영
+  - `pending`: 승인 대기이고 지금 기준선으로 다시 비교해도 `BREAKING`·`WARNING`이 남음. 그사이 같은 변화를 승인했으면 `false`
+  - 승인(`PATCH /api/runs/{runId}/results/{resultId}`): 그 결과의 지문을 기준선에 넣고 영구 허용을 남김 (기록할 때 반영한 경우와 같음). 그 결과의 `changes`는 앞선 실행 기준 그대로이고 `approval`에 승인 기록. 뒤 실행은 반영된 기준선으로 다시 비교하므로 같은 변화는 보고하지 않음. 앞선 승인 대기 결과는 그대로
   - `changes[]`: `{level, kind, path, expected, actual}`. 등급(심한 순) → 경로 순
 
     | level | kind | 의미 |
@@ -289,7 +295,7 @@ curl -i -X POST localhost:8080/api/runs \
     | `WARNING` | `NULLABLE` | null이 새로 나타남 |
     | `INFO` | `ADDED` | 새 필드 (하위 필드는 상위 한 건으로) |
   - 보고하지 않는 경우: 빈 배열·빈 동적 키, 상위가 없거나 null인 필드의 하위, 타입이 바뀐 경로의 하위, 일부만 기록한(`complete: false`) 지문의 없어진 필드
-  - 조회는 기록 때와 같은 기준으로 다시 계산. 실행 1건의 모든 케이스를 지문·영구 허용 각 쿼리 1회로 조회하며 케이스마다 최근 창 크기만큼만 읽음 (이력 길이와 무관). 지난 실행은 그 뒤에 남은 영구 허용 없이 판정. 알림은 이후 단계
+  - 조회는 기록 때와 같은 기준으로 다시 계산. 실행 1건의 모든 케이스를 지문·영구 허용 각 쿼리 1회로 조회하며 케이스마다 최근 창 크기만큼만 읽음 (이력 길이와 무관). 지난 실행은 그 뒤에 남은 영구 허용 없이 판정 (승인한 결과 뒤의 실행은 그 승인을 반영해 판정). 알림은 이후 단계
 - 요청·응답 헤더와 본문은 보관기간(기본 30일) 경과 후 삭제 ("결과 원문 보관기간" 참고)
 - `previousRun`·`change`: 직전 실행 대비 변화 (아래 "직전 실행 대비 변화")
 
@@ -503,7 +509,7 @@ deploy-check:
 | 환경 | `GET /api/environments?projectId=` | `GET /api/environments/{id}` | `POST /api/environments`, `PATCH /api/environments/{id}` | `DELETE /api/environments/{id}` |
 | 스위트 | `GET /api/suites?projectId=` | `GET /api/suites/{id}` | `POST /api/suites`, `PATCH /api/suites/{id}` | `DELETE /api/suites/{id}` |
 | 케이스 | `GET /api/cases?suiteId=&q=` | `GET /api/cases/{id}` | `POST /api/cases`, `PATCH /api/cases/{id}` | `DELETE /api/cases/{id}` |
-| 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&failing=&page=0&size=20` | `GET /api/runs/{id}` | `POST /api/runs`, `PATCH /api/runs/{id}`(중지) | |
+| 실행 | `GET /api/runs?projectId=&suiteId=&environmentId=&status=&from=&to=&failing=&page=0&size=20` | `GET /api/runs/{id}`, `GET /api/runs/{runId}/results/{resultId}` | `POST /api/runs`, `PATCH /api/runs/{id}`(중지), `PATCH /api/runs/{runId}/results/{resultId}`(구조 변화 승인) | |
 | 스케줄 | `GET /api/schedules?suiteId=` | `GET /api/schedules/{id}` | `POST /api/schedules`, `PATCH /api/schedules/{id}`, `PATCH /api/schedules`(여러 건) | `DELETE /api/schedules/{id}` |
 | 점검 시간 | `GET /api/maintenance-windows?environmentId=` | `GET /api/maintenance-windows/{id}`(끝난 점검 포함) | `POST /api/maintenance-windows`, `PATCH /api/maintenance-windows/{id}` | `DELETE /api/maintenance-windows/{id}` |
 | 휴일 | `GET /api/holidays?year=` | `GET /api/holidays/{id}` | `POST /api/holidays`, `POST /api/holiday-imports`(여러 건) | `DELETE /api/holidays/{id}` |
