@@ -8,6 +8,7 @@ import { captureRedirect } from "@/test/next";
 import { type CaseDraft, emptyDraft } from "@/lib/case-draft";
 
 import {
+  approveSchema,
   cancelRun,
   createCase,
   createSchedule,
@@ -300,6 +301,31 @@ describe("cancelRun", () => {
     capture("patch", "/api/runs/43", () => problem(404, "test run 43 not found"));
 
     await expect(cancelRun(43)).resolves.toEqual({
+      error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다",
+    });
+  });
+});
+
+describe("approveSchema", () => {
+  it("asks Spring to accept the pending schema and reloads the page", async () => {
+    const bodies = capture("patch", "/api/runs/43/results/7", () => HttpResponse.json({ id: 7 }));
+
+    await expect(approveSchema(43, 7)).resolves.toEqual({});
+    expect(bodies).toEqual([{ schemaPending: false }]);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("explains a schema approved meanwhile and reloads to show it", async () => {
+    capture("patch", "/api/runs/43/results/7", () => problem(409, "test result 7 has no schema pending approval"));
+
+    await expect(approveSchema(43, 7)).resolves.toEqual({ error: "이미 기준선에 반영된 결과입니다" });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("tells when the result is gone", async () => {
+    capture("patch", "/api/runs/43/results/7", () => problem(404, "test result 7 not found"));
+
+    await expect(approveSchema(43, 7)).resolves.toEqual({
       error: "대상을 찾을 수 없습니다. 다른 곳에서 삭제되었을 수 있습니다",
     });
   });

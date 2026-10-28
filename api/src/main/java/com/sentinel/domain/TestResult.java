@@ -7,6 +7,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -142,6 +143,12 @@ public class TestResult extends BaseEntity {
 	 */
 	@Column(nullable = false)
 	private boolean schemaPending;
+
+	/** 승인 대기 지문을 기준선에 반영한 사용자 (V32). 승인한 결과만 값이 있음 */
+	private Long schemaApprovedBy;
+
+	/** 승인 대기 지문을 기준선에 반영한 시각 (V32) */
+	private Instant schemaApprovedAt;
 
 	private Long elapsedMs;
 

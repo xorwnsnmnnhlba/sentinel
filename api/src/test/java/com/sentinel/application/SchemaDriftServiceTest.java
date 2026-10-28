@@ -27,6 +27,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 // 쿼리 수를 세므로 같은 컨텍스트에서 쿼리를 보내는 스케줄 폴링·주간 요약 확인을 끔 (통계는 SessionFactory 전체 기준)
 @SpringBootTest(properties = { "sentinel.schedule.enabled=false", "spring.jpa.properties.hibernate.generate_statistics=true",
@@ -83,9 +84,9 @@ class SchemaDriftServiceTest {
 		TestRunDetail.Result third = runWith(dev, "{\"id\": 3, \"name\": \"c\"}");
 
 		// 최소 관측 수(2) 전까지는 수집 중
-		assertThat(first.drift()).isEqualTo(new ResultDrift(ResultDrift.Status.COLLECTING, 0, List.of()));
-		assertThat(second.drift()).isEqualTo(new ResultDrift(ResultDrift.Status.COLLECTING, 1, List.of()));
-		assertThat(third.drift()).isEqualTo(new ResultDrift(ResultDrift.Status.COMPARED, 2, List.of()));
+		assertThat(first.drift()).isEqualTo(new ResultDrift(ResultDrift.Status.COLLECTING, 0, List.of(), false, null));
+		assertThat(second.drift()).isEqualTo(new ResultDrift(ResultDrift.Status.COLLECTING, 1, List.of(), false, null));
+		assertThat(third.drift()).isEqualTo(new ResultDrift(ResultDrift.Status.COMPARED, 2, List.of(), false, null));
 	}
 
 	@Test
@@ -155,6 +156,88 @@ class SchemaDriftServiceTest {
 	}
 
 	@Test
+	void stopsReportingAChangeOnceItIsApproved() {
+		runWith(dev, "{\"id\": 1}");
+		runWith(dev, "{\"id\": 2}");
+		long changedRun = runIdWith(dev, "{\"id\": \"3\"}");
+		TestRunDetail.Result changed = result(changedRun);
+		assertThat(changed.drift().pending()).isTrue();
+
+		testRunService.approveSchema(changedRun, changed.id(), tester);
+
+		// 이 결과의 판정은 앞선 실행 기준 그대로, 승인 기록만 추가
+		ResultDrift approved = result(changedRun).drift();
+		assertThat(approved.changes()).extracting(Change::kind).containsExactly(Kind.TYPE_CHANGED);
+		assertThat(approved.pending()).isFalse();
+		assertThat(approved.approval().approvedBy().id()).isEqualTo(tester);
+		assertThat(approved.approval().approvedAt()).isNotNull();
+		assertThat(runWith(dev, "{\"id\": \"4\"}").drift().changes()).isEmpty();
+	}
+
+	@Test
+	void stopsShowingLaterResultsWithTheApprovedChangeAsPending() {
+		runWith(dev, "{\"id\": 1}");
+		runWith(dev, "{\"id\": 2}");
+		long first = runIdWith(dev, "{\"id\": \"3\"}");
+		long second = runIdWith(dev, "{\"id\": \"4\"}");
+		long other = runIdWith(dev, "{\"code\": 5}");
+
+		testRunService.approveSchema(first, result(first).id(), tester);
+
+		// 뒤 결과는 반영된 기준선으로 다시 비교. 같은 변화는 대기가 아니고, 다른 변화(필드 없음)는 그대로 대기
+		assertThat(result(second).drift().changes()).isEmpty();
+		assertThat(result(second).drift().pending()).isFalse();
+		assertThat(result(other).drift().changes()).extracting(Change::kind).contains(Kind.REMOVED);
+		assertThat(result(other).drift().pending()).isTrue();
+	}
+
+	@Test
+	void keepsEarlierResultsPendingWhenALaterOneIsApproved() {
+		runWith(dev, "{\"id\": 1}");
+		runWith(dev, "{\"id\": 2}");
+		long first = runIdWith(dev, "{\"id\": \"3\"}");
+		long second = runIdWith(dev, "{\"id\": \"4\"}");
+
+		testRunService.approveSchema(second, result(second).id(), tester);
+
+		// 앞선 결과의 기준선에는 뒤 결과가 들어가지 않음
+		assertThat(result(first).drift().pending()).isTrue();
+		assertThat(runWith(dev, "{\"id\": \"5\"}").drift().changes()).isEmpty();
+	}
+
+	@Test
+	void remembersApprovedNullsAfterTheyLeaveTheWindow() {
+		runWith(dev, "{\"name\": \"a\"}");
+		runWith(dev, "{\"name\": \"b\"}");
+		long nulled = runIdWith(dev, "{\"name\": null}");
+		for (int i = 0; i < 4; i++) {
+			runWith(dev, "{\"name\": \"c\"}");
+		}
+		// 뒤 실행들이 모두 창에서 밀어낸 다음에 승인 (뒤 실행은 기록할 때 대기 결과를 기준선에 쓰지 않아 null 허용을 남기지 않음)
+		testRunService.approveSchema(nulled, result(nulled).id(), tester);
+
+		// 창(4)에는 승인한 결과가 없지만 승인할 때 남긴 null 허용은 계속 유효
+		assertThat(runWith(dev, "{\"name\": null}").drift().changes()).isEmpty();
+	}
+
+	@Test
+	void refusesToApproveResultsThatAreNotPending() {
+		runWith(dev, "{\"id\": 1}");
+		runWith(dev, "{\"id\": 2}");
+		long accepted = runIdWith(dev, "{\"id\": 3}");
+		long changed = runIdWith(dev, "{\"id\": \"4\"}");
+		long changedResult = result(changed).id();
+		testRunService.approveSchema(changed, changedResult, tester);
+
+		assertThatThrownBy(() -> testRunService.approveSchema(changed, changedResult, tester))
+			.isInstanceOf(ConflictException.class);
+		assertThatThrownBy(() -> testRunService.approveSchema(accepted, result(accepted).id(), tester))
+			.isInstanceOf(ConflictException.class);
+		assertThatThrownBy(() -> testRunService.approveSchema(accepted, changedResult, tester))
+			.isInstanceOf(NotFoundException.class);
+	}
+
+	@Test
 	void holdsNewNullsForApproval() {
 		runWith(dev, "{\"name\": \"a\"}");
 		runWith(dev, "{\"name\": \"b\"}");
@@ -162,6 +245,7 @@ class SchemaDriftServiceTest {
 		TestRunDetail.Result nulled = runWith(dev, "{\"name\": null}");
 
 		assertThat(nulled.drift().changes()).extracting(Change::kind).containsExactly(Kind.NULLABLE);
+		assertThat(nulled.drift().pending()).isTrue();
 		assertThat(results.findById(nulled.id()).orElseThrow().isSchemaPending()).isTrue();
 		assertThat(runWith(dev, "{\"name\": null}").drift().changes()).extracting(Change::kind)
 			.containsExactly(Kind.NULLABLE);
@@ -177,7 +261,7 @@ class SchemaDriftServiceTest {
 
 		assertThat(added.drift().changes()).extracting(Change::kind).containsExactly(Kind.ADDED);
 		assertThat(results.findById(added.id()).orElseThrow().isSchemaPending()).isFalse();
-		assertThat(next.drift()).isEqualTo(new ResultDrift(ResultDrift.Status.COMPARED, 3, List.of()));
+		assertThat(next.drift()).isEqualTo(new ResultDrift(ResultDrift.Status.COMPARED, 3, List.of(), false, null));
 	}
 
 	@Test

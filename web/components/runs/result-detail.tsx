@@ -3,6 +3,7 @@ import { DriftSummary } from "@/components/runs/drift";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { ActionState } from "@/lib/actions/catalog";
 import type { Headers, ResponseSchema, RunResult } from "@/lib/api/types";
 import { describeErrorReason } from "@/lib/error-reason";
 import { type ExtractionResult, splitExtractions } from "@/lib/extraction";
@@ -17,11 +18,14 @@ export function ResultDetail({
   result,
   rawPurged = false,
   singleCase = false,
+  approveSchema,
 }: {
   result: RunResult;
   rawPurged?: boolean;
   /** 케이스 단건 실행의 결과 */
   singleCase?: boolean;
+  /** 승인 대기 응답 구조를 기준선에 반영 */
+  approveSchema?: () => Promise<ActionState>;
 }) {
   const { assertions, extractions } = splitExtractions(result.assertionResults);
   return (
@@ -72,7 +76,7 @@ export function ResultDetail({
       {rawPurged && result.responseSchema && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium">응답 구조</h4>
-          {result.drift && <DriftSummary drift={result.drift} />}
+          {result.drift && <DriftSummary drift={result.drift} approve={approveSchema} />}
           <SchemaTable schema={result.responseSchema} />
         </div>
       )}
@@ -96,7 +100,7 @@ export function ResultDetail({
           </TabsContent>
           {result.responseSchema && (
             <TabsContent value="schema" className="space-y-3">
-              {result.drift && <DriftSummary drift={result.drift} />}
+              {result.drift && <DriftSummary drift={result.drift} approve={approveSchema} />}
               <SchemaTable schema={result.responseSchema} />
             </TabsContent>
           )}

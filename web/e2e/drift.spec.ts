@@ -1,8 +1,8 @@
 import { accessibilityViolations, expect, test, waitForRun } from "./fixtures";
 
 /**
- * 응답 구조 변화 (스키마 드리프트 2단계). 같은 케이스·환경의 이전 실행 지문을 기준선으로 비교
- * 객체를 돌려주던 케이스를 배열을 돌려주는 경로로 바꿔 호환이 깨지는 변화(BREAKING)를 만듦
+ * 응답 구조 변화 (스키마 드리프트 2·3단계). 같은 케이스·환경의 이전 실행 지문을 기준선으로 비교
+ * 객체를 돌려주던 케이스를 배열을 돌려주는 경로로 바꿔 호환이 깨지는 변화(BREAKING)를 만들고 승인 대기를 기준선에 반영
  */
 const api = process.env.E2E_API_URL ?? "http://localhost:18080";
 
@@ -56,7 +56,7 @@ test.beforeAll(async ({ request }) => {
   await waitForRun(request, api, headers, runId);
 });
 
-test("구조가 바뀐 케이스를 표시하고 펼쳐서 변화를 보여 줌", async ({ page }) => {
+test("구조가 바뀐 케이스를 표시하고 펼쳐서 변화를 보여 준 뒤 기준선에 반영", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("이메일").fill("admin@sentinel.test");
   await page.getByLabel("비밀번호").fill("e2e-admin-password");
@@ -67,7 +67,7 @@ test("구조가 바뀐 케이스를 표시하고 펼쳐서 변화를 보여 줌"
   const trigger = page.getByRole("button", { name: new RegExp(caseName) });
   // 판정은 통과지만 호환이 깨지는 변화라 목록에 표시하고 펼친 상태
   await expect(trigger).toContainText("통과");
-  await expect(trigger).toContainText("구조 변화 1");
+  await expect(trigger).toContainText("구조 변화 1 · 승인 대기");
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
 
   await page.getByRole("tab", { name: "구조" }).click();
@@ -77,5 +77,18 @@ test("구조가 바뀐 케이스를 표시하고 펼쳐서 변화를 보여 줌"
   await expect(changes.first()).toContainText("호환 깨짐");
   await expect(changes.first()).toContainText("타입 변경");
   await expect(changes.first()).toContainText("object → array");
+  await expect(page.getByText(/승인 대기: 기준선에 반영하기 전까지 매 실행 같은 변화를 보고합니다/)).toBeVisible();
   expect(await accessibilityViolations(page)).toEqual([]);
+
+  // 의도한 변경으로 보고 반영. 이 결과의 변화 목록은 그대로 두고 반영 기록 표시
+  await page.getByRole("button", { name: "기준선에 반영" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "기준선에 반영" });
+  await expect(dialog).toContainText("되돌릴 수 없습니다");
+  await dialog.getByRole("button", { name: "반영", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/기준선에 반영됨 · admin@sentinel\.test · /)).toBeVisible();
+  await expect(trigger).toContainText("구조 변화 1");
+  await expect(trigger).not.toContainText("승인 대기");
+  await expect(page.getByRole("button", { name: "기준선에 반영" })).toHaveCount(0);
+  await expect(changes).toHaveCount(1);
 });

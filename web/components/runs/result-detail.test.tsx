@@ -28,7 +28,7 @@ const responded: RunResult = {
     bodyTruncated: false,
   },
   responseSchema: { fields: { $: ["object"], "$.orderId": ["number"] }, complete: true },
-  drift: { status: "COMPARED", observations: 3, changes: [] },
+  drift: { status: "COMPARED", observations: 3, changes: [], pending: false, approval: null },
   change: null,
   retries: 0,
   supporting: false,
@@ -54,6 +54,31 @@ describe("ResultDetail", () => {
     const table = screen.getByRole("table", { name: "응답 구조" });
     expect(within(table).getByRole("row", { name: "$.orderId number" })).toBeInTheDocument();
     expect(screen.getByText(/일부만 기록했습니다/)).toBeInTheDocument();
+  });
+
+  it("offers to approve a pending structure change in both layouts", async () => {
+    const user = userEvent.setup();
+    const pending: RunResult = {
+      ...responded,
+      drift: {
+        status: "COMPARED",
+        observations: 3,
+        changes: [
+          { level: "BREAKING", kind: "TYPE_CHANGED", path: "$.orderId", expected: ["number"], actual: ["string"] },
+        ],
+        pending: true,
+        approval: null,
+      },
+    };
+    const approve = async () => ({});
+    const { unmount } = render(<ResultDetail result={pending} approveSchema={approve} />);
+
+    await user.click(screen.getByRole("tab", { name: "구조" }));
+    expect(screen.getByRole("button", { name: "기준선에 반영" })).toBeInTheDocument();
+    unmount();
+
+    render(<ResultDetail result={{ ...pending, ...purged, drift: pending.drift }} rawPurged approveSchema={approve} />);
+    expect(screen.getByRole("button", { name: "기준선에 반영" })).toBeInTheDocument();
   });
 
   it("offers no structure tab when the response was not JSON", () => {

@@ -1,5 +1,6 @@
 package com.sentinel.application.drift;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -8,7 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 
+import com.sentinel.application.IdName;
 import com.sentinel.domain.TestResult;
 import com.sentinel.domain.TestRun;
 import com.sentinel.infra.persistence.TestResultRepository;
@@ -27,6 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 기준선: 같은 케이스·환경에서 이 실행보다 앞선 실행 중 받아들인(승인 대기가 아닌) 지문 최근 {@code window}건 + 영구 허용 변동
  * ({@link SchemaTolerance}). 결과를 기록할 때 판정하여 호환이 깨지는 변화(BREAKING)·null 전환(WARNING)이 있으면 승인 대기로 두고
  * 기준선에 넣지 않음. 새 필드(INFO)만 있거나 기준선 수집 중이면 받아들이고 그 지문까지의 변동을 영구 허용으로 남김.
+ * 승인 대기는 사용자가 승인하면 받아들인 경우와 같이 기준선에 넣음 (2차).
  * 조회는 같은 기준으로 다시 계산 (실행 1건의 모든 케이스를 지문·허용 각 쿼리 1회로)
  */
 @Service
@@ -44,9 +48,11 @@ public class SchemaDriftService {
 
 	/**
 	 * 트랜잭션 안에서 호출
+	 * @param userName 승인한 사용자 이름 조회. 찾을 수 없으면 null
 	 * @return 결과 ID별 구조 변화. 지문이 없는 결과(JSON이 아닌 응답, 응답 없음)는 제외
 	 */
-	public Map<Long, ResultDrift> driftOf(TestRun run, List<TestResult> runResults) {
+	public Map<Long, ResultDrift> driftOf(TestRun run, List<TestResult> runResults,
+			Function<Long, IdName> userName) {
 		List<TestResult> fingerprinted = runResults.stream().filter(result -> result.getResponseSchema() != null).toList();
 		if (fingerprinted.isEmpty()) {
 			return Map.of();
@@ -57,11 +63,18 @@ public class SchemaDriftService {
 		Map<Long, List<ResponseSchema>> previous = previousSchemas(environmentId, caseIds, run.getId(), firstResultId);
 		Map<Long, Set<SchemaTolerance>> tolerances = tolerances(environmentId, caseIds, firstResultId);
 
+		Map<Long, IdName> approvers = new HashMap<>();
 		Map<Long, ResultDrift> drifts = new HashMap<>();
 		for (TestResult result : fingerprinted) {
 			long caseId = result.getTestCase().getId();
-			drifts.put(result.getId(), judge(previous.getOrDefault(caseId, List.of()),
-					tolerances.getOrDefault(caseId, Set.of()), result.getResponseSchema()));
+			ResultDrift judged = judge(previous.getOrDefault(caseId, List.of()),
+					tolerances.getOrDefault(caseId, Set.of()), result.getResponseSchema());
+			ResultDrift.Approval approval = result.getSchemaApprovedAt() == null ? null
+					: new ResultDrift.Approval(
+							approvers.computeIfAbsent(result.getSchemaApprovedBy(), userName),
+							result.getSchemaApprovedAt());
+			drifts.put(result.getId(), new ResultDrift(judged.status(), judged.observations(), judged.changes(),
+					result.isSchemaPending() && holds(judged), approval));
 		}
 		return drifts;
 	}
@@ -75,34 +88,65 @@ public class SchemaDriftService {
 		if (schema == null) {
 			return;
 		}
-		long caseId = saved.getTestCase().getId();
-		List<ResponseSchema> history = previousSchemas(environmentId, List.of(caseId), saved.getRun().getId(),
-				saved.getId())
-			.getOrDefault(caseId, List.of());
-		Set<SchemaTolerance> known = tolerances(environmentId, List.of(caseId), saved.getId())
-			.getOrDefault(caseId, Set.of());
-		boolean held = judge(history, known, schema).changes()
-			.stream()
-			.anyMatch(change -> change.level() != SchemaDrift.Level.INFO);
-		if (held) {
+		Basis basis = basis(environmentId, saved);
+		if (holds(judge(basis.history(), basis.known(), schema))) {
 			saved.holdSchema();
 			return;
 		}
-		// 기준선(최근 순)에 이 지문을 더해 오래된 순으로 변동을 찾고, 새로 본 것만 기록
-		List<ResponseSchema> accepted = new ArrayList<>(history.reversed());
-		accepted.add(schema);
+		accept(environmentId, saved, basis);
+	}
+
+	/**
+	 * 승인 대기 결과의 지문을 기준선에 반영 (기록할 때 받아들인 경우와 같이 그 지문까지의 변동을 영구 허용으로 남김).
+	 * 그 뒤 실행의 판정도 반영된 기준선으로 다시 계산하므로 같은 변화가 이어진 결과는 더 이상 승인 대기로 표시하지 않음.
+	 * 트랜잭션 안에서 호출
+	 * @param approvedBy 승인한 사용자
+	 * @return 반영 여부. 승인 대기가 아니면(이미 반영했거나 기록할 때 받아들인 결과) false
+	 */
+	public boolean approve(TestResult result, long approvedBy, Instant approvedAt) {
+		if (results.approveSchemaIfPending(result.getId(), approvedBy, approvedAt) == 0) {
+			return false;
+		}
+		long environmentId = result.getRun().getEnvironment().getId();
+		accept(environmentId, result, basis(environmentId, result));
+		return true;
+	}
+
+	/** 기준선(최근 순)에 이 지문을 더해 오래된 순으로 변동을 찾고, 새로 본 것만 기록 */
+	private void accept(long environmentId, TestResult result, Basis basis) {
+		long caseId = result.getTestCase().getId();
+		List<ResponseSchema> accepted = new ArrayList<>(basis.history().reversed());
+		accepted.add(result.getResponseSchema());
 		SchemaTolerance.observedIn(accepted)
 			.stream()
-			.filter(tolerance -> !known.contains(tolerance) && tolerance.path().length() <= MAX_TOLERANCE_PATH)
+			.filter(tolerance -> !basis.known().contains(tolerance)
+					&& tolerance.path().length() <= MAX_TOLERANCE_PATH)
 			.forEach(tolerance -> results.addSchemaTolerance(caseId, environmentId, tolerance.path(),
-					tolerance.kind().name(), saved.getId()));
+					tolerance.kind().name(), result.getId()));
+	}
+
+	/** 결과 1건의 기준선: 앞선 실행의 받아들인 지문(최근 순)과 그보다 앞서 남긴 영구 허용 */
+	private Basis basis(long environmentId, TestResult result) {
+		long caseId = result.getTestCase().getId();
+		return new Basis(
+				previousSchemas(environmentId, List.of(caseId), result.getRun().getId(), result.getId())
+					.getOrDefault(caseId, List.of()),
+				tolerances(environmentId, List.of(caseId), result.getId()).getOrDefault(caseId, Set.of()));
+	}
+
+	private record Basis(List<ResponseSchema> history, Set<SchemaTolerance> known) {
+	}
+
+	/** 승인 없이 기준선에 넣지 않는 변화(호환이 깨지는 변화·null 전환)가 있음 */
+	private static boolean holds(ResultDrift drift) {
+		return drift.changes().stream().anyMatch(change -> change.level() != SchemaDrift.Level.INFO);
 	}
 
 	private ResultDrift judge(List<ResponseSchema> history, Set<SchemaTolerance> tolerances, ResponseSchema schema) {
 		return history.size() < properties.minObservations()
-				? new ResultDrift(ResultDrift.Status.COLLECTING, history.size(), List.of())
+				? new ResultDrift(ResultDrift.Status.COLLECTING, history.size(), List.of(), false, null)
 				: new ResultDrift(ResultDrift.Status.COMPARED, history.size(),
-						SchemaDrift.compare(SchemaBaseline.of(history).tolerating(tolerances), schema));
+						SchemaDrift.compare(SchemaBaseline.of(history).tolerating(tolerances), schema), false, null);
 	}
 
 	/** @return 케이스 ID별 이전 지문 (최근 순) */

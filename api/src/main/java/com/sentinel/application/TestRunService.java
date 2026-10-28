@@ -273,9 +273,21 @@ public class TestRunService {
 			List<TestResult> runResults = results.findWithTestCaseByRunId(runId);
 			return TestRunDetail.of(run, runResults, userName(run.getTriggeredBy()), userName(run.getCanceledBy()),
 					caseName(run.getTestCaseId()), caseName(run.getThroughCaseId()),
-					schemaDrift.driftOf(run, runResults), previous(run),
+					schemaDrift.driftOf(run, runResults, this::userName), previous(run),
 					run.isRerun() ? failedCaseIds(run.getRerunOfRunId()) : null);
 		});
+	}
+
+	/**
+	 * 결과 1건. 구조 변화·직전 실행 대비 변화는 실행 상세와 같은 기준
+	 * @throws NotFoundException 실행·결과 미존재 또는 다른 실행의 결과
+	 */
+	public TestRunDetail.Result getResult(long runId, long resultId) {
+		return getRun(runId).results()
+			.stream()
+			.filter(result -> result.id() == resultId)
+			.findFirst()
+			.orElseThrow(() -> new NotFoundException("test result", resultId));
 	}
 
 	/**
@@ -313,7 +325,7 @@ public class TestRunService {
 			.orElse(null);
 	}
 
-	/** 실행·중지한 사용자 이름. 없으면(스케줄 실행, 중지되지 않은 실행) null, 삭제(보관)된 사용자도 이력 표시를 위해 조회 */
+	/** 실행·중지·구조 변화를 승인한 사용자 이름. 없으면(스케줄 실행, 중지되지 않은 실행) null, 삭제(보관)된 사용자도 이력 표시를 위해 조회 */
 	private IdName userName(Long userId) {
 		if (userId == null) {
 			return null;
@@ -469,6 +481,23 @@ public class TestRunService {
 			TestRun run = runs.findById(runId).orElseThrow(() -> new NotFoundException("test run", runId));
 			if (runs.cancelIfRunning(runId, canceledBy, clock.instant()) == 0) {
 				throw new ConflictException("test run " + runId + " is already " + run.getStatus());
+			}
+		});
+	}
+
+	/**
+	 * 결과의 승인 대기 응답 구조를 기준선에 반영 ({@link SchemaDriftService#approve})
+	 * @param approvedBy 승인한 사용자
+	 * @throws NotFoundException 결과 미존재 또는 다른 실행의 결과
+	 * @throws ConflictException 승인 대기가 아닌 결과 (이미 반영, 기록할 때 받아들임, 지문 없음)
+	 */
+	public void approveSchema(long runId, long resultId, long approvedBy) {
+		transactions.writeWithoutResult(status -> {
+			TestResult result = results.findById(resultId)
+				.filter(found -> found.getRun().getId() == runId)
+				.orElseThrow(() -> new NotFoundException("test result", resultId));
+			if (!schemaDrift.approve(result, approvedBy, clock.instant())) {
+				throw new ConflictException("test result " + resultId + " has no schema pending approval");
 			}
 		});
 	}

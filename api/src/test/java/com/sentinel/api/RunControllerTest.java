@@ -2,6 +2,7 @@ package com.sentinel.api;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import com.jayway.jsonpath.JsonPath;
@@ -239,9 +240,81 @@ class RunControllerTest {
 		assertThat(mvc.get().uri("/api/runs?suiteId=-1")).bodyJson().extractingPath("$.totalElements").isEqualTo(0);
 	}
 
+	@Test
+	void approvesAPendingSchemaChangeOnce() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/orders", null, null);
+		String run = "{\"caseId\": %d, \"environmentId\": %d}".formatted(testCase.getId(), environment.getId());
+		Map<String, List<String>> json = Map.of("Content-Type", List.of("application/json"));
+		executor.respond(200, json, "{\"id\": 1}");
+		for (int i = 0; i < 3; i++) {
+			createRun(run);
+		}
+		executor.respond(200, json, "{\"id\": \"1\"}");
+		MvcTestResult changed = createRun(run);
+		long runId = id(changed);
+		long resultId = firstResultId(changed);
+		assertThat(changed).bodyJson().extractingPath("$.results[0].drift.pending").isEqualTo(true);
+		assertThat(changed).bodyJson().extractingPath("$.results[0].drift.approval").isNull();
+
+		MvcTestResult approved = patchResult(runId, resultId, "{\"schemaPending\": false}");
+
+		assertThat(approved).hasStatusOk();
+		var result = assertThat(approved).bodyJson();
+		result.extractingPath("$.id").isEqualTo((int) resultId);
+		result.extractingPath("$.drift.pending").isEqualTo(false);
+		result.extractingPath("$.drift.approval.approvedBy.name").asString().startsWith("tester-");
+		result.extractingPath("$.drift.approval.approvedAt").isNotNull();
+		// 이 결과의 판정은 그대로 (앞선 실행 기준), 다음 실행부터 같은 변화를 보고하지 않음
+		result.extractingPath("$.drift.changes[0].kind").isEqualTo("TYPE_CHANGED");
+		assertThat(mvc.get().uri("/api/runs/{runId}/results/{resultId}", runId, resultId)).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.drift.approval.approvedAt")
+			.isNotNull();
+		assertThat(createRun(run)).bodyJson().extractingPath("$.results[0].drift.changes").asArray().isEmpty();
+
+		assertThat(patchResult(runId, resultId, "{\"schemaPending\": false}")).hasStatus(HttpStatus.CONFLICT);
+	}
+
+	@Test
+	void refusesOtherSchemaUpdatesAndResultsOfOtherRuns() {
+		Project project = fixtures.project();
+		Environment environment = fixtures.environment(project, Map.of());
+		TestCase testCase = fixtures.testCase(project, HttpMethod.GET, "/orders", null, null);
+		String run = "{\"caseId\": %d, \"environmentId\": %d}".formatted(testCase.getId(), environment.getId());
+		MvcTestResult first = createRun(run);
+		MvcTestResult second = createRun(run);
+		long resultId = firstResultId(first);
+
+		assertThat(patchResult(id(first), resultId, "{\"schemaPending\": true}")).hasStatus(HttpStatus.BAD_REQUEST);
+		assertThat(patchResult(id(first), resultId, "{}")).hasStatus(HttpStatus.BAD_REQUEST);
+		// 구조 지문이 없는 결과(JSON이 아닌 응답)는 승인 대기가 될 수 없음
+		assertThat(patchResult(id(first), resultId, "{\"schemaPending\": false}")).hasStatus(HttpStatus.CONFLICT);
+		assertThat(patchResult(id(second), resultId, "{\"schemaPending\": false}")).hasStatus(HttpStatus.NOT_FOUND);
+		assertThat(mvc.get().uri("/api/runs/{runId}/results/{resultId}", id(second), resultId))
+			.hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	private MvcTestResult patchResult(long runId, long resultId, String body) {
+		return mvc.patch()
+			.uri("/api/runs/{runId}/results/{resultId}", runId, resultId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(body)
+			.exchange();
+	}
+
 	private static long id(MvcTestResult result) {
+		return number(result, "$.id");
+	}
+
+	private static long firstResultId(MvcTestResult run) {
+		return number(run, "$.results[0].id");
+	}
+
+	private static long number(MvcTestResult result, String path) {
 		try {
-			return ((Number) JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.id"))
+			return ((Number) JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), path))
 				.longValue();
 		}
 		catch (UnsupportedEncodingException ex) {

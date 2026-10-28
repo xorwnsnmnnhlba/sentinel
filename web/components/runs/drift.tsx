@@ -1,5 +1,8 @@
+import { ApproveSchemaButton } from "@/components/runs/approve-schema-button";
 import { Badge } from "@/components/ui/badge";
+import type { ActionState } from "@/lib/actions/catalog";
 import type { DriftChange, DriftLevel, ResultDrift } from "@/lib/api/types";
+import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const levelStyle: Record<DriftLevel, { label: string; className: string }> = {
@@ -20,7 +23,7 @@ export function highestLevel(drift: ResultDrift | null): DriftLevel | null {
   return drift?.changes[0]?.level ?? null;
 }
 
-/** 결과 목록의 요약 배지. 가장 심한 등급의 색, 전체 변화 수 */
+/** 결과 목록의 요약 배지. 가장 심한 등급의 색, 전체 변화 수, 승인 대기 여부 */
 export function DriftBadge({ drift }: { drift: ResultDrift | null }) {
   const level = highestLevel(drift);
   if (!drift || !level) {
@@ -29,13 +32,16 @@ export function DriftBadge({ drift }: { drift: ResultDrift | null }) {
   return (
     <Badge className={cn("shrink-0", levelStyle[level].className)}>
       구조 변화 {drift.changes.length}
+      {drift.pending && " · 승인 대기"}
       <span className="sr-only"> (가장 심한 등급: {levelStyle[level].label})</span>
     </Badge>
   );
 }
 
-/** 구조 탭 상단의 변화 목록 */
-export function DriftSummary({ drift }: { drift: ResultDrift }) {
+/**
+ * 구조 탭 상단의 변화 목록. 승인 대기면 기준선 반영 안내와 버튼(approve), 반영한 결과는 반영 기록
+ */
+export function DriftSummary({ drift, approve }: { drift: ResultDrift; approve?: () => Promise<ActionState> }) {
   if (drift.status === "COLLECTING") {
     return (
       <p className="text-xs text-muted-foreground">
@@ -44,11 +50,26 @@ export function DriftSummary({ drift }: { drift: ResultDrift }) {
     );
   }
   if (drift.changes.length === 0) {
-    return <p className="text-xs text-muted-foreground">이전 실행 {drift.observations}회와 구조가 같습니다</p>;
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">이전 실행 {drift.observations}회와 구조가 같습니다</p>
+        <ApprovalNote drift={drift} />
+      </div>
+    );
   }
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">이전 실행 {drift.observations}회를 기준으로 비교한 변화입니다</p>
+      {drift.pending && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+          <p className="min-w-0 flex-1">
+            승인 대기: 기준선에 반영하기 전까지 매 실행 같은 변화를 보고합니다. 의도한 API 변경이면 기준선에 반영해
+            주세요
+          </p>
+          {approve && <ApproveSchemaButton action={approve} />}
+        </div>
+      )}
+      <ApprovalNote drift={drift} />
       <ul aria-label="구조 변화" className="divide-y rounded-md border">
         {drift.changes.map((change) => (
           <li key={`${change.kind} ${change.path}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
@@ -62,6 +83,20 @@ export function DriftSummary({ drift }: { drift: ResultDrift }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/** 승인 대기였다가 기준선에 반영한 기록. 승인한 사용자를 찾을 수 없으면 시각만 */
+function ApprovalNote({ drift }: { drift: ResultDrift }) {
+  if (!drift.approval) {
+    return null;
+  }
+  const { approvedBy, approvedAt } = drift.approval;
+  return (
+    <p className="text-xs text-muted-foreground">
+      기준선에 반영됨 · {approvedBy && `${approvedBy.name} · `}
+      {formatDateTime(approvedAt)}
+    </p>
   );
 }
 
