@@ -1,6 +1,6 @@
 # Sentinel 사용 설명서
 
-Ver: 1.6.0  
+Ver: 1.7.0  
 설치는 2장, 되돌리기·인증서 교체·백업 등 운영 세부는 [deploy.md](deploy.md), API 형식은 [api/README.md](../api/README.md)
 
 ## 목차
@@ -114,7 +114,7 @@ Ver: 1.6.0
 ```bash
 git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 git tag --sort=-v:refname | head -n 3
-git checkout v1.6.0
+git checkout v1.7.0
 ```
 
 - 둘째 줄로 최신 릴리스 태그 확인, 셋째 줄은 그 태그로
@@ -277,7 +277,7 @@ docker compose up -d --build --wait
 
 1. `https://<접속 이름>` 접속 시 인증서 경고 없음 (내부 인증 기관은 루트 인증서를 등록한 PC에서), `http://`는 `https://`로 이동
 2. 최초 관리자로 로그인
-3. 사이드바 "시스템 상태": 버전 1.6.0, 암호화 키 "사용 중", 알림·감시 설정이 "설정됨" (없는 항목은 `sentinel.env` 확인)
+3. 사이드바 "시스템 상태": 버전 1.7.0, 암호화 키 "사용 중", 알림·감시 설정이 "설정됨" (없는 항목은 `sentinel.env` 확인)
 4. "알림 이력" → "기본 채널 테스트 알림"으로 기본 채널에 메시지가 오는지 확인
 5. 생존 신호를 설정했다면 외부 감시 서비스에 첫 신호 도착 (1분 안)
 
@@ -309,7 +309,7 @@ docker compose up -d --build --wait
 ```bash
 git fetch --tags
 git describe --tags
-git checkout v1.6.0
+git checkout v1.7.0
 scripts/preflight.sh
 docker compose pull --ignore-buildable
 docker compose build --pull
@@ -1053,6 +1053,7 @@ staging 환경의 기본 URL, Sentinel 서버에서 그 주소로 가는 네트�
 
 | 버전 | 날짜 | 내용 |
 |------|------|------|
+| 1.7.0 | 2026-10-31 | 홈 대시보드에 "승인 대기 구조 변화": 가장 최근 JSON 응답의 구조가 승인 대기인 케이스·환경을 심한 변화 순으로 표시, 누르면 그 실행 화면에서 기준선에 반영 (11.3). 판정이 통과라 알림이 없는 실행의 구조 변화도 결과 화면을 열지 않고 확인. API: `GET /api/pending-schema-changes` 추가 |
 | 1.6.0 | 2026-10-28 | 호환이 깨지는 응답 구조 변화(필드 삭제·타입 변경 등)는 "승인 대기"로 표시하고, 결과 화면 "구조" 탭의 "기준선에 반영"으로 승인하기 전까지 매 실행 같은 변화를 보고 (11.1 "구조 변화"). 기준선에 넣은 null·누락은 오래 지나도 다시 보고하지 않음. API: 결과 1건 조회·승인 `GET`·`PATCH /api/runs/{runId}/results/{resultId}`, 결과의 `drift`에 `pending`·`approval` 추가 (기존 필드 유지) |
 | 1.5.1 | 2026-10-27 | 매분 실행 스케줄이 약 22분마다 1회 빠지던 문제 수정 (스케줄 확인을 매 주기 경계 직후에 실행). 의존성 업데이트 (Spring Boot 4.1.2 등). 사용 방법 변화 없음 |
 | 1.5.0 | 2026-10-25 | 문서 가져오기 중 이름이 겹치면 겹친 이름만 표시(서버 영어 문구 제거). 저장·실행 뒤 결과(오류 등)와 버튼의 진행 상태가 같은 순간에 바뀜. API의 409·400 응답에 화면이 구분할 `code` 추가(이름 겹침, 동시 수정, 다시 실행 불가, 비밀번호 길이. 기존 필드 유지) |
