@@ -39,7 +39,7 @@
 ```bash
 git clone https://github.com/xorwnsnmnnhlba/sentinel.git && cd sentinel
 git tag --sort=-v:refname | head -n 3   # 최신 릴리스 확인
-git checkout v1.6.0                      # 최신 릴리스 태그로
+git checkout v1.7.0                      # 최신 릴리스 태그로
 ```
 
 - 서버는 브랜치가 아니라 태그를 받으므로 git이 "detached HEAD"라고 안내하는 것이 정상
@@ -109,8 +109,8 @@ git fetch --tags
 git describe --tags                      # 지금 버전
 git tag --sort=-v:refname | head -n 3   # 새 릴리스 확인
 # 새 DB 마이그레이션이 있으면 먼저 RDS 스냅샷
-git diff --stat HEAD v1.6.0 -- api/src/main/resources/db/migration
-git checkout v1.6.0                      # 올릴 릴리스 태그
+git diff --stat HEAD v1.7.0 -- api/src/main/resources/db/migration
+git checkout v1.7.0                      # 올릴 릴리스 태그
 scripts/preflight.sh
 docker compose pull --ignore-buildable
 docker compose build --pull
@@ -122,12 +122,12 @@ docker image prune -f
 - 중단 시간: 컨테이너 교체 동안(수십 초) 접속 불가. 그 사이 놓친 스케줄 실행은 기동 후 1회만 실행
 - 바뀐 코드가 없어도 api 컨테이너는 매번 다시 시작 (jar에 빌드 시각이 들어가 이미지가 새로 만들어짐). web·앞단은 바뀐 것이 없으면 그대로
 - 마이그레이션은 api 기동 시 Flyway가 적용. 실패하면 api가 기동하지 않고 `--wait`가 오류로 종료
-- 확인: `docker compose ps`(모두 healthy), 화면 "시스템 상태"의 버전이 올린 릴리스(예: 1.6.0)이고 빌드 시각·DB 마이그레이션이 새 값, `docker compose logs --since 10m sentinel-api`
+- 확인: `docker compose ps`(모두 healthy), 화면 "시스템 상태"의 버전이 올린 릴리스(예: 1.7.0)이고 빌드 시각·DB 마이그레이션이 새 값, `docker compose logs --since 10m sentinel-api`
 
 ## 되돌리기
 
 ```bash
-git checkout v1.5.1                      # 이전 릴리스 태그
+git checkout v1.6.0                      # 이전 릴리스 태그
 docker compose up -d --build --wait
 ```
 
