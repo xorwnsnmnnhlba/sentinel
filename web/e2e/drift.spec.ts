@@ -2,7 +2,8 @@ import { accessibilityViolations, expect, test, waitForRun } from "./fixtures";
 
 /**
  * 응답 구조 변화 (스키마 드리프트 2·3단계). 같은 케이스·환경의 이전 실행 지문을 기준선으로 비교
- * 객체를 돌려주던 케이스를 배열을 돌려주는 경로로 바꿔 호환이 깨지는 변화(BREAKING)를 만들고 승인 대기를 기준선에 반영
+ * 객체를 돌려주던 케이스를 배열을 돌려주는 경로로 바꿔 호환이 깨지는 변화(BREAKING)를 만들고,
+ * 대시보드의 승인 대기 목록에서 실행 화면으로 이동해 기준선에 반영
  */
 const api = process.env.E2E_API_URL ?? "http://localhost:18080";
 
@@ -56,14 +57,20 @@ test.beforeAll(async ({ request }) => {
   await waitForRun(request, api, headers, runId);
 });
 
-test("구조가 바뀐 케이스를 표시하고 펼쳐서 변화를 보여 준 뒤 기준선에 반영", async ({ page }) => {
+test("대시보드에서 구조가 바뀐 케이스를 찾아 변화를 보여 준 뒤 기준선에 반영", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("이메일").fill("admin@sentinel.test");
   await page.getByLabel("비밀번호").fill("e2e-admin-password");
   await page.getByRole("button", { name: "로그인" }).click();
   await expect(page).toHaveURL(/\/$/);
 
-  await page.goto(`/runs/${runId}`);
+  // 판정이 통과라 실패 목록에는 없지만 대시보드의 승인 대기 목록에 표시
+  const pendingRow = page
+    .getByRole("table", { name: "승인 대기 구조 변화" })
+    .getByRole("row", { name: new RegExp(caseName) });
+  await expect(pendingRow).toContainText("호환 깨짐 1");
+  await pendingRow.getByRole("link", { name: caseName }).click();
+  await expect(page).toHaveURL(new RegExp(`/runs/${runId}$`));
   const trigger = page.getByRole("button", { name: new RegExp(caseName) });
   // 판정은 통과지만 호환이 깨지는 변화라 목록에 표시하고 펼친 상태
   await expect(trigger).toContainText("통과");
@@ -91,4 +98,9 @@ test("구조가 바뀐 케이스를 표시하고 펼쳐서 변화를 보여 준 
   await expect(trigger).not.toContainText("승인 대기");
   await expect(page.getByRole("button", { name: "기준선에 반영" })).toHaveCount(0);
   await expect(changes).toHaveCount(1);
+
+  // 반영하면 대시보드 목록에서 빠짐
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "대시보드" })).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(caseName) })).toHaveCount(0);
 });

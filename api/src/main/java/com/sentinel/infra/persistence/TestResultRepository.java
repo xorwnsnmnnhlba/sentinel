@@ -253,6 +253,34 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long>, T
 			@Param("path") String path, @Param("kind") String kind, @Param("resultId") long resultId);
 
 	/**
+	 * 케이스·환경별 마지막 구조 지문이 승인 대기인 결과. 그 뒤에 지문이 있는 결과(받아들인 결과)가 있으면 지난 대기라 제외
+	 * <p>
+	 * 승인 대기 결과만 부분 인덱스 {@code idx_result_schema_pending}(V33)로 읽어 케이스·환경별 마지막 대기를 구하고,
+	 * 그보다 뒤의 결과만 {@code idx_result_case_time}으로 확인. 대기가 아닌 대부분의 결과는 읽지 않음
+	 * @return 결과 ID
+	 */
+	@Query(nativeQuery = true, value = """
+			SELECT p.pending_id
+			FROM (
+			    SELECT r.test_case_id, t.environment_id, MAX(r.id) AS pending_id
+			    FROM {h-schema}test_result r
+			    JOIN {h-schema}test_run t ON t.id = r.run_id
+			    WHERE r.schema_pending
+			    GROUP BY r.test_case_id, t.environment_id
+			) p
+			WHERE NOT EXISTS (
+			    SELECT 1
+			    FROM {h-schema}test_result r
+			    JOIN {h-schema}test_run t ON t.id = r.run_id
+			    WHERE r.test_case_id = p.test_case_id
+			      AND r.id > p.pending_id
+			      AND t.environment_id = p.environment_id
+			      AND r.response_schema IS NOT NULL
+			)
+			""")
+	List<Long> findLatestPendingSchemaResultIds();
+
+	/**
 	 * 승인 대기면 기준선에 반영하고 승인 기록. 두 사람이 동시에 승인해도 한쪽만 반영되도록 조건부 갱신
 	 * @return 갱신한 행 수. 승인 대기가 아니면(이미 반영) 0
 	 */

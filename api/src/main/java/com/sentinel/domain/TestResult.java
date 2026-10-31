@@ -139,7 +139,8 @@ public class TestResult extends BaseEntity {
 	private ResponseSchema responseSchema;
 
 	/**
-	 * 구조 변화 승인 대기 (V31). 기록할 때 호환이 깨지는 변화·null 전환이 있어 지문을 기준선에 넣지 않음
+	 * 구조 변화 승인 대기 (V31). 기록할 때 호환이 깨지는 변화·null 전환이 있어 지문을 기준선에 넣지 않음.
+	 * 승인 대기 결과만 담는 부분 인덱스 {@code idx_result_schema_pending}(V33)는 {@code @Index}로 표현할 수 없어 마이그레이션에만 둠
 	 */
 	@Column(nullable = false)
 	private boolean schemaPending;

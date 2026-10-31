@@ -257,6 +257,12 @@ class RunControllerTest {
 		long resultId = firstResultId(changed);
 		assertThat(changed).bodyJson().extractingPath("$.results[0].drift.pending").isEqualTo(true);
 		assertThat(changed).bodyJson().extractingPath("$.results[0].drift.approval").isNull();
+		var pending = assertThat(mvc.get().uri("/api/pending-schema-changes")).hasStatusOk().bodyJson();
+		pending.extractingPath("$[0].id").isEqualTo((int) resultId);
+		pending.extractingPath("$[0].run.id").isEqualTo((int) runId);
+		pending.extractingPath("$[0].testCase.id").isEqualTo(testCase.getId().intValue());
+		pending.extractingPath("$[0].environment.id").isEqualTo(environment.getId().intValue());
+		pending.extractingPath("$[0].changes[0].kind").isEqualTo("TYPE_CHANGED");
 
 		MvcTestResult approved = patchResult(runId, resultId, "{\"schemaPending\": false}");
 
@@ -272,6 +278,7 @@ class RunControllerTest {
 			.bodyJson()
 			.extractingPath("$.drift.approval.approvedAt")
 			.isNotNull();
+		assertThat(mvc.get().uri("/api/pending-schema-changes")).bodyJson().extractingPath("$").asArray().isEmpty();
 		assertThat(createRun(run)).bodyJson().extractingPath("$.results[0].drift.changes").asArray().isEmpty();
 
 		assertThat(patchResult(runId, resultId, "{\"schemaPending\": false}")).hasStatus(HttpStatus.CONFLICT);
