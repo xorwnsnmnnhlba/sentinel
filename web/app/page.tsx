@@ -8,6 +8,7 @@ import { FailingChannelList } from "@/components/dashboard/failing-channel-list"
 import { FailureCauseList } from "@/components/dashboard/failure-cause-list";
 import { GettingStarted } from "@/components/dashboard/getting-started";
 import { MonitoringGapList } from "@/components/dashboard/monitoring-gap-list";
+import { PendingSchemaTable } from "@/components/dashboard/pending-schema-table";
 import { SlowdownTable } from "@/components/dashboard/slowdown-table";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { UnstableCaseTable } from "@/components/dashboard/unstable-case-table";
@@ -22,6 +23,7 @@ import type {
   MonitoringGaps,
   NotificationChannel,
   Page,
+  PendingSchemaChange,
   ProjectItem,
   ResponseTimeChanges,
   RunSummary,
@@ -59,6 +61,9 @@ const UNSTABLE_LIMIT = 10;
 /** 지금 느린 케이스 표시 수 (늘어난 비율이 큰 순) */
 const SLOWDOWN_LIMIT = 10;
 
+/** 승인 대기 구조 변화 표시 수 (심한 변화 순) */
+const PENDING_SCHEMA_LIMIT = 10;
+
 /** 모니터링 공백 표시 수 (최근 시작 순) */
 const GAP_LIMIT = 5;
 
@@ -87,6 +92,7 @@ export default async function Dashboard(props: PageProps<"/">) {
     unstable,
     monitoringGaps,
     slowdowns,
+    pendingSchemaChanges,
     failureCauses,
     channels,
     projects,
@@ -103,6 +109,7 @@ export default async function Dashboard(props: PageProps<"/">) {
     apiGet<UnstableCases>(`/api/unstable-cases?${range(current)}`),
     apiGet<MonitoringGaps>(`/api/monitoring-gaps?${range(current)}`),
     apiGet<Slowdown[]>("/api/slowdowns"),
+    apiGet<PendingSchemaChange[]>("/api/pending-schema-changes"),
     apiGet<FailureCauses>(`/api/failure-causes?${range(current)}`),
     apiGet<NotificationChannel[]>("/api/notification-channels"),
     apiGet<ProjectItem[]>("/api/projects"),
@@ -241,6 +248,17 @@ export default async function Dashboard(props: PageProps<"/">) {
       {slowdowns.length > 0 && (
         <Panel title="지금 느린 케이스" count={slowdowns.length} meta="응답시간 악화 알림 후 회복 전">
           <SlowdownTable slowdowns={slowdowns} limit={SLOWDOWN_LIMIT} />
+        </Panel>
+      )}
+
+      {/* 판정이 통과여도 응답 구조가 바뀐 케이스. 기간과 무관한 지금 상태라 없으면 표시하지 않음 */}
+      {pendingSchemaChanges.length > 0 && (
+        <Panel
+          title="승인 대기 구조 변화"
+          count={pendingSchemaChanges.length}
+          meta="기준선에 반영하기 전까지 매 실행 보고"
+        >
+          <PendingSchemaTable changes={pendingSchemaChanges} limit={PENDING_SCHEMA_LIMIT} />
         </Panel>
       )}
 

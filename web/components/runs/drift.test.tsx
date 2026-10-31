@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ResultDrift } from "@/lib/api/types";
 
-import { DriftBadge, DriftSummary, highestLevel } from "./drift";
+import { DriftBadge, DriftLevelCounts, DriftSummary, highestLevel } from "./drift";
 
 const changed: ResultDrift = {
   status: "COMPARED",
@@ -25,6 +25,17 @@ describe("drift", () => {
       highestLevel({ status: "COMPARED", observations: 5, changes: [], pending: false, approval: null }),
     ).toBeNull();
     expect(highestLevel(null)).toBeNull();
+  });
+
+  it("counts changes by level from the most severe, leaving out absent levels", () => {
+    const { container } = render(
+      <DriftLevelCounts changes={[changed.changes[0], changed.changes[0], changed.changes[2]]} />,
+    );
+
+    expect([...container.querySelectorAll("[data-slot=badge]")].map((badge) => badge.textContent)).toEqual([
+      "호환 깨짐 2",
+      "새 필드 1",
+    ]);
   });
 
   it("shows a badge only when something changed", () => {

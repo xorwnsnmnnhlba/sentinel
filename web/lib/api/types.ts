@@ -522,6 +522,20 @@ export interface Slowdown {
 }
 
 /**
+ * 승인 대기 구조 변화 (api/README.md "승인 대기 구조 변화"). 케이스·환경별 마지막 구조 지문이 승인 대기인 결과
+ * id: 결과 ID, changes: 지금 기준선으로 비교한 변화 (등급 심한 순)
+ */
+export interface PendingSchemaChange {
+  id: number;
+  run: { id: number; startedAt: string };
+  testCase: IdName;
+  suite: IdName;
+  project: IdName;
+  environment: IdName;
+  changes: DriftChange[];
+}
+
+/**
  * 모니터링 공백 (api/README.md "모니터링 공백"). 스케줄이 예정 시각보다 크게 늦게 실행된 기간
  * startedAt: 늦은 스케줄 중 가장 이른 예정 시각, endedAt: 폴링 재개 시각
  */

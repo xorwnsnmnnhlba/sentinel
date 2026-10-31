@@ -38,6 +38,22 @@ export function DriftBadge({ drift }: { drift: ResultDrift | null }) {
   );
 }
 
+/** 등급별 변화 수 배지 (심한 등급부터, 없는 등급은 생략) */
+export function DriftLevelCounts({ changes }: { changes: DriftChange[] }) {
+  const levels = (Object.keys(levelStyle) as DriftLevel[]).filter((level) =>
+    changes.some((change) => change.level === level),
+  );
+  return (
+    <span className="flex flex-wrap gap-1">
+      {levels.map((level) => (
+        <Badge key={level} className={levelStyle[level].className}>
+          {levelStyle[level].label} {changes.filter((change) => change.level === level).length}
+        </Badge>
+      ))}
+    </span>
+  );
+}
+
 /**
  * 구조 탭 상단의 변화 목록. 승인 대기면 기준선 반영 안내와 버튼(approve), 반영한 결과는 반영 기록
  */
