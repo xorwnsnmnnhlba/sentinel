@@ -207,3 +207,18 @@ docker compose logs --since 1h sentinel-proxy
 ```bash
 docker compose logs --since 1d sentinel-api | grep "Notification delivery"
 ```
+
+## 구조 변화 판정 점검
+
+응답 구조 변화를 실행마다 알릴지, 기준값(`sentinel.schema-drift.window`·`min-observations`)을 바꿀지 정하기 전에 실제 이력으로 승인 대기가 얼마나 정확한지 확인. 운영 2주 이상 뒤 (`docs/design.md` "스키마 드리프트 감지")
+
+```bash
+psql "host=<RDS 엔드포인트> dbname=<DB> user=<계정> sslmode=require" -v days=14 < scripts/drift-report.sql
+```
+
+- 읽기 전용 트랜잭션에서 조회만 하고 끝에 되돌림. 조회마다 최대 60초. 2주치(결과 약 30만 건) 약 1초
+- 서버에 psql이 없으면 `docker run --rm -i postgres:18-alpine psql "..." -v days=14 < scripts/drift-report.sql` (`-t` 없이)
+- 대기 구간: 케이스·환경별로 구조 지문이 있는 결과에서 승인 대기가 이어진 구간. 결말은 `passed`(승인 없이 원래 구조로 돌아옴), `approved`(기준선에 반영), `open`(아직 대기)
+- `consecutive` 표: 대기가 k회 이어졌을 때 알린다면 보냈을 알림 수와 결말. k=1이 대기마다 바로 알리는 경우
+- 읽는 법: `passed`가 많으면 일시적인 오류 응답 등이 대기를 만듦. 그 알림은 소음이므로 k를 늘려 알리거나 알리지 않음. `approved`·`open`이 대부분이면 실행 알림으로 써도 됨
+- 등급(호환 깨짐·주의)은 저장하지 않으므로 나누지 않음. 대기 중인 케이스의 등급은 홈 대시보드에서 확인
