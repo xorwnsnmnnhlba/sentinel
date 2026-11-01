@@ -101,6 +101,30 @@ FROM (SELECT run_id, count(*) FILTER (WHERE verdict = 'PASSED') AS passed,
 WHERE c.run_id = t.id;
 \endif
 
+-- 구조 변화 승인 대기 (V31 이후 스키마). 대량 UPDATE를 피하려고 대기로 둘 결과만 바꿈 (1년치 약 4만 건)
+-- - 지나간 대기: 지문이 있는 결과의 약 0.1%가 오류 본문 구조. 일시적인 오류 응답이 남긴 대기라 뒤 결과는 원래 구조
+-- - 쌓인 대기: 첫 스위트의 perf-case-2는 최근 28일, perf-case-3은 최근 180일 동안 매 실행 id가 문자열 (승인하지 않은 변경)
+SELECT EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'sentinel' AND table_name = 'test_result' AND column_name = 'schema_pending') AS has_pending \gset
+\if :has_pending
+UPDATE test_result r
+SET schema_pending = TRUE,
+    response_schema = '{"fields": {"$": ["object"], "$.error": ["string"]}, "complete": true}'::json
+WHERE r.id % 997 = 0
+  AND r.response_schema IS NOT NULL;
+
+UPDATE test_result r
+SET schema_pending = TRUE,
+    response_schema = '{"fields": {"$": ["object"], "$.id": ["string"], "$.items": ["array"], "$.items[]": ["object"], "$.items[].sku": ["string"], "$.name": ["string"]}, "complete": true}'::json
+FROM test_run t, test_case c
+WHERE t.id = r.run_id
+  AND c.id = r.test_case_id
+  AND c.suite_id = (SELECT min(id) FROM test_suite WHERE name LIKE 'perf-suite-%')
+  AND ((c.name = 'perf-case-2' AND t.started_at >= now() - interval '28 days')
+       OR (c.name = 'perf-case-3' AND t.started_at >= now() - interval '180 days'))
+  AND r.response_schema IS NOT NULL;
+\endif
+
 ANALYZE;
 
 SELECT (SELECT count(*) FROM test_run) AS runs, (SELECT count(*) FROM test_result) AS results,
@@ -109,3 +133,8 @@ SELECT (SELECT count(*) FROM test_run) AS runs, (SELECT count(*) FROM test_resul
 -- 판정 분포 확인 (약 96% 통과, 3% 실패, 1% 오류)
 SELECT verdict, count(*), round(100.0 * count(*) / sum(count(*)) OVER (), 1) AS percent
 FROM test_result GROUP BY verdict ORDER BY verdict;
+
+\if :has_pending
+-- 승인 대기 결과 수 (1년치 약 4만 건)
+SELECT count(*) AS pending_results FROM test_result WHERE schema_pending;
+\endif
