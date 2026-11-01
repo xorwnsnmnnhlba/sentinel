@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.sentinel.application.notification.Notification;
 import com.sentinel.application.notification.NotificationProperties;
+import com.sentinel.runner.schema.SchemaDrift;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +37,8 @@ class WeeklyDigestServiceTest {
 	private final MonitoringGapService monitoringGaps = mock(MonitoringGapService.class);
 
 	private final FailureCauseService failureCauses = mock(FailureCauseService.class);
+
+	private final PendingSchemaChangeService pendingSchemaChanges = mock(PendingSchemaChangeService.class);
 
 	@BeforeEach
 	void setUp() {
@@ -77,6 +80,10 @@ class WeeklyDigestServiceTest {
 					List.of(change("결제 승인", 320, 610, 0.91), change("환불 조회", 100, 120, 0.2),
 							change("정산 조회", 200, 210, 0.05), change("회원 조회", 100, 100, 0.0),
 							change("검색", 100, 90, -0.1))));
+		when(pendingSchemaChanges.list()).thenReturn(List.of(pending(1, "주문 조회", "dev", SchemaDrift.Level.BREAKING),
+				pending(2, "회원 조회", "staging", SchemaDrift.Level.WARNING),
+				pending(3, "상품 조회", "dev", SchemaDrift.Level.BREAKING),
+				pending(4, "f", "dev", SchemaDrift.Level.WARNING)));
 		when(monitoringGaps.list(FROM, TO)).thenReturn(new MonitoringGapService.MonitoringGaps(FROM, TO,
 				List.of(gap("2026-09-22T00:10:00Z", "2026-09-22T02:40:00Z"),
 						gap("2026-09-24T14:00:00Z", "2026-09-24T15:30:00Z"))));
@@ -89,6 +96,8 @@ class WeeklyDigestServiceTest {
 				"불안정 케이스 5건: 결제 승인 (dev), 환불 조회 (staging), c (dev) 외 2건",
 				// 빨라졌거나 같은 케이스는 제외. 딱 3건이면 "외" 없음
 				"응답시간 나빠진 케이스 (p95): 결제 승인 (dev) 320ms → 610ms, 환불 조회 (dev) 100ms → 120ms, 정산 조회 (dev) 200ms → 210ms",
+				// 케이스마다 가장 심한 등급 (목록은 심한 순으로 정렬되어 옴)
+				"승인 대기 구조 변화 4건: 주문 조회 (dev) 호환 깨짐, 회원 조회 (staging) 주의, 상품 조회 (dev) 호환 깨짐 외 1건",
 				"모니터링 공백 2건 · 4시간 0분");
 	}
 
@@ -124,13 +133,17 @@ class WeeklyDigestServiceTest {
 	@Test
 	void asksToCheckTheSchedulerWhenNothingRan() {
 		suites(FROM, TO, suite(1, "결제", 0, 0, 0, 0));
+		when(pendingSchemaChanges.list())
+			.thenReturn(List.of(pending(1, "주문 조회", "dev", SchemaDrift.Level.BREAKING)));
 		when(monitoringGaps.list(FROM, TO)).thenReturn(new MonitoringGapService.MonitoringGaps(FROM, TO,
 				List.of(gap("2026-09-21T00:00:00Z", "2026-09-27T00:00:00Z"))));
 
 		Notification digest = service(null).build(FROM, TO);
 
+		// 승인 대기는 기간 집계가 아닌 지금 상태라 실행이 없어도 보고
 		assertThat(digest.lines()).containsExactly(
-				"기간 안 실행 없음 - 스케줄이 꺼져 있거나 Sentinel이 멈춰 있었는지 확인해 주세요", "모니터링 공백 1건 · 144시간 0분");
+				"기간 안 실행 없음 - 스케줄이 꺼져 있거나 Sentinel이 멈춰 있었는지 확인해 주세요", "승인 대기 구조 변화 1건: 주문 조회 (dev) 호환 깨짐",
+				"모니터링 공백 1건 · 144시간 0분");
 	}
 
 	@Test
@@ -145,6 +158,7 @@ class WeeklyDigestServiceTest {
 
 	private WeeklyDigestService service(String webBaseUrl) {
 		return new WeeklyDigestService(suiteSummaries, unstableCases, responseTimes, monitoringGaps, failureCauses,
+				pendingSchemaChanges,
 				new NotificationProperties(null, webBaseUrl, Duration.ofSeconds(3), Duration.ofSeconds(5), Duration.ofHours(1)));
 	}
 
@@ -171,6 +185,19 @@ class WeeklyDigestServiceTest {
 
 	private static FailureCauseService.CauseSummary cause(FailureCauseService.Cause cause, long results) {
 		return new FailureCauseService.CauseSummary(cause, cause.group(), results, 1, List.of());
+	}
+
+	private static PendingSchemaChangeService.PendingSchemaChange pending(long id, String name, String environment,
+			SchemaDrift.Level level) {
+		SchemaDrift.Change nullable = new SchemaDrift.Change(SchemaDrift.Level.WARNING, SchemaDrift.Kind.NULLABLE,
+				"$.name", List.of("string"), List.of("null", "string"));
+		// 변화는 심한 순. 호환 깨짐 케이스에도 주의가 함께 있음
+		List<SchemaDrift.Change> changes = level == SchemaDrift.Level.BREAKING ? List.of(new SchemaDrift.Change(
+				SchemaDrift.Level.BREAKING, SchemaDrift.Kind.TYPE_CHANGED, "$.id", List.of("number"), List.of("string")),
+				nullable) : List.of(nullable);
+		return new PendingSchemaChangeService.PendingSchemaChange(id,
+				new PendingSchemaChangeService.Run(id, Instant.parse("2026-09-27T00:00:00Z")), new IdName(id, name),
+				new IdName(1, "결제"), new IdName(1, "프로젝트"), new IdName(environment.length(), environment), changes);
 	}
 
 	private static MonitoringGapService.Gap gap(String startedAt, String endedAt) {

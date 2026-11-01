@@ -12,13 +12,14 @@ import java.util.function.Function;
 import com.sentinel.application.notification.Notification;
 import com.sentinel.application.notification.NotificationFormat;
 import com.sentinel.application.notification.NotificationProperties;
+import com.sentinel.runner.schema.SchemaDrift;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주간 요약 알림 문구. 대시보드와 같은 집계(스위트 요약·실패 원인·불안정 케이스·응답시간 변화·모니터링 공백)를 한 알림으로.
- * 해당 항목이 없는 줄은 생략. 기간에 실행이 없으면 스케줄이 멈췄는지 확인하도록 안내
+ * 주간 요약 알림 문구. 대시보드와 같은 집계(스위트 요약·실패 원인·불안정 케이스·응답시간 변화·승인 대기 구조 변화·모니터링 공백)를
+ * 한 알림으로. 해당 항목이 없는 줄은 생략. 기간에 실행이 없으면 스케줄이 멈췄는지 확인하도록 안내
  */
 @Service
 @RequiredArgsConstructor
@@ -38,6 +39,8 @@ class WeeklyDigestService {
 	private final MonitoringGapService monitoringGaps;
 
 	private final FailureCauseService failureCauses;
+
+	private final PendingSchemaChangeService pendingSchemaChanges;
 
 	private final NotificationProperties notificationProperties;
 
@@ -90,6 +93,13 @@ class WeeklyDigestService {
 							+ change.previousP95() + "ms → " + change.currentP95() + "ms"));
 		}
 
+		// 기간 집계가 아닌 발송 시점의 상태. 승인(기준선에 반영)하기 전까지 매주 보고
+		List<PendingSchemaChangeService.PendingSchemaChange> pending = pendingSchemaChanges.list();
+		if (!pending.isEmpty()) {
+			lines.add("승인 대기 구조 변화 " + pending.size() + "건: " + top(pending, change -> change.testCase().name() + " ("
+					+ change.environment().name() + ") " + levelLabel(change.changes().getFirst().level())));
+		}
+
 		List<MonitoringGapService.Gap> gaps = monitoringGaps.list(from, to).gaps();
 		if (!gaps.isEmpty()) {
 			Duration total = gaps.stream()
@@ -128,6 +138,15 @@ class WeeklyDigestService {
 							+ "%")
 					.toList());
 		return all.size() > TOP ? shown + " 외 " + (all.size() - TOP) + "가지" : shown;
+	}
+
+	/** 화면 배지와 같은 이름 */
+	private static String levelLabel(SchemaDrift.Level level) {
+		return switch (level) {
+			case BREAKING -> "호환 깨짐";
+			case WARNING -> "주의";
+			case INFO -> "새 필드";
+		};
 	}
 
 	private static <T> String top(List<T> items, Function<T, String> label) {
