@@ -137,7 +137,7 @@ jobs:
           distribution: zulu
           java-version: 25
       # Gradle 캐시, wrapper 체크섬 검증
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       # Testcontainers(PostgreSQL, WireMock)는 러너의 Docker 사용
       - run: ./gradlew test jacocoTestReport
       # 커버리지는 보고만 (수치 기준으로 실패시키지 않음). 합계는 실행 요약, 자세한 내용은 산출물 api-coverage
